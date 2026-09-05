@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "worm-up-app",
+    "name": "Worm Up",
     "slug": "worm-up-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,8 +10,10 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.wormup.customerapp",
+      "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#05062A",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -20,6 +22,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "88be2903-cd4c-4e04-904e-de239ec8dcfb"
+      }
+    },
+    "owner": "darshanthanki007"
   }
 }
