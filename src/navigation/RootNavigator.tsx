@@ -2,7 +2,6 @@ import React, { useEffect } from 'react';
 import { View, StyleSheet, BackHandler, Platform } from 'react-native';
 import { useApp } from '../context/AppContext';
 import { BottomNavigation, TabKey } from '../components/common/BottomNavigation';
-import { ScreenJumperModal } from '../components/common/ScreenJumperModal';
 
 // All 26 screens
 import { S01_SplashScreen } from '../screens/S01_SplashScreen';
@@ -187,9 +186,6 @@ export const RootNavigator: React.FC = () => {
           onSelectTab={handleTabPress}
         />
       )}
-
-      {/* Dev Screen Jumper Modal (Allows previewing all 26 screens) */}
-      <ScreenJumperModal />
     </View>
   );
 };
