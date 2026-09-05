@@ -15,14 +15,19 @@ import { COLORS } from '../theme/colors';
 import { SPACING, RADIUS } from '../theme/spacing';
 import { GradientButton } from '../components/common/GradientButton';
 import { useApp } from '../context/AppContext';
-import { AuthService } from '../services/authService';
+import { AuthService, generateRandomIndianMobile } from '../services/authService';
 
 export const S06_MobileNumberScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { setActiveScreen, user, setUser, goBack } = useApp();
-  const [mobile, setMobile] = useState(user.phoneNumber || '9876543210');
+  const [mobile, setMobile] = useState(() => generateRandomIndianMobile());
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const handleRandomize = () => {
+    setMobile(generateRandomIndianMobile());
+    setError('');
+  };
 
   const handleSendOtp = async () => {
     if (mobile.length !== 10) {
@@ -80,6 +85,22 @@ export const S06_MobileNumberScreen: React.FC = () => {
                 if (error) setError('');
               }}
             />
+            {mobile.length > 0 ? (
+              <TouchableOpacity
+                onPress={() => setMobile('')}
+                style={styles.inputActionBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons name="close-circle" size={18} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity
+              onPress={handleRandomize}
+              style={styles.inputActionBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="dice-outline" size={20} color={COLORS.purple} />
+            </TouchableOpacity>
           </View>
 
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -173,6 +194,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.textPrimary,
     fontWeight: '500',
+  },
+  inputActionBtn: {
+    padding: 6,
+    marginLeft: 4,
   },
   errorText: {
     color: COLORS.error,

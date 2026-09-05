@@ -16,7 +16,7 @@ import { AuthService } from '../services/authService';
 export const S07_OtpVerificationScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { setActiveScreen, user, goBack } = useApp();
-  const [otp, setOtp] = useState<string[]>(['1', '2', '', '']);
+  const [otp, setOtp] = useState<string[]>(['1', '2', '3', '4']);
   const [timer, setTimer] = useState(30);
   const [error, setError] = useState('');
 
