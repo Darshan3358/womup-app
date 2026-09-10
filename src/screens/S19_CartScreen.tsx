@@ -39,7 +39,7 @@ export const S19_CartScreen: React.FC = () => {
           <Text style={styles.emptySubtitle}>Explore everyday essentials and add items to your cart</Text>
           <GradientButton
             title="Start Shopping"
-            onPress={() => setActiveScreen('C12_Home')}
+            onPress={() => setActiveScreen('Blinkit_Home')}
             style={styles.startShoppingButton}
           />
         </View>

@@ -5,17 +5,21 @@ import {
   TouchableOpacity,
   StyleSheet,
   useWindowDimensions,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../../theme/colors';
+import { LinearGradient } from 'expo-linear-gradient';
+import { COLORS, GRADIENTS } from '../../theme/colors';
+import { AppIcon, IconName } from './AppIcon';
 import { useApp } from '../../context/AppContext';
 
-export type TabKey = 'Home' | 'Categories' | 'Cart' | 'Orders' | 'Account';
+export type BlinkitTabKey = 'Home' | 'Order Again' | 'Categories' | 'Print' | 'District';
+// Backward compatibility alias
+export type TabKey = BlinkitTabKey | 'Cart' | 'Orders' | 'Account';
 
 interface BottomNavigationProps {
-  currentTab: TabKey;
-  onSelectTab: (tab: TabKey) => void;
+  currentTab: BlinkitTabKey | TabKey;
+  onSelectTab: (tab: any) => void;
 }
 
 export const BottomNavigation: React.FC<BottomNavigationProps> = ({
@@ -24,61 +28,54 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { cartCount } = useApp();
+  const { setDistrictModalVisible } = useApp();
 
   const isSmallDevice = width <= 360;
-  const isLargeDevice = width > 430;
 
-  const tabs: { key: TabKey; label: string; activeIcon: keyof typeof Ionicons.glyphMap; inactiveIcon: keyof typeof Ionicons.glyphMap }[] = [
-    {
-      key: 'Home',
-      label: 'Home',
-      activeIcon: 'home',
-      inactiveIcon: 'home-outline',
-    },
-    {
-      key: 'Categories',
-      label: 'Categories',
-      activeIcon: 'grid',
-      inactiveIcon: 'grid-outline',
-    },
-    {
-      key: 'Cart',
-      label: 'Cart',
-      activeIcon: 'cart',
-      inactiveIcon: 'cart-outline',
-    },
-    {
-      key: 'Orders',
-      label: 'Orders',
-      activeIcon: 'receipt',
-      inactiveIcon: 'receipt-outline',
-    },
-    {
-      key: 'Account',
-      label: 'Account',
-      activeIcon: 'person',
-      inactiveIcon: 'person-outline',
-    },
+  const tabs: {
+    key: BlinkitTabKey;
+    label: string;
+    icon: IconName;
+    isDistrict?: boolean;
+  }[] = [
+    { key: 'Home', label: 'Home', icon: 'home' },
+    { key: 'Order Again', label: 'Order Again', icon: 'shopping-basket' },
+    { key: 'Categories', label: 'Categories', icon: 'grid' },
+    { key: 'Print', label: 'Print', icon: 'printer' },
+    { key: 'District', label: 'district', icon: 'sparkles', isDistrict: true },
   ];
 
-  // Dynamic bottom padding: handles Android 3-button/gesture and iPhone home indicator
-  const bottomPadding = Math.max(insets.bottom, 6);
-  const barHeight = isSmallDevice ? 52 : 58;
+  const bottomPadding = Math.max(insets.bottom, 8);
+  const barHeight = 64;
 
   return (
     <View style={[styles.wrapper, { paddingBottom: bottomPadding }]}>
-      <View
-        style={[
-          styles.container,
-          { height: barHeight },
-          isLargeDevice && styles.tabletContainer,
-        ]}
-      >
+      <View style={[styles.container, { height: barHeight }]}>
         {tabs.map((tab) => {
+          if (tab.isDistrict) {
+            return (
+              <TouchableOpacity
+                key={tab.key}
+                activeOpacity={0.85}
+                onPress={() => setDistrictModalVisible(true)}
+                style={styles.districtTabItem}
+                accessibilityLabel="District by Blinkit"
+              >
+                <LinearGradient
+                  colors={GRADIENTS.logo}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.districtPill}
+                >
+                  <Text style={styles.districtText}>district</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            );
+          }
+
           const isActive = currentTab === tab.key;
-          const iconColor = isActive ? COLORS.blue : COLORS.textMuted;
-          const labelColor = isActive ? COLORS.blue : COLORS.textMuted;
+          const iconColor = isActive ? COLORS.hotPink : COLORS.textMuted;
+          const labelColor = isActive ? COLORS.hotPink : COLORS.textMuted;
 
           return (
             <TouchableOpacity
@@ -86,33 +83,30 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
               activeOpacity={0.7}
               onPress={() => onSelectTab(tab.key)}
               style={styles.tabItem}
+              accessibilityLabel={`${tab.label} tab`}
             >
               <View style={styles.iconContainer}>
-                <Ionicons
-                  name={isActive ? tab.activeIcon : tab.inactiveIcon}
-                  size={isSmallDevice ? 20 : 23}
+                <AppIcon
+                  name={tab.icon}
+                  size={isSmallDevice ? 22 : 24}
                   color={iconColor}
+                  isActive={isActive}
                 />
-                {tab.key === 'Cart' && cartCount > 0 && (
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>
-                      {cartCount > 99 ? '99+' : cartCount}
-                    </Text>
-                  </View>
-                )}
               </View>
 
               <Text
                 style={[
                   styles.tabLabel,
                   { color: labelColor },
-                  isSmallDevice && styles.smallTabLabel,
                   isActive && styles.activeTabLabel,
                 ]}
                 numberOfLines={1}
               >
                 {tab.label}
               </Text>
+
+              {/* Active Indicator Bar */}
+              {isActive && <View style={styles.activeBar} />}
             </TouchableOpacity>
           );
         })}
@@ -124,64 +118,73 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
 const styles = StyleSheet.create({
   wrapper: {
     backgroundColor: COLORS.white,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopWidth: 1,
     borderTopColor: COLORS.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 8,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 -2px 4px rgba(0, 0, 0, 0.06)',
+      } as any,
+      default: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 4,
+        elevation: 8,
+      },
+    }),
   },
   container: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
     width: '100%',
-  },
-  tabletContainer: {
-    maxWidth: 440,
-    alignSelf: 'center',
+    paddingHorizontal: 4,
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 4,
+    position: 'relative',
   },
   iconContainer: {
-    position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
+    height: 24,
   },
   tabLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
     marginTop: 3,
-  },
-  smallTabLabel: {
-    fontSize: 11,
   },
   activeTabLabel: {
     fontWeight: '700',
   },
-  badge: {
-    position: 'absolute',
-    top: -4,
-    right: -10,
+  activeBar: {
+    width: 20,
+    height: 3,
+    borderRadius: 1.5,
     backgroundColor: COLORS.hotPink,
-    minWidth: 17,
-    height: 17,
-    borderRadius: 9,
+    marginTop: 3,
+  },
+  districtTabItem: {
+    flex: 1.1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 3,
-    borderWidth: 1.5,
-    borderColor: COLORS.white,
+    paddingHorizontal: 4,
   },
-  badgeText: {
+  districtPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 64,
+  },
+  districtText: {
     color: COLORS.white,
-    fontSize: 10,
-    fontWeight: '700',
-    lineHeight: 12,
+    fontWeight: '900',
+    fontSize: 13,
+    letterSpacing: -0.3,
   },
 });

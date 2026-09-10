@@ -18,31 +18,68 @@ import { GradientButton } from '../components/common/GradientButton';
 import { useApp } from '../context/AppContext';
 import { Address } from '../types';
 
+import { AddressService } from '../services/addressService';
+
 export const S11_AddAddressScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const { setActiveScreen, selectedAddress, addAddress, goBack } = useApp();
+  const {
+    setActiveScreen,
+    user,
+    selectedAddress,
+    setSelectedAddress,
+    addAddress,
+    setDeliveryLocation,
+    goBack,
+  } = useApp();
 
-  const [fullName, setFullName] = useState(selectedAddress.fullName || 'Rahul Sharma');
-  const [phoneNumber, setPhoneNumber] = useState(selectedAddress.phoneNumber || '+91 98765 43210');
-  const [houseFlat, setHouseFlat] = useState(selectedAddress.houseFlat || 'B-402, Shivalik Heights');
-  const [areaLandmark, setAreaLandmark] = useState(selectedAddress.areaLandmark || 'Opp. ISKCON Temple, SG Highway');
-  const [city, setCity] = useState(selectedAddress.city || 'Ahmedabad, Gujarat');
+  const [fullName, setFullName] = useState(selectedAddress.fullName || user.fullName || '');
+  const [phoneNumber, setPhoneNumber] = useState(selectedAddress.phoneNumber || user.phoneNumber || '');
+  const [houseFlat, setHouseFlat] = useState(selectedAddress.houseFlat || '');
+  const [areaLandmark, setAreaLandmark] = useState(selectedAddress.areaLandmark || '');
+  const [city, setCity] = useState(selectedAddress.city || 'Ahmedabad');
+  const [pincode, setPincode] = useState(selectedAddress.pincode || '380015');
   const [addressType, setAddressType] = useState<'Home' | 'Work' | 'Other'>('Home');
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    setSaving(true);
     const newAddress: Address = {
       id: `addr_${Date.now()}`,
       type: addressType,
-      fullName,
-      phoneNumber,
+      fullName: fullName || user.fullName || 'Customer',
+      phoneNumber: phoneNumber || user.phoneNumber || '',
       houseFlat,
       areaLandmark,
       city,
-      pincode: '380015',
+      pincode: pincode || '380015',
       isDefault: true,
     };
+
     addAddress(newAddress);
-    setActiveScreen('C12_Home');
+    setSelectedAddress(newAddress);
+    setDeliveryLocation(`${addressType} — ${city.split(',')[0]}`);
+
+    try {
+      await AddressService.saveAddress({
+        type: addressType,
+        fullName: newAddress.fullName,
+        phoneNumber: newAddress.phoneNumber,
+        houseFlat,
+        areaLandmark,
+        city,
+        pincode: '380015',
+        isDefault: true,
+        latitude: 23.0225,
+        longitude: 72.5714,
+      });
+
+      await AddressService.checkServiceability(23.0225, 72.5714);
+    } catch (e) {
+      console.warn('Address sync error:', e);
+    } finally {
+      setSaving(false);
+      setActiveScreen('Blinkit_Home');
+    }
   };
 
   return (

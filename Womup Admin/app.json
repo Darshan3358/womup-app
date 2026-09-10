@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "Womup Admin Console",
+    "slug": "womup-admin",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/womup_logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#05062A"
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "android": {
+      "package": "com.web3apk.womupadmin"
+    }
+  }
+}

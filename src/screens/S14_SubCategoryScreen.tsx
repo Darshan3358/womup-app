@@ -11,12 +11,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../theme/colors';
 import { SPACING, RADIUS } from '../theme/spacing';
 import { Header } from '../components/common/Header';
-import { SUB_CATEGORIES } from '../data/categories';
+import { ProductService } from '../services/productService';
 import { useApp } from '../context/AppContext';
 
 export const S14_SubCategoryScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const { setActiveScreen, selectedCategoryName, setSelectedCategoryName, goBack } = useApp();
+  const { setActiveScreen, selectedCategoryId, selectedCategoryName, setSelectedCategoryName, goBack } = useApp();
+
+  const subCategories = ProductService.getSubCategories(selectedCategoryId);
 
   const handleSubCategorySelect = (subName: string) => {
     setSelectedCategoryName(subName);
@@ -31,7 +33,7 @@ export const S14_SubCategoryScreen: React.FC = () => {
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {SUB_CATEGORIES.map((item) => (
+        {subCategories.map((item) => (
           <TouchableOpacity
             key={item.id}
             activeOpacity={0.7}

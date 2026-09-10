@@ -15,7 +15,7 @@ import { useApp } from '../context/AppContext';
 
 export const S02_Onboarding1Screen: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const { setActiveScreen } = useApp();
+  const { setActiveScreen, handleOnboardingSkip } = useApp();
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 20 }]}>
@@ -23,7 +23,7 @@ export const S02_Onboarding1Screen: React.FC = () => {
       <View style={styles.topBar}>
         <View style={{ width: 40 }} />
         <TouchableOpacity
-          onPress={() => setActiveScreen('C06_MobileNumber')}
+          onPress={handleOnboardingSkip}
           style={styles.skipButton}
         >
           <Text style={styles.skipText}>Skip</Text>

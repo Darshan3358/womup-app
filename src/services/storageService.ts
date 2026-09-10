@@ -7,6 +7,11 @@ const KEYS = {
   COINS: '@wormup_coins',
   ONBOARDING_DONE: '@wormup_onboarding_done',
   SELECTED_ADDRESS: '@wormup_selected_address',
+  AUTH_TOKEN: '@wormup_token',
+  REFRESH_TOKEN: '@wormup_refresh_token',
+  ACTIVE_SCREEN: '@wormup_active_screen',
+  BLINKIT_CART: '@wormup_blinkit_cart',
+  WISHLIST: '@wormup_wishlist',
 };
 
 export const StorageService = {

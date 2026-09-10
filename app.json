@@ -6,11 +6,17 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/Wormup.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#05062A"
-    },
+    "plugins": [
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/Wormup.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#05062A"
+        }
+      ]
+    ],
     "ios": {
       "supportsTablet": true
     },
@@ -32,6 +38,9 @@
         "projectId": "88be2903-cd4c-4e04-904e-de239ec8dcfb"
       }
     },
-    "owner": "darshanthanki007"
+    "owner": "darshanthanki007",
+    "plugins": [
+      "expo-font"
+    ]
   }
 }

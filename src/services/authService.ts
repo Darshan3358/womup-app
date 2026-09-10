@@ -1,45 +1,136 @@
 import { UserProfile, Address } from '../types';
-
-export const generateRandomIndianMobile = (): string => {
-  const prefixes = ['98', '97', '99', '96', '95', '91', '89', '88', '70'];
-  const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
-  const rest = Math.floor(10000000 + Math.random() * 90000000).toString();
-  return `${prefix}${rest}`.slice(0, 10);
-};
-
-const defaultRandomPhone = generateRandomIndianMobile();
+import { api } from './api';
+import { StorageService } from './storageService';
 
 export const INITIAL_ADDRESS: Address = {
-  id: 'addr_1',
+  id: '',
   type: 'Home',
-  fullName: 'Rahul Sharma',
-  phoneNumber: `+91 ${defaultRandomPhone.slice(0, 5)} ${defaultRandomPhone.slice(5)}`,
-  houseFlat: 'B-402, Shivalik Heights',
-  areaLandmark: 'Opp. ISKCON Temple, SG Highway',
-  city: 'Ahmedabad, Gujarat',
+  fullName: '',
+  phoneNumber: '',
+  houseFlat: '',
+  areaLandmark: '',
+  city: 'Ahmedabad',
   pincode: '380015',
   isDefault: true,
 };
 
 export const INITIAL_USER: UserProfile = {
-  fullName: 'Rahul Sharma',
-  phoneNumber: defaultRandomPhone,
-  email: 'rahul.sharma@example.com',
-  referralCode: 'WORM500',
-  shoppingCoins: 2000,
-  savedAddresses: [INITIAL_ADDRESS],
+  fullName: '',
+  phoneNumber: '',
+  email: '',
+  referralCode: '',
+  shoppingCoins: 0,
+  savedAddresses: [],
 };
 
 export const AuthService = {
-  simulateSendOtp(mobile: string): Promise<string> {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve('1234'); // standard test OTP
-      }, 500);
-    });
+  async sendOtp(email: string): Promise<{ success: boolean; verificationId?: string; message?: string }> {
+    const normalizedEmail = email.trim().toLowerCase();
+    const res = await api.post<any>('/auth/send-otp', { email: normalizedEmail });
+    if (res.success && res.data?.verificationId) {
+      return {
+        success: true,
+        verificationId: res.data.verificationId,
+        message: res.data.message || 'OTP sent successfully',
+      };
+    }
+    return {
+      success: false,
+      message: res.message || 'Failed to send OTP',
+    };
   },
 
-  simulateVerifyOtp(otp: string): boolean {
-    return otp === '1234' || otp.length === 4;
+  async verifyOtp(
+    verificationId: string,
+    otp: string,
+  ): Promise<{ success: boolean; isNewUser?: boolean; user?: any; token?: string; message?: string }> {
+    const res = await api.post<any>('/auth/verify-otp', { verificationId, otp });
+    if (res.success && res.data) {
+      if (res.data.accessToken) {
+        api.setToken(res.data.accessToken);
+        await StorageService.saveItem(StorageService.KEYS.AUTH_TOKEN, res.data.accessToken);
+        if (res.data.refreshToken) {
+          await StorageService.saveItem(StorageService.KEYS.REFRESH_TOKEN, res.data.refreshToken);
+        }
+      }
+      return {
+        success: true,
+        isNewUser: res.data.isNewUser,
+        user: res.data.user,
+        token: res.data.accessToken,
+        message: res.data.message,
+      };
+    }
+    return {
+      success: false,
+      message: res.message || 'Failed to verify OTP',
+    };
+  },
+
+  async register(
+    verificationId: string,
+    name: string,
+    phone?: string,
+    referralCode?: string,
+  ): Promise<{ success: boolean; user?: any; token?: string; message?: string }> {
+    const res = await api.post<any>('/auth/register', {
+      verificationId,
+      name,
+      phone,
+      referralCode,
+    });
+    if (res.success && res.data) {
+      if (res.data.accessToken) {
+        api.setToken(res.data.accessToken);
+        await StorageService.saveItem(StorageService.KEYS.AUTH_TOKEN, res.data.accessToken);
+        if (res.data.refreshToken) {
+          await StorageService.saveItem(StorageService.KEYS.REFRESH_TOKEN, res.data.refreshToken);
+        }
+      }
+      return {
+        success: true,
+        user: res.data.user,
+        token: res.data.accessToken,
+        message: res.data.message,
+      };
+    }
+    return {
+      success: false,
+      message: res.message || 'Registration failed',
+    };
+  },
+
+  async getProfile(): Promise<UserProfile | null> {
+    const res = await api.get<any>('/users/me');
+    if (res.success && res.data) {
+      return {
+        fullName: res.data.name || '',
+        phoneNumber: res.data.phone || '',
+        email: res.data.email || '',
+        referralCode: res.data.referralCode || '',
+        shoppingCoins: res.data.shoppingCoins || 0,
+        savedAddresses: [],
+        birthday: res.data.birthday || undefined,
+      };
+    }
+    return null;
+  },
+
+  async logout(): Promise<void> {
+    try {
+      await api.post('/auth/logout');
+    } catch (_) {}
+    api.setToken(null);
+    await StorageService.removeItem(StorageService.KEYS.AUTH_TOKEN);
+    await StorageService.removeItem(StorageService.KEYS.REFRESH_TOKEN);
+    await StorageService.removeItem(StorageService.KEYS.USER);
   },
 };
+
+export const generateRandomIndianMobile = (): string => {
+  const prefixes = ['98', '99', '97', '96', '95', '94', '93', '91', '90', '88', '89', '87'];
+  const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+  const remaining = Math.floor(10000000 + Math.random() * 90000000).toString().slice(0, 8);
+  return `${prefix}${remaining}`;
+};
+

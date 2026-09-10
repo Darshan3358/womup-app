@@ -1,9 +1,24 @@
 import React, { useEffect } from 'react';
 import { View, StyleSheet, BackHandler, Platform } from 'react-native';
 import { useApp } from '../context/AppContext';
-import { BottomNavigation, TabKey } from '../components/common/BottomNavigation';
+import { BottomNavigation, BlinkitTabKey } from '../components/common/BottomNavigation';
+import { LocationPickerModal } from '../components/common/LocationPickerModal';
+import { DistrictModal } from '../components/common/DistrictModal';
+import { COLORS } from '../theme/colors';
 
-// All 26 screens
+// Blinkit Screens
+import { BlinkitHomeScreen } from '../screens/blinkit/BlinkitHomeScreen';
+import { BlinkitCategoriesScreen } from '../screens/blinkit/BlinkitCategoriesScreen';
+import { BlinkitOrderAgainScreen } from '../screens/blinkit/BlinkitOrderAgainScreen';
+import { BlinkitPrintScreen } from '../screens/blinkit/BlinkitPrintScreen';
+import { BlinkitProfileScreen } from '../screens/blinkit/BlinkitProfileScreen';
+import { BlinkitMoneyScreen } from '../screens/blinkit/BlinkitMoneyScreen';
+import { BlinkitProductDetailScreen } from '../screens/blinkit/BlinkitProductDetailScreen';
+import { BlinkitCartScreen } from '../screens/blinkit/BlinkitCartScreen';
+import { BlinkitCheckoutScreen } from '../screens/blinkit/BlinkitCheckoutScreen';
+import { BlinkitWishlistScreen } from '../screens/blinkit/BlinkitWishlistScreen';
+
+// Legacy screens for backward compatibility
 import { S01_SplashScreen } from '../screens/S01_SplashScreen';
 import { S02_Onboarding1Screen } from '../screens/S02_Onboarding1Screen';
 import { S03_Onboarding2Screen } from '../screens/S03_Onboarding2Screen';
@@ -58,7 +73,6 @@ export const RootNavigator: React.FC = () => {
         }
       };
 
-      // Push state so browser has a history entry to go back from
       window.history.pushState({ screen: activeScreen }, '');
       window.addEventListener('popstate', handlePopState);
       return () => window.removeEventListener('popstate', handlePopState);
@@ -67,52 +81,76 @@ export const RootNavigator: React.FC = () => {
 
   // Screens that show bottom navigation bar
   const isMainTabScreen =
+    activeScreen === 'Blinkit_Home' ||
+    activeScreen === 'Blinkit_OrderAgain' ||
+    activeScreen === 'Blinkit_Categories' ||
+    activeScreen === 'Blinkit_Print' ||
     activeScreen === 'C12_Home' ||
     activeScreen === 'C13_Category' ||
     activeScreen === 'C19_Cart' ||
     activeScreen === 'C25_OrderHistory' ||
     activeScreen === 'C26_Account';
 
-  const getCurrentTabKey = (): TabKey => {
+  const getCurrentTabKey = (): BlinkitTabKey => {
     switch (activeScreen) {
+      case 'Blinkit_Home':
       case 'C12_Home':
         return 'Home';
+      case 'Blinkit_OrderAgain':
+      case 'C25_OrderHistory':
+        return 'Order Again';
+      case 'Blinkit_Categories':
       case 'C13_Category':
         return 'Categories';
-      case 'C19_Cart':
-        return 'Cart';
-      case 'C25_OrderHistory':
-        return 'Orders';
-      case 'C26_Account':
-        return 'Account';
+      case 'Blinkit_Print':
+        return 'Print';
       default:
         return 'Home';
     }
   };
 
-  const handleTabPress = (tab: TabKey) => {
+  const handleTabPress = (tab: BlinkitTabKey) => {
     switch (tab) {
       case 'Home':
-        setActiveScreen('C12_Home');
+        setActiveScreen('Blinkit_Home');
+        break;
+      case 'Order Again':
+        setActiveScreen('Blinkit_OrderAgain');
         break;
       case 'Categories':
-        setActiveScreen('C13_Category');
+        setActiveScreen('Blinkit_Categories');
         break;
-      case 'Cart':
-        setActiveScreen('C19_Cart');
-        break;
-      case 'Orders':
-        setActiveScreen('C25_OrderHistory');
-        break;
-      case 'Account':
-        setActiveScreen('C26_Account');
+      case 'Print':
+        setActiveScreen('Blinkit_Print');
         break;
     }
   };
 
   const renderCurrentScreen = () => {
     switch (activeScreen) {
-      // Flow 1
+      // Blinkit Primary Screens
+      case 'Blinkit_Home':
+        return <BlinkitHomeScreen />;
+      case 'Blinkit_Categories':
+        return <BlinkitCategoriesScreen />;
+      case 'Blinkit_OrderAgain':
+        return <BlinkitOrderAgainScreen />;
+      case 'Blinkit_Print':
+        return <BlinkitPrintScreen />;
+      case 'Blinkit_Profile':
+        return <BlinkitProfileScreen />;
+      case 'Blinkit_Money':
+        return <BlinkitMoneyScreen />;
+      case 'Blinkit_ProductDetail':
+        return <BlinkitProductDetailScreen />;
+      case 'Blinkit_Cart':
+        return <BlinkitCartScreen />;
+      case 'Blinkit_Checkout':
+        return <BlinkitCheckoutScreen />;
+      case 'Blinkit_Wishlist':
+        return <BlinkitWishlistScreen />;
+
+      // Legacy screens
       case 'C01_Splash':
         return <S01_SplashScreen />;
       case 'C02_Onboarding1':
@@ -133,14 +171,12 @@ export const RootNavigator: React.FC = () => {
         return <S09_ReferralCodeScreen />;
       case 'C10_LocationPermission':
         return <S10_LocationPermissionScreen />;
-
-      // Flow 2
       case 'C11_AddAddress':
         return <S11_AddAddressScreen />;
       case 'C12_Home':
-        return <S12_HomeScreen />;
+        return <BlinkitHomeScreen />;
       case 'C13_Category':
-        return <S13_CategoryScreen />;
+        return <BlinkitCategoriesScreen />;
       case 'C14_SubCategory':
         return <S14_SubCategoryScreen />;
       case 'C15_ProductListing':
@@ -151,8 +187,6 @@ export const RootNavigator: React.FC = () => {
         return <S17_SearchScreen />;
       case 'C18_FilterSort':
         return <S18_FilterSortScreen />;
-
-      // Flow 3
       case 'C19_Cart':
         return <S19_CartScreen />;
       case 'C20_Checkout':
@@ -171,7 +205,7 @@ export const RootNavigator: React.FC = () => {
         return <S26_AccountScreen />;
 
       default:
-        return <S12_HomeScreen />;
+        return <BlinkitHomeScreen />;
     }
   };
 
@@ -179,13 +213,17 @@ export const RootNavigator: React.FC = () => {
     <View style={styles.container}>
       <View style={styles.screenContainer}>{renderCurrentScreen()}</View>
 
-      {/* Responsive Bottom Navigation when on main tab screens */}
+      {/* 5-Tab Bottom Navigation for main tab screens */}
       {isMainTabScreen && (
         <BottomNavigation
           currentTab={getCurrentTabKey()}
           onSelectTab={handleTabPress}
         />
       )}
+
+      {/* Global Modals */}
+      <LocationPickerModal />
+      <DistrictModal />
     </View>
   );
 };
@@ -193,7 +231,7 @@ export const RootNavigator: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FEFEFE',
+    backgroundColor: COLORS.white,
   },
   screenContainer: {
     flex: 1,

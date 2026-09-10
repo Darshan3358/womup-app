@@ -38,3 +38,4 @@ npx expo start
 ```bash
 npx eas-cli build --platform android --profile preview
 ```
+# womup-app

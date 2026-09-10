@@ -12,16 +12,77 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, GRADIENTS } from '../theme/colors';
 import { SPACING, RADIUS } from '../theme/spacing';
 import { useApp } from '../context/AppContext';
+import { StorageService } from '../services/storageService';
+import { AuthService } from '../services/authService';
+import { api } from '../services/api';
 
 export const S01_SplashScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const { setActiveScreen } = useApp();
+  const { setActiveScreen, setUser } = useApp();
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setActiveScreen('C02_Onboarding1');
-    }, 2400);
-    return () => clearTimeout(timer);
+    let isMounted = true;
+
+    const checkSession = async () => {
+      try {
+        const token = await StorageService.getItem<string | null>(
+          StorageService.KEYS.AUTH_TOKEN,
+          null
+        );
+        const savedUser = await StorageService.getItem<any | null>(
+          StorageService.KEYS.USER,
+          null
+        );
+        const savedScreen = await StorageService.getItem<string | null>(
+          StorageService.KEYS.ACTIVE_SCREEN,
+          null
+        );
+
+        if (token) {
+          api.setToken(token);
+          if (savedUser && isMounted) {
+            setUser(savedUser);
+          }
+          try {
+            const profile = await AuthService.getProfile();
+            if (profile && (profile.email || profile.phoneNumber || profile.fullName) && isMounted) {
+              setUser(profile);
+            }
+          } catch (err) {}
+
+          if (isMounted) {
+            const validTarget =
+              savedScreen &&
+              savedScreen !== 'C01_Splash' &&
+              savedScreen !== 'C02_Onboarding1' &&
+              savedScreen !== 'C03_Onboarding2' &&
+              savedScreen !== 'C04_Onboarding3' &&
+              savedScreen !== 'C05_Onboarding4' &&
+              savedScreen !== 'C06_MobileNumber' &&
+              savedScreen !== 'C07_OtpVerification'
+                ? (savedScreen as any)
+                : 'Blinkit_Home';
+            setActiveScreen(validTarget);
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('Session check failed:', e);
+      }
+
+      const timer = setTimeout(() => {
+        if (isMounted) {
+          setActiveScreen('C02_Onboarding1');
+        }
+      }, 1500);
+      return () => clearTimeout(timer);
+    };
+
+    checkSession();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   return (

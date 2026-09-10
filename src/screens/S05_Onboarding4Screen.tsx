@@ -15,7 +15,7 @@ import { useApp } from '../context/AppContext';
 
 export const S05_Onboarding4Screen: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const { setActiveScreen, goBack } = useApp();
+  const { setActiveScreen, goBack, handleOnboardingSkip } = useApp();
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 20 }]}>
@@ -27,7 +27,7 @@ export const S05_Onboarding4Screen: React.FC = () => {
           <Ionicons name="chevron-back" size={24} color={COLORS.textPrimary} />
         </TouchableOpacity>
         <TouchableOpacity
-          onPress={() => setActiveScreen('C06_MobileNumber')}
+          onPress={handleOnboardingSkip}
           style={styles.skipButton}
         >
           <Text style={styles.skipText}>Skip</Text>

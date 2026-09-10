@@ -28,14 +28,30 @@ interface ScreenGroup {
 
 const SCREEN_GROUPS: ScreenGroup[] = [
   {
+    title: '⚡ Blinkit Quick Commerce Screens',
+    badgeColor: '#238823',
+    screens: [
+      { id: 'Blinkit_Home', label: 'Blinkit 01 — Home Screen (9-min Delivery)', badge: 'B1' },
+      { id: 'Blinkit_Categories', label: 'Blinkit 02 — Full Categories Grid', badge: 'B2' },
+      { id: 'Blinkit_OrderAgain', label: 'Blinkit 03 — Order Again & Bestsellers', badge: 'B3' },
+      { id: 'Blinkit_Print', label: 'Blinkit 04 — Print Store & Document Upload', badge: 'B4' },
+      { id: 'Blinkit_Money', label: 'Blinkit 05 — Blinkit Money Wallet', badge: 'B5' },
+      { id: 'Blinkit_ProductDetail', label: 'Blinkit 06 — Product Details (PDP)', badge: 'B6' },
+      { id: 'Blinkit_Cart', label: 'Blinkit 07 — Cart & Savings Bill', badge: 'B7' },
+      { id: 'Blinkit_Checkout', label: 'Blinkit 08 — Checkout & Addresses', badge: 'B8' },
+      { id: 'Blinkit_Profile', label: 'Blinkit 09 — Profile & Settings', badge: 'B9' },
+      { id: 'Blinkit_Wishlist', label: 'Blinkit 10 — My Wishlist (Saved Items)', badge: 'B10' },
+    ],
+  },
+  {
     title: '1. Onboarding & Auth Flow',
     badgeColor: COLORS.hotPink,
     screens: [
-      { id: 'C01_Splash', label: 'Screen 01 — Splash Screen', badge: '1' },
-      { id: 'C02_Onboarding1', label: 'Screen 02 — Onboarding 1 (Essentials)', badge: '2' },
-      { id: 'C03_Onboarding2', label: 'Screen 03 — Onboarding 2 (Savings)', badge: '3' },
-      { id: 'C04_Onboarding3', label: 'Screen 04 — Onboarding 3 (Coins)', badge: '4' },
-      { id: 'C05_Onboarding4', label: 'Screen 05 — Onboarding 4 (Delivery)', badge: '5' },
+      { id: 'C01_Splash', label: 'Screen 01 — Splash Screen (Smart Shopping)', badge: '1' },
+      { id: 'C02_Onboarding1', label: 'Screen 02 — Onboarding 1 (Everyday Essentials)', badge: '2' },
+      { id: 'C03_Onboarding2', label: 'Screen 03 — Onboarding 2 (Save on Every Purchase)', badge: '3' },
+      { id: 'C04_Onboarding3', label: 'Screen 04 — Onboarding 3 (Coins & Rewards)', badge: '4' },
+      { id: 'C05_Onboarding4', label: 'Screen 05 — Onboarding 4 (Fast Delivery Doorstep)', badge: '5' },
       { id: 'C06_MobileNumber', label: 'Screen 06 — Mobile Number', badge: '6' },
       { id: 'C07_OtpVerification', label: 'Screen 07 — OTP Verification', badge: '7' },
       { id: 'C08_CreateAccount', label: 'Screen 08 — Create Account', badge: '8' },
@@ -81,20 +97,10 @@ export const ScreenJumperModal: React.FC = () => {
     setJumperVisible(false);
   };
 
+  if (!isJumperVisible) return null;
+
   return (
     <>
-      {/* Floating Trigger Button */}
-      <TouchableOpacity
-        activeOpacity={0.85}
-        onPress={() => setJumperVisible(true)}
-        style={styles.floatingTrigger}
-      >
-        <View style={styles.floatingTriggerInner}>
-          <Ionicons name="apps" size={16} color={COLORS.white} />
-          <Text style={styles.floatingTriggerText}>26 Screens</Text>
-        </View>
-      </TouchableOpacity>
-
       {/* Full Modal */}
       <Modal
         visible={isJumperVisible}

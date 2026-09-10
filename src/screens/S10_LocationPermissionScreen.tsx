@@ -12,10 +12,40 @@ import { COLORS } from '../theme/colors';
 import { SPACING } from '../theme/spacing';
 import { GradientButton } from '../components/common/GradientButton';
 import { useApp } from '../context/AppContext';
+import { LocationService } from '../services/locationService';
 
 export const S10_LocationPermissionScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const { setActiveScreen, goBack } = useApp();
+  const { setActiveScreen, goBack, setDeliveryLocation, setSelectedAddress, user } = useApp();
+  const [loading, setLoading] = React.useState(false);
+
+  const handleAllowLocation = async () => {
+    setLoading(true);
+    try {
+      const loc = await LocationService.getCurrentLocation();
+      if (loc) {
+        setDeliveryLocation(`Current Location — ${loc.shortAddress || loc.readableAddress}`);
+        setSelectedAddress({
+          id: `current_${Date.now()}`,
+          type: 'Current',
+          fullName: user.fullName || 'Customer',
+          phoneNumber: user.phoneNumber || '',
+          houseFlat: loc.street || 'Current GPS Location',
+          areaLandmark: loc.areaLandmark || loc.shortAddress,
+          city: loc.city || 'Ahmedabad',
+          pincode: loc.pincode || '380015',
+          latitude: loc.latitude,
+          longitude: loc.longitude,
+          isDefault: true,
+        });
+      }
+    } catch (e) {
+      console.warn('Location permission detection error:', e);
+    } finally {
+      setLoading(false);
+      setActiveScreen('Blinkit_Home');
+    }
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 20 }]}>
@@ -46,14 +76,14 @@ export const S10_LocationPermissionScreen: React.FC = () => {
       {/* Action Buttons */}
       <View style={styles.buttonContainer}>
         <GradientButton
-          title="Allow Location"
-          onPress={() => setActiveScreen('C11_AddAddress')}
+          title={loading ? 'Detecting Location...' : 'Allow Location'}
+          onPress={handleAllowLocation}
           style={styles.button}
         />
 
         <TouchableOpacity
           activeOpacity={0.7}
-          onPress={() => setActiveScreen('C12_Home')}
+          onPress={() => setActiveScreen('Blinkit_Home')}
           style={styles.notNowButton}
         >
           <Text style={styles.notNowText}>Not Now</Text>

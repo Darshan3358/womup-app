@@ -12,13 +12,22 @@ import { COLORS } from '../theme/colors';
 import { SPACING, RADIUS } from '../theme/spacing';
 import { useApp } from '../context/AppContext';
 import { AuthService } from '../services/authService';
+import { StorageService } from '../services/storageService';
 
 export const S07_OtpVerificationScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const { setActiveScreen, user, goBack } = useApp();
-  const [otp, setOtp] = useState<string[]>(['1', '2', '3', '4']);
+  const {
+    setActiveScreen,
+    user,
+    setUser,
+    goBack,
+    authVerificationId,
+    setAuthVerificationId,
+  } = useApp();
+  const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
   const [timer, setTimer] = useState(30);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (timer > 0) {
@@ -35,8 +44,8 @@ export const S07_OtpVerificationScreen: React.FC = () => {
       nextOtp[emptyIndex] = num;
       setOtp(nextOtp);
 
-      // If finished, verify
-      if (emptyIndex === 3) {
+      // If all 6 digits entered, automatically verify
+      if (emptyIndex === 5) {
         verifyOtp(nextOtp.join(''));
       }
     }
@@ -55,13 +64,53 @@ export const S07_OtpVerificationScreen: React.FC = () => {
     }
   };
 
-  const verifyOtp = (code: string) => {
-    if (code.length === 4) {
-      const isValid = AuthService.simulateVerifyOtp(code);
-      if (isValid) {
-        setActiveScreen('C08_CreateAccount');
+  const handleResend = async () => {
+    setTimer(30);
+    setError('');
+    if (user.email) {
+      const res = await AuthService.sendOtp(user.email);
+      if (res.success && res.verificationId) {
+        setAuthVerificationId(res.verificationId);
       } else {
-        setError('Incorrect OTP. Please try again.');
+        setError(res.message || 'Failed to resend OTP');
+      }
+    }
+  };
+
+  const verifyOtp = async (code: string) => {
+    if (code.length >= 4) {
+      setLoading(true);
+      setError('');
+      if (!authVerificationId) {
+        setLoading(false);
+        setError('Verification session expired. Please go back and resend OTP.');
+        return;
+      }
+
+      const res = await AuthService.verifyOtp(authVerificationId, code);
+      setLoading(false);
+      if (res.success) {
+        if (res.isNewUser === false) {
+          // Existing customer: Logged in! Go straight to Blinkit Home!
+          if (res.user) {
+            const updatedUser = {
+              ...user,
+              fullName: res.user.name || user.fullName,
+              email: res.user.email || user.email,
+              phoneNumber: res.user.phone || user.phoneNumber,
+              shoppingCoins: res.user.shoppingCoins || user.shoppingCoins,
+            };
+            setUser(updatedUser);
+            StorageService.saveItem(StorageService.KEYS.USER, updatedUser);
+          }
+          StorageService.saveItem(StorageService.KEYS.ACTIVE_SCREEN, 'Blinkit_Home');
+          setActiveScreen('Blinkit_Home');
+        } else {
+          // New user registration flow
+          setActiveScreen('C08_CreateAccount');
+        }
+      } else {
+        setError(res.message || 'Incorrect OTP. Please try again.');
       }
     }
   };
@@ -80,13 +129,19 @@ export const S07_OtpVerificationScreen: React.FC = () => {
 
       {/* Main Form Info */}
       <View style={styles.content}>
-        <Text style={styles.title}>Verify OTP</Text>
+        <Text style={styles.title}>Verify your Email</Text>
         <Text style={styles.subtitle}>
-          Enter the 4-digit code sent to{' '}
-          <Text style={styles.phoneBold}>+91 {user.phoneNumber || '98765 43210'}</Text>
+          Enter the 6-digit code sent to{' '}
+          <Text style={styles.phoneBold}>{user.email || 'your email'}</Text>
         </Text>
 
-        {/* 4 OTP Digit Boxes */}
+        {/* Email confirmation badge */}
+        <View style={styles.sentBadge}>
+          <Ionicons name="mail" size={16} color="#059669" />
+          <Text style={styles.sentBadgeText}>OTP sent to your email inbox</Text>
+        </View>
+
+        {/* 6 OTP Digit Boxes */}
         <View style={styles.otpBoxesRow}>
           {otp.map((digit, index) => {
             const isFilled = digit !== '';
@@ -114,7 +169,7 @@ export const S07_OtpVerificationScreen: React.FC = () => {
               Resend OTP in <Text style={styles.timerBold}>00:{timer < 10 ? `0${timer}` : timer}</Text>
             </Text>
           ) : (
-            <TouchableOpacity onPress={() => setTimer(30)}>
+            <TouchableOpacity onPress={handleResend}>
               <Text style={styles.resendAction}>Resend OTP</Text>
             </TouchableOpacity>
           )}
@@ -213,12 +268,12 @@ const styles = StyleSheet.create({
   otpBoxesRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 14,
+    gap: 8,
     marginBottom: SPACING.md,
   },
   otpBox: {
-    width: 54,
-    height: 54,
+    width: 44,
+    height: 52,
     borderRadius: RADIUS.input,
     borderWidth: 1.5,
     borderColor: COLORS.border,
@@ -237,6 +292,23 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
     color: COLORS.textPrimary,
+  },
+  sentBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+    borderWidth: 1,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginBottom: SPACING.lg,
+    gap: 6,
+  },
+  sentBadgeText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#065F46',
   },
   errorText: {
     color: COLORS.error,

@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,12 +18,36 @@ import { useApp } from '../context/AppContext';
 
 export const S26_AccountScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const { user, setActiveScreen } = useApp();
+  const { user, logout, setActiveScreen } = useApp();
+
+  const handleLogout = async () => {
+    if (Platform.OS === 'web') {
+      const confirmed = typeof window !== 'undefined' ? window.confirm('Are you sure you want to log out from Worm Up?') : true;
+      if (confirmed) {
+        await logout();
+      }
+    } else {
+      Alert.alert(
+        'Log Out',
+        'Are you sure you want to log out from Worm Up?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Log Out',
+            style: 'destructive',
+            onPress: async () => {
+              await logout();
+            },
+          },
+        ]
+      );
+    }
+  };
 
   const menuItems = [
     {
       title: 'My Addresses',
-      subtitle: `${user.savedAddresses.length} saved address`,
+      subtitle: `${user.savedAddresses?.length || 0} saved address${(user.savedAddresses?.length || 0) === 1 ? '' : 'es'}`,
       icon: 'location-outline',
       color: COLORS.hotPink,
       action: () => setActiveScreen('C11_AddAddress'),
@@ -43,8 +68,8 @@ export const S26_AccountScreen: React.FC = () => {
     },
     {
       title: 'My Referrals',
-      subtitle: 'You earned 500 SC',
-      badge: '500 SC',
+      subtitle: `You earned ${user.shoppingCoins || 0} SC`,
+      badge: `${user.shoppingCoins || 0} SC`,
       icon: 'gift-outline',
       color: COLORS.hotPink,
       action: () => setActiveScreen('C09_ReferralCode'),
@@ -54,14 +79,14 @@ export const S26_AccountScreen: React.FC = () => {
       subtitle: 'FAQs, live chat, call center',
       icon: 'help-circle-outline',
       color: COLORS.darkBlue,
-      action: () => {},
+      action: () => Alert.alert('Support', '24x7 Customer Support is available at support@wormup.in'),
     },
     {
       title: 'Settings',
       subtitle: 'Notifications, language, privacy',
       icon: 'settings-outline',
       color: COLORS.textMuted,
-      action: () => {},
+      action: () => Alert.alert('Settings', 'App version: v1.0.0 (Production)'),
     },
   ];
 
@@ -79,9 +104,11 @@ export const S26_AccountScreen: React.FC = () => {
             <Ionicons name="person" size={28} color={COLORS.white} />
           </View>
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>{user.fullName || 'Rahul Sharma'}</Text>
-            <Text style={styles.profilePhone}>+91 {user.phoneNumber || '98765 43210'}</Text>
-            <Text style={styles.profileEmail}>{user.email || 'rahul.sharma@example.com'}</Text>
+            <Text style={styles.profileName}>{user.fullName || 'Valued Customer'}</Text>
+            {user.email ? <Text style={styles.profileEmail}>{user.email}</Text> : null}
+            <Text style={styles.profilePhone}>
+              {user.phoneNumber ? `+91 ${user.phoneNumber}` : 'No mobile linked'}
+            </Text>
           </View>
           <TouchableOpacity
             onPress={() => setActiveScreen('C08_CreateAccount')}
@@ -153,7 +180,7 @@ export const S26_AccountScreen: React.FC = () => {
         {/* Logout Button */}
         <TouchableOpacity
           activeOpacity={0.7}
-          onPress={() => setActiveScreen('C06_MobileNumber')}
+          onPress={handleLogout}
           style={styles.logoutButton}
         >
           <Ionicons name="log-out-outline" size={20} color={COLORS.error} />

@@ -58,7 +58,7 @@ export const S23_OrderPlacedScreen: React.FC = () => {
 
         <TouchableOpacity
           activeOpacity={0.7}
-          onPress={() => setActiveScreen('C12_Home')}
+          onPress={() => setActiveScreen('Blinkit_Home')}
           style={styles.homeButton}
         >
           <Text style={styles.homeButtonText}>Go to Home</Text>

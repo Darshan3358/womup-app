@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,23 +15,85 @@ import { Header } from '../components/common/Header';
 import { ProductCard } from '../components/product/ProductCard';
 import { useApp } from '../context/AppContext';
 import { ProductService } from '../services/productService';
+import { Product } from '../types';
 
 export const S15_ProductListingScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const {
     setActiveScreen,
+    selectedCategoryId,
+    selectedCategoryIds,
     selectedCategoryName,
+    currentAreaId,
     filters,
     goBack,
   } = useApp();
 
-  const allProducts = ProductService.getAllProducts();
-  const filteredProducts = ProductService.filterAndSortProducts(allProducts, filters);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    let isCancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const hasCategoryIds = selectedCategoryIds && selectedCategoryIds.length > 0;
+        const live = await ProductService.fetchProducts({
+          categoryIds: hasCategoryIds ? selectedCategoryIds : undefined,
+          categoryId: !hasCategoryIds && selectedCategoryId && selectedCategoryId !== 'All' ? selectedCategoryId : undefined,
+          areaId: currentAreaId || undefined,
+        });
+
+        if (!isCancelled) {
+          setProducts(live || []);
+        }
+      } catch (e) {
+        if (!isCancelled) {
+          setProducts(ProductService.getAllProducts());
+        }
+      } finally {
+        if (!isCancelled) {
+          setLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [selectedCategoryId, selectedCategoryIds, currentAreaId]);
+
+  // Enforce strict category scoping on the frontend to guarantee zero unrelated products leak
+  const categoryScopedProducts = products.filter((p) => {
+    if (selectedCategoryIds && selectedCategoryIds.length > 0) {
+      return selectedCategoryIds.some((cid) => {
+        const target = cid.toLowerCase();
+        return (
+          (p.categoryId || '').toString().toLowerCase() === target ||
+          (p.categorySlug || '').toLowerCase() === target ||
+          (p.categoryName || '').toLowerCase() === target
+        );
+      });
+    }
+
+    if (selectedCategoryId && selectedCategoryId !== 'All') {
+      const target = selectedCategoryId.toLowerCase();
+      return (
+        (p.categoryId || '').toString().toLowerCase() === target ||
+        (p.categorySlug || '').toLowerCase() === target ||
+        (p.categoryName || '').toLowerCase() === target
+      );
+    }
+
+    return true;
+  });
+
+  const filteredProducts = ProductService.filterAndSortProducts(categoryScopedProducts, filters);
 
   return (
     <View style={[styles.flex, { paddingTop: insets.top }]}>
       <Header
-        title={selectedCategoryName || 'Rice & Rice Products'}
+        title={selectedCategoryName || 'Products'}
         onBack={goBack}
         rightAction={
           <TouchableOpacity
@@ -68,13 +131,28 @@ export const S15_ProductListingScreen: React.FC = () => {
       </View>
 
       {/* Product List */}
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <Text style={styles.resultsCount}>{filteredProducts.length} Products available</Text>
-        {filteredProducts.map((prod) => (
-          <ProductCard key={prod.id} product={prod} variant="horizontal" />
-        ))}
-        <View style={{ height: 40 }} />
-      </ScrollView>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Loading products...</Text>
+        </View>
+      ) : filteredProducts.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="basket-outline" size={56} color={COLORS.textMuted} />
+          <Text style={styles.emptyTitle}>No products found</Text>
+          <Text style={styles.emptySubtitle}>
+            There are currently no items available in {selectedCategoryName || 'this category'}.
+          </Text>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <Text style={styles.resultsCount}>{filteredProducts.length} Products available</Text>
+          {filteredProducts.map((prod) => (
+            <ProductCard key={prod.id} product={prod} variant="horizontal" />
+          ))}
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      )}
     </View>
   );
 };
@@ -136,5 +214,37 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     marginBottom: SPACING.sm,
     fontWeight: '500',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.xl,
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: COLORS.textMuted,
+    fontWeight: '500',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.xl,
+    gap: 8,
+    marginTop: 60,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginTop: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    maxWidth: 280,
   },
 });

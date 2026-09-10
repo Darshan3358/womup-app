@@ -1,4 +1,5 @@
 import { CartItem } from '../types';
+import { api } from './api';
 
 export interface CartSummary {
   subtotalMrp: number;
@@ -53,5 +54,41 @@ export const CartService = {
       totalSavings,
       totalCoinsEarnable,
     };
+  },
+
+  // Authoritative server API methods
+  async getServerCart(): Promise<any> {
+    const res = await api.get<any>('/cart');
+    return res.success ? res.data : null;
+  },
+
+  async addItemToServer(productId: string, quantity: number = 1): Promise<any> {
+    const res = await api.post<any>('/cart/items', { productId, quantity });
+    return res.success ? res.data : null;
+  },
+
+  async updateQuantityOnServer(productId: string, delta: number): Promise<any> {
+    const res = await api.patch<any>(`/cart/items/${productId}`, { delta });
+    return res.success ? res.data : null;
+  },
+
+  async removeItemFromServer(productId: string): Promise<boolean> {
+    const res = await api.delete<any>(`/cart/items/${productId}`);
+    return res.success;
+  },
+
+  async clearServerCart(): Promise<boolean> {
+    const res = await api.delete<any>('/cart');
+    return res.success;
+  },
+
+  async applyCoinsOnServer(coins: number): Promise<any> {
+    const res = await api.post<any>('/cart/apply-coins', { coins });
+    return res.success ? res.data : null;
+  },
+
+  async applyCouponOnServer(couponCode: string): Promise<any> {
+    const res = await api.post<any>('/cart/apply-coupon', { couponCode });
+    return res.success ? res.data : null;
   },
 };

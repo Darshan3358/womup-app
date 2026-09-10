@@ -55,7 +55,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             <Image
               source={product.image || { uri: product.imageUrl }}
               style={styles.horizontalImage}
-              resizeMode="contain"
+              resizeMode="cover"
             />
           ) : (
             <View style={styles.iconCircle}>
@@ -127,7 +127,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           <Image
             source={product.image || { uri: product.imageUrl }}
             style={styles.gridProductImage}
-            resizeMode="contain"
+            resizeMode="cover"
           />
         ) : (
           <View style={styles.iconCircleLarge}>
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
     width: 160,
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.card,
-    padding: SPACING.compact,
+    padding: 0,
     marginRight: SPACING.md,
     borderWidth: 1,
     borderColor: COLORS.border,
@@ -190,20 +190,24 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
     position: 'relative',
+    overflow: 'hidden',
   },
   gridImageContainer: {
-    height: 105,
-    backgroundColor: '#FFFFFF',
-    borderRadius: RADIUS.sm,
+    width: '100%',
+    aspectRatio: 1,
+    backgroundColor: '#F8FAFC',
+    borderTopLeftRadius: RADIUS.card,
+    borderTopRightRadius: RADIUS.card,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: SPACING.sm,
-    padding: 4,
+    marginBottom: 4,
+    padding: 0,
     overflow: 'hidden',
   },
   gridProductImage: {
     width: '100%',
     height: '100%',
+    resizeMode: 'cover',
   },
   iconCircleLarge: {
     width: 54,
@@ -221,7 +225,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
-    zIndex: 1,
+    zIndex: 2,
   },
   discountText: {
     color: COLORS.white,
@@ -230,6 +234,8 @@ const styles = StyleSheet.create({
   },
   gridContent: {
     flex: 1,
+    paddingHorizontal: SPACING.sm,
+    paddingBottom: SPACING.sm,
   },
   brandText: {
     fontSize: 10,
@@ -302,18 +308,19 @@ const styles = StyleSheet.create({
   },
   horizontalImageContainer: {
     width: 72,
-    height: 72,
-    backgroundColor: '#FFFFFF',
+    aspectRatio: 1,
+    backgroundColor: '#F8FAFC',
     borderRadius: RADIUS.sm,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-    padding: 4,
+    padding: 0,
     overflow: 'hidden',
   },
   horizontalImage: {
     width: '100%',
     height: '100%',
+    resizeMode: 'cover',
   },
   iconCircle: {
     width: 44,

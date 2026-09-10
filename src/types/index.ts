@@ -15,15 +15,29 @@ export type OrderStatus =
   | 'RETURNED'
   | 'REFUNDED';
 
+/** One weight/size option for a product, with area-specific pricing */
+export interface ProductVariantPriced {
+  id: string;
+  label: string;          // "500 g" | "1 kg" | "500 ml" | "6 pcs"
+  price: number;          // area-specific selling price
+  mrp: number;
+  discountPercent: number;
+  stock: number;
+  isAvailable: boolean;
+  isDefault: boolean;
+}
+
 export interface Product {
   id: string;
   name: string;
   brand: string;
   categoryId: string;
+  categorySlug?: string;
+  categoryName?: string;
   subCategoryId?: string;
   image?: ImageSourcePropType;
   imageUrl?: string;
-  quantityLabel: string;
+  quantityLabel: string;  // display label for the currently selected variant
   mrp: number;
   sellingPrice: number;
   discountPercent: number;
@@ -36,7 +50,9 @@ export interface Product {
   deliveryMinutes: number;
   description?: string;
   specifications?: Record<string, string>;
+  variants?: ProductVariantPriced[];  // ← populated from MongoDB via area pricing
 }
+
 
 export interface Category {
   id: string;
@@ -63,7 +79,7 @@ export interface CartItem {
 
 export interface Address {
   id: string;
-  type: 'Home' | 'Work' | 'Other';
+  type: 'Home' | 'Work' | 'Other' | 'Current';
   fullName: string;
   phoneNumber: string;
   houseFlat: string;
@@ -71,6 +87,8 @@ export interface Address {
   city: string;
   pincode: string;
   isDefault?: boolean;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface OrderItem {
@@ -111,7 +129,9 @@ export interface UserProfile {
   referralCode?: string;
   shoppingCoins: number;
   savedAddresses: Address[];
+  birthday?: string; // "07 August 2005" — persisted in MongoDB via PATCH /users/me
 }
+
 
 export type PaymentType =
   | 'UPI'
@@ -156,4 +176,53 @@ export type ScreenId =
   | 'C23_OrderPlaced'
   | 'C24_OrderTracking'
   | 'C25_OrderHistory'
-  | 'C26_Account';
+  | 'C26_Account'
+  | 'Blinkit_Home'
+  | 'Blinkit_Categories'
+  | 'Blinkit_OrderAgain'
+  | 'Blinkit_Print'
+  | 'Blinkit_Profile'
+  | 'Blinkit_Money'
+  | 'Blinkit_ProductDetail'
+  | 'Blinkit_Cart'
+  | 'Blinkit_Checkout'
+  | 'Blinkit_OrderSuccess'
+  | 'Blinkit_Wishlist';
+
+export interface BlinkitProduct {
+  id: string;
+  name: string;
+  brand: string;
+  category: string;
+  packSize: string;
+  sellingPrice: number;
+  mrp: number;
+  discountBadge?: string;
+  isPriceDrop?: boolean;
+  deliveryMinutes: number;
+  rating: number;
+  reviewCount: number;
+  stockUrgency?: string;
+  stock: number;
+  imageUrl: string;
+  galleryImages?: string[];
+  imageType?: string;
+  attributes?: { label: string; value: string }[];
+  bankOffer?: {
+    bank: string;
+    text: string;
+    code: string;
+    effectivePrice: number;
+  };
+  specifications?: Record<string, string>;
+  variants?: ProductVariantPriced[];  // ← DB-driven weight/size picker options
+}
+
+export interface BlinkitCategoryCard {
+  id: string;
+  title: string;
+  countBadge: string;
+  imageUrls: [string, string, string, string];
+  itemTypes?: [string, string, string, string];
+}
+
