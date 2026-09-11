@@ -35,12 +35,9 @@
     },
     "extra": {
       "eas": {
-        "projectId": "88be2903-cd4c-4e04-904e-de239ec8dcfb"
+        "projectId": "1d64c304-0e2d-4716-8301-de5ebd1d6900"
       }
     },
-    "owner": "darshanthanki007",
-    "plugins": [
-      "expo-font"
-    ]
+    "owner": "darshanthanki007"
   }
 }
