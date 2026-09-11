@@ -1,11 +1,9 @@
-// Top-level build file where you can add configuration options common to all sub-projects/modules.
-
 buildscript {
     ext {
         buildToolsVersion = findProperty('android.buildToolsVersion') ?: '35.0.0'
-        minSdkVersion = Integer.parseInt(findProperty('android.minSdkVersion') ?: '24')
-        compileSdkVersion = Integer.parseInt(findProperty('android.compileSdkVersion') ?: '35')
-        targetSdkVersion = Integer.parseInt(findProperty('android.targetSdkVersion') ?: '34')
+        minSdkVersion = Integer.parseInt((findProperty('android.minSdkVersion') ?: '24').toString())
+        compileSdkVersion = Integer.parseInt((findProperty('android.compileSdkVersion') ?: '35').toString())
+        targetSdkVersion = Integer.parseInt((findProperty('android.targetSdkVersion') ?: '34').toString())
         kotlinVersion = findProperty('android.kotlinVersion') ?: '1.9.25'
 
         ndkVersion = "26.1.10909125"
@@ -22,6 +20,15 @@ buildscript {
 }
 
 apply plugin: "com.facebook.react.rootproject"
+
+ext {
+    buildToolsVersion = findProperty('android.buildToolsVersion') ?: '35.0.0'
+    minSdkVersion = Integer.parseInt((findProperty('android.minSdkVersion') ?: '24').toString())
+    compileSdkVersion = Integer.parseInt((findProperty('android.compileSdkVersion') ?: '35').toString())
+    targetSdkVersion = Integer.parseInt((findProperty('android.targetSdkVersion') ?: '34').toString())
+    kotlinVersion = findProperty('android.kotlinVersion') ?: '1.9.25'
+    ndkVersion = "26.1.10909125"
+}
 
 // Fix: Compose Compiler 1.5.15 requires Kotlin 1.9.25 but RN pins 1.9.24.
 // Use lazy allprojects + configureEach (Gradle 8 compatible, no afterEvaluate needed).
