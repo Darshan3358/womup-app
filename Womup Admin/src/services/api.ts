@@ -30,11 +30,8 @@ import {
   LIVE_AUDIT_LOGS,
 } from '../data/liveDatabase';
 
-const API_BASE_URL = Platform.select({
-  android: 'http://10.0.2.2:5001',
-  ios: 'http://localhost:5001',
-  default: 'http://localhost:5001',
-});
+const API_BASE_URL = 'https://womup-admin-backend.onrender.com';
+
 
 export interface LiveDbData {
   customers: Customer[];
