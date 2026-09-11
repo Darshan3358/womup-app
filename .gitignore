@@ -11,6 +11,9 @@ expo-env.d.ts
 
 # Native
 .kotlin/
+.cxx/
+android/app/build/
+android/build/
 *.orig.*
 *.jks
 *.p8
@@ -40,7 +43,7 @@ backend/.env
 
 # generated native folders
 /ios
-/android
+
 
 # build archives and large binaries
 *.zip
