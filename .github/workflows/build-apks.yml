@@ -18,6 +18,8 @@ jobs:
     if: inputs.target_app == 'customer' || inputs.target_app == 'both'
     name: Build Customer App APK
     runs-on: ubuntu-latest
+    env:
+      NODE_ENV: production
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -44,6 +46,11 @@ jobs:
       - name: Make Gradle Executable
         run: chmod +x android/gradlew
 
+      - name: Clean Gradle
+        run: |
+          cd android
+          ./gradlew clean
+
       - name: Build Release APK
         run: |
           cd android
@@ -60,6 +67,8 @@ jobs:
     if: inputs.target_app == 'admin' || inputs.target_app == 'both'
     name: Build Admin App APK
     runs-on: ubuntu-latest
+    env:
+      NODE_ENV: production
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -85,6 +94,11 @@ jobs:
 
       - name: Make Admin Gradle Executable
         run: chmod +x "Womup Admin/android/gradlew"
+
+      - name: Clean Admin Gradle
+        run: |
+          cd "Womup Admin/android"
+          ./gradlew clean
 
       - name: Build Admin Release APK
         run: |
