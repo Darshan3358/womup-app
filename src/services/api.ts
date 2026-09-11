@@ -2,10 +2,8 @@ import { Platform } from 'react-native';
 import { StorageService } from './storageService';
 
 // Automatically detect host based on environment
-export const API_BASE_URL =
-  Platform.OS === 'android' && !Platform.isTV
-    ? 'http://10.0.2.2:5050/api/v1'
-    : 'http://localhost:5050/api/v1';
+// Live Render Cloud Backend
+export const API_BASE_URL = 'https://womup-app.onrender.com/api/v1';
 
 class ApiClient {
   private token: string | null = null;
