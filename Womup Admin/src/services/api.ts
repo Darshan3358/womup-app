@@ -76,7 +76,7 @@ export const ApiService = {
   async fetchLiveSnapshot(): Promise<LiveDbData | null> {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
 
       const res = await fetch(`${API_BASE_URL}/api/realtime-data`, {
         signal: controller.signal,
