@@ -15,6 +15,12 @@
     },
     "android": {
       "package": "com.web3apk.womupadmin"
+    },
+    "owner": "darshanthanki007",
+    "extra": {
+      "eas": {
+        "projectId": "48151227-8b4b-48e3-8e1c-941787f381c8"
+      }
     }
   }
 }
