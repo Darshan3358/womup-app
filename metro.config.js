@@ -3,8 +3,10 @@ const path = require('path');
 
 const config = getDefaultConfig(__dirname);
 
-// Disable hierarchical lookup to prevent walking up or through duplicate node_modules
-config.resolver.disableHierarchicalLookup = true;
+// Ensure Metro resolves packages directly from project node_modules
+config.resolver.nodeModulesPaths = [
+  path.resolve(__dirname, 'node_modules'),
+];
 
 // Exclude nested Womup Admin project from Metro crawler & resolver
 const defaultBlockList = Array.isArray(config.resolver.blockList)

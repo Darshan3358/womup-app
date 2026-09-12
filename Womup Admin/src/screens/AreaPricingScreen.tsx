@@ -56,7 +56,15 @@ export const AreaPricingScreen: React.FC = () => {
       isActive: true,
     };
 
-  const filteredProducts = products.filter((p) => p.categoryId === activeCategory.id);
+  const isProductInCategory = (p: ProductItem, cat?: CategoryItem) => {
+    if (!cat) return false;
+    if (p.categoryId && cat.id && String(p.categoryId) === String(cat.id)) return true;
+    if (p.category && cat.name && p.category.trim().toLowerCase() === cat.name.trim().toLowerCase()) return true;
+    if (p.category && cat.slug && p.category.trim().toLowerCase() === cat.slug.trim().toLowerCase()) return true;
+    return false;
+  };
+
+  const filteredProducts = products.filter((p) => isProductInCategory(p, activeCategory));
 
   const currentZoneObj = zones.find(
     (z) => z.name === selectedZone || z.id === selectedZone
@@ -217,7 +225,7 @@ export const AreaPricingScreen: React.FC = () => {
         >
           {categories.map((cat) => {
             const isSelected = activeCategory?.id === cat.id;
-            const count = products.filter((p) => p.categoryId === cat.id).length;
+            const count = products.filter((p) => isProductInCategory(p, cat)).length;
             return (
               <TouchableOpacity
                 key={cat.id}
