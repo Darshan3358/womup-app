@@ -16,21 +16,18 @@ import {
   CategoryItem,
   DarkStoreItem,
 } from '../types/admin';
-import {
-  LIVE_CUSTOMERS,
-  LIVE_ORDERS,
-  LIVE_PRODUCTS,
-  LIVE_CATEGORIES,
-  LIVE_ZONES,
-  LIVE_ZONE_PRICES,
-  LIVE_INVENTORY,
-  LIVE_STAFF,
-  LIVE_CAMPAIGNS,
-  LIVE_COIN_LEDGER,
-  LIVE_AUDIT_LOGS,
-} from '../data/liveDatabase';
 
-const API_BASE_URL = 'https://womup-admin-backend.onrender.com';
+const getApiBaseUrl = () => {
+  if (typeof window !== 'undefined' && window.location) {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') {
+      return 'http://localhost:5001';
+    }
+  }
+  return 'https://womup-admin-backend.onrender.com';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 
 export interface LiveDbData {
@@ -54,21 +51,21 @@ export interface LiveDbData {
 export const ApiService = {
   getInitialData(): LiveDbData {
     return {
-      customers: LIVE_CUSTOMERS,
-      orders: LIVE_ORDERS,
+      customers: [],
+      orders: [],
       printOrders: [],
-      products: LIVE_PRODUCTS,
-      categories: LIVE_CATEGORIES,
-      zones: LIVE_ZONES,
+      products: [],
+      categories: [],
+      zones: [],
       stores: [],
       zonePrices: {},
       areaPricing: {},
       areaPricingRecords: [],
-      inventory: LIVE_INVENTORY,
-      staff: LIVE_STAFF,
-      campaigns: LIVE_CAMPAIGNS,
-      coinLedger: LIVE_COIN_LEDGER,
-      auditLogs: LIVE_AUDIT_LOGS,
+      inventory: [],
+      staff: [],
+      campaigns: [],
+      coinLedger: [],
+      auditLogs: [],
     };
   },
 
@@ -76,7 +73,7 @@ export const ApiService = {
   async fetchLiveSnapshot(): Promise<LiveDbData | null> {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000);
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
 
       const res = await fetch(`${API_BASE_URL}/api/realtime-data`, {
         signal: controller.signal,
@@ -230,7 +227,7 @@ export const ApiService = {
                 sortOrder: c.sortOrder || 0,
                 isActive: c.isActive !== false,
               }))
-          : LIVE_CATEGORIES;
+          : [];
 
         // 5. DYNAMICALLY MAP PRODUCTS AND ATTACH VARIANTS
         const dynamicProducts: ProductItem[] = (data.products && data.products.length > 0)
@@ -264,7 +261,7 @@ export const ApiService = {
                 updatedAt: p.updatedAt,
               };
             })
-          : LIVE_PRODUCTS;
+          : [];
 
         // 6. DYNAMICALLY MAP ZONES FROM LIVE MONGODB
         const dynamicZones: Zone[] = (data.areas && data.areas.length > 0)
@@ -276,10 +273,10 @@ export const ApiService = {
               address: a.address || `${a.name}, ${a.city || 'Ahmedabad'}`,
               city: a.city || 'Ahmedabad',
               isActive: a.isActive !== false,
-              activeOrders: 12,
-              gmvSharePercent: 20,
+              activeOrders: 0,
+              gmvSharePercent: 0,
             }))
-          : LIVE_ZONES;
+          : [];
 
         const areaIdToName: Record<string, string> = {};
         dynamicZones.forEach((z) => {
@@ -384,9 +381,87 @@ export const ApiService = {
           };
         });
 
+        // 10. DYNAMICALLY MAP STAFF FROM USERS COLLECTION (Roles: PICKER, RIDER, STAFF, ADMIN)
+        const dynamicStaff: StaffMember[] = (data.users || [])
+          .filter((u: any) => u.role && u.role !== 'CUSTOMER')
+          .map((u: any) => ({
+            id: u._id?.toString ? u._id.toString() : String(u._id),
+            name: u.name || 'Staff Member',
+            phone: u.phone || '',
+            role: (u.role === 'RIDER' ? 'Rider' : 'Picker') as 'Picker' | 'Rider',
+            zone: 'Ahmedabad Central',
+            darkStore: 'Wom Up Ahmedabad Central Dark Store',
+            status: 'On Duty',
+            activeOrdersCount: 0,
+            rating: 5.0,
+            avatar: u.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&q=80',
+          }));
+
+        // 11. DYNAMICALLY MAP MARKETING CAMPAIGNS FROM REAL COUPONS & BANNERS IN MONGODB
+        const dynamicCampaigns: MarketingCampaign[] = [
+          ...(data.coupons || []).map((c: any) => ({
+            id: c._id?.toString ? c._id.toString() : String(c._id),
+            name: `${c.code} Coupon`,
+            scheduledAt: c.validUntil ? `Expires: ${new Date(c.validUntil).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}` : 'Ongoing',
+            targetAudience: `Min Order ₹${c.minOrderValue || 0}`,
+            isEnabled: c.isActive !== false,
+            subject: c.description || `Get ${c.discountValue}${c.discountType === 'PERCENTAGE' ? '%' : '₹'} OFF`,
+            message: `Discount: ${c.discountValue}${c.discountType === 'PERCENTAGE' ? '%' : '₹'} | Max: ₹${c.maxDiscountAmount || c.discountValue}`,
+            status: (c.isActive ? 'Scheduled' : 'Completed') as 'Scheduled' | 'Completed',
+            sentCount: c.perUserLimit || 1,
+          })),
+          ...(data.banners || []).map((b: any) => ({
+            id: b._id?.toString ? b._id.toString() : String(b._id),
+            name: b.title || 'Promotional Banner',
+            scheduledAt: `Banner (${b.placement || 'HOME'})`,
+            targetAudience: 'All App Users',
+            isEnabled: b.isActive !== false,
+            subject: b.title || 'App Banner',
+            message: b.videoUrl ? `Video Banner: ${b.videoUrl}` : 'Image Banner',
+            status: (b.isActive ? 'Scheduled' : 'Completed') as 'Scheduled' | 'Completed',
+            sentCount: b.sortOrder || 1,
+          }))
+        ];
+
+        // 12. DYNAMICALLY MAP COIN LEDGER FROM REAL COIN TRANSACTIONS IN MONGODB
+        const dynamicCoinLedger: CoinLedgerItem[] = (data.coinTransactions || []).map((ct: any) => {
+          const user = (data.users || []).find(
+            (u: any) => (u._id?.toString ? u._id.toString() : String(u._id)) === (ct.userId?.toString ? ct.userId.toString() : String(ct.userId))
+          );
+          return {
+            id: ct._id?.toString ? ct._id.toString() : String(ct._id),
+            userName: user ? user.name : 'Customer',
+            type: ct.type === 'BONUS' ? 'Earned' : ct.type === 'SPEND' ? 'Used' : 'Adjusted',
+            amount: Number(ct.coins) || 0,
+            reason: ct.description || ct.referenceType || 'Reward / Transaction',
+            timestamp: ct.createdAt ? new Date(ct.createdAt).toLocaleString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            }) : 'Recent',
+          };
+        });
+
+        // 13. DYNAMICALLY MAP AUDIT LOGS FROM REAL ORDER STATUS HISTORY IN MONGODB
+        const dynamicAuditLogs: AuditLogItem[] = (data.orderHistory || []).map((oh: any) => ({
+          id: oh._id?.toString ? oh._id.toString() : String(oh._id),
+          adminName: oh.changedByRole === 'CUSTOMER' ? 'Customer App' : (oh.changedByRole || 'System Admin'),
+          action: `Status: ${oh.previousStatus || 'INIT'} ➔ ${oh.newStatus || 'UPDATED'}`,
+          target: `Order #${String(oh.orderId).slice(-6).toUpperCase()}`,
+          details: oh.notes || 'Order state transition updated in MongoDB',
+          timestamp: oh.createdAt ? new Date(oh.createdAt).toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            year: 'numeric'
+          }) : 'Recent',
+        }));
+
         return {
-          customers: dynamicCustomers.length > 0 ? dynamicCustomers : LIVE_CUSTOMERS,
-          orders: dynamicOrders.length > 0 ? dynamicOrders : LIVE_ORDERS,
+          customers: dynamicCustomers,
+          orders: dynamicOrders,
           printOrders: dynamicPrintOrders,
           products: dynamicProducts,
           categories: dynamicCategories,
@@ -396,10 +471,10 @@ export const ApiService = {
           areaPricing: areaPricingMap,
           areaPricingRecords,
           inventory: dynamicInventory,
-          staff: LIVE_STAFF,
-          campaigns: LIVE_CAMPAIGNS,
-          coinLedger: LIVE_COIN_LEDGER,
-          auditLogs: LIVE_AUDIT_LOGS,
+          staff: dynamicStaff,
+          campaigns: dynamicCampaigns,
+          coinLedger: dynamicCoinLedger,
+          auditLogs: dynamicAuditLogs,
         };
       }
       return null;

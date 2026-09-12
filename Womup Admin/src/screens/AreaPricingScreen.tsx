@@ -58,9 +58,9 @@ export const AreaPricingScreen: React.FC = () => {
 
   const isProductInCategory = (p: ProductItem, cat?: CategoryItem) => {
     if (!cat) return false;
-    if (p.categoryId && cat.id && String(p.categoryId) === String(cat.id)) return true;
-    if (p.category && cat.name && p.category.trim().toLowerCase() === cat.name.trim().toLowerCase()) return true;
-    if (p.category && cat.slug && p.category.trim().toLowerCase() === cat.slug.trim().toLowerCase()) return true;
+    if (cat.id && p.categoryId && p.categoryId === cat.id) return true;
+    if (cat.name && p.category && p.category.trim().toLowerCase() === cat.name.trim().toLowerCase()) return true;
+    if (cat.slug && p.category && p.category.trim().toLowerCase() === cat.slug.trim().toLowerCase()) return true;
     return false;
   };
 

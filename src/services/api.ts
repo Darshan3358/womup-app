@@ -2,8 +2,9 @@ import { Platform } from 'react-native';
 import { StorageService } from './storageService';
 
 // Automatically detect host based on environment
-// Live Render Cloud Backend
-export const API_BASE_URL = 'https://womup-app.onrender.com/api/v1';
+// API URL from env var — set EXPO_PUBLIC_API_URL in .env to switch between local/Render
+export const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_URL ?? 'https://womup-app.onrender.com/api/v1';
 
 class ApiClient {
   private token: string | null = null;

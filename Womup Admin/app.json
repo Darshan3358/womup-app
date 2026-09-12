@@ -4,7 +4,6 @@
     "slug": "womup-admin",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/womup_logo.png",
@@ -15,12 +14,7 @@
       "bundler": "metro"
     },
     "android": {
-      "package": "com.web3apk.womupadmin",
-      "adaptiveIcon": {
-        "backgroundColor": "#05062A",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png"
-      }
+      "package": "com.web3apk.womupadmin"
     },
     "owner": "darshanthanki007",
     "extra": {

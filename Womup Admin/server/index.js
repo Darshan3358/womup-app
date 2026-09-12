@@ -58,6 +58,7 @@ app.get('/api/realtime-data', async (req, res) => {
     const printOrders = await db.collection('print_orders').find({}).toArray();
     const productVariants = await db.collection('product_variants').find({}).toArray();
     const areaPricing = await db.collection('area_pricing').find({}).toArray();
+    const banners = await db.collection('banners').find({}).toArray();
 
     res.json({
       users,
@@ -71,6 +72,7 @@ app.get('/api/realtime-data', async (req, res) => {
       inventory,
       coinTransactions,
       coupons,
+      banners,
       orderHistory,
       addresses,
       printOrders,

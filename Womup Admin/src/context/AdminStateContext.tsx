@@ -17,19 +17,6 @@ import {
   CategoryItem,
   DarkStoreItem,
 } from '../types/admin';
-import {
-  LIVE_CUSTOMERS,
-  LIVE_ZONES,
-  LIVE_PRODUCTS,
-  LIVE_CATEGORIES,
-  LIVE_ZONE_PRICES,
-  LIVE_INVENTORY,
-  LIVE_ORDERS,
-  LIVE_STAFF,
-  LIVE_CAMPAIGNS,
-  LIVE_COIN_LEDGER,
-  LIVE_AUDIT_LOGS,
-} from '../data/liveDatabase';
 import { ApiService } from '../services/api';
 
 export type ActiveTab =
@@ -202,40 +189,40 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const toggleSidebar = () => setIsSidebarOpen((prev) => !prev);
 
   const [syncStatus, setSyncStatus] = useState<string>('Live MongoDB Connected');
-  const [zones, setZones] = useState<Zone[]>(LIVE_ZONES);
-  const [customers, setCustomers] = useState<Customer[]>(LIVE_CUSTOMERS);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(LIVE_CUSTOMERS[0] || null);
+  const [zones, setZones] = useState<Zone[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
-  const [categories, setCategories] = useState<CategoryItem[]>(LIVE_CATEGORIES);
-  const [products, setProducts] = useState<ProductItem[]>(LIVE_PRODUCTS);
+  const [categories, setCategories] = useState<CategoryItem[]>([]);
+  const [products, setProducts] = useState<ProductItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
-  const [zonePrices, setZonePrices] = useState<Record<string, Record<string, number>>>(LIVE_ZONE_PRICES);
+  const [zonePrices, setZonePrices] = useState<Record<string, Record<string, number>>>({});
   const [areaPricing, setAreaPricing] = useState<Record<string, Record<string, number>>>({});
   const [areaPricingRecords, setAreaPricingRecords] = useState<AreaPricingRecord[]>([]);
-  const [selectedZone, setSelectedZone] = useState<string>(LIVE_ZONES[0]?.name || 'Prahlad Nagar');
+  const [selectedZone, setSelectedZone] = useState<string>('');
   const [selectedVariantPricing, setSelectedVariantPricing] = useState<{
     product: ProductItem;
     variant: ProductVariantItem;
     zone: string;
   } | null>(null);
 
-  const [inventory, setInventory] = useState<InventoryItem[]>(LIVE_INVENTORY);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [darkStores, setDarkStores] = useState<DarkStoreItem[]>([]);
-  const [selectedDarkStore, setSelectedDarkStore] = useState<string>('Wom Up Ahmedabad Central Dark Store');
+  const [selectedDarkStore, setSelectedDarkStore] = useState<string>('');
   const [spoilageLogs, setSpoilageLogs] = useState<StockAdjustment[]>([]);
 
-  const [orders, setOrders] = useState<Order[]>(LIVE_ORDERS);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(LIVE_ORDERS[0] || null);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   const [printOrders, setPrintOrders] = useState<PrintOrder[]>([]);
   const [selectedPrintOrder, setSelectedPrintOrder] = useState<PrintOrder | null>(null);
 
   const [labelPrintData, setLabelPrintData] = useState<any | null>(null);
 
-  const [staff, setStaff] = useState<StaffMember[]>(LIVE_STAFF);
-  const [campaigns, setCampaigns] = useState<MarketingCampaign[]>(LIVE_CAMPAIGNS);
-  const [coinLedger, setCoinLedger] = useState<CoinLedgerItem[]>(LIVE_COIN_LEDGER);
-  const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>(LIVE_AUDIT_LOGS);
+  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [campaigns, setCampaigns] = useState<MarketingCampaign[]>([]);
+  const [coinLedger, setCoinLedger] = useState<CoinLedgerItem[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
 
   const logAudit = (action: string, target: string, details: string) => {
     const newLog: AuditLogItem = {
@@ -253,47 +240,33 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     try {
       const live = await ApiService.fetchLiveSnapshot();
       if (live) {
-        setCustomers(live.customers);
-        setOrders(live.orders);
-        if (live.printOrders && live.printOrders.length > 0) {
-          setPrintOrders(live.printOrders);
+        setCustomers(live.customers || []);
+        if (live.customers && live.customers.length > 0) {
+          setSelectedCustomer((prev) => prev || live.customers[0]);
         }
-        if (live.categories && live.categories.length > 0) {
-          setCategories(live.categories);
+        setOrders(live.orders || []);
+        if (live.orders && live.orders.length > 0) {
+          setSelectedOrder((prev) => prev || live.orders[0]);
         }
-        if (live.products && live.products.length > 0) {
-          setProducts(live.products);
-        }
+        setPrintOrders(live.printOrders || []);
+        setCategories(live.categories || []);
+        setProducts(live.products || []);
+        setZones(live.zones || []);
         if (live.zones && live.zones.length > 0) {
-          setZones(live.zones);
+          setSelectedZone((prev) => prev || live.zones[0].name);
         }
+        setDarkStores(live.stores || []);
         if (live.stores && live.stores.length > 0) {
-          setDarkStores(live.stores);
+          setSelectedDarkStore((prev) => prev || live.stores[0].name);
         }
-        if (live.zonePrices && Object.keys(live.zonePrices).length > 0) {
-          setZonePrices(live.zonePrices);
-        }
-        if (live.areaPricing && Object.keys(live.areaPricing).length > 0) {
-          setAreaPricing(live.areaPricing);
-        }
-        if (live.areaPricingRecords && live.areaPricingRecords.length > 0) {
-          setAreaPricingRecords(live.areaPricingRecords);
-        }
-        if (live.inventory && live.inventory.length > 0) {
-          setInventory(live.inventory);
-        }
-        if (live.staff && live.staff.length > 0) {
-          setStaff(live.staff);
-        }
-        if (live.campaigns && live.campaigns.length > 0) {
-          setCampaigns(live.campaigns);
-        }
-        if (live.coinLedger && live.coinLedger.length > 0) {
-          setCoinLedger(live.coinLedger);
-        }
-        if (live.auditLogs && live.auditLogs.length > 0) {
-          setAuditLogs(live.auditLogs);
-        }
+        setZonePrices(live.zonePrices || {});
+        setAreaPricing(live.areaPricing || {});
+        setAreaPricingRecords(live.areaPricingRecords || []);
+        setInventory(live.inventory || []);
+        setStaff(live.staff || []);
+        setCampaigns(live.campaigns || []);
+        setCoinLedger(live.coinLedger || []);
+        setAuditLogs(live.auditLogs || []);
         setSyncStatus('Live MongoDB Connected');
       } else {
         setSyncStatus('Live DB Active (Cluster0)');
