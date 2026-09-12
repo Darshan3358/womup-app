@@ -264,7 +264,7 @@ export const ApiService = {
                 updatedAt: p.updatedAt,
               };
             })
-          : [];
+          : LIVE_PRODUCTS;
 
         // 6. DYNAMICALLY MAP ZONES FROM LIVE MONGODB
         const dynamicZones: Zone[] = (data.areas && data.areas.length > 0)

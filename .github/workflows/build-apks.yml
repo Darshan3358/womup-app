@@ -12,6 +12,7 @@ on:
           - customer
           - admin
           - both
+          
 
 jobs:
   build-customer:

@@ -261,23 +261,39 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (live.categories && live.categories.length > 0) {
           setCategories(live.categories);
         }
-        setProducts(live.products);
-        setZones(live.zones);
+        if (live.products && live.products.length > 0) {
+          setProducts(live.products);
+        }
+        if (live.zones && live.zones.length > 0) {
+          setZones(live.zones);
+        }
         if (live.stores && live.stores.length > 0) {
           setDarkStores(live.stores);
         }
-        setZonePrices(live.zonePrices);
-        if (live.areaPricing) {
+        if (live.zonePrices && Object.keys(live.zonePrices).length > 0) {
+          setZonePrices(live.zonePrices);
+        }
+        if (live.areaPricing && Object.keys(live.areaPricing).length > 0) {
           setAreaPricing(live.areaPricing);
         }
-        if (live.areaPricingRecords) {
+        if (live.areaPricingRecords && live.areaPricingRecords.length > 0) {
           setAreaPricingRecords(live.areaPricingRecords);
         }
-        setInventory(live.inventory);
-        setStaff(live.staff);
-        setCampaigns(live.campaigns);
-        setCoinLedger(live.coinLedger);
-        setAuditLogs(live.auditLogs);
+        if (live.inventory && live.inventory.length > 0) {
+          setInventory(live.inventory);
+        }
+        if (live.staff && live.staff.length > 0) {
+          setStaff(live.staff);
+        }
+        if (live.campaigns && live.campaigns.length > 0) {
+          setCampaigns(live.campaigns);
+        }
+        if (live.coinLedger && live.coinLedger.length > 0) {
+          setCoinLedger(live.coinLedger);
+        }
+        if (live.auditLogs && live.auditLogs.length > 0) {
+          setAuditLogs(live.auditLogs);
+        }
         setSyncStatus('Live MongoDB Connected');
       } else {
         setSyncStatus('Live DB Active (Cluster0)');
