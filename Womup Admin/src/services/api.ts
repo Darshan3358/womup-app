@@ -71,17 +71,23 @@ export const ApiService = {
 
   // Dynamic live snapshot parser connecting directly to MongoDB Atlas
   async fetchLiveSnapshot(): Promise<LiveDbData | null> {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const controller = new AbortController();
+        // 35s timeout to allow Render free-tier cold start & mobile latency
+        const timeoutId = setTimeout(() => controller.abort(), 35000);
 
-      const res = await fetch(`${API_BASE_URL}/api/realtime-data`, {
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
+        const res = await fetch(`${API_BASE_URL}/api/realtime-data`, {
+          signal: controller.signal,
+          headers: {
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache',
+          },
+        });
+        clearTimeout(timeoutId);
 
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
 
       if (data && data.users) {
         // 1. DYNAMICALLY MAP CUSTOMERS FROM LIVE MONGODB
@@ -478,10 +484,13 @@ export const ApiService = {
         };
       }
       return null;
-    } catch {
-      return null;
+    } catch (err: any) {
+      console.warn(`[API] fetchLiveSnapshot attempt ${attempt} error:`, err?.message || err);
+      if (attempt === 2) return null;
     }
-  },
+  }
+  return null;
+},
 
   // 1. PERSIST CUSTOMER EDIT TO LIVE MONGODB
   async updateCustomer(id: string, data: Partial<Customer>): Promise<boolean> {
