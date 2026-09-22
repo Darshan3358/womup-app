@@ -16,13 +16,15 @@ on:
           - store
           - both
 
+env:
+  NODE_ENV: production
+  ANDROID_HOME: /usr/local/lib/android/sdk
+
 jobs:
   build-customer:
     if: inputs.target_app == 'customer' || inputs.target_app == 'all' || inputs.target_app == 'both'
     name: Build Customer App APK
     runs-on: ubuntu-latest
-    env:
-      NODE_ENV: production
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -43,8 +45,8 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Accept Android SDK Licenses
+        run: yes | sdkmanager --licenses 2>/dev/null || true
 
       - name: Make Gradle Executable
         run: chmod +x android/gradlew
@@ -70,8 +72,6 @@ jobs:
     if: inputs.target_app == 'admin' || inputs.target_app == 'all' || inputs.target_app == 'both'
     name: Build Admin App APK
     runs-on: ubuntu-latest
-    env:
-      NODE_ENV: production
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -81,6 +81,7 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '17'
+          cache: 'gradle'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -92,8 +93,8 @@ jobs:
           cd "Womup Admin"
           npm ci
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Accept Android SDK Licenses
+        run: yes | sdkmanager --licenses 2>/dev/null || true
 
       - name: Make Admin Gradle Executable
         run: chmod +x "Womup Admin/android/gradlew"
@@ -119,8 +120,6 @@ jobs:
     if: inputs.target_app == 'rider' || inputs.target_app == 'all'
     name: Build Rider App APK
     runs-on: ubuntu-latest
-    env:
-      NODE_ENV: production
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -130,6 +129,7 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '17'
+          cache: 'gradle'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -141,8 +141,8 @@ jobs:
           cd "Womup Rider"
           npm ci
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Accept Android SDK Licenses
+        run: yes | sdkmanager --licenses 2>/dev/null || true
 
       - name: Make Rider Gradle Executable
         run: chmod +x "Womup Rider/android/gradlew"
@@ -168,8 +168,6 @@ jobs:
     if: inputs.target_app == 'store' || inputs.target_app == 'all'
     name: Build Store App APK
     runs-on: ubuntu-latest
-    env:
-      NODE_ENV: production
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -179,6 +177,7 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '17'
+          cache: 'gradle'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -190,8 +189,8 @@ jobs:
           cd "Womup Store"
           npm ci
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Accept Android SDK Licenses
+        run: yes | sdkmanager --licenses 2>/dev/null || true
 
       - name: Make Store Gradle Executable
         run: chmod +x "Womup Store/android/gradlew"
@@ -212,5 +211,3 @@ jobs:
           name: WormUp-Store-Release-APK
           path: "Womup Store/android/app/build/outputs/apk/release/*.apk"
           retention-days: 7
-
-          
