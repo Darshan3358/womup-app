@@ -15,6 +15,7 @@ import { InventoryScreen } from './src/screens/InventoryScreen';
 import { OrdersScreen } from './src/screens/OrdersScreen';
 import { StaffScreen } from './src/screens/StaffScreen';
 import { MarketingScreen } from './src/screens/MarketingScreen';
+import { StoresManagementScreen } from './src/screens/StoresManagementScreen';
 
 // Sub Views
 import { CustomerProfileScreen } from './src/screens/sub/CustomerProfileScreen';
@@ -68,6 +69,8 @@ const MainApp: React.FC = () => {
         return <StaffScreen />;
       case 'Marketing':
         return <MarketingScreen />;
+      case 'Stores':
+        return <StoresManagementScreen />;
       default:
         return <DashboardScreen />;
     }

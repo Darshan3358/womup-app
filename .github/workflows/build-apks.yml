@@ -6,17 +6,19 @@ on:
       target_app:
         description: 'Which APK to build'
         required: true
-        default: 'both'
+        default: 'all'
         type: choice
         options:
+          - all
           - customer
           - admin
+          - rider
+          - store
           - both
-          
 
 jobs:
   build-customer:
-    if: inputs.target_app == 'customer' || inputs.target_app == 'both'
+    if: inputs.target_app == 'customer' || inputs.target_app == 'all' || inputs.target_app == 'both'
     name: Build Customer App APK
     runs-on: ubuntu-latest
     env:
@@ -65,7 +67,7 @@ jobs:
           retention-days: 7
 
   build-admin:
-    if: inputs.target_app == 'admin' || inputs.target_app == 'both'
+    if: inputs.target_app == 'admin' || inputs.target_app == 'all' || inputs.target_app == 'both'
     name: Build Admin App APK
     runs-on: ubuntu-latest
     env:
@@ -112,3 +114,103 @@ jobs:
           name: WormUp-Admin-Release-APK
           path: "Womup Admin/android/app/build/outputs/apk/release/*.apk"
           retention-days: 7
+
+  build-rider:
+    if: inputs.target_app == 'rider' || inputs.target_app == 'all'
+    name: Build Rider App APK
+    runs-on: ubuntu-latest
+    env:
+      NODE_ENV: production
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Rider Dependencies
+        run: |
+          cd "Womup Rider"
+          npm ci
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Make Rider Gradle Executable
+        run: chmod +x "Womup Rider/android/gradlew"
+
+      - name: Clean Rider Gradle
+        run: |
+          cd "Womup Rider/android"
+          ./gradlew clean
+
+      - name: Build Rider Release APK
+        run: |
+          cd "Womup Rider/android"
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Upload Rider APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: WormUp-Rider-Release-APK
+          path: "Womup Rider/android/app/build/outputs/apk/release/*.apk"
+          retention-days: 7
+
+  build-store:
+    if: inputs.target_app == 'store' || inputs.target_app == 'all'
+    name: Build Store App APK
+    runs-on: ubuntu-latest
+    env:
+      NODE_ENV: production
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Store Dependencies
+        run: |
+          cd "Womup Store"
+          npm ci
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Make Store Gradle Executable
+        run: chmod +x "Womup Store/android/gradlew"
+
+      - name: Clean Store Gradle
+        run: |
+          cd "Womup Store/android"
+          ./gradlew clean
+
+      - name: Build Store Release APK
+        run: |
+          cd "Womup Store/android"
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Upload Store APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: WormUp-Store-Release-APK
+          path: "Womup Store/android/app/build/outputs/apk/release/*.apk"
+          retention-days: 7
+
+          

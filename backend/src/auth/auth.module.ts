@@ -11,6 +11,8 @@ import { User, UserSchema } from '../users/schemas/user.schema';
 import { OtpVerification, OtpVerificationSchema } from './schemas/otp.schema';
 import { RefreshToken, RefreshTokenSchema } from './schemas/refresh-token.schema';
 import { CoinTransaction, CoinTransactionSchema } from '../coins/schemas/coin-transaction.schema';
+import { DeliveryPartner, DeliveryPartnerSchema } from '../delivery/schemas/delivery-partner.schema';
+import { Store, StoreSchema } from '../stores/schemas/store.schema';
 
 @Module({
   imports: [
@@ -22,6 +24,8 @@ import { CoinTransaction, CoinTransactionSchema } from '../coins/schemas/coin-tr
       { name: OtpVerification.name, schema: OtpVerificationSchema },
       { name: RefreshToken.name, schema: RefreshTokenSchema },
       { name: CoinTransaction.name, schema: CoinTransactionSchema },
+      { name: DeliveryPartner.name, schema: DeliveryPartnerSchema },
+      { name: Store.name, schema: StoreSchema },
     ]),
   ],
   controllers: [AuthController],

@@ -44,7 +44,20 @@ app.get('/api/health', (req, res) => {
 app.get('/api/realtime-data', async (req, res) => {
   try {
     const db = getDB();
-    const users = await db.collection('users').find({}).toArray();
+    const deliveryPartners = await db.collection('delivery_partners').find({}).toArray();
+    const partnerUserIds = deliveryPartners.map(p => p.userId?.toString()).filter(Boolean);
+
+    // Only genuine customers (exclude delivery partners and admins)
+    const users = await db.collection('users').find({
+      role: { $nin: ['DELIVERY_PARTNER', 'delivery_partner', 'ADMIN', 'admin'] },
+      _id: {
+        $nin: partnerUserIds
+          .map(id => {
+            try { return new ObjectId(id); } catch { return null; }
+          })
+          .filter(Boolean),
+      },
+    }).toArray();
     const orders = await db.collection('orders').find({}).toArray();
     const products = await db.collection('products').find({}).toArray();
     const categories = await db.collection('categories').find({}).toArray();
@@ -62,6 +75,7 @@ app.get('/api/realtime-data', async (req, res) => {
 
     res.json({
       users,
+      deliveryPartners,
       orders,
       products,
       productVariants,
@@ -79,6 +93,140 @@ app.get('/api/realtime-data', async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+const { ObjectId } = require('mongodb');
+
+// Explicit Customers vs Delivery Partners endpoints
+app.get('/api/admin/customers', async (req, res) => {
+  try {
+    const db = getDB();
+    const deliveryPartners = await db.collection('delivery_partners').find({}).toArray();
+    const partnerUserIds = deliveryPartners.map(p => p.userId?.toString()).filter(Boolean);
+
+    const customers = await db.collection('users').find({
+      role: { $nin: ['DELIVERY_PARTNER', 'delivery_partner', 'ADMIN', 'admin'] },
+      _id: {
+        $nin: partnerUserIds
+          .map(id => {
+            try { return new ObjectId(id); } catch { return null; }
+          })
+          .filter(Boolean),
+      },
+    }).toArray();
+    res.json({ success: true, count: customers.length, data: customers });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/admin/riders', async (req, res) => {
+  try {
+    const db = getDB();
+    const riders = await db.collection('delivery_partners').find({}).toArray();
+    res.json({ success: true, count: riders.length, data: riders });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/admin/riders/:id', async (req, res) => {
+  try {
+    const db = getDB();
+    const { id } = req.params;
+    let query = {};
+    if (ObjectId.isValid(id)) {
+      query = { $or: [{ _id: new ObjectId(id) }, { partnerCode: id }] };
+    } else {
+      query = { partnerCode: id };
+    }
+
+    const rider = await db.collection('delivery_partners').findOne(query);
+    if (!rider) {
+      return res.status(404).json({ success: false, error: 'Rider not found' });
+    }
+
+    let email = '';
+    if (rider.userId) {
+      const user = await db.collection('users').findOne({ _id: new ObjectId(rider.userId.toString()) });
+      if (user) {
+        email = user.email || '';
+      }
+    }
+
+    let bankAccount = null;
+    const bankDoc = await db.collection('rider_bank_accounts').findOne({
+      $or: [{ riderId: rider._id }, { userId: rider.userId }]
+    });
+    if (bankDoc) {
+      bankAccount = {
+        accountNumber: bankDoc.accountNumber,
+        ifscCode: bankDoc.ifscCode,
+        bankName: bankDoc.bankName,
+        accountHolderName: bankDoc.accountHolderName,
+        isVerified: bankDoc.isVerified,
+      };
+    }
+
+    res.json({
+      success: true,
+      data: {
+        ...rider,
+        email,
+        bankAccount,
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.patch('/api/admin/riders/:id', async (req, res) => {
+  try {
+    const db = getDB();
+    const { id } = req.params;
+    const updates = req.body;
+
+    let query = {};
+    if (ObjectId.isValid(id)) {
+      query = { $or: [{ _id: new ObjectId(id) }, { partnerCode: id }] };
+    } else {
+      query = { partnerCode: id };
+    }
+
+    const rider = await db.collection('delivery_partners').findOne(query);
+    if (!rider) {
+      return res.status(404).json({ success: false, error: 'Rider not found' });
+    }
+
+    const fieldsToUpdate = {};
+    if (updates.fullName !== undefined) fieldsToUpdate.fullName = updates.fullName;
+    if (updates.name !== undefined) fieldsToUpdate.fullName = updates.name;
+    if (updates.phoneNumber !== undefined) fieldsToUpdate.phoneNumber = updates.phoneNumber;
+    if (updates.phone !== undefined) fieldsToUpdate.phoneNumber = updates.phone;
+    if (updates.vehicleType !== undefined) fieldsToUpdate.vehicleType = updates.vehicleType;
+    if (updates.vehicleNumber !== undefined) fieldsToUpdate.vehicleNumber = updates.vehicleNumber;
+    if (updates.hubName !== undefined) fieldsToUpdate.hubName = updates.hubName;
+    if (updates.city !== undefined) fieldsToUpdate.city = updates.city;
+    if (updates.status !== undefined) fieldsToUpdate.status = updates.status;
+    if (updates.verificationStatus !== undefined) fieldsToUpdate.verificationStatus = updates.verificationStatus;
+    if (updates.isOnline !== undefined) fieldsToUpdate.isOnline = Boolean(updates.isOnline);
+    fieldsToUpdate.updatedAt = new Date();
+
+    await db.collection('delivery_partners').updateOne({ _id: rider._id }, { $set: fieldsToUpdate });
+
+    if (rider.userId && (fieldsToUpdate.fullName || fieldsToUpdate.phoneNumber)) {
+      const userUpdate = {};
+      if (fieldsToUpdate.fullName) userUpdate.name = fieldsToUpdate.fullName;
+      if (fieldsToUpdate.phoneNumber) userUpdate.phone = fieldsToUpdate.phoneNumber;
+      await db.collection('users').updateOne({ _id: new ObjectId(rider.userId.toString()) }, { $set: userUpdate });
+    }
+
+    const updatedRider = await db.collection('delivery_partners').findOne({ _id: rider._id });
+    res.json({ success: true, message: 'Rider updated successfully', data: updatedRider });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

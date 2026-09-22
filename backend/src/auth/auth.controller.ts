@@ -1,7 +1,7 @@
 import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { SendOtpDto, VerifyOtpDto, RegisterDto, RefreshTokenDto } from './dto/auth.dto';
+import { SendOtpDto, VerifyOtpDto, RegisterDto, RegisterRiderDto, RefreshTokenDto } from './dto/auth.dto';
 
 @ApiTags('Authentication')
 @Controller('api/v1/auth')
@@ -29,6 +29,13 @@ export class AuthController {
   @ApiResponse({ status: 201, description: 'User account created with access and refresh tokens' })
   async register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
+  }
+
+  @Post('delivery-register')
+  @ApiOperation({ summary: 'Complete rider registration with verified email and unique mobile number' })
+  @ApiResponse({ status: 201, description: 'Rider account created with access and refresh tokens' })
+  async registerRider(@Body() dto: RegisterRiderDto) {
+    return this.authService.registerRider(dto);
   }
 
   @Post('refresh-token')

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,30 +6,334 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  Animated,
+  Linking,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import io, { Socket } from 'socket.io-client';
 import { COLORS, GRADIENTS } from '../theme/colors';
 import { SPACING, RADIUS } from '../theme/spacing';
 import { Header } from '../components/common/Header';
 import { useApp } from '../context/AppContext';
 import { LinearGradient } from 'expo-linear-gradient';
+import { DynamicLiveMap } from '../components/tracking/DynamicLiveMap';
+import { S27_ChatModal } from '../components/tracking/S27_ChatModal';
 
 export const S24_OrderTrackingScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { currentOrder, setActiveScreen, goBack, user, addToCart } = useApp();
 
   const order = currentOrder;
-  const orderNum = order?.orderNumber || '#W12345678';
-  const partner = order?.deliveryPartner || { name: 'Rohit Kumar (Worm Up Express)', phone: '+91 98123 45678' };
-  const isDelivered = order?.status === 'DELIVERED';
+  const orderNum = order?.orderNumber || (order as any)?.orderId || '';
+  const orderId = (order as any)?._id || order?.id || (orderNum ? orderNum.replace(/^#/, '') : '');
 
+  // Real-time tracking state
+  const [liveStatus, setLiveStatus] = useState<string>((order?.status || 'PLACED').toUpperCase());
+  const [deliveryPin, setDeliveryPin] = useState<string>((order as any)?.deliveryOtp || '4821');
+
+  const rawPartnerName =
+    order?.deliveryPartner?.name ||
+    order?.deliveryPartnerId?.fullName ||
+    (order as any)?.partnerName ||
+    '';
+  const initialPartnerName =
+    rawPartnerName.toLowerCase().includes('rohit') || rawPartnerName.toLowerCase() === 'delivery partner'
+      ? ''
+      : rawPartnerName.replace(/\s*\(Worm Up Express\)/gi, '').trim();
+
+  const initialPartnerPhone =
+    order?.deliveryPartner?.phone ||
+    order?.deliveryPartnerId?.phoneNumber ||
+    (order as any)?.partnerPhone ||
+    '';
+  const initialVehicleNumber =
+    order?.deliveryPartner?.vehicleNumber ||
+    order?.deliveryPartnerId?.vehicleNumber ||
+    (order as any)?.vehicleNumber ||
+    '';
+
+  const [partner, setPartner] = useState({
+    name: initialPartnerName,
+    phone: initialPartnerPhone,
+    vehicleNumber: initialVehicleNumber,
+  });
+  const [riderCoords, setRiderCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [etaText, setEtaText] = useState('9-12 minutes');
+  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
+
+  // Sync real-time updates whenever currentOrder changes in AppContext
+  useEffect(() => {
+    if (order) {
+      if (order.status) {
+        setLiveStatus(order.status.toUpperCase());
+      }
+      if (order.deliveryOtp) {
+        setDeliveryPin(order.deliveryOtp);
+      }
+      const p = order.deliveryPartner || order.deliveryPartnerId;
+      if (p) {
+        const raw = (p as any).name || (p as any).fullName || '';
+        if (raw && !raw.toLowerCase().includes('rohit') && raw.toLowerCase() !== 'delivery partner') {
+          setPartner((prev) => ({
+            name: raw.replace(/\s*\(Worm Up Express\)/gi, '').trim(),
+            phone: (p as any).phone || (p as any).phoneNumber || prev.phone,
+            vehicleNumber: (p as any).vehicleNumber || prev.vehicleNumber,
+          }));
+        }
+      }
+    }
+  }, [order]);
+
+  const isPartnerAssigned = Boolean(
+    partner.name &&
+    partner.name.trim() !== '' &&
+    partner.name.toLowerCase() !== 'delivery partner' &&
+    partner.name.toLowerCase() !== 'assigning...' &&
+    !partner.name.toLowerCase().includes('rohit') &&
+    liveStatus !== 'PLACED'
+  );
+
+  const handleCallPartner = async () => {
+    if (!isPartnerAssigned || !partner.phone) {
+      Alert.alert(
+        'Delivery Partner',
+        'Your delivery partner is currently being allotted. You can call once they accept the order.'
+      );
+      return;
+    }
+    const clean = partner.phone.replace(/[^0-9+]/g, '');
+    const url = `tel:${clean}`;
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        Alert.alert(`Call ${partner.name}`, `Phone: ${partner.phone}`);
+      }
+    } catch {
+      Alert.alert(`Call ${partner.name}`, `Phone: ${partner.phone}`);
+    }
+  };
+
+  // Animation for scooter pulse
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const socketRef = useRef<Socket | null>(null);
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.15,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [pulseAnim]);
+
+  const liveStatusRef = useRef(liveStatus);
+  useEffect(() => {
+    liveStatusRef.current = liveStatus;
+  }, [liveStatus]);
+
+  // Connect to WebSocket Gateway
+  useEffect(() => {
+    const socket = io('http://localhost:5050/tracking', {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 20,
+      reconnectionDelay: 1500,
+    });
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      setIsConnected(true);
+      if (orderId) {
+        socket.emit('join_order', { orderId });
+      }
+      if (orderNum) {
+        socket.emit('join_order', { orderId: orderNum });
+        socket.emit('join_order', { orderId: orderNum.replace(/^#/, '') });
+      }
+    });
+
+    socket.on('disconnect', () => {
+      setIsConnected(false);
+    });
+
+    socket.on('order_status', (data: any) => {
+      if (!data) return;
+      const eventOrderId = data.orderId?.toString();
+      const eventOrderNum = (data.orderNumber || data.orderNum)?.toString();
+      const curOrderId = orderId?.toString();
+      const curOrderNum = orderNum?.toString();
+
+      const isMatch =
+        !eventOrderId ||
+        eventOrderId === curOrderId ||
+        eventOrderId === curOrderNum ||
+        eventOrderNum === curOrderNum ||
+        (curOrderNum && eventOrderNum && curOrderNum.replace(/^#/, '') === eventOrderNum.replace(/^#/, '')) ||
+        (curOrderId && eventOrderId && curOrderId.replace(/^#/, '') === eventOrderId.replace(/^#/, ''));
+
+      if (!isMatch) return;
+
+      const rawStatus = data.status || data.orderStatus || '';
+      const newStatus = rawStatus.toUpperCase();
+      if (newStatus) {
+        setLiveStatus(newStatus);
+
+        if (newStatus === 'OUT_FOR_DELIVERY') {
+          setEtaText('5-7 minutes');
+        } else if (newStatus === 'ARRIVED_AT_CUSTOMER') {
+          setEtaText('Arrived at Doorstep');
+        } else if (newStatus === 'DELIVERED') {
+          setEtaText('Delivered');
+        }
+      }
+
+      if (data.partnerName || data.partnerId || data.phoneNumber || data.partnerPhone) {
+        const rawName = data.partnerName || '';
+        const cleanName = rawName.replace(/\s*\(Worm Up Express\)/gi, '').trim();
+        if (cleanName && !cleanName.toLowerCase().includes('rohit') && cleanName.toLowerCase() !== 'delivery partner') {
+          setPartner((prev) => ({
+            ...prev,
+            name: cleanName,
+            phone: data.partnerPhone || data.phoneNumber || prev.phone,
+            vehicleNumber: data.vehicleNumber || prev.vehicleNumber,
+          }));
+        }
+      }
+
+      if (data.deliveryOtp) {
+        setDeliveryPin(data.deliveryOtp);
+      }
+    });
+
+    socket.on('update_delivery_location', (data: any) => {
+      if (!data) return;
+      const eventOrderId = data.orderId?.toString();
+      if (eventOrderId && orderId && eventOrderId !== orderId && eventOrderId !== orderNum) return;
+      if (data.latitude && data.longitude) {
+        setRiderCoords({ latitude: data.latitude, longitude: data.longitude });
+      }
+    });
+
+    // Helper to refresh order data with self-healing REST fallback
+    const refreshOrderData = async () => {
+      if (liveStatusRef.current === 'DELIVERED') return;
+      const targetQuery = orderId || orderNum.replace(/^#/, '') || orderNum;
+      if (!targetQuery || targetQuery === 'W12345678') return;
+
+      try {
+        const res = await fetch(`http://localhost:5050/api/v1/orders/${encodeURIComponent(targetQuery)}`);
+        if (res.ok) {
+          const json = await res.json();
+          const fresh = json.data || json;
+          const rawStatus = fresh?.status || fresh?.orderStatus || '';
+          const targetStatus = rawStatus.toUpperCase();
+          if (targetStatus) {
+            setLiveStatus(targetStatus);
+            if (targetStatus === 'OUT_FOR_DELIVERY') {
+              setEtaText('5-7 minutes');
+            } else if (targetStatus === 'ARRIVED_AT_CUSTOMER') {
+              setEtaText('Arrived at Doorstep');
+            } else if (targetStatus === 'DELIVERED') {
+              setEtaText('Delivered');
+            }
+          }
+          if (fresh?.deliveryOtp) setDeliveryPin(fresh.deliveryOtp);
+          const pObj = fresh?.deliveryPartner || fresh?.deliveryPartnerId;
+          if (pObj) {
+            const raw = pObj.name || pObj.fullName || '';
+            const clean = raw.replace(/\s*\(Worm Up Express\)/gi, '').trim();
+            if (clean && !clean.toLowerCase().includes('rohit') && clean.toLowerCase() !== 'delivery partner') {
+              setPartner((prev) => ({
+                ...prev,
+                name: clean,
+                phone: pObj.phone || pObj.phoneNumber || prev.phone,
+                vehicleNumber: pObj.vehicleNumber || prev.vehicleNumber,
+              }));
+            }
+            if (pObj.currentLocation && pObj.currentLocation.latitude && pObj.currentLocation.longitude) {
+              setRiderCoords({
+                latitude: pObj.currentLocation.latitude,
+                longitude: pObj.currentLocation.longitude,
+              });
+            }
+          }
+        }
+      } catch (err) {
+        // silent fallback
+      }
+    };
+
+    // Initial immediate fetch to populate assigned partner details & catch latest status
+    refreshOrderData();
+
+    // Fallback polling every 5s
+    const pollInterval = setInterval(refreshOrderData, 5000);
+
+    return () => {
+      clearInterval(pollInterval);
+      if (orderId) {
+        socket.emit('leave_order', { orderId });
+      }
+      if (orderNum) {
+        socket.emit('leave_order', { orderId: orderNum });
+      }
+      socket.off('connect');
+      socket.off('disconnect');
+      socket.off('order_status');
+      socket.off('update_delivery_location');
+      socket.disconnect();
+    };
+  }, [orderId, orderNum]);
+
+  const isDelivered = liveStatus === 'DELIVERED';
+  const isOutForDelivery = liveStatus === 'OUT_FOR_DELIVERY' || liveStatus === 'ARRIVED_AT_CUSTOMER' || isDelivered;
+  const isPacked = ['GOING_TO_STORE', 'ARRIVED_AT_STORE', 'PACKING', 'PACKED', 'OUT_FOR_DELIVERY', 'ARRIVED_AT_CUSTOMER', 'DELIVERED'].includes(liveStatus);
+
+  // Stepper steps based on real-time authoritative status
   const steps = [
-    { title: 'Order Confirmed', time: order?.date ? order.date.split(',')[1] || 'Just now' : 'Just now', status: 'completed' },
-    { title: 'Packed & Dispatched', time: 'In 3 mins', status: isDelivered ? 'completed' : 'active' },
-    { title: 'Out for Delivery', time: 'In 6 mins', status: isDelivered ? 'completed' : 'pending' },
-    { title: isDelivered ? 'Delivered' : 'Delivering in 9 mins', time: isDelivered ? 'Delivered' : 'Estimated', status: isDelivered ? 'completed' : 'pending' },
+    {
+      title: 'Order Confirmed',
+      time: order?.date ? order.date.split(',')[1] || 'Just now' : 'Just now',
+      status: 'completed',
+    },
+    {
+      title: 'Packed & Dispatched',
+      time: isPacked ? 'Completed' : 'In 3 mins',
+      status: isPacked ? 'completed' : 'active',
+    },
+    {
+      title: 'Out for Delivery',
+      time: isOutForDelivery ? (liveStatus === 'ARRIVED_AT_CUSTOMER' ? 'At Doorstep' : 'In progress') : 'In 6 mins',
+      status: isDelivered ? 'completed' : (isOutForDelivery ? 'active' : 'pending'),
+    },
+    {
+      title: isDelivered ? 'Delivered' : 'Delivering in 9 mins',
+      time: isDelivered ? 'Verified & Delivered' : etaText,
+      status: isDelivered ? 'completed' : (liveStatus === 'ARRIVED_AT_CUSTOMER' ? 'active' : 'pending'),
+    },
   ];
+
+  // Scooter position calculation
+  let scooterLeft = '52%';
+  if (liveStatus === 'PLACED' || liveStatus === 'PACKING') scooterLeft = '22%';
+  else if (liveStatus === 'GOING_TO_STORE' || liveStatus === 'ARRIVED_AT_STORE') scooterLeft = '35%';
+  else if (liveStatus === 'OUT_FOR_DELIVERY') scooterLeft = '60%';
+  else if (liveStatus === 'ARRIVED_AT_CUSTOMER' || liveStatus === 'DELIVERED') scooterLeft = '80%';
+
+  const pinDigits = (deliveryPin || '4821').slice(0, 4).split('');
 
   const handleRepeatOrder = () => {
     if (order?.items && order.items.length > 0) {
@@ -60,11 +364,19 @@ export const S24_OrderTrackingScreen: React.FC = () => {
   return (
     <View style={[styles.flex, { paddingTop: insets.top }]}>
       <Header
-        title="Order Details"
+        title="Live Order Tracking"
         onBack={goBack}
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Connection Status Banner */}
+        <View style={styles.connectionBar}>
+          <View style={[styles.statusDot, isConnected ? styles.dotConnected : styles.dotDisconnected]} />
+          <Text style={styles.connectionText}>
+            {isConnected ? 'Live WebSocket Telemetry Connected' : 'Connecting to live tracking...'}
+          </Text>
+        </View>
+
         {/* Order Info & Status Header */}
         <View style={styles.orderInfoCard}>
           <View style={{ flex: 1 }}>
@@ -73,42 +385,95 @@ export const S24_OrderTrackingScreen: React.FC = () => {
           </View>
           <View style={[styles.statusPill, isDelivered ? styles.statusPillDelivered : styles.statusPillActive]}>
             <Text style={[styles.statusPillText, isDelivered ? styles.statusTextDelivered : styles.statusTextActive]}>
-              {order?.status || 'PLACED'}
+              {liveStatus}
             </Text>
           </View>
         </View>
 
-        {/* Live Delivery Map Visualization */}
-        <View style={styles.mapCard}>
-          <View style={styles.mapMockBackground}>
-            <View style={styles.roadLine} />
-            <View style={styles.dashedRoute} />
+        {/* ANTI-FRAUD DELIVERY PIN CARD */}
+        {!isDelivered ? (
+          <View style={styles.pinCard}>
+            <LinearGradient
+              colors={['#1E1B4B', '#2E1065']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.pinGradient}
+            >
+              <View style={styles.pinHeaderRow}>
+                <View style={styles.pinIconWrap}>
+                  <Ionicons name="shield-checkmark" size={20} color="#F59E0B" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.pinHeading}>DELIVERY VERIFICATION PIN</Text>
+                  <Text style={styles.pinSubheading}>Doorstep Anti-Fraud Handover</Text>
+                </View>
+                <View style={styles.secureTag}>
+                  <Ionicons name="lock-closed" size={11} color="#10B981" />
+                  <Text style={styles.secureTagText}>Secure</Text>
+                </View>
+              </View>
 
-            {/* Store Pin */}
-            <View style={[styles.mapPin, styles.storePin]}>
-              <Ionicons name="storefront" size={16} color={COLORS.white} />
-            </View>
+              <Text style={styles.pinDescription}>
+                Share this 4-digit secret PIN with your delivery partner at your door to verify and complete handover.
+              </Text>
 
-            {/* Delivery Scooter on the way */}
-            <View style={[styles.mapPin, styles.scooterPin]}>
-              <Ionicons name="bicycle" size={18} color={COLORS.white} />
-            </View>
+              {/* 4 Large Digit Display Boxes */}
+              <View style={styles.otpBoxesRow}>
+                {pinDigits.map((digit, idx) => (
+                  <View key={idx} style={styles.otpBox}>
+                    <Text style={styles.otpDigitText}>{digit}</Text>
+                  </View>
+                ))}
+              </View>
 
-            {/* Home Destination Pin */}
-            <View style={[styles.mapPin, styles.homePin]}>
-              <Ionicons name="home" size={16} color={COLORS.white} />
-            </View>
+              <View style={styles.pinFooter}>
+                <Ionicons name="alert-circle-outline" size={14} color="#CBD5E1" />
+                <Text style={styles.pinFooterText}>Do not share this PIN before parcel handover</Text>
+              </View>
+            </LinearGradient>
           </View>
-
-          <View style={styles.mapFooter}>
-            <Text style={styles.mapEta}>
-              {isDelivered ? 'Order Delivered Successfully' : 'Estimated arrival: 9-12 minutes'}
-            </Text>
-            <Text style={styles.mapSub}>
-              {isDelivered ? 'Thank you for shopping with Worm Up!' : 'Worm Up Express delivery partner on the way'}
-            </Text>
+        ) : (
+          <View style={styles.deliveredSuccessCard}>
+            <LinearGradient
+              colors={['#065F46', '#047857']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.deliveredGradient}
+            >
+              <Ionicons name="checkmark-circle" size={32} color="#FFFFFF" />
+              <View style={{ marginLeft: 12, flex: 1 }}>
+                <Text style={styles.deliveredTitle}>Order Delivered & Verified!</Text>
+                <Text style={styles.deliveredSubtitle}>
+                  Handover PIN verified. 10% Shopping Coins credited to your wallet!
+                </Text>
+              </View>
+            </LinearGradient>
           </View>
-        </View>
+        )}
+
+        {/* Dynamic Real-Time Live Map Tracker */}
+        <DynamicLiveMap
+          storeCoords={{
+            latitude: (order as any)?.storeId?.location?.coordinates?.[1] || 23.0305,
+            longitude: (order as any)?.storeId?.location?.coordinates?.[0] || 72.56,
+          }}
+          storeName={(order as any)?.storeId?.name || 'Worm Up Dark Store #01'}
+          customerCoords={{
+            latitude: (order as any)?.deliveryAddress?.coordinates?.[1] || 23.0225,
+            longitude: (order as any)?.deliveryAddress?.coordinates?.[0] || 72.5714,
+          }}
+          customerAddress={
+            order?.deliveryAddress?.houseFlat
+              ? `${order.deliveryAddress.houseFlat}, ${order.deliveryAddress.areaLandmark || ''}`
+              : 'Customer Doorstep'
+          }
+          riderCoords={riderCoords}
+          liveStatus={liveStatus}
+          partnerName={partner.name}
+          partnerVehicle={partner.vehicleNumber}
+          etaText={etaText}
+          orderNumber={orderNum}
+        />
 
         {/* Timeline Progress */}
         <View style={styles.timelineCard}>
@@ -245,31 +610,50 @@ export const S24_OrderTrackingScreen: React.FC = () => {
         </View>
 
         {/* Delivery Partner Section */}
-        <View style={styles.partnerCard}>
-          <View style={styles.partnerAvatar}>
-            <Ionicons name="person" size={24} color={COLORS.purple} />
-          </View>
+        {!isPartnerAssigned ? (
+          <View style={styles.assigningPartnerCard}>
+            <View style={styles.assigningBeacon}>
+              <View style={styles.assigningDot} />
+              <Ionicons name="bicycle" size={24} color={COLORS.hotPink} />
+            </View>
 
-          <View style={styles.partnerInfo}>
-            <Text style={styles.partnerRole}>Delivery Partner</Text>
-            <Text style={styles.partnerName}>{partner.name}</Text>
-          </View>
+            <View style={styles.assigningInfo}>
+              <Text style={styles.assigningTitle}>Assigning delivery partner...</Text>
+              <Text style={styles.assigningSub}>Locating nearest rider at dark store</Text>
+            </View>
 
-          <View style={styles.partnerActions}>
-            <TouchableOpacity
-              onPress={() => Alert.alert('Calling Partner', `Calling ${partner.phone}...`)}
-              style={styles.circleActionButton}
-            >
-              <Ionicons name="call" size={18} color={COLORS.hotPink} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => Alert.alert('Support Chat', 'Worm Up 24x7 Customer Support is here to help.')}
-              style={styles.circleActionButton}
-            >
-              <Ionicons name="chatbubble-ellipses" size={18} color={COLORS.blue} />
-            </TouchableOpacity>
+            <ActivityIndicator size="small" color={COLORS.hotPink} />
           </View>
-        </View>
+        ) : (
+          <View style={styles.partnerCard}>
+            <View style={styles.partnerAvatar}>
+              <Ionicons name="person" size={24} color={COLORS.purple} />
+            </View>
+
+            <View style={styles.partnerInfo}>
+              <Text style={styles.partnerRole}>Delivery Partner</Text>
+              <Text style={styles.partnerName}>{partner.name.replace(/\s*\(Worm Up Express\)/gi, '').trim()}</Text>
+              <Text style={styles.partnerVehicle}>{partner.vehicleNumber || 'Electric Scooter'}</Text>
+            </View>
+
+            <View style={styles.partnerActions}>
+              <TouchableOpacity
+                onPress={handleCallPartner}
+                style={styles.circleActionButton}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="call" size={18} color={COLORS.hotPink} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setIsChatModalOpen(true)}
+                style={styles.circleActionButton}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="chatbubble-ellipses" size={18} color={COLORS.blue} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         {/* Action Buttons: Repeat Order and Help */}
         <TouchableOpacity
@@ -298,6 +682,21 @@ export const S24_OrderTrackingScreen: React.FC = () => {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Real-Time Live Order Chat Modal */}
+      <S27_ChatModal
+        visible={isChatModalOpen}
+        onClose={() => setIsChatModalOpen(false)}
+        orderId={orderId}
+        orderNumber={orderNum}
+        partnerName={partner.name}
+        partnerPhone={partner.phone}
+        partnerVehicle={partner.vehicleNumber}
+        customerId={(user as any)?.id || (user as any)?._id || 'cust_current'}
+        customerName={user?.fullName || 'Worm Up Customer'}
+        liveStatus={liveStatus}
+        socket={socketRef.current}
+      />
     </View>
   );
 };
@@ -310,6 +709,34 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: SPACING.md,
     paddingBottom: 40,
+  },
+  connectionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  dotConnected: {
+    backgroundColor: '#10B981',
+  },
+  dotDisconnected: {
+    backgroundColor: '#F59E0B',
+  },
+  connectionText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
   },
   orderInfoCard: {
     flexDirection: 'row',
@@ -332,21 +759,116 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     marginTop: 2,
   },
-  etaBadge: {
+  pinCard: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: SPACING.md,
+    shadowColor: '#1E1B4B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  pinGradient: {
+    padding: 18,
+  },
+  pinHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF0F7',
+    marginBottom: 10,
+  },
+  pinIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  pinHeading: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#F59E0B',
+    letterSpacing: 0.8,
+  },
+  pinSubheading: {
+    fontSize: 11,
+    color: '#94A3B8',
+  },
+  secureTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: RADIUS.pill,
+    borderRadius: 6,
     gap: 4,
-    borderWidth: 1,
-    borderColor: '#FCE1F5',
   },
-  etaBadgeText: {
-    fontSize: 12,
+  secureTagText: {
+    fontSize: 11,
     fontWeight: '700',
-    color: COLORS.hotPink,
+    color: '#10B981',
+  },
+  pinDescription: {
+    fontSize: 12,
+    color: '#E2E8F0',
+    lineHeight: 18,
+    marginBottom: 14,
+  },
+  otpBoxesRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  otpBox: {
+    width: 54,
+    height: 58,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderWidth: 1.5,
+    borderColor: '#F59E0B',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  otpDigitText: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: '#FDE68A',
+    letterSpacing: 1,
+  },
+  pinFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingTop: 4,
+  },
+  pinFooterText: {
+    fontSize: 11,
+    color: '#94A3B8',
+  },
+  deliveredSuccessCard: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: SPACING.md,
+  },
+  deliveredGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  deliveredTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  deliveredSubtitle: {
+    fontSize: 12,
+    color: '#D1FAE5',
+    marginTop: 2,
+    lineHeight: 16,
   },
   mapCard: {
     backgroundColor: COLORS.white,
@@ -372,7 +894,7 @@ const styles = StyleSheet.create({
   },
   dashedRoute: {
     position: 'absolute',
-    width: '50%',
+    width: '60%',
     height: 3,
     backgroundColor: COLORS.hotPink,
     left: '20%',
@@ -395,7 +917,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.navy,
   },
   scooterPin: {
-    left: '52%',
     backgroundColor: COLORS.hotPink,
   },
   homePin: {
@@ -415,6 +936,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textMuted,
     marginTop: 2,
+  },
+  gpsCoordsText: {
+    fontSize: 10,
+    color: '#059669',
+    marginTop: 4,
+    fontWeight: '600',
   },
   timelineCard: {
     backgroundColor: COLORS.cardBackground,
@@ -490,6 +1017,48 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     marginTop: 2,
   },
+  assigningPartnerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF8FA',
+    borderRadius: RADIUS.card,
+    padding: SPACING.md,
+    borderWidth: 1.5,
+    borderColor: '#FED7E2',
+    borderStyle: 'dashed',
+  },
+  assigningBeacon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFE3EC',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    position: 'relative',
+  },
+  assigningDot: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.hotPink,
+  },
+  assigningInfo: {
+    flex: 1,
+  },
+  assigningTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.navy,
+  },
+  assigningSub: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
   partnerCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -520,6 +1089,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: COLORS.navy,
+    marginTop: 2,
+  },
+  partnerVehicle: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '600',
     marginTop: 2,
   },
   partnerActions: {

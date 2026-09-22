@@ -8,6 +8,7 @@ import {
   ProductVariantDocument,
 } from './schemas/product.schema';
 import { AreaPricing, AreaPricingDocument } from '../areas/schemas/area-pricing.schema';
+import { Inventory, InventoryDocument } from '../inventory/schemas/inventory.schema';
 
 export interface ProductQueryFilter {
   categoryId?: string;
@@ -23,6 +24,7 @@ export interface ProductQueryFilter {
   page?: number;
   limit?: number;
   areaId?: string;
+  storeId?: string;
 }
 
 @Injectable()
@@ -31,9 +33,10 @@ export class ProductsService {
     @InjectModel(Product.name) private productModel: Model<ProductDocument>,
     @InjectModel(ProductVariant.name) private variantModel: Model<ProductVariantDocument>,
     @InjectModel(AreaPricing.name) private areaPricingModel: Model<AreaPricingDocument>,
+    @InjectModel(Inventory.name) private inventoryModel: Model<InventoryDocument>,
   ) {}
 
-  private async enrichWithVariants(products: ProductDocument[], areaId?: string): Promise<any[]> {
+  private async enrichWithVariants(products: ProductDocument[], areaId?: string, storeId?: string): Promise<any[]> {
     if (products.length === 0) return [];
     const productIds = products.map((p) => (p as any)._id);
     const allVariants = await this.variantModel
@@ -59,19 +62,34 @@ export class ProductsService {
       }
     }
 
+    let inventoryByProduct = new Map<string, number>();
+    if (storeId && Types.ObjectId.isValid(storeId)) {
+      const invRecords = await this.inventoryModel
+        .find({
+          storeId: new Types.ObjectId(storeId),
+          productId: { $in: productIds },
+        })
+        .exec();
+      for (const inv of invRecords) {
+        inventoryByProduct.set(inv.productId.toString(), inv.availableQty);
+      }
+    }
+
     return products.map((product) => {
       const prodId = (product as any)._id.toString();
       const variants = (variantsByProduct.get(prodId) || []).map((v) => {
         const vidStr = (v as any)._id.toString();
         const pricing = pricingByVariant.get(vidStr);
+        const storeStock = inventoryByProduct.get(prodId);
+        const effectiveStock = storeStock !== undefined ? storeStock : (pricing?.stock ?? 100);
         return {
           id: vidStr,
           label: v.weightOrVolume,
           price: pricing?.price ?? v.sellingPrice,
           mrp: pricing?.mrp ?? v.mrp,
           discountPercent: pricing?.discountPercent ?? v.discountPercent,
-          stock: pricing?.stock ?? 100,
-          isAvailable: pricing?.isAvailable ?? true,
+          stock: effectiveStock,
+          isAvailable: effectiveStock > 0 && (pricing?.isAvailable ?? true),
           isDefault: v.isDefault,
         };
       });
@@ -79,10 +97,14 @@ export class ProductsService {
       const defaultVariant = variants.find((v) => v.isDefault) || variants[0];
       const effectivePrice = defaultVariant?.price ?? product.sellingPrice;
       const effectiveMrp = defaultVariant?.mrp ?? product.mrp;
+      const storeStock = inventoryByProduct.get(prodId);
+      const effectiveStock = storeStock !== undefined ? storeStock : ((product as any).stock ?? 100);
 
       return {
         ...(product as any).toObject(),
         variants,
+        stock: effectiveStock,
+        isOutOfStock: effectiveStock <= 0,
         sellingPrice: effectivePrice,
         mrp: effectiveMrp,
       };
@@ -202,27 +224,27 @@ export class ProductsService {
       this.productModel.countDocuments(query).exec(),
     ]);
 
-    const items = await this.enrichWithVariants(rawItems, filters.areaId);
+    const items = await this.enrichWithVariants(rawItems, filters.areaId, filters.storeId);
     return { items, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
-  async findById(id: string, areaId?: string) {
+  async findById(id: string, areaId?: string, storeId?: string) {
     if (!Types.ObjectId.isValid(id)) throw new NotFoundException('Invalid Product ID');
     const product = await this.productModel.findById(id).populate('categoryId', 'name slug').exec();
     if (!product) throw new NotFoundException('Product not found');
-    const [enriched] = await this.enrichWithVariants([product], areaId);
+    const [enriched] = await this.enrichWithVariants([product], areaId, storeId);
     return enriched;
   }
 
-  async findPopular(limit = 10, areaId?: string) {
+  async findPopular(limit = 10, areaId?: string, storeId?: string) {
     const products = await this.productModel
       .find({ isActive: true, isPopular: true }).limit(limit).exec();
-    return this.enrichWithVariants(products, areaId);
+    return this.enrichWithVariants(products, areaId, storeId);
   }
 
-  async findDeals(limit = 10, areaId?: string) {
+  async findDeals(limit = 10, areaId?: string, storeId?: string) {
     const products = await this.productModel
       .find({ isActive: true, isDeal: true }).limit(limit).exec();
-    return this.enrichWithVariants(products, areaId);
+    return this.enrichWithVariants(products, areaId, storeId);
   }
 }

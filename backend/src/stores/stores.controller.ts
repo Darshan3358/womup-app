@@ -27,4 +27,24 @@ export class StoresController {
   ) {
     return this.storesService.checkServiceability(body.latitude, body.longitude);
   }
+
+  @Post('location/resolve')
+  @ApiOperation({ summary: 'Resolve customer GPS to serviceable area and dark store' })
+  @ApiResponse({ status: 200, description: 'Resolved area and dark store details' })
+  async resolveLocation(
+    @Body() body: { latitude: number; longitude: number; pincode?: string },
+  ) {
+    const res = await this.storesService.checkServiceability(body.latitude, body.longitude);
+    return {
+      serviceable: res.serviceable,
+      areaId: res.areaId,
+      areaName: res.areaName,
+      storeId: res.storeId,
+      storeName: res.storeName,
+      storeCode: res.storeCode,
+      city: 'Ahmedabad',
+      deliveryMinutes: res.estimatedDeliveryMinutes || 9,
+      message: res.message,
+    };
+  }
 }

@@ -28,6 +28,29 @@ export interface Customer {
   createdAt: string;
 }
 
+export interface DeliveryPartnerItem {
+  id: string;
+  partnerCode: string;
+  name: string;
+  phone: string;
+  email?: string;
+  avatar?: string;
+  hubName: string;
+  city: string;
+  vehicleType: string;
+  vehicleNumber: string;
+  status: 'APPROVED' | 'PENDING' | 'REJECTED' | 'SUSPENDED';
+  verificationStatus: string;
+  isOnline: boolean;
+  rating: number;
+  totalDeliveries: number;
+  completedDeliveries: number;
+  acceptanceRate: number;
+  completionRate: number;
+  avgDeliveryMinutes: number;
+  joinedDate: string;
+}
+
 export interface CategoryItem {
   id: string;
   name: string;
@@ -146,6 +169,7 @@ export interface OrderAuditStep {
 
 export interface Order {
   id: string; // e.g. #WMP10234
+  storeId?: string;
   customerId: string;
   customerName: string;
   customerPhone: string;
@@ -191,11 +215,21 @@ export interface DarkStoreItem {
   id: string;
   name: string;
   code: string;
+  loginId?: string;
   address?: string;
   city?: string;
+  pincode?: string;
   areaId?: string;
   areaName?: string;
   isActive?: boolean;
+  orderCount?: number;
+  pendingOrders?: number;
+  riderCount?: number;
+  serviceRadiusKm?: number;
+  estimatedDeliveryMinutes?: number;
+  lastLoginAt?: string;
+  coordinates?: [number, number];
+  createdAt?: string;
 }
 
 export interface StockAdjustment {

@@ -16,6 +16,7 @@ const defaultBlockList = Array.isArray(config.resolver.blockList)
 config.resolver.blockList = [
   ...defaultBlockList,
   new RegExp('^' + path.resolve(__dirname, 'Womup Admin') + '/.*'),
+  new RegExp('^' + path.resolve(__dirname, 'Womup Rider') + '/.*'),
   new RegExp('^' + path.resolve(__dirname, 'backend') + '/.*'),
   new RegExp('^' + path.resolve(__dirname, 'Womup Admin.zip') + '.*'),
 ];

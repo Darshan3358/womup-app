@@ -38,31 +38,30 @@ export const OrderService = {
         deliveryAddress: item.deliveryAddress ? {
           id: 'addr_' + (item._id || Date.now()),
           type: item.deliveryAddress.label || 'Home',
-          fullName: item.deliveryAddress.label || 'Home',
-          phoneNumber: '',
-          houseFlat: item.deliveryAddress.houseNumber || 'Flat 402, Shivalik High Street',
-          areaLandmark: item.deliveryAddress.landmark || item.deliveryAddress.street || 'Prahlad Nagar',
+          fullName: item.deliveryAddress.fullName || item.deliveryAddress.label || 'Customer',
+          phoneNumber: item.deliveryAddress.phoneNumber || '',
+          houseFlat: item.deliveryAddress.houseNumber ? `${item.deliveryAddress.houseNumber}, ${item.deliveryAddress.street || ''}`.trim() : (item.deliveryAddress.street || 'Address'),
+          areaLandmark: item.deliveryAddress.landmark || '',
           city: item.deliveryAddress.city || 'Ahmedabad',
-          pincode: item.deliveryAddress.pincode || '380015',
+          pincode: item.deliveryAddress.pincode || '',
           isDefault: true,
         } : (item.address || {
-          id: 'addr_default',
-          type: 'HOME',
+          id: 'addr_' + (item._id || Date.now()),
+          type: 'Home',
           name: 'Customer',
-          phone: '+91 98765 43210',
-          addressLine: 'Makarba, Sarkhej-Okaf',
-          landmark: 'Near SG Highway',
-          city: 'Ahmedabad, Gujarat',
-          pincode: '380051',
+          phone: '',
+          addressLine: 'Delivery Address',
+          landmark: '',
+          city: 'Ahmedabad',
+          pincode: '',
           isDefault: true,
         }),
         deliverySlot: item.deliverySlot || '9 minutes delivery',
         paymentMethod: item.paymentMethod || 'UPI',
+        _id: item._id,
+        deliveryOtp: item.deliveryOtp || '4821',
         estimatedArrival: '9 min',
-        deliveryPartner: item.deliveryPartner || {
-          name: 'Delivery Partner',
-          phone: '+91 98123 45678',
-        },
+        deliveryPartner: item.deliveryPartner || undefined,
       }));
       cachedOrders = mapped;
       StorageService.saveItem(StorageService.KEYS.ORDERS, mapped);
@@ -105,6 +104,8 @@ export const OrderService = {
         deliveryAddress: item.address,
         deliverySlot: item.deliverySlot || '9 minutes delivery',
         paymentMethod: item.paymentMethod || 'UPI',
+        _id: item._id,
+        deliveryOtp: item.deliveryOtp || '4821',
         estimatedArrival: '9 min',
         deliveryPartner: item.deliveryPartner,
       };
@@ -114,10 +115,12 @@ export const OrderService = {
   },
 
   async createOrder(data: {
-    addressId: string;
+    addressId?: string;
     paymentMethod: string;
     reservationId?: string;
     deliveryInstructions?: string;
+    address?: any;
+    tip?: number;
     items?: {
       productId: string;
       quantity: number;

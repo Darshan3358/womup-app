@@ -2,10 +2,26 @@ import { IsString, IsNotEmpty, IsEnum, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateOrderDto {
-  @ApiProperty({ example: '64f1a2b3c4d5e6f7a8b9c0d1', description: 'Selected Address ID' })
+  @ApiProperty({ example: '64f1a2b3c4d5e6f7a8b9c0d1', description: 'Selected Address ID', required: false })
   @IsString()
-  @IsNotEmpty()
-  addressId: string;
+  @IsOptional()
+  addressId?: string;
+
+  @ApiProperty({ required: false, description: 'Optional delivery address payload if addressId is not in DB' })
+  @IsOptional()
+  address?: {
+    houseFlat?: string;
+    houseNumber?: string;
+    street?: string;
+    areaLandmark?: string;
+    landmark?: string;
+    city?: string;
+    pincode?: string;
+    latitude?: number;
+    longitude?: number;
+    label?: string;
+    type?: string;
+  };
 
   @ApiProperty({ example: 'UPI', enum: ['UPI', 'WALLET', 'CARD', 'NET_BANKING', 'COD'] })
   @IsString()
@@ -21,6 +37,10 @@ export class CreateOrderDto {
   @IsString()
   @IsOptional()
   deliveryInstructions?: string;
+
+  @ApiProperty({ example: 20, required: false, description: 'Tip amount for delivery partner' })
+  @IsOptional()
+  tip?: number;
 
   @ApiProperty({ required: false, description: 'Client cart items to sync before checkout' })
   @IsOptional()

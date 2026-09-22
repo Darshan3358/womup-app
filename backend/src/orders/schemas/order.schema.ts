@@ -119,7 +119,7 @@ export class Order {
 
   @Prop({
     required: true,
-    enum: ['UPI', 'WALLET', 'CARD', 'NET_BANKING', 'COD'],
+    enum: ['UPI', 'WALLET', 'CARD', 'NET_BANKING', 'COD', 'ONLINE'],
   })
   paymentMethod: string;
 
@@ -147,6 +147,12 @@ export class Order {
 
   @Prop()
   cancellationReason?: string;
+
+  @Prop({
+    default: () => Math.floor(1000 + Math.random() * 9000).toString(),
+    index: true,
+  })
+  deliveryOtp: string;
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);

@@ -44,6 +44,11 @@ export const BlinkitHomeScreen: React.FC = () => {
     setSelectedCategoryName,
     navigateToProductListing,
     currentAreaId,
+    currentStoreId,
+    currentStoreName,
+    isServiceable,
+    deliveryEtaMinutes,
+    setLocationModalVisible,
   } = useApp();
   const [selectedTab, setSelectedTab] = useState('All');
   const [dbProducts, setDbProducts] = useState<Product[]>([]);
@@ -53,7 +58,10 @@ export const BlinkitHomeScreen: React.FC = () => {
     (async () => {
       try {
         const [prods, cats] = await Promise.all([
-          ProductService.fetchProducts({ areaId: currentAreaId || undefined }),
+          ProductService.fetchProducts({
+            areaId: currentAreaId || undefined,
+            storeId: currentStoreId || undefined,
+          }),
           ProductService.fetchCategories(),
         ]);
         setDbProducts(prods);
@@ -62,7 +70,7 @@ export const BlinkitHomeScreen: React.FC = () => {
         console.warn('Error loading live home data:', e);
       }
     })();
-  }, [currentAreaId]);
+  }, [currentAreaId, currentStoreId]);
 
   const handleOpenProductDetail = (prod: BlinkitProduct) => {
     setSelectedBlinkitProduct(prod);
@@ -113,11 +121,32 @@ export const BlinkitHomeScreen: React.FC = () => {
       <BlinkitHeader
         variant="gradient"
         etaLabel="Delivery in"
-        etaTime="9 minutes"
+        etaTime={isServiceable ? `${deliveryEtaMinutes || 9} minutes` : (!currentStoreName ? 'Set Location' : 'Outside Zone')}
         searchPlaceholder='Search "milk, chips, maggi"'
         activeCategoryTab={selectedTab}
         onSelectCategoryTab={setSelectedTab}
       />
+
+      {/* Location Required / Unserviceable Notification Banner */}
+      {!isServiceable && (
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => setLocationModalVisible(true)}
+          style={styles.unserviceableBanner}
+        >
+          <AppIcon name="map-pin" size={18} color="#B45309" />
+          <View style={styles.unserviceableTextWrap}>
+            <Text style={styles.unserviceableTitle}>
+              {!currentStoreName ? 'Delivery Location Required' : 'Outside Active Delivery Zone'}
+            </Text>
+            <Text style={styles.unserviceableSubtitle}>
+              {!currentStoreName
+                ? 'Tap here to allow GPS or select your address to see accurate store inventory and delivery ETA.'
+                : 'We currently fulfill orders from 8 dark stores in Ahmedabad. Tap to select a serviceable address.'}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      )}
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -604,5 +633,30 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: COLORS.navy,
+  },
+  unserviceableBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    borderBottomWidth: 1,
+    borderBottomColor: '#FDE68A',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 10,
+  },
+  unserviceableTextWrap: {
+    flex: 1,
+  },
+  unserviceableTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#92400E',
+  },
+  unserviceableSubtitle: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#B45309',
+    marginTop: 2,
+    lineHeight: 15,
   },
 });

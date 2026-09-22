@@ -363,10 +363,7 @@ export const BlinkitPrintScreen: React.FC = () => {
         deliveryAddress: selectedAddress,
         deliverySlot: 'Express (10 minutes)',
         paymentMethod: 'Cash on Delivery / Online',
-        deliveryPartner: {
-          name: 'Vikram Singh (Worm Up Express)',
-          phone: '+91 98234 56789',
-        },
+        deliveryPartner: undefined,
       };
 
       setCurrentOrder(printOrderObj);

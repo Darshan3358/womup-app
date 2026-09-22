@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import {
   Customer,
+  DeliveryPartnerItem,
   Zone,
   ProductItem,
   ProductVariantItem,
@@ -18,6 +19,7 @@ import {
   DarkStoreItem,
 } from '../types/admin';
 import { ApiService } from '../services/api';
+import io from 'socket.io-client';
 
 export type ActiveTab =
   | 'Dashboard'
@@ -27,6 +29,7 @@ export type ActiveTab =
   | 'Orders'
   | 'Staff'
   | 'Marketing'
+  | 'Stores'
   | 'More';
 
 export type ActiveSubView =
@@ -74,6 +77,10 @@ interface AdminStateContextType {
   customers: Customer[];
   selectedCustomer: Customer | null;
   setSelectedCustomer: (customer: Customer | null) => void;
+  riders: DeliveryPartnerItem[];
+  selectedRider: DeliveryPartnerItem | null;
+  setSelectedRider: (rider: DeliveryPartnerItem | null) => void;
+  updateRider: (id: string, updates: Partial<DeliveryPartnerItem>) => Promise<boolean>;
 
   categories: CategoryItem[];
   products: ProductItem[];
@@ -192,6 +199,8 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [zones, setZones] = useState<Zone[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [riders, setRiders] = useState<DeliveryPartnerItem[]>([]);
+  const [selectedRider, setSelectedRider] = useState<DeliveryPartnerItem | null>(null);
 
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [products, setProducts] = useState<ProductItem[]>([]);
@@ -244,6 +253,10 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (live.customers && live.customers.length > 0) {
           setSelectedCustomer((prev) => prev || live.customers[0]);
         }
+        setRiders(live.riders || []);
+        if (live.riders && live.riders.length > 0) {
+          setSelectedRider((prev) => prev || live.riders[0]);
+        }
         setOrders(live.orders || []);
         if (live.orders && live.orders.length > 0) {
           setSelectedOrder((prev) => prev || live.orders[0]);
@@ -278,8 +291,162 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   useEffect(() => {
     refreshFromDb();
+
+    // Connect to NestJS authoritative WebSocket Tracking Gateway
+    const socket = io('http://localhost:5050/tracking', {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 25,
+      reconnectionDelay: 2000,
+    });
+
+    socket.on('connect', () => {
+      setSyncStatus('Live WebSocket & DB Active (Cluster0)');
+    });
+
+    socket.on('reconnect', () => {
+      setSyncStatus('Live WebSocket Reconnected (Cluster0)');
+      refreshFromDb();
+    });
+
+    socket.on('new_order', (data: any) => {
+      // Zero-latency state prepend before full DB fetch
+      const raw = data?.order || data;
+      if (raw && (raw.orderNumber || raw._id || raw.id)) {
+        const addr = raw.deliveryAddress || {};
+        const fullAddress = `${addr.houseNumber || ''}, ${addr.street || ''}, ${addr.city || 'Ahmedabad'}`.trim();
+
+        const rawStoreId = raw.storeId ? String(raw.storeId) : '';
+        const matchedStore = darkStores.find((s: any) => String(s.id) === rawStoreId);
+        let resolvedZone = '';
+        let resolvedStore = matchedStore ? matchedStore.name : '';
+
+        if (matchedStore) {
+          const clean = matchedStore.name.replace(/Wom\s*Up|Worm\s*Up|Dark\s*Store/gi, '').trim();
+          const matchedArea = zones.find((z) =>
+            z.name.toLowerCase() === clean.toLowerCase() ||
+            matchedStore.name.toLowerCase().includes(z.name.toLowerCase()) ||
+            z.name.toLowerCase().includes(clean.toLowerCase())
+          );
+          resolvedZone = matchedArea ? matchedArea.name : clean;
+        }
+
+        if (!resolvedZone) {
+          const addrText = `${addr.street || ''} ${addr.landmark || ''} ${addr.city || ''} ${addr.houseNumber || ''}`.toLowerCase();
+          const matchedArea = zones.find((z) => {
+            if (!z.name) return false;
+            const zName = z.name.toLowerCase();
+            if (addrText.includes(zName)) return true;
+            const parts = zName.split(/[\s-]+/).filter((p) => p.length > 3);
+            return parts.some((p) => addrText.includes(p));
+          });
+          if (matchedArea) {
+            resolvedZone = matchedArea.name;
+            if (!resolvedStore) resolvedStore = `Wom Up ${matchedArea.name} Dark Store`;
+          }
+        }
+
+        if (!resolvedZone) resolvedZone = addr.street || addr.city || 'Prahlad Nagar';
+        if (!resolvedStore) resolvedStore = 'Wom Up Ahmedabad Central Dark Store';
+
+        const mappedOrder: Order = {
+          id: raw.orderNumber || `#WMP-${(raw._id || raw.id || '').slice(-6).toUpperCase()}`,
+          storeId: rawStoreId,
+          customerId: raw.userId ? (raw.userId.toString ? raw.userId.toString() : raw.userId) : 'cust_live',
+          customerName: raw.customerName || data.customerName || 'Customer',
+          customerPhone: raw.customerPhone || '9879432010',
+          address: fullAddress || 'Ahmedabad',
+          zoneName: resolvedZone,
+          darkStore: resolvedStore,
+          items: (raw.items || []).map((i: any) => ({
+            id: i.productId || 'item_1',
+            name: i.name || 'Item',
+            quantityKg: i.quantity || 1,
+            pricePerKg: i.unitPrice || 0,
+            subtotal: i.subtotal || 0,
+          })),
+          subtotal: raw.itemSubtotal || raw.totalAmount || 0,
+          deliveryFee: raw.deliveryFee || 0,
+          discount: (raw.discount || 0) + (raw.couponDiscount || 0) + (raw.coinsDiscount || 0),
+          total: raw.totalAmount || 0,
+          status: 'Order Placed',
+          pickerName: 'Ramesh Patel (Central Hub)',
+          riderName: 'Vikram Solanki (Express)',
+          timeAgo: 'Just now',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          timeline: [
+            {
+              stage: 'Order Placed',
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              actor: 'Customer',
+              notes: 'Real-time WebSocket event received'
+            }
+          ]
+        };
+
+        setOrders(prev => {
+          if (prev.some(o => o.id === mappedOrder.id)) return prev;
+          return [mappedOrder, ...prev];
+        });
+      }
+      refreshFromDb();
+    });
+
+    socket.on('order_status', (data: any) => {
+      if (data?.orderId) {
+        const targetId = data.orderId;
+        setOrders(prev => prev.map(o => {
+          if (o.id === targetId || o.id.includes(targetId.slice(-6).toUpperCase())) {
+            const mappedStatus = 
+              data.status === 'PACKING' ? 'Picking' :
+              data.status === 'OUT_FOR_DELIVERY' ? 'Out for Delivery' :
+              data.status === 'DELIVERED' ? 'Delivered' :
+              data.status === 'CANCELLED' ? 'Cancelled' : o.status;
+            return { ...o, status: mappedStatus as any };
+          }
+          return o;
+        }));
+      }
+      refreshFromDb();
+    });
+
+    socket.on('inventory_alert', () => {
+      refreshFromDb();
+    });
+
+    socket.on('inventory_update', (data: any) => {
+      if (data && (data.productId || data.id)) {
+        const pId = (data.productId || data.id).toString();
+        const sId = data.storeId ? data.storeId.toString() : null;
+        const newAvail = Number(data.newAvailableStock ?? data.availableQty ?? 0);
+        const newRes = Number(data.newReservedStock ?? data.reservedQty ?? 0);
+
+        setInventory((prev) =>
+          prev.map((item) => {
+            const matchProduct = item.productId === pId || item.id === pId;
+            const matchStore = !sId || item.darkStoreId === sId;
+            if (matchProduct && matchStore) {
+              const threshold = item.lowStockThreshold || 10;
+              const newStatus = newAvail <= 0 ? 'Low Stock' : newAvail <= threshold ? 'Low Stock' : 'Healthy';
+              return {
+                ...item,
+                availableKg: newAvail,
+                reservedKg: newRes,
+                status: newStatus as any,
+              };
+            }
+            return item;
+          })
+        );
+      }
+      refreshFromDb();
+    });
+
     const interval = setInterval(refreshFromDb, 10000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      socket.disconnect();
+    };
   }, [refreshFromDb]);
 
   const addProductItem = async (data: Partial<ProductItem>) => {
@@ -787,6 +954,25 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
+  const updateRider = async (id: string, updates: Partial<DeliveryPartnerItem>): Promise<boolean> => {
+    try {
+      const res = await ApiService.updateRider(id, updates);
+      if (res) {
+        setRiders((prev) =>
+          prev.map((r) => (r.id === id || r.partnerCode === id ? { ...r, ...updates, ...res } : r))
+        );
+        if (selectedRider && (selectedRider.id === id || selectedRider.partnerCode === id)) {
+          setSelectedRider((prev) => (prev ? { ...prev, ...updates, ...res } : null));
+        }
+        logAudit('Rider Updated', updates.name || id, 'Updated rider details');
+        return true;
+      }
+    } catch (e) {
+      console.warn('Failed to update rider:', e);
+    }
+    return false;
+  };
+
   return (
     <AdminStateContext.Provider
       value={{
@@ -806,6 +992,10 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         customers,
         selectedCustomer,
         setSelectedCustomer,
+        riders,
+        selectedRider,
+        setSelectedRider,
+        updateRider,
         categories,
         products,
         selectedProduct,

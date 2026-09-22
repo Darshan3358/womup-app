@@ -18,6 +18,8 @@ import { PrintingModule } from './printing/printing.module';
 import { BannersModule } from './banners/banners.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { AreasModule } from './areas/areas.module';
+import { DeliveryModule } from './delivery/delivery.module';
+import { StoreModule } from './store/store.module';
 
 @Module({
   imports: [
@@ -48,6 +50,8 @@ import { AreasModule } from './areas/areas.module';
     BannersModule,
     CloudinaryModule,
     AreasModule,
+    DeliveryModule,
+    StoreModule,
   ],
   controllers: [AppController],
 })

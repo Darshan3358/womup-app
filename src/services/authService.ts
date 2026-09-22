@@ -9,8 +9,8 @@ export const INITIAL_ADDRESS: Address = {
   phoneNumber: '',
   houseFlat: '',
   areaLandmark: '',
-  city: 'Ahmedabad',
-  pincode: '380015',
+  city: '',
+  pincode: '',
   isDefault: true,
 };
 

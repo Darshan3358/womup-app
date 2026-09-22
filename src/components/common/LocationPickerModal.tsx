@@ -30,6 +30,9 @@ export const LocationPickerModal: React.FC = () => {
     setSelectedAddress,
     setActiveScreen,
     setCurrentArea,
+    setCurrentStore,
+    setIsServiceable,
+    setDeliveryEtaMinutes,
   } = useApp();
 
   const [isDetecting, setIsDetecting] = useState<boolean>(false);
@@ -89,10 +92,25 @@ export const LocationPickerModal: React.FC = () => {
     setSelectedAddress(addressObj);
     setLocationModalVisible(false);
 
-    // Immediately resolve area for area-based product pricing
-    LocationService.resolveArea(loc.latitude, loc.longitude).then((area) => {
-      if (area) setCurrentArea(area.areaId, area.areaName);
-    });
+    // ✅ CRITICAL: Clear stale in-memory and storage cache BEFORE resolving
+    LocationService.clearCache();
+
+    // Immediately resolve area & dark store for store-specific inventory and pricing (force fresh)
+    try {
+      const area = await LocationService.resolveArea(loc.latitude, loc.longitude, true);
+      if (area) {
+        setCurrentArea(area.areaId, area.areaName);
+        if (area.storeId) {
+          setCurrentStore(area.storeId, area.storeName || null);
+        }
+        setIsServiceable(area.serviceable === true);
+        if (area.deliveryMinutes) {
+          setDeliveryEtaMinutes(area.deliveryMinutes);
+        }
+      }
+    } catch (e) {
+      console.warn('[LocationPickerModal] resolveArea fresh check warning:', e);
+    }
 
     // Save to Database (MongoDB Atlas) in background
     try {
@@ -283,6 +301,7 @@ export const LocationPickerModal: React.FC = () => {
                   activeOpacity={0.8}
                   onPress={(e) => {
                     e.stopPropagation();
+                    LocationService.clearCache();
                     handleAutoDetectLocation();
                   }}
                   style={styles.refreshLocBtn}
@@ -334,8 +353,18 @@ export const LocationPickerModal: React.FC = () => {
                       setDeliveryLocation(`${label} — ${formatted}`);
                       setSelectedAddress(addr);
                       if (addr.latitude && addr.longitude) {
-                        LocationService.resolveArea(addr.latitude, addr.longitude).then((area) => {
-                          if (area) setCurrentArea(area.areaId, area.areaName);
+                        LocationService.clearCache();
+                        LocationService.resolveArea(addr.latitude, addr.longitude, true).then((area) => {
+                          if (area) {
+                            setCurrentArea(area.areaId, area.areaName);
+                            if (area.storeId) {
+                              setCurrentStore(area.storeId, area.storeName || null);
+                            }
+                            setIsServiceable(area.serviceable === true);
+                            if (area.deliveryMinutes) {
+                              setDeliveryEtaMinutes(area.deliveryMinutes);
+                            }
+                          }
                         });
                       }
                       setLocationModalVisible(false);

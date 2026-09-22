@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../theme/colors';
@@ -29,18 +30,29 @@ export const BlinkitCheckoutScreen: React.FC = () => {
   const [selectedPayment, setSelectedPayment] = useState<'blinkit_money' | 'upi' | 'card' | 'cod'>('upi');
   const [useWalletBalance, setUseWalletBalance] = useState(walletBalance > 0);
   const [deliveryInstruction, setDeliveryInstruction] = useState('Ring bell & leave at door');
+  const [tipAmount, setTipAmount] = useState<number>(0);
   const [isOrderConfirmed, setOrderConfirmed] = useState(false);
+
+  const TIP_OPTIONS = [0, 10, 20, 30, 50];
 
   const deliveryFee = blinkitCartTotal > 199 ? 0 : 15;
   const handlingFee = 5;
-  const baseTotal = Math.max(0, blinkitCartTotal + deliveryFee + handlingFee - couponDiscount);
+  const baseTotal = Math.max(0, blinkitCartTotal + deliveryFee + handlingFee + tipAmount - couponDiscount);
   const walletDeduction = useWalletBalance ? Math.min(walletBalance, baseTotal) : 0;
   const finalPayable = Math.max(0, baseTotal - walletDeduction);
 
-  const handlePlaceOrder = () => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handlePlaceOrder = async () => {
+    if (isSubmitting) return;
     const paymentMethod = useWalletBalance && finalPayable === 0 ? 'WALLET' : selectedPayment.toUpperCase();
-    placeOrder(paymentMethod);
-    setOrderConfirmed(true);
+    setIsSubmitting(true);
+    try {
+      await placeOrder(paymentMethod, { tip: tipAmount, deliveryInstructions: deliveryInstruction });
+      setOrderConfirmed(true);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleDoneReturnHome = () => {
@@ -120,7 +132,46 @@ export const BlinkitCheckoutScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* 3. Payment Method Selection */}
+        {/* 3. Delivery Partner Tip Selection */}
+        <View style={styles.cardSection}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <Text style={[TYPOGRAPHY.bodyMdMedium, styles.subSectionTitle, { marginBottom: 0 }]}>
+              💝 Tip your delivery partner
+            </Text>
+            {tipAmount > 0 && (
+              <TouchableOpacity onPress={() => setTipAmount(0)} activeOpacity={0.7}>
+                <Text style={{ fontSize: 12, color: COLORS.error, fontWeight: '700' }}>Clear</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          <Text style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 12 }}>
+            100% of your tip goes directly to your rider partner.
+          </Text>
+          <View style={styles.tipButtonsRow}>
+            {TIP_OPTIONS.map((amt) => (
+              <TouchableOpacity
+                key={amt}
+                activeOpacity={0.75}
+                onPress={() => setTipAmount(amt)}
+                style={[
+                  styles.tipPill,
+                  tipAmount === amt && styles.tipPillActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.tipPillText,
+                    tipAmount === amt && styles.tipPillTextActive,
+                  ]}
+                >
+                  {amt === 0 ? 'No tip' : `₹${amt}`}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* 4. Payment Method Selection */}
         <View style={styles.cardSection}>
           <Text style={[TYPOGRAPHY.headingMd, styles.subSectionTitle]}>
             Select Payment Method
@@ -251,6 +302,14 @@ export const BlinkitCheckoutScreen: React.FC = () => {
             <Text style={styles.summaryLabel}>Order Total</Text>
             <Text style={styles.summaryValue}>₹{baseTotal}</Text>
           </View>
+          {tipAmount > 0 && (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Delivery Partner Tip</Text>
+              <Text style={[styles.summaryValue, { color: COLORS.primary, fontWeight: '700' }]}>
+                + ₹{tipAmount}
+              </Text>
+            </View>
+          )}
           {walletDeduction > 0 && (
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Blinkit Money Deducted</Text>
@@ -283,10 +342,15 @@ export const BlinkitCheckoutScreen: React.FC = () => {
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={handlePlaceOrder}
-          style={styles.placeOrderBtn}
+          style={[styles.placeOrderBtn, isSubmitting && { opacity: 0.8 }]}
+          disabled={isSubmitting}
           accessibilityLabel="Place Order"
         >
-          <Text style={styles.placeOrderBtnText}>Place Order</Text>
+          {isSubmitting ? (
+            <ActivityIndicator color={COLORS.white} size="small" />
+          ) : (
+            <Text style={styles.placeOrderBtnText}>Place Order</Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -447,6 +511,34 @@ const styles = StyleSheet.create({
   instructionTextActive: {
     color: COLORS.primary,
     fontWeight: '700',
+  },
+  tipButtonsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  tipPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: COLORS.cardBackground,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    minWidth: 60,
+    alignItems: 'center',
+  },
+  tipPillActive: {
+    backgroundColor: COLORS.lightPink,
+    borderColor: COLORS.primary,
+  },
+  tipPillText: {
+    fontSize: 12,
+    color: COLORS.textPrimary,
+    fontWeight: '600',
+  },
+  tipPillTextActive: {
+    color: COLORS.primary,
+    fontWeight: '800',
   },
   paymentOptionRow: {
     flexDirection: 'row',

@@ -101,6 +101,7 @@ export interface OrderItem {
 
 export interface Order {
   id: string;
+  _id?: string;
   orderNumber: string;
   date: string;
   status: OrderStatus;
@@ -115,10 +116,21 @@ export interface Order {
   deliverySlot: string;
   paymentMethod: string;
   estimatedArrival?: string;
+  deliveryOtp?: string;
   deliveryPartner?: {
+    id?: string;
     name: string;
     phone: string;
+    vehicleNumber?: string;
     avatar?: string;
+    rating?: number;
+  };
+  deliveryPartnerId?: {
+    _id?: string;
+    fullName?: string;
+    phoneNumber?: string;
+    vehicleNumber?: string;
+    rating?: number;
   };
 }
 

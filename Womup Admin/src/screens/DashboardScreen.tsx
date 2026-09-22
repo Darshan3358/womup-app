@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { TrendingUp, Users, ShoppingBag, Truck, DollarSign, ArrowRight, Zap } from 'lucide-react-native';
+import { TrendingUp, Users, ShoppingBag, Truck, DollarSign, ArrowRight, Zap, Store } from 'lucide-react-native';
 import { COLORS, GRADIENTS, RADIUS, SPACING } from '../theme';
 import { KpiCard } from '../components/common/KpiCard';
 import { useAdminState } from '../context/AdminStateContext';
@@ -89,8 +89,22 @@ export const DashboardScreen: React.FC = () => {
         </View>
 
         {zones.map((zone) => {
-          const zoneActiveOrders = orders.filter((o) => o.zoneName === zone.name && o.status !== 'Delivered' && o.status !== 'Cancelled').length;
-          const zoneGmv = orders.filter((o) => o.zoneName === zone.name).reduce((sum, o) => sum + (o.total || 0), 0);
+          const zoneOrders = orders.filter((o) => {
+            if (!o) return false;
+            if (o.zoneName === zone.name) return true;
+            const zLower = (zone.name || '').toLowerCase();
+            const oZoneLower = (o.zoneName || '').toLowerCase();
+            const oStoreLower = (o.darkStore || '').toLowerCase();
+            const oAddrLower = (o.address || '').toLowerCase();
+
+            if (oZoneLower && (zLower.includes(oZoneLower) || oZoneLower.includes(zLower))) return true;
+            if (oStoreLower && (oStoreLower.includes(zLower) || zLower.split(/[\s-]+/).some((p) => p.length > 3 && oStoreLower.includes(p)))) return true;
+            if (oAddrLower && zLower.split(/[\s-]+/).some((p) => p.length > 3 && oAddrLower.includes(p))) return true;
+
+            return false;
+          });
+          const zoneActiveOrders = zoneOrders.filter((o) => o.status !== 'Delivered' && o.status !== 'Cancelled').length;
+          const zoneGmv = zoneOrders.reduce((sum, o) => sum + (o.total || 0), 0);
           const percent = totalGmv > 0 ? Math.round((zoneGmv / totalGmv) * 100) : 0;
           return (
             <View key={zone.id} style={styles.zoneRow}>
@@ -103,7 +117,7 @@ export const DashboardScreen: React.FC = () => {
                   colors={GRADIENTS.primary}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
-                  style={[styles.progressBar, { width: `${Math.max(percent * 2.5, 0)}%` }]}
+                  style={[styles.progressBar, { width: `${Math.min(100, Math.max(percent, percent > 0 ? 10 : 0))}%` }]}
                 />
               </View>
               <Text style={styles.percentText}>{percent}%</Text>
@@ -143,6 +157,19 @@ export const DashboardScreen: React.FC = () => {
             <ShoppingBag size={18} color={COLORS.white} />
           </LinearGradient>
           <Text style={styles.shortcutText}>Live Orders</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.shortcutBtn}
+          onPress={() => {
+            setSubView('none');
+            setActiveTab('Stores');
+          }}
+        >
+          <LinearGradient colors={['#FCE1F5', '#BF54D0']} style={styles.shortcutIcon}>
+            <Store size={18} color={COLORS.white} />
+          </LinearGradient>
+          <Text style={styles.shortcutText}>Dark Stores</Text>
         </TouchableOpacity>
 
         <TouchableOpacity

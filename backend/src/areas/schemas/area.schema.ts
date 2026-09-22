@@ -31,8 +31,30 @@ export class Area {
 
   @Prop({ default: true })
   isActive: boolean;
+
+  @Prop({ trim: true })
+  code?: string;
+
+  @Prop({
+    type: {
+      type: String,
+      enum: ['Polygon'],
+      default: 'Polygon',
+    },
+    coordinates: {
+      type: [[[Number]]], // [[[lng, lat], [lng, lat], ...]]
+    },
+  })
+  polygon?: {
+    type: string;
+    coordinates: number[][][];
+  };
+
+  @Prop({ type: Object, ref: 'Store' })
+  hubStoreId?: any;
 }
 
 export const AreaSchema = SchemaFactory.createForClass(Area);
 AreaSchema.index({ centerLat: 1, centerLng: 1 });
 AreaSchema.index({ pincodes: 1 });
+AreaSchema.index({ polygon: '2dsphere' });

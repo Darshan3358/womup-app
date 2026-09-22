@@ -50,7 +50,35 @@ export class Store {
 
   @Prop({ default: '23:00' })
   closingTime: string;
+
+  @Prop({ type: Object, ref: 'Area' })
+  areaId?: any;
+
+  @Prop({ trim: true })
+  areaName?: string;
+
+  @Prop({ trim: true })
+  managerName?: string;
+
+  @Prop({ trim: true })
+  managerPhone?: string;
+
+  @Prop({ trim: true, lowercase: true, sparse: true })
+  loginId?: string;
+
+  @Prop()
+  loginPasswordHash?: string;
+
+  @Prop()
+  passwordUpdatedAt?: Date;
+
+  @Prop()
+  lastLoginAt?: Date;
+
+  @Prop({ trim: true })
+  lastLoginBy?: string;
 }
 
 export const StoreSchema = SchemaFactory.createForClass(Store);
 StoreSchema.index({ location: '2dsphere' });
+StoreSchema.index({ loginId: 1 }, { unique: true, sparse: true });

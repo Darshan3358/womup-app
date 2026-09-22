@@ -31,11 +31,13 @@ export const AddressService = {
       label: address.type || 'Home',
       houseNumber,
       street,
-      landmark: address.areaLandmark || 'Prahlad Nagar',
+      landmark: address.areaLandmark || '',
       city: address.city.split(',')[0].trim() || 'Ahmedabad',
       state: 'Gujarat',
-      pincode: address.pincode || '380015',
-      coordinates: [address.longitude || 72.5714, address.latitude || 23.0225],
+      pincode: address.pincode || '',
+      coordinates: address.longitude !== undefined && address.latitude !== undefined
+        ? [address.longitude, address.latitude]
+        : [],
       isDefault: address.isDefault ?? true,
       deliveryInstructions: '',
     };
@@ -44,7 +46,16 @@ export const AddressService = {
     return res;
   },
 
-  async checkServiceability(lat: number = 23.0225, lng: number = 72.5714): Promise<ServiceabilityResponse> {
+  async checkServiceability(lat?: number, lng?: number): Promise<ServiceabilityResponse> {
+    if (typeof lat !== 'number' || typeof lng !== 'number') {
+      return {
+        serviceable: false,
+        estimatedDeliveryMinutes: 0,
+        storeName: 'Location Required',
+        deliveryFee: 0,
+        message: 'Valid GPS coordinates are required to verify serviceability.',
+      };
+    }
     const res = await api.post<any>('/serviceability/check', {
       latitude: lat,
       longitude: lng,
@@ -53,9 +64,9 @@ export const AddressService = {
       return res.data;
     }
     return {
-      serviceable: true,
-      estimatedDeliveryMinutes: 9,
-      storeName: 'Worm Up Ahmedabad Central Dark Store',
+      serviceable: false,
+      estimatedDeliveryMinutes: 0,
+      storeName: 'Unserviceable Area',
       deliveryFee: 0,
     };
   },

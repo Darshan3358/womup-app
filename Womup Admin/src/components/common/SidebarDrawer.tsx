@@ -26,6 +26,7 @@ import {
   Settings,
   ChevronRight,
   LogOut,
+  Store,
 } from 'lucide-react-native';
 import { COLORS, GRADIENTS, RADIUS, SPACING } from '../../theme';
 import { useAdminState, ActiveTab, ActiveSubView } from '../../context/AdminStateContext';
@@ -234,6 +235,23 @@ export const SidebarDrawer: React.FC = () => {
               </View>
               <Text style={[styles.menuLabel, activeTab === 'Marketing' && subView === 'none' && styles.menuLabelActive]}>
                 Marketing & Campaigns
+              </Text>
+              <ChevronRight size={16} color={COLORS.secondaryText} />
+            </TouchableOpacity>
+
+            {/* 8. Dark Stores & Hubs */}
+            <TouchableOpacity
+              style={[
+                styles.menuItem,
+                activeTab === 'Stores' && subView === 'none' && styles.menuItemActive,
+              ]}
+              onPress={() => handleNavigateTab('Stores')}
+            >
+              <View style={[styles.iconContainer, activeTab === 'Stores' && subView === 'none' && styles.iconActive]}>
+                <Store size={18} color={activeTab === 'Stores' && subView === 'none' ? COLORS.white : COLORS.hotPink} />
+              </View>
+              <Text style={[styles.menuLabel, activeTab === 'Stores' && subView === 'none' && styles.menuLabelActive]}>
+                Dark Stores & Hubs
               </Text>
               <ChevronRight size={16} color={COLORS.secondaryText} />
             </TouchableOpacity>

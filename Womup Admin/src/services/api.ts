@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import {
   Customer,
+  DeliveryPartnerItem,
   Order,
   ProductItem,
   ProductVariantItem,
@@ -32,6 +33,7 @@ const API_BASE_URL = getApiBaseUrl();
 
 export interface LiveDbData {
   customers: Customer[];
+  riders: DeliveryPartnerItem[];
   orders: Order[];
   printOrders: PrintOrder[];
   products: ProductItem[];
@@ -52,6 +54,7 @@ export const ApiService = {
   getInitialData(): LiveDbData {
     return {
       customers: [],
+      riders: [],
       orders: [],
       printOrders: [],
       products: [],
@@ -90,8 +93,15 @@ export const ApiService = {
         const data = await res.json();
 
       if (data && data.users) {
-        // 1. DYNAMICALLY MAP CUSTOMERS FROM LIVE MONGODB
-        const dynamicCustomers: Customer[] = (data.users || []).map((u: any, idx: number) => {
+        // 1. DYNAMICALLY MAP CUSTOMERS FROM LIVE MONGODB (Excluding Delivery Partners)
+        const partnerUserIds = (data.deliveryPartners || []).map((dp: any) => (dp.userId?.toString ? dp.userId.toString() : String(dp.userId))).filter(Boolean);
+        const customerUsers = (data.users || []).filter((u: any) => {
+          const uId = u._id?.toString ? u._id.toString() : String(u._id);
+          const role = (u.role || '').toUpperCase();
+          return role !== 'DELIVERY_PARTNER' && !partnerUserIds.includes(uId);
+        });
+
+        const dynamicCustomers: Customer[] = customerUsers.map((u: any, idx: number) => {
           const userOrders = (data.orders || []).filter((o: any) => o.userId && (o.userId.toString() === u._id || o.userId === u._id));
           const totalSpend = userOrders.reduce((sum: number, o: any) => sum + (o.totalAmount || 0), 0);
           const userAddrs = (data.addresses || []).filter((a: any) => a.userId && (a.userId.toString() === u._id || a.userId === u._id));
@@ -129,20 +139,87 @@ export const ApiService = {
           };
         });
 
+        // 1b. DYNAMICALLY MAP DELIVERY PARTNERS (RIDERS) FROM LIVE MONGODB
+        const dynamicRiders: DeliveryPartnerItem[] = (data.deliveryPartners || []).map((r: any) => ({
+          id: r._id ? (r._id.toString ? r._id.toString() : r._id) : r.partnerCode,
+          partnerCode: r.partnerCode || 'RDR-0000',
+          name: r.fullName || 'Delivery Partner',
+          phone: r.phoneNumber || '',
+          email: r.email || '',
+          avatar: r.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&q=80',
+          hubName: r.hubName || 'Satellite Hub Dark Store',
+          city: r.city || 'Ahmedabad',
+          vehicleType: r.vehicleType || 'EV_SCOOTER',
+          vehicleNumber: r.vehicleNumber || 'GJ-01-ET-4829',
+          status: r.status || 'APPROVED',
+          verificationStatus: r.verificationStatus || 'VERIFIED',
+          isOnline: r.isOnline !== false,
+          rating: Number(r.rating) || 4.88,
+          totalDeliveries: Number(r.totalDeliveries) || 0,
+          completedDeliveries: Number(r.completedDeliveries) || 0,
+          acceptanceRate: Number(r.acceptanceRate) || 95,
+          completionRate: Number(r.completionRate) || 98,
+          avgDeliveryMinutes: Number(r.avgDeliveryMinutes) || 12,
+          joinedDate: r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recently',
+        }));
+
         // 2. DYNAMICALLY MAP ORDERS FROM LIVE MONGODB
         const dynamicOrders: Order[] = (data.orders || []).map((o: any) => {
           const user = (data.users || []).find((u: any) => u._id === o.userId || (u._id.toString && u._id.toString() === o.userId));
           const addr = o.deliveryAddress || {};
           const fullAddress = `${addr.houseNumber || ''}, ${addr.street || ''}, ${addr.city || 'Ahmedabad'}`.trim();
 
+          const oStoreIdStr = o.storeId ? (o.storeId.toString ? o.storeId.toString() : String(o.storeId)) : '';
+          const matchedStore = (data.stores || []).find((s: any) => {
+            const sIdStr = s._id ? (s._id.toString ? s._id.toString() : String(s._id)) : String(s.id || '');
+            return oStoreIdStr && sIdStr === oStoreIdStr;
+          });
+
+          let resolvedZoneName = '';
+          let resolvedDarkStore = matchedStore ? matchedStore.name : '';
+
+          if (matchedStore) {
+            const cleanStoreName = (matchedStore.name || '').replace(/Wom\s*Up|Worm\s*Up|Dark\s*Store/gi, '').trim();
+            const matchedArea = (data.areas || []).find((a: any) => {
+              if (!a.name) return false;
+              const aName = a.name.toLowerCase();
+              const cName = cleanStoreName.toLowerCase();
+              return aName === cName || matchedStore.name.toLowerCase().includes(aName) || aName.includes(cName);
+            });
+            resolvedZoneName = matchedArea ? matchedArea.name : cleanStoreName;
+          }
+
+          if (!resolvedZoneName) {
+            const addrText = `${addr.street || ''} ${addr.landmark || ''} ${addr.city || ''} ${addr.houseNumber || ''}`.toLowerCase();
+            const matchedArea = (data.areas || []).find((a: any) => {
+              if (!a.name) return false;
+              const aName = a.name.toLowerCase();
+              if (addrText.includes(aName)) return true;
+              const parts = aName.split(/[\s-]+/).filter((p: string) => p.length > 3);
+              return parts.some((p: string) => addrText.includes(p));
+            });
+            if (matchedArea) {
+              resolvedZoneName = matchedArea.name;
+              if (!resolvedDarkStore) resolvedDarkStore = `Wom Up ${matchedArea.name} Dark Store`;
+            }
+          }
+
+          if (!resolvedZoneName) {
+            resolvedZoneName = addr.street || addr.city || 'Prahlad Nagar';
+          }
+          if (!resolvedDarkStore) {
+            resolvedDarkStore = 'Wom Up Ahmedabad Central Dark Store';
+          }
+
           return {
             id: o.orderNumber || `#WMP-${(o._id || '').slice(-6).toUpperCase()}`,
+            storeId: oStoreIdStr,
             customerId: o.userId ? (o.userId.toString ? o.userId.toString() : o.userId) : 'cust_1',
             customerName: user ? user.name : 'Customer',
             customerPhone: user ? user.phone : '9879432010',
             address: fullAddress,
-            zoneName: addr.street || addr.city || 'Prahlad Nagar',
-            darkStore: 'Worm Up Ahmedabad Central Dark Store',
+            zoneName: resolvedZoneName,
+            darkStore: resolvedDarkStore,
             items: (o.items || []).map((i: any) => ({
               id: i.productId || 'item_1',
               name: i.name,
@@ -333,11 +410,21 @@ export const ApiService = {
               id: s._id?.toString ? s._id.toString() : String(s._id || s.id),
               name: s.name || 'Wom Up Dark Store',
               code: s.code || '',
+              loginId: s.loginId || '',
               address: s.address || '',
               city: s.city || 'Ahmedabad',
+              pincode: s.pincode || '',
               areaId: s.areaId?.toString ? s.areaId.toString() : s.areaId,
               areaName: s.areaName,
               isActive: s.isActive !== false,
+              orderCount: s.orderCount,
+              pendingOrders: s.pendingOrders,
+              riderCount: s.riderCount,
+              serviceRadiusKm: s.serviceRadiusKm,
+              estimatedDeliveryMinutes: s.estimatedDeliveryMinutes,
+              lastLoginAt: s.lastLoginAt,
+              coordinates: s.coordinates || s.location?.coordinates,
+              createdAt: s.createdAt,
             }))
           : [];
 
@@ -467,6 +554,7 @@ export const ApiService = {
 
         return {
           customers: dynamicCustomers,
+          riders: dynamicRiders,
           orders: dynamicOrders,
           printOrders: dynamicPrintOrders,
           products: dynamicProducts,
@@ -772,6 +860,92 @@ export const ApiService = {
     } catch (err) {
       console.error('[API] Error fetching price history:', err);
       return [];
+    }
+  },
+
+  // 15. FETCH SINGLE RIDER DETAIL
+  async fetchRiderDetail(id: string): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/riders/${id}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      return json.data || null;
+    } catch (e) {
+      console.warn(`[API] Failed to fetch rider detail ${id}:`, e);
+      return null;
+    }
+  },
+
+  // 16. UPDATE RIDER DETAIL
+  async updateRider(id: string, updates: any): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/riders/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      return json.data || null;
+    } catch (e) {
+      console.warn(`[API] Failed to update rider ${id}:`, e);
+      return null;
+    }
+  },
+
+  // 17. FETCH ALL STORES ENRICHED
+  async fetchStores(): Promise<DarkStoreItem[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/stores`);
+      if (!res.ok) return [];
+      const json = await res.json();
+      return json.data || [];
+    } catch (err) {
+      console.error('[API] Error fetching stores:', err);
+      return [];
+    }
+  },
+
+  // 18. CREATE STORE WITH INITIAL CREDENTIALS & INVENTORY
+  async createStore(payload: any): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/stores`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      return json;
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error creating store' };
+    }
+  },
+
+  // 19. RESET STORE PASSWORD
+  async resetStorePassword(id: string, password?: string): Promise<{ success: boolean; password?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/stores/${id}/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      const json = await res.json();
+      return json;
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error resetting password' };
+    }
+  },
+
+  // 20. DELETE STORE
+  async deleteStore(id: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/stores/${id}`, {
+        method: 'DELETE',
+      });
+      const json = await res.json();
+      return json;
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error deleting store' };
     }
   },
 };

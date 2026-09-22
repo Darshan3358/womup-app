@@ -69,13 +69,14 @@ export const S22_PaymentScreen: React.FC = () => {
   const [selectedMethod, setSelectedMethod] = useState<PaymentType>('UPI');
   const [processing, setProcessing] = useState(false);
 
-  const handlePay = () => {
+  const handlePay = async () => {
     setProcessing(true);
-    setTimeout(() => {
-      placeOrder(selectedMethod);
-      setProcessing(false);
+    try {
+      await placeOrder(selectedMethod);
       setActiveScreen('C23_OrderPlaced');
-    }, 800);
+    } finally {
+      setProcessing(false);
+    }
   };
 
   return (

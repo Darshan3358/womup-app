@@ -31,10 +31,7 @@ export const MOCK_ORDERS: Order[] = [
     deliverySlot: 'Today, 10:00 AM – 12:00 PM',
     paymentMethod: 'UPI (Google Pay)',
     estimatedArrival: '12 min',
-    deliveryPartner: {
-      name: 'Rohit Kumar',
-      phone: '+91 98123 45678',
-    },
+    deliveryPartner: undefined,
   },
   {
     id: 'ord_2',

@@ -4,8 +4,8 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { InjectModel, InjectConnection } from '@nestjs/mongoose';
+import { Model, Types, Connection } from 'mongoose';
 import { Order, OrderDocument } from './schemas/order.schema';
 import {
   OrderStatusHistory,
@@ -28,6 +28,13 @@ import {
   WalletTransaction,
   WalletTransactionDocument,
 } from '../wallet/schemas/wallet-transaction.schema';
+import {
+  DeliveryPartner,
+  DeliveryPartnerDocument,
+  DeliveryAssignment,
+  DeliveryAssignmentDocument,
+  RiderAssignmentStatus,
+} from '../delivery/schemas/delivery-partner.schema';
 import { CreateOrderDto } from './dto/order.dto';
 import { TrackingGateway } from '../tracking/tracking.gateway';
 
@@ -46,16 +53,21 @@ export class OrdersService {
     private coinTxModel: Model<CoinTransactionDocument>,
     @InjectModel(WalletTransaction.name)
     private walletTxModel: Model<WalletTransactionDocument>,
+    @InjectModel(DeliveryPartner.name)
+    private partnerModel: Model<DeliveryPartnerDocument>,
+    @InjectModel(DeliveryAssignment.name)
+    private assignmentModel: Model<DeliveryAssignmentDocument>,
+    @InjectConnection() private readonly connection: Connection,
     private cartService: CartService,
     private inventoryService: InventoryService,
     private trackingGateway: TrackingGateway,
-  ) {}
+  ) { }
 
   async createOrder(userId: string, dto: CreateOrderDto) {
     const uId = new Types.ObjectId(userId);
 
     // Look up address or fall back to user's default / auto-provision
-    let address = Types.ObjectId.isValid(dto.addressId)
+    let address = (dto.addressId && Types.ObjectId.isValid(dto.addressId))
       ? await this.addressModel.findOne({ _id: new Types.ObjectId(dto.addressId), userId: uId })
       : null;
 
@@ -63,22 +75,40 @@ export class OrdersService {
       address = await this.addressModel.findOne({ userId: uId }).sort({ isDefault: -1, createdAt: -1 });
     }
 
+    // Auto-provision address from inline dto.address or user GPS/defaults so order is NEVER rejected
     if (!address) {
+      const inlineAddr = dto.address || (dto as any).deliveryAddress;
+      const lat = Number(inlineAddr?.latitude ?? (dto as any).latitude ?? 23.0827);
+      const lng = Number(inlineAddr?.longitude ?? (dto as any).longitude ?? 72.5606);
+      const houseNumber = inlineAddr?.houseNumber || inlineAddr?.houseFlat || 'A-101, Green View';
+      const street = inlineAddr?.street || inlineAddr?.areaLandmark || 'Chandlodiya';
+      const city = inlineAddr?.city || 'Ahmedabad';
+      const pincode = inlineAddr?.pincode || '382481';
+      const label = inlineAddr?.label || inlineAddr?.type || 'Home';
+
       address = await this.addressModel.create({
         userId: uId,
-        label: 'Home',
-        houseNumber: 'Flat 402, Shivalik High Street',
-        street: 'Prahlad Nagar, SG Highway',
-        landmark: 'Near Corporate Road',
-        city: 'Ahmedabad',
+        label,
+        houseNumber,
+        street,
+        city,
         state: 'Gujarat',
-        pincode: '380015',
-        isDefault: true,
+        pincode,
         location: {
           type: 'Point',
-          coordinates: [72.5714, 23.0225],
+          coordinates: [lng, lat],
         },
+        isDefault: true,
       });
+      this.logger.log(`[OrdersService] Auto-provisioned address ${address._id} for user ${userId} at [${lng}, ${lat}]`);
+    }
+
+    if (!address.location?.coordinates || address.location.coordinates.length < 2) {
+      address.location = {
+        type: 'Point',
+        coordinates: [72.5606, 23.0827],
+      };
+      await address.save();
     }
 
     let orderItems: any[] = [];
@@ -117,8 +147,9 @@ export class OrdersService {
         });
       }
 
+      tip = typeof dto.tip === 'number' ? Math.max(0, Number(dto.tip)) : 0;
       deliveryFee = itemSubtotal >= 199 ? 0 : 15;
-      totalAmount = Math.max(0, itemSubtotal + deliveryFee + handlingFee);
+      totalAmount = Math.max(0, itemSubtotal + deliveryFee + handlingFee + tip);
     } else {
       const summary = await this.cartService.getCartSummary(userId);
       if (!summary.items || summary.items.length === 0) {
@@ -143,32 +174,66 @@ export class OrdersService {
       coinDiscount = summary.coinDiscount;
       deliveryFee = summary.deliveryFee;
       handlingFee = summary.handlingFee;
-      tip = summary.tip;
-      totalAmount = summary.totalAmount;
+      tip = typeof dto.tip === 'number' ? Math.max(0, Number(dto.tip)) : (summary.tip || 0);
+      totalAmount = Math.max(0, (summary.totalAmount - (summary.tip || 0)) + tip);
     }
 
-    const coords = address.location?.coordinates || [72.5714, 23.0225];
-
-    // 2. Select Nearest Dark Store
-    let store = await this.storeModel.findOne({ isActive: true }).exec();
-    if (!store) {
-      store = await this.storeModel.findOne().exec();
+    const coords = address.location?.coordinates;
+    if (!coords || coords.length < 2 || typeof coords[0] !== 'number' || typeof coords[1] !== 'number') {
+      throw new BadRequestException('The selected delivery address does not have valid GPS coordinates.');
     }
+    const lng = coords[0];
+    const lat = coords[1];
+
+    // 2. Select Serviceable Dark Store using Serviceability Engine (Polygon / 2dsphere)
+    let store: StoreDocument | null = null;
+
+    const matchedArea = await this.storeModel.db.collection('areas').findOne({
+      polygon: {
+        $geoIntersects: {
+          $geometry: {
+            type: 'Point',
+            coordinates: [lng, lat],
+          },
+        },
+      },
+      isActive: true,
+    });
+
+    if (matchedArea) {
+      if (matchedArea.hubStoreId) {
+        store = await this.storeModel.findOne({ _id: matchedArea.hubStoreId, isActive: true }).exec();
+      }
+      if (!store) {
+        store = await this.storeModel.findOne({ areaId: matchedArea._id, isActive: true }).exec();
+      }
+    }
+
     if (!store) {
-      store = await this.storeModel.create({
-        name: 'Worm Up Ahmedabad Central Dark Store',
-        code: 'AHM-01',
-        address: 'Prahlad Nagar, SG Highway',
-        city: 'Ahmedabad',
-        pincode: '380015',
-        serviceRadiusKm: 10,
-        estimatedDeliveryMinutes: 9,
+      const nearest = await this.storeModel.find({
         isActive: true,
         location: {
-          type: 'Point',
-          coordinates: [72.5714, 23.0225],
+          $near: {
+            $geometry: {
+              type: 'Point',
+              coordinates: [lng, lat],
+            },
+            $maxDistance: 8000,
+          },
         },
-      });
+      }).limit(1).exec();
+
+      if (nearest && nearest.length > 0) {
+        store = nearest[0];
+      }
+    }
+
+    if (!store) {
+      store = await this.storeModel.findOne({ isActive: true }).exec();
+    }
+
+    if (!store) {
+      throw new BadRequestException('No active dark store available for this delivery address');
     }
 
     // 3. Confirm Inventory Reservation if supplied or reserve
@@ -222,20 +287,22 @@ export class OrdersService {
     // 6. Create Order with snapshot records in MongoDB Atlas
     const orderNumber = `WORM-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
     const estimatedArrival = new Date(Date.now() + 9 * 60 * 1000); // 9 mins
+    const deliveryOtp = Math.floor(1000 + Math.random() * 9000).toString();
 
     const order = await this.orderModel.create({
       orderNumber,
       userId: uId,
       storeId: store._id,
       status: OrderStatus.PLACED,
+      deliveryOtp,
       items: orderItems,
       deliveryAddress: {
-        label: address.label || 'Home',
-        houseNumber: address.houseNumber || 'Flat 402, Shivalik High Street',
-        street: address.street || 'Prahlad Nagar, SG Highway',
-        landmark: address.landmark || 'Near Corporate Road',
-        city: address.city || 'Ahmedabad',
-        pincode: address.pincode || '380015',
+        label: address.label || '',
+        houseNumber: address.houseNumber || '',
+        street: address.street || '',
+        landmark: address.landmark || '',
+        city: address.city || '',
+        pincode: address.pincode || '',
         coordinates: coords,
       },
       itemSubtotal,
@@ -281,13 +348,70 @@ export class OrdersService {
       description: `Earned 10% Shopping Coins reward on Order #${orderNumber}`,
     });
 
-    // 9. Clear customer cart
+    // 9. Automated Dispatch Engine: Assign to available online rider
+    try {
+      const onlinePartner = await this.partnerModel.findOne({ isOnline: true }).sort({ updatedAt: -1 });
+      if (onlinePartner) {
+        const payoutAmount = Math.max(35, Math.round((order.totalAmount || 50) * 0.15) + 25);
+        await this.assignmentModel.create({
+          orderId: order._id,
+          partnerId: onlinePartner._id,
+          status: RiderAssignmentStatus.OFFERED,
+          payoutAmount,
+          distanceKm: 2.1,
+          etaMinutes: 12,
+          assignedAt: new Date(),
+        });
+        this.logger.log(`[Dispatch] Auto-offered Order #${orderNumber} to rider ${onlinePartner.fullName} (${onlinePartner.partnerCode})`);
+      }
+    } catch (dispatchErr: any) {
+      this.logger.warn(`Failed to auto-dispatch order #${orderNumber}: ${dispatchErr.message}`);
+    }
+
+    // 9b. Real-Time Stock Management: Decrement availableQty and Increment reservedQty
+    if (store && order.items && order.items.length > 0) {
+      for (const item of order.items) {
+        try {
+          const updatedInv = await this.connection.collection('inventory').findOneAndUpdate(
+            {
+              storeId: new Types.ObjectId(store._id.toString()),
+              productId: new Types.ObjectId(item.productId.toString()),
+            },
+            {
+              $inc: {
+                availableQty: -item.quantity,
+                reservedQty: item.quantity,
+              },
+            },
+            { upsert: true, returnDocument: 'after' }
+          );
+
+          this.trackingGateway.broadcastInventoryUpdate({
+            storeId: store._id.toString(),
+            productId: item.productId.toString(),
+            productName: item.name,
+            availableQty: updatedInv?.availableQty ?? 0,
+            reservedQty: updatedInv?.reservedQty ?? item.quantity,
+          });
+        } catch (invErr: any) {
+          this.logger.warn(`Failed to update real-time stock for product ${item.productId}: ${invErr.message}`);
+        }
+      }
+    }
+
+    // 10. Clear customer cart
     await this.cartService.clearCart(userId);
 
-    // 10. Emit real-time WebSocket event
-    this.trackingGateway.notifyOrderStatus(order._id.toString(), OrderStatus.PLACED);
+    // 11. Emit real-time WebSocket events to all apps
+    this.trackingGateway.broadcastNewOrder(order);
+    this.trackingGateway.notifyOrderStatus(order._id.toString(), OrderStatus.PLACED, {
+      orderId: order._id.toString(),
+      orderNumber: order.orderNumber,
+      deliveryOtp: order.deliveryOtp,
+      status: OrderStatus.PLACED,
+    });
 
-    this.logger.log(`Order #${orderNumber} created successfully for user ${userId}. Total: ₹${order.totalAmount}`);
+    this.logger.log(`Order #${orderNumber} placed. Delivery PIN: ${deliveryOtp}. Total: ₹${order.totalAmount}`);
     return order;
   }
 
@@ -393,6 +517,37 @@ export class OrdersService {
       }
     }
 
+    // Reverse Inventory: decrement reservedQty and increment availableQty
+    if (order.storeId && order.items && order.items.length > 0) {
+      for (const item of order.items) {
+        try {
+          const updatedInv = await this.connection.collection('inventory').findOneAndUpdate(
+            {
+              storeId: new Types.ObjectId(order.storeId.toString()),
+              productId: new Types.ObjectId(item.productId.toString()),
+            },
+            {
+              $inc: {
+                availableQty: item.quantity,
+                reservedQty: -item.quantity,
+              },
+            },
+            { returnDocument: 'after' }
+          );
+
+          this.trackingGateway.broadcastInventoryUpdate({
+            storeId: order.storeId.toString(),
+            productId: item.productId.toString(),
+            productName: item.name,
+            availableQty: updatedInv?.availableQty ?? 0,
+            reservedQty: Math.max(0, updatedInv?.reservedQty ?? 0),
+          });
+        } catch (invErr: any) {
+          this.logger.warn(`Failed to restore inventory on cancel for product ${item.productId}: ${invErr.message}`);
+        }
+      }
+    }
+
     return this.updateOrderStatus(
       orderId,
       OrderStatus.CANCELLED,
@@ -402,67 +557,226 @@ export class OrdersService {
     );
   }
 
-  async getOrderById(orderId: string, userId: string) {
-    const order = await this.orderModel
-      .findOne({
-        _id: new Types.ObjectId(orderId),
-        userId: new Types.ObjectId(userId),
-      })
-      .populate('deliveryPartnerId', 'fullName phoneNumber vehicleNumber rating')
-      .exec();
+  async getOrderById(orderId: string, userId?: string) {
+    let query: any = {};
+    if (Types.ObjectId.isValid(orderId)) {
+      query = { $or: [{ _id: new Types.ObjectId(orderId) }, { orderNumber: orderId }] };
+    } else {
+      const cleanNum = orderId.replace(/^#/, '');
+      query = {
+        $or: [
+          { orderNumber: orderId },
+          { orderNumber: cleanNum },
+          { orderNumber: `#${cleanNum}` },
+        ],
+      };
+    }
+
+    if (userId && Types.ObjectId.isValid(userId)) {
+      query.userId = new Types.ObjectId(userId);
+    }
+
+    let order: any = null;
+    try {
+      order = await this.orderModel
+        .findOne(query)
+        .populate('deliveryPartnerId', 'fullName phoneNumber vehicleNumber rating currentLocation')
+        .populate('storeId', 'name address location')
+        .exec();
+    } catch (popErr) {
+      this.logger.warn(`Populate failed in getOrderById: ${popErr?.message}, falling back to unpopulated find`);
+      order = await this.orderModel.findOne(query).exec();
+    }
 
     if (!order) {
       throw new NotFoundException('Order not found');
     }
-    return order;
+
+    const orderObj: any = order.toObject ? order.toObject() : { ...order };
+
+    // If deliveryPartnerId is not populated directly on order, check delivery_assignments (only if accepted/active)
+    if (!orderObj.deliveryPartnerId) {
+      const assignment = await this.assignmentModel
+        .findOne({
+          orderId: order._id,
+          status: {
+            $in: [
+              RiderAssignmentStatus.ACCEPTED,
+              RiderAssignmentStatus.GOING_TO_STORE,
+              RiderAssignmentStatus.ARRIVED_AT_STORE,
+              RiderAssignmentStatus.PICKUP_VERIFIED,
+              RiderAssignmentStatus.OUT_FOR_DELIVERY,
+              RiderAssignmentStatus.ARRIVED_AT_CUSTOMER,
+              RiderAssignmentStatus.COMPLETED,
+            ],
+          },
+        })
+        .sort({ createdAt: -1 });
+
+      if (assignment && assignment.partnerId) {
+        try {
+          const partner = await this.partnerModel.findById(assignment.partnerId);
+          if (partner) {
+            orderObj.deliveryPartnerId = {
+              _id: partner._id,
+              fullName: partner.fullName,
+              phoneNumber: partner.phoneNumber,
+              vehicleNumber: partner.vehicleNumber,
+              rating: partner.rating || 4.9,
+              currentLocation: (partner as any).currentLocation,
+            };
+          }
+        } catch {
+          // non-fatal
+        }
+      }
+    }
+
+    if (orderObj.deliveryPartnerId) {
+      const pLoc = orderObj.deliveryPartnerId.currentLocation;
+      let coords: { latitude: number; longitude: number } | undefined = undefined;
+      if (pLoc && Array.isArray(pLoc.coordinates) && pLoc.coordinates.length >= 2) {
+        coords = {
+          latitude: pLoc.coordinates[1],
+          longitude: pLoc.coordinates[0],
+        };
+      }
+
+      orderObj.deliveryPartner = {
+        id: orderObj.deliveryPartnerId._id?.toString() || '',
+        name: orderObj.deliveryPartnerId.fullName || null,
+        phone: orderObj.deliveryPartnerId.phoneNumber || '',
+        vehicleNumber: orderObj.deliveryPartnerId.vehicleNumber || '',
+        rating: orderObj.deliveryPartnerId.rating || 4.9,
+        currentLocation: coords,
+      };
+    }
+
+    return orderObj;
   }
 
   async getOrderHistory(userId: string, page = 1, limit = 20) {
-    const uId = new Types.ObjectId(userId);
-    const skip = (page - 1) * limit;
+    const p = Math.max(1, Number(page) || 1);
+    const l = Math.max(1, Math.min(100, Number(limit) || 20));
+    const skip = (p - 1) * l;
 
-    const [orders, total] = await Promise.all([
-      this.orderModel
-        .find({ userId: uId })
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .populate('deliveryPartnerId', 'fullName phoneNumber vehicleNumber')
-        .exec(),
-      this.orderModel.countDocuments({ userId: uId }).exec(),
-    ]);
+    if (!userId) {
+      return {
+        orders: [],
+        pagination: { page: p, limit: l, total: 0, totalPages: 0 },
+      };
+    }
+
+    const isObjId = Types.ObjectId.isValid(userId);
+    const userQuery = isObjId
+      ? { $or: [{ userId: new Types.ObjectId(userId) }, { userId }] }
+      : { userId };
+
+    let orders: any[] = [];
+    let total = 0;
+
+    try {
+      const [fetchedOrders, count] = await Promise.all([
+        this.orderModel
+          .find(userQuery)
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(l)
+          .populate({
+            path: 'deliveryPartnerId',
+            select: 'fullName phoneNumber vehicleNumber',
+            options: { lean: true },
+          })
+          .lean()
+          .exec(),
+        this.orderModel.countDocuments(userQuery).exec(),
+      ]);
+      orders = fetchedOrders || [];
+      total = count || 0;
+    } catch (popErr) {
+      this.logger.warn(`Populate failed in getOrderHistory: ${popErr?.message}, falling back to unpopulated lean query`);
+      try {
+        const [fetchedOrders, count] = await Promise.all([
+          this.orderModel
+            .find(userQuery)
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(l)
+            .lean()
+            .exec(),
+          this.orderModel.countDocuments(userQuery).exec(),
+        ]);
+        orders = fetchedOrders || [];
+        total = count || 0;
+      } catch (findErr) {
+        this.logger.error(`Failed to fetch orders in getOrderHistory: ${findErr?.message}`);
+        orders = [];
+        total = 0;
+      }
+    }
 
     return {
       orders,
       pagination: {
-        page,
-        limit,
+        page: p,
+        limit: l,
         total,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.ceil(total / l),
       },
     };
   }
 
   async findAllForAdmin(status?: string, page = 1, limit = 20) {
+    const p = Math.max(1, Number(page) || 1);
+    const l = Math.max(1, Math.min(100, Number(limit) || 20));
+    const skip = (p - 1) * l;
+
     const query: any = {};
     if (status) query.status = status;
-    const skip = (page - 1) * limit;
 
-    const [orders, total] = await Promise.all([
-      this.orderModel
-        .find(query)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .populate('userId', 'name phone')
-        .populate('deliveryPartnerId', 'fullName phoneNumber')
-        .exec(),
-      this.orderModel.countDocuments(query).exec(),
-    ]);
+    let orders: any[] = [];
+    let total = 0;
+
+    try {
+      const [fetchedOrders, count] = await Promise.all([
+        this.orderModel
+          .find(query)
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(l)
+          .populate('userId', 'name phone')
+          .populate('deliveryPartnerId', 'fullName phoneNumber')
+          .lean()
+          .exec(),
+        this.orderModel.countDocuments(query).exec(),
+      ]);
+      orders = fetchedOrders || [];
+      total = count || 0;
+    } catch (popErr) {
+      this.logger.warn(`Populate failed in findAllForAdmin: ${popErr?.message}, falling back to unpopulated lean query`);
+      try {
+        const [fetchedOrders, count] = await Promise.all([
+          this.orderModel
+            .find(query)
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(l)
+            .lean()
+            .exec(),
+          this.orderModel.countDocuments(query).exec(),
+        ]);
+        orders = fetchedOrders || [];
+        total = count || 0;
+      } catch (findErr) {
+        this.logger.error(`Failed in findAllForAdmin: ${findErr?.message}`);
+        orders = [];
+        total = 0;
+      }
+    }
 
     return {
       orders,
-      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+      pagination: { page: p, limit: l, total, totalPages: Math.ceil(total / l) },
     };
   }
 }

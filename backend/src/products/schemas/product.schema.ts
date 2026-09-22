@@ -75,6 +75,12 @@ export class Product {
   @Prop({ default: 100 })
   stock: number;
 
+  @Prop({ default: '', trim: true })
+  shelfLocation: string; // e.g. "A3-R2"
+
+  @Prop({ default: '', trim: true, index: true })
+  barcode: string;
+
   @Prop({ default: true })
   isActive: boolean;
 }

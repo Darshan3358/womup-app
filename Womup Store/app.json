@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "Worm Up Dark Store",
+    "slug": "womup-store",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#05062A"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.womup.store"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#05062A",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png"
+      },
+      "package": "com.womup.store",
+      "permissions": [
+        "CAMERA"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    }
+  }
+}

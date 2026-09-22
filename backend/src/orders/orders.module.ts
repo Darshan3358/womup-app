@@ -16,6 +16,12 @@ import {
   WalletTransaction,
   WalletTransactionSchema,
 } from '../wallet/schemas/wallet-transaction.schema';
+import {
+  DeliveryPartner,
+  DeliveryPartnerSchema,
+  DeliveryAssignment,
+  DeliveryAssignmentSchema,
+} from '../delivery/schemas/delivery-partner.schema';
 import { OrdersService } from './orders.service';
 import { OrdersController } from './orders.controller';
 import { StoreOrdersController } from './store-orders.controller';
@@ -38,6 +44,8 @@ import { TrackingModule } from '../tracking/tracking.module';
       { name: User.name, schema: UserSchema },
       { name: CoinTransaction.name, schema: CoinTransactionSchema },
       { name: WalletTransaction.name, schema: WalletTransactionSchema },
+      { name: DeliveryPartner.name, schema: DeliveryPartnerSchema },
+      { name: DeliveryAssignment.name, schema: DeliveryAssignmentSchema },
     ]),
   ],
   controllers: [

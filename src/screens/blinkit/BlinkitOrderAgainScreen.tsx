@@ -101,10 +101,7 @@ export const BlinkitOrderAgainScreen: React.FC = () => {
       deliveryAddress: selectedAddress,
       deliverySlot: 'Express (10 minutes)',
       paymentMethod: 'Online / Cash on Delivery',
-      deliveryPartner: {
-        name: 'Vikram Singh (Worm Up Express)',
-        phone: '+91 98234 56789',
-      },
+      deliveryPartner: undefined,
     };
     setCurrentOrder(printTrackingObj);
     setActiveScreen('C24_OrderTracking');
@@ -289,8 +286,28 @@ export const BlinkitOrderAgainScreen: React.FC = () => {
                     <Text style={styles.orderDateText}>{ord.date}</Text>
                   </View>
                   <View style={styles.statusAndArrowRow}>
-                    <View style={styles.orderStatusBadge}>
-                      <Text style={styles.orderStatusText}>{ord.status}</Text>
+                    <View
+                      style={[
+                        styles.orderStatusBadge,
+                        ord.status === 'CANCELLED'
+                          ? { backgroundColor: '#FEE2E2' }
+                          : ord.status === 'DELIVERED'
+                          ? { backgroundColor: '#E6F9F0' }
+                          : { backgroundColor: '#EDE9FE' },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.orderStatusText,
+                          ord.status === 'CANCELLED'
+                            ? { color: '#DC2626' }
+                            : ord.status === 'DELIVERED'
+                            ? { color: '#059669' }
+                            : { color: COLORS.purple },
+                        ]}
+                      >
+                        {ord.status}
+                      </Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color={COLORS.purple} style={{ marginLeft: 6 }} />
                   </View>

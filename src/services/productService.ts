@@ -9,6 +9,7 @@ export const ProductService = {
   // --- Live API Methods (Fetching directly from MongoDB Atlas) ---
   async fetchProducts(params: {
     areaId?: string;
+    storeId?: string;
     categoryId?: string;
     categoryIds?: string[];
     search?: string;
@@ -21,6 +22,7 @@ export const ProductService = {
   } = {}): Promise<Product[]> {
     const queryParts: string[] = [];
     if (params.areaId) queryParts.push(`areaId=${encodeURIComponent(params.areaId)}`);
+    if (params.storeId) queryParts.push(`storeId=${encodeURIComponent(params.storeId)}`);
     if (params.categoryId) queryParts.push(`categoryId=${encodeURIComponent(params.categoryId)}`);
     if (params.categoryIds && params.categoryIds.length > 0) {
       queryParts.push(`categoryIds=${encodeURIComponent(params.categoryIds.join(','))}`);

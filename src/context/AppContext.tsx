@@ -92,7 +92,7 @@ interface AppContextType {
   orders: Order[];
   currentOrder: Order | null;
   setCurrentOrder: (order: Order | null) => void;
-  placeOrder: (paymentMethod: string) => Order;
+  placeOrder: (paymentMethod: string, options?: { tip?: number; deliveryInstructions?: string }) => Promise<Order>;
 
   // Product Selection for Details / Listing
   selectedProduct: Product;
@@ -156,10 +156,17 @@ interface AppContextType {
   isInWishlist: (productId: string) => boolean;
   clearWishlist: () => void;
 
-  // Delivery Area & GPS Resolution
+  // Delivery Area & Dark Store Resolution
   currentAreaId: string | null;
   currentAreaName: string | null;
+  currentStoreId: string | null;
+  currentStoreName: string | null;
+  isServiceable: boolean;
+  setIsServiceable: (serviceable: boolean) => void;
+  deliveryEtaMinutes: number | null;
+  setDeliveryEtaMinutes: (minutes: number | null) => void;
   setCurrentArea: (areaId: string, areaName: string) => void;
+  setCurrentStore: (storeId: string | null, storeName: string | null) => void;
 
   // Onboarding & Auth State
   isAuthenticated: boolean;
@@ -225,20 +232,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [user, setUser] = useState<UserProfile>(INITIAL_USER);
   const [selectedAddress, setSelectedAddress] = useState<Address>(INITIAL_ADDRESS);
 
-  // Delivery Area & GPS Pricing
+  // Delivery Area & Dark Store Resolution
   const [currentAreaId, setCurrentAreaId] = useState<string | null>(null);
-  const [currentAreaName, setCurrentAreaName] = useState<string | null>('Prahlad Nagar');
+  const [currentAreaName, setCurrentAreaName] = useState<string | null>(null);
+  const [currentStoreId, setCurrentStoreId] = useState<string | null>(null);
+  const [currentStoreName, setCurrentStoreName] = useState<string | null>(null);
+  const [isServiceable, setIsServiceable] = useState<boolean>(false);
+  const [deliveryEtaMinutes, setDeliveryEtaMinutes] = useState<number | null>(null);
 
   const setCurrentArea = (areaId: string, areaName: string) => {
     setCurrentAreaId(areaId);
     setCurrentAreaName(areaName);
   };
 
+  const setCurrentStore = (storeId: string | null, storeName: string | null) => {
+    setCurrentStoreId(storeId);
+    setCurrentStoreName(storeName);
+  };
+
   // Blinkit Extensions
   const [walletBalance, setWalletBalance] = useState<number>(50);
   const [hideSensitiveItems, setHideSensitiveItems] = useState<boolean>(false);
   const [appearance, setAppearance] = useState<'LIGHT' | 'DARK' | 'SYSTEM'>('LIGHT');
-  const [deliveryLocation, setDeliveryLocation] = useState<string>('Home — Prahlad Nagar, Ahmedabad');
+  const [deliveryLocation, setDeliveryLocation] = useState<string>('Set Delivery Location');
   const [isLocationModalVisible, setLocationModalVisible] = useState<boolean>(false);
   const [isDistrictModalVisible, setDistrictModalVisible] = useState<boolean>(false);
   const [selectedBlinkitProduct, setSelectedBlinkitProduct] = useState<BlinkitProduct>(
@@ -427,6 +443,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               if (liveOrders && liveOrders.length > 0) {
                 setOrders(liveOrders);
                 setCurrentOrder(liveOrders[0]);
+                StorageService.saveItem(StorageService.KEYS.ORDERS, liveOrders);
+              } else {
+                const saved = await StorageService.getItem<Order[] | null>(StorageService.KEYS.ORDERS, null);
+                if (saved && saved.length > 0) {
+                  setOrders(saved);
+                  setCurrentOrder(saved[0]);
+                }
               }
             } catch (e) {
               console.warn('Error fetching live orders from backend:', e);
@@ -489,35 +512,148 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       } catch (e) {}
 
-      // Saved Orders
+      // Saved Orders fallback
       try {
         const savedOrders = await StorageService.getItem<Order[] | null>(
           StorageService.KEYS.ORDERS,
           null
         );
         if (savedOrders && savedOrders.length > 0) {
-          setOrders(savedOrders);
-          setCurrentOrder(savedOrders[0]);
+          setOrders((prev) => (prev && prev.length > 0 ? prev : savedOrders));
+          setCurrentOrder((prev) => prev || savedOrders[0]);
         }
       } catch (e) {}
 
-      // 3. Resolve Delivery Area & Fetch Live Products from MongoDB Atlas
-      let initialAreaId: string | undefined = undefined;
+      // 3. Resolve Real Delivery Area & Dark Store from GPS / Saved Address
       try {
-        const initialLat = selectedAddress?.latitude || 23.0225;
-        const initialLng = selectedAddress?.longitude || 72.5714;
-        const areaRes = await LocationService.resolveArea(initialLat, initialLng);
-        if (areaRes) {
-          setCurrentAreaId(areaRes.areaId);
-          setCurrentAreaName(areaRes.areaName);
-          initialAreaId = areaRes.areaId;
+        const cached = await StorageService.getItem<{ area: any; ts: number } | null>(
+          '@wormup_resolved_area',
+          null
+        );
+        if (cached?.ts && Date.now() - cached.ts > 5 * 60 * 1000) {
+          LocationService.clearCache();
+        }
+      } catch (_) {}
+
+      // 3a. Restore saved address from previous session
+      let initialLat: number | undefined = undefined;
+      let initialLng: number | undefined = undefined;
+
+      try {
+        const savedAddress = await StorageService.getItem<Address | null>(
+          StorageService.KEYS.SELECTED_ADDRESS,
+          null
+        );
+        if (savedAddress && (savedAddress.latitude || savedAddress.houseFlat)) {
+          setSelectedAddress(savedAddress);
+          const shortLabel = savedAddress.houseFlat || savedAddress.areaLandmark || savedAddress.city;
+          setDeliveryLocation(`${savedAddress.type || 'Current Location'} — ${shortLabel}`);
+          if (savedAddress.latitude && savedAddress.longitude) {
+            initialLat = savedAddress.latitude;
+            initialLng = savedAddress.longitude;
+          }
         }
       } catch (e) {
-        console.warn('Error resolving initial delivery area:', e);
+        console.warn('Error restoring saved address:', e);
+      }
+
+      // 3b. Auto-detect real-time device GPS immediately on boot
+      try {
+        const detected = await LocationService.getCurrentLocation();
+        if (detected) {
+          initialLat = detected.latitude;
+          initialLng = detected.longitude;
+          const shortLabel = detected.shortAddress || detected.readableAddress;
+          setDeliveryLocation(`Current Location — ${shortLabel}`);
+          const addressObj: Address = {
+            id: `current_${Date.now()}`,
+            type: 'Current' as const,
+            fullName: user?.fullName || 'Customer',
+            phoneNumber: user?.phoneNumber || '',
+            houseFlat: detected.street || 'Current GPS Location',
+            areaLandmark: detected.areaLandmark || detected.shortAddress,
+            city: detected.city || 'Ahmedabad',
+            pincode: detected.pincode || '380015',
+            latitude: detected.latitude,
+            longitude: detected.longitude,
+            isDefault: true,
+          };
+          setSelectedAddress(addressObj);
+          StorageService.saveItem(StorageService.KEYS.SELECTED_ADDRESS, addressObj);
+        }
+      } catch (err) {
+        console.log('[AppContext] Auto GPS on boot waiting for permission or unavailable:', err);
+      }
+
+      // 3c. Listen for browser geolocation permission changes (instant resolution on user allow)
+      if (typeof navigator !== 'undefined' && (navigator as any).permissions) {
+        try {
+          (navigator as any).permissions.query({ name: 'geolocation' }).then((status: any) => {
+            status.onchange = async () => {
+              if (status.state === 'granted') {
+                try {
+                  const loc = await LocationService.getCurrentLocation();
+                  if (loc) {
+                    const shortLabel = loc.shortAddress || loc.readableAddress;
+                    setDeliveryLocation(`Current Location — ${shortLabel}`);
+                    const addrObj: Address = {
+                      id: `current_${Date.now()}`,
+                      type: 'Current' as const,
+                      fullName: 'Customer',
+                      phoneNumber: '',
+                      houseFlat: loc.street || 'Current GPS Location',
+                      areaLandmark: loc.areaLandmark || loc.shortAddress,
+                      city: loc.city || 'Ahmedabad',
+                      pincode: loc.pincode || '380015',
+                      latitude: loc.latitude,
+                      longitude: loc.longitude,
+                      isDefault: true,
+                    };
+                    setSelectedAddress(addrObj);
+                    StorageService.saveItem(StorageService.KEYS.SELECTED_ADDRESS, addrObj);
+                    const area = await LocationService.resolveArea(loc.latitude, loc.longitude, true);
+                    if (area) {
+                      setCurrentAreaId(area.areaId);
+                      setCurrentAreaName(area.areaName);
+                      setCurrentStoreId(area.storeId || null);
+                      setCurrentStoreName(area.storeName || null);
+                      setIsServiceable(area.serviceable === true);
+                      setDeliveryEtaMinutes(area.deliveryMinutes || 9);
+                    }
+                  }
+                } catch (_) {}
+              }
+            };
+          }).catch(() => {});
+        } catch (_) {}
+      }
+
+      let initialAreaId: string | undefined = undefined;
+      let initialStoreId: string | undefined = undefined;
+
+      if (initialLat && initialLng) {
+        try {
+          const areaRes = await LocationService.resolveArea(initialLat, initialLng, true);
+          if (areaRes) {
+            setCurrentAreaId(areaRes.areaId);
+            setCurrentAreaName(areaRes.areaName);
+            setCurrentStoreId(areaRes.storeId || null);
+            setCurrentStoreName(areaRes.storeName || null);
+            setIsServiceable(areaRes.serviceable === true);
+            setDeliveryEtaMinutes(areaRes.deliveryMinutes || 9);
+            initialAreaId = areaRes.areaId;
+            initialStoreId = areaRes.storeId;
+          }
+        } catch (e) {
+          console.warn('Error resolving initial delivery area & dark store:', e);
+        }
       }
 
       try {
-        const liveProducts = await ProductService.fetchProducts({ areaId: initialAreaId });
+        const liveProducts = await ProductService.fetchProducts({
+          areaId: initialAreaId,
+          storeId: initialStoreId,
+        });
         if (liveProducts && liveProducts.length > 0) {
           setSelectedProduct(liveProducts[0]);
           setSelectedBlinkitProduct(mapProductToBlinkit(liveProducts[0]));
@@ -539,31 +675,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     })();
   }, []);
 
-  // Re-resolve area when selected address coordinates change
+  // Re-resolve area and dark store when selected address coordinates change
   useEffect(() => {
     if (selectedAddress?.latitude && selectedAddress?.longitude) {
-      LocationService.resolveArea(selectedAddress.latitude, selectedAddress.longitude).then(
+      LocationService.resolveArea(selectedAddress.latitude, selectedAddress.longitude, true).then(
         (area) => {
-          if (area && area.areaId !== currentAreaId) {
+          if (area) {
             setCurrentAreaId(area.areaId);
             setCurrentAreaName(area.areaName);
+            setCurrentStoreId(area.storeId || null);
+            setCurrentStoreName(area.storeName || null);
+            setIsServiceable(area.serviceable ?? false);
+            setDeliveryEtaMinutes(area.deliveryMinutes || 9);
           }
         }
       );
     }
   }, [selectedAddress?.latitude, selectedAddress?.longitude]);
 
-  // When currentAreaId updates, re-fetch products with area-specific prices
+  // When currentAreaId or currentStoreId updates, re-fetch products with store-specific stock and area prices
   useEffect(() => {
-    if (currentAreaId) {
-      ProductService.fetchProducts({ areaId: currentAreaId }).then((liveProducts) => {
+    if (currentAreaId || currentStoreId) {
+      ProductService.fetchProducts({
+        areaId: currentAreaId || undefined,
+        storeId: currentStoreId || undefined,
+      }).then((liveProducts) => {
         if (liveProducts && liveProducts.length > 0) {
           setSelectedProduct(liveProducts[0]);
           setSelectedBlinkitProduct(mapProductToBlinkit(liveProducts[0]));
         }
       });
     }
-  }, [currentAreaId]);
+  }, [currentAreaId, currentStoreId]);
 
   // Save cart changes
   useEffect(() => {
@@ -620,7 +763,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setSelectedAddress(address);
   };
 
-  const placeOrder = (paymentMethod: string): Order => {
+  const placeOrder = async (
+    paymentMethod: string,
+    options?: { tip?: number; deliveryInstructions?: string },
+  ): Promise<Order> => {
     const orderItems = (cartCount > 0 ? cart : blinkitCartList).map((i: any) => ({
       productId: i.product.id,
       name: `${i.product.name} ${i.product.quantityLabel || i.product.packSize || ''}`.trim(),
@@ -631,27 +777,68 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       quantityLabel: i.product.quantityLabel || i.product.packSize || '1 unit',
     }));
 
-    // Authoritative backend creation in MongoDB Atlas
-    OrderService.createOrder({
-      addressId: selectedAddress.id || 'default_addr',
-      paymentMethod,
-      items: orderItems,
-      deliveryInstructions: 'Ring bell & leave at door',
-    })
-      .then(async (res) => {
-        if (res.success) {
-          const liveOrders = await OrderService.fetchOrders();
-          if (liveOrders && liveOrders.length > 0) {
-            setOrders(liveOrders);
-            setCurrentOrder(liveOrders[0]);
-          }
-        }
-      })
-      .catch((err) => {
-        console.warn('Backend order creation error:', err);
+    // Deduct coins & optimistic rewards
+    setUser((prev) => ({
+      ...prev,
+      shoppingCoins:
+        prev.shoppingCoins -
+        (cartCount > 0 ? cartSummary.shoppingCoinDiscount : 0) +
+        (cartCount > 0 ? cartSummary.totalCoinsEarnable : 10),
+    }));
+
+    let liveOrder: Order | null = null;
+    try {
+      // Authoritative backend creation in MongoDB Atlas
+      const res = await OrderService.createOrder({
+        addressId: selectedAddress.id?.startsWith('current_') || selectedAddress.id === 'default_addr' ? undefined : selectedAddress.id,
+        paymentMethod,
+        items: orderItems,
+        tip: options?.tip || 0,
+        deliveryInstructions: options?.deliveryInstructions || 'Ring bell & leave at door',
+        address: {
+          houseFlat: selectedAddress.houseFlat || 'Chandlodiya',
+          areaLandmark: selectedAddress.areaLandmark || 'Chandlodiya, Ahmedabad',
+          city: selectedAddress.city || 'Ahmedabad',
+          pincode: selectedAddress.pincode || '382481',
+          latitude: selectedAddress.latitude || 23.0827,
+          longitude: selectedAddress.longitude || 72.5606,
+          label: selectedAddress.type || 'Home',
+        },
       });
 
-    const newOrder: Order = {
+      if (res.success && res.data) {
+        const liveData = res.data;
+        const livePartner = liveData.deliveryPartner || liveData.deliveryPartnerId;
+        liveOrder = {
+          id: liveData._id || liveData.id || `ord_${Date.now()}`,
+          _id: liveData._id,
+          orderNumber: liveData.orderNumber || `#WUP-${Date.now().toString().slice(-6)}`,
+          date: 'Just now',
+          status: liveData.status || 'PLACED',
+          itemCount: liveData.items?.length || orderItems.length,
+          items: orderItems,
+          subtotal: liveData.itemSubtotal || (cartCount > 0 ? cartSummary.subtotalSelling : blinkitCartTotal),
+          discount: liveData.discount ?? (cartCount > 0 ? cartSummary.productDiscount : 0),
+          shoppingCoinsUsed: liveData.coinsUsed ?? (cartCount > 0 ? cartSummary.shoppingCoinDiscount : appliedCoins),
+          deliveryFee: liveData.deliveryFee ?? (cartCount > 0 ? cartSummary.deliveryFee : 0),
+          totalAmount: liveData.totalAmount || (cartCount > 0 ? cartSummary.totalPayable : blinkitCartTotal),
+          deliveryAddress: selectedAddress,
+          deliverySlot: 'Today, within 9 minutes',
+          paymentMethod,
+          estimatedArrival: '9 min',
+          deliveryOtp: liveData.deliveryOtp || '4821',
+          deliveryPartner: livePartner && livePartner.fullName ? {
+            name: livePartner.fullName || livePartner.name,
+            phone: livePartner.phoneNumber || livePartner.phone,
+            vehicleNumber: livePartner.vehicleNumber,
+          } : undefined,
+        };
+      }
+    } catch (err) {
+      console.warn('Backend order creation error:', err);
+    }
+
+    const orderToSave: Order = liveOrder || {
       id: `ord_${Date.now()}`,
       orderNumber: `#W${Math.floor(10000000 + Math.random() * 90000000)}`,
       date: 'Just now',
@@ -683,25 +870,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       deliverySlot: 'Today, within 9 minutes',
       paymentMethod,
       estimatedArrival: '9 min',
-      deliveryPartner: {
-        name: 'Rohit Kumar',
-        phone: '+91 98123 45678',
-      },
+      deliveryPartner: undefined,
     };
 
-    setUser((prev) => ({
-      ...prev,
-      shoppingCoins:
-        prev.shoppingCoins -
-        (cartCount > 0 ? cartSummary.shoppingCoinDiscount : 0) +
-        (cartCount > 0 ? cartSummary.totalCoinsEarnable : 10),
-    }));
-
-    setOrders((prev) => [newOrder, ...prev]);
-    setCurrentOrder(newOrder);
+    setOrders((prev) => {
+      const updated = [orderToSave, ...prev.filter((o) => o.id !== orderToSave.id && o.orderNumber !== orderToSave.orderNumber)];
+      StorageService.saveItem(StorageService.KEYS.ORDERS, updated);
+      return updated;
+    });
+    setCurrentOrder(orderToSave);
     clearCart();
     clearBlinkitCart();
-    return newOrder;
+    return orderToSave;
   };
 
   const resetFilters = () => {
@@ -852,7 +1032,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         clearWishlist,
         currentAreaId,
         currentAreaName,
+        currentStoreId,
+        currentStoreName,
+        isServiceable,
+        setIsServiceable,
+        deliveryEtaMinutes,
+        setDeliveryEtaMinutes,
         setCurrentArea,
+        setCurrentStore,
         authVerificationId,
         setAuthVerificationId,
         tempRegistration,

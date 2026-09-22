@@ -45,6 +45,9 @@ export const BlinkitHeader: React.FC<BlinkitHeaderProps> = ({
   const {
     walletBalance,
     deliveryLocation,
+    currentStoreName,
+    isServiceable,
+    deliveryEtaMinutes,
     setLocationModalVisible,
     setActiveScreen,
     goBack,
@@ -120,9 +123,11 @@ export const BlinkitHeader: React.FC<BlinkitHeaderProps> = ({
       <View style={styles.topRow}>
         <View style={styles.etaContainer}>
           <Text style={styles.etaLabelText}>
-            {(!etaLabel || etaLabel.toLowerCase().includes('blinkit')) ? 'Delivery in' : etaLabel}
+            {!isServiceable ? 'Status' : (!etaLabel || etaLabel.toLowerCase().includes('blinkit')) ? 'Delivery in' : etaLabel}
           </Text>
-          <Text style={styles.etaHeroText}>{etaTime}</Text>
+          <Text style={[styles.etaHeroText, !isServiceable && { fontSize: 20, color: '#FCD34D' }]}>
+            {isServiceable ? (etaTime || `${deliveryEtaMinutes || 9} minutes`) : 'Outside Zone'}
+          </Text>
 
           {/* Location Row */}
           <TouchableOpacity
@@ -136,6 +141,14 @@ export const BlinkitHeader: React.FC<BlinkitHeaderProps> = ({
             </Text>
             <AppIcon name="chevron-down" size={16} color={COLORS.white} />
           </TouchableOpacity>
+
+          {/* Dark Store Hub Indicator */}
+          <View style={styles.storeHubPill}>
+            <View style={[styles.statusDot, { backgroundColor: isServiceable ? '#10B981' : '#EF4444' }]} />
+            <Text style={styles.storeHubText} numberOfLines={1}>
+              {isServiceable ? (currentStoreName || 'Ahmedabad Dark Store') : 'No Dark Store Nearby'}
+            </Text>
+          </View>
         </View>
 
         {/* Action buttons: Wishlist, Wallet & Profile */}
@@ -340,6 +353,28 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.white,
     marginRight: 4,
+  },
+  storeHubPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    maxWidth: '90%',
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 5,
+  },
+  storeHubText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.white,
   },
   topRightActions: {
     flexDirection: 'row',
