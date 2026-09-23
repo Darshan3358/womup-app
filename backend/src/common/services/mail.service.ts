@@ -13,13 +13,17 @@ export class MailService {
 
     this.transporter = nodemailer.createTransport({
       host: this.configService.get<string>('SMTP_HOST', 'smtp.gmail.com'),
-      port: Number(this.configService.get<number>('SMTP_PORT', 587)),
-      secure: false, // TLS
+      port: 465,
+      secure: true,
+      family: 4, // Force IPv4
       auth: {
         user,
         pass,
       },
-    });
+      connectionTimeout: 5000,
+      greetingTimeout: 5000,
+      socketTimeout: 8000,
+    } as any);
 
     if (user && pass) {
       this.logger.log(`[MailService] Initialized with Gmail SMTP account: ${user}`);

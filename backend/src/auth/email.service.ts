@@ -15,9 +15,15 @@ export class EmailService {
     if (user && pass) {
       const cleanPass = pass.replace(/\s+/g, '');
       this.transporter = nodemailer.createTransport({
-        service: 'gmail',
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
+        family: 4, // Force IPv4 to prevent 120s IPv6 timeout on cloud hosts like Render
         auth: { user, pass: cleanPass },
-      });
+        connectionTimeout: 5000,
+        greetingTimeout: 5000,
+        socketTimeout: 8000,
+      } as any);
       this.logger.log(`Email Service initialized with: ${user}`);
     } else {
       this.logger.warn('EMAIL_USER or EMAIL_PASS not set — email delivery disabled (dev mode)');

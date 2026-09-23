@@ -66,9 +66,19 @@ export class AuthService {
         expiresAt,
       });
 
-      // 3. Dispatch OTP to real email via SMTP
-      await this.emailService.sendOtpEmail(email, otp);
-      this.logger.log(`[Rider Email OTP] Dispatched real OTP to ${email} (Session: ${verificationId})`);
+      // 3. Dispatch OTP in background so mobile client transitions immediately
+      this.emailService
+        .sendOtpEmail(email, otp)
+        .then((sent) => {
+          if (sent) {
+            this.logger.log(`[Rider Email OTP] Dispatched real OTP to ${email} (Session: ${verificationId})`);
+          } else {
+            this.logger.warn(`[Rider Email OTP] Failed to send email to ${email}`);
+          }
+        })
+        .catch((err) => {
+          this.logger.error(`[Rider Email OTP] Background send failed: ${err.message}`);
+        });
 
       return {
         message: `OTP sent successfully to ${email}`,
@@ -100,8 +110,18 @@ export class AuthService {
     });
 
     if (dto.email) {
-      await this.emailService.sendOtpEmail(identifier, otp);
-      this.logger.log(`[Email OTP] Dispatched to ${identifier} (Session: ${verificationId})`);
+      this.emailService
+        .sendOtpEmail(identifier, otp)
+        .then((sent) => {
+          if (sent) {
+            this.logger.log(`[Email OTP] Dispatched to ${identifier} (Session: ${verificationId})`);
+          } else {
+            this.logger.warn(`[Email OTP] Failed to send email to ${identifier}`);
+          }
+        })
+        .catch((err) => {
+          this.logger.error(`[Email OTP] Background send failed: ${err.message}`);
+        });
     } else {
       this.logger.log(`[SMS OTP] Code for ${identifier}: ${otp} (Session: ${verificationId})`);
     }

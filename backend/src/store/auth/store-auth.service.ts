@@ -173,9 +173,15 @@ export class StoreAuthService {
       attempts: 0,
     });
 
-    // Send via email
-    await this.mailService.sendOtpEmail(cleanEmail, rawOtp);
-    this.logger.log(`[Store Staff Auth] OTP sent to email ${cleanEmail.replace(/(.{2}).+(@.*)/, '$1***$2')}`);
+    // Send via email non-blocking so store login screen responds instantly
+    this.mailService
+      .sendOtpEmail(cleanEmail, rawOtp)
+      .then(() => {
+        this.logger.log(`[Store Staff Auth] OTP sent to email ${cleanEmail.replace(/(.{2}).+(@.*)/, '$1***$2')}`);
+      })
+      .catch((err) => {
+        this.logger.error(`[Store Staff Auth] Background send failed: ${err.message}`);
+      });
 
     return {
       success: true,

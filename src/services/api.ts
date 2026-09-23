@@ -39,11 +39,16 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${this.token}`;
     }
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
+
     try {
       const res = await fetch(url, {
         ...options,
         headers,
+        signal: options.signal || controller.signal,
       });
+      clearTimeout(timeoutId);
 
       // Handle 401 Unauthorized by attempting to refresh token
       if (
@@ -77,6 +82,14 @@ class ApiClient {
       }
       return json;
     } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        console.warn(`[API Timeout] ${endpoint} exceeded 20s limit`);
+        return {
+          success: false,
+          message: 'Connection timed out. Please check your network and try again.',
+        };
+      }
       console.warn(`[API Connection Error] ${endpoint}:`, err.message);
       return {
         success: false,
