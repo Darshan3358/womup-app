@@ -16,6 +16,13 @@ import { Ionicons } from '@expo/vector-icons';
 import io, { Socket } from 'socket.io-client';
 import { COLORS } from '../../theme/colors';
 
+const isLocalWeb =
+  typeof window !== 'undefined' &&
+  (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1');
+
+const CHAT_SOCKET_URL = isLocalWeb ? 'http://localhost:5050/tracking' : 'https://womup-app.onrender.com/tracking';
+const CHAT_API_BASE = isLocalWeb ? 'http://localhost:5050/api/v1' : 'https://womup-app.onrender.com/api/v1';
+
 export interface ChatMessageItem {
   _id: string;
   orderId: string;
@@ -67,7 +74,7 @@ export const RiderChatModal: React.FC<RiderChatModalProps> = ({
   useEffect(() => {
     if (!visible || !orderId) return;
 
-    const socket = io('http://localhost:5050/tracking', {
+    const socket = io(CHAT_SOCKET_URL, {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: 15,
@@ -127,7 +134,7 @@ export const RiderChatModal: React.FC<RiderChatModalProps> = ({
       setIsLoadingHistory(true);
       try {
         const cleanId = orderId.replace(/^#/, '');
-        const res = await fetch(`http://localhost:5050/api/v1/chat/${encodeURIComponent(cleanId)}/history`);
+        const res = await fetch(`${CHAT_API_BASE}/chat/${encodeURIComponent(cleanId)}/history`);
         if (res.ok) {
           const json = await res.json();
           if (isMounted && json.data) {
@@ -186,7 +193,7 @@ export const RiderChatModal: React.FC<RiderChatModalProps> = ({
       });
     } else {
       // REST fallback
-      fetch(`http://localhost:5050/api/v1/chat/${encodeURIComponent(cleanId)}/send`, {
+      fetch(`${CHAT_API_BASE}/chat/${encodeURIComponent(cleanId)}/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

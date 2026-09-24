@@ -1,6 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE_URL = 'http://localhost:5050/api/v1/store';
+const isLocalWeb =
+  typeof window !== 'undefined' &&
+  (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1');
+
+const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_URL ||
+  (isLocalWeb ? 'http://localhost:5050/api/v1/store' : 'https://womup-app.onrender.com/api/v1/store');
 
 export const TOKEN_STORAGE_KEY = '@womup_store_access_token';
 export const STAFF_STORAGE_KEY = '@womup_store_staff';

@@ -17,6 +17,12 @@ import { LocationTrackerService, HubLocation, AHMEDABAD_HUBS } from '../services
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import io from 'socket.io-client';
 
+const isLocalWeb =
+  typeof window !== 'undefined' &&
+  (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1');
+
+const SOCKET_URL = isLocalWeb ? 'http://localhost:5050/tracking' : 'https://womup-app.onrender.com/tracking';
+
 interface RiderContextType {
   // Auth & Onboarding State (R01 - R06)
   authStep: AuthScreenState;
@@ -402,7 +408,7 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     if (authStep !== 'AUTHENTICATED' || !isOnline) return;
 
-    const socket = io('http://localhost:5050/tracking', {
+    const socket = io(SOCKET_URL, {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: 25,
