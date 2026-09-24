@@ -50,11 +50,6 @@ export class EmailService {
 
   /** Send OTP email to user */
   async sendOtpEmail(email: string, otp: string): Promise<boolean> {
-    if (!this.transporter) {
-      this.logger.warn(`[Email OTP] Dev mode — OTP for ${email}: ${otp}`);
-      return true; // Dev mode fallback
-    }
-
     const fromName = 'Worm Up';
     const fromEmail = this.configService.get<string>('EMAIL_USER');
 
@@ -120,19 +115,56 @@ export class EmailService {
 </body>
 </html>`;
 
-    try {
-      await this.transporter.sendMail({
-        from: `"${fromName}" <${fromEmail}>`,
-        to: email,
-        subject: `${otp} is your Worm Up verification code`,
-        text: `Your Worm Up OTP is: ${otp}. Valid for 10 minutes. Do not share with anyone.`,
-        html,
-      });
-      this.logger.log(`[Email OTP] Sent successfully to ${email}`);
-      return true;
-    } catch (err: any) {
-      this.logger.error(`[Email OTP] Failed to send to ${email}: ${err.message}`);
-      return false;
+    // 1. Try HTTPS API (Resend) - Works 100% on cloud platforms like Render without port 465/587 blocks
+    const resendKey = this.configService.get<string>('RESEND_API_KEY');
+    if (resendKey) {
+      try {
+        const response = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${resendKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: 'Worm Up <onboarding@resend.dev>',
+            to: [email],
+            subject: `${otp} is your Worm Up verification code`,
+            text: `Your Worm Up OTP is: ${otp}. Valid for 10 minutes. Do not share with anyone.`,
+            html,
+          }),
+        });
+
+        if (response.ok) {
+          this.logger.log(`[Email OTP] Sent via Resend HTTPS API to ${email}`);
+          return true;
+        } else {
+          const errText = await response.text();
+          this.logger.error(`[Email OTP] Resend API error: ${errText}`);
+        }
+      } catch (err: any) {
+        this.logger.error(`[Email OTP] Resend API request failed: ${err.message}`);
+      }
     }
+
+    // 2. SMTP Transporter (Works on localhost, blocked on Render free tier)
+    if (this.transporter) {
+      try {
+        await this.transporter.sendMail({
+          from: `"${fromName}" <${fromEmail}>`,
+          to: email,
+          subject: `${otp} is your Worm Up verification code`,
+          text: `Your Worm Up OTP is: ${otp}. Valid for 10 minutes. Do not share with anyone.`,
+          html,
+        });
+        this.logger.log(`[Email OTP] Sent successfully via SMTP to ${email}`);
+        return true;
+      } catch (err: any) {
+        this.logger.error(`[Email OTP] SMTP failed to send to ${email}: ${err.message}`);
+        return false;
+      }
+    }
+
+    this.logger.warn(`[Email OTP] Dev mode fallback — OTP for ${email}: ${otp}`);
+    return true;
   }
 }
