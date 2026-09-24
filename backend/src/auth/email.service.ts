@@ -116,7 +116,7 @@ export class EmailService {
 </html>`;
 
     // 1. Try HTTPS API (Resend) - Works 100% on cloud platforms like Render without port 465/587 blocks
-    const resendKey = this.configService.get<string>('RESEND_API_KEY');
+    const resendKey = this.configService.get<string>('RESEND_API_KEY')?.trim();
     if (resendKey) {
       try {
         const response = await fetch('https://api.resend.com/emails', {

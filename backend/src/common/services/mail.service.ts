@@ -67,6 +67,38 @@ export class MailService {
       </div>
     `;
 
+    // 1. Try Resend HTTPS API (Port 443 - works 100% on Render)
+    const resendKey = this.configService.get<string>('RESEND_API_KEY')?.trim();
+    if (resendKey) {
+      try {
+        const response = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${resendKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: 'Worm Up <onboarding@resend.dev>',
+            to: [toEmail],
+            subject: `Worm Up Store — Your Login OTP: ${otp}`,
+            text: `Your Worm Up Dark Store login OTP is: ${otp}\n\nThis code expires in 10 minutes. Never share it with anyone.`,
+            html,
+          }),
+        });
+
+        if (response.ok) {
+          this.logger.log(`[Mail] OTP email sent via Resend HTTPS API to ${toEmail}`);
+          return;
+        } else {
+          const errText = await response.text();
+          this.logger.error(`[Mail] Resend API error: ${errText}`);
+        }
+      } catch (err: any) {
+        this.logger.error(`[Mail] Resend API request failed: ${err.message}`);
+      }
+    }
+
+    // 2. SMTP fallback
     try {
       await this.transporter.sendMail({
         from: `"${fromName}" <${fromAddress}>`,
