@@ -19,6 +19,7 @@ import { useApp, mapProductToBlinkit } from '../../context/AppContext';
 import { ProductService } from '../../services/productService';
 import { GaneshChaturthiSection } from '../../components/common/GaneshChaturthiSection';
 import { PromotionalBannersCarousel } from '../../components/common/PromotionalBannersCarousel';
+import { HeroBannerCarousel, HeroBannerItem } from '../../components/common/HeroBannerCarousel';
 import {
   BESTSELLER_CATEGORY_CARDS_ROW1,
   BESTSELLER_CATEGORY_CARDS_ROW2,
@@ -101,6 +102,18 @@ export const BlinkitHomeScreen: React.FC = () => {
     navigateToProductListing(catName, categoryIds);
   };
 
+  const handleBannerPress = (banner: HeroBannerItem) => {
+    if (banner.type === 'deals') {
+      if (dealsProducts.length > 0) {
+        handleOpenProductDetail(dealsProducts[0]);
+      } else {
+        setActiveScreen('C15_ProductListing');
+      }
+    } else if (banner.type === 'category' && banner.categoryName && banner.categoryId) {
+      handleSelectCategory(banner.categoryName, banner.categoryId);
+    }
+  };
+
   // Merge live database products with curated rich HD catalog products
   const liveBlinkitProducts: BlinkitProduct[] = dbProducts.map(mapProductToBlinkit);
 
@@ -152,36 +165,8 @@ export const BlinkitHomeScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* 1. Full-Width Promotional Hero Banner (Animated Maggi Double Masala) */}
-        <TouchableOpacity
-          activeOpacity={0.92}
-          onPress={() => handleOpenProductDetail(dealsProducts[0])}
-          style={styles.fullWidthBannerContainer}
-          accessibilityLabel="Shop New Maggi Double Masala Noodles"
-        >
-          {Platform.OS === 'web' ? (
-            React.createElement('video', {
-              src: require('../../../assets/create_this_banner_as_gif_Crea.mp4'),
-              autoPlay: true,
-              loop: true,
-              muted: true,
-              playsInline: true,
-              style: {
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                display: 'block',
-                pointerEvents: 'none',
-              },
-            })
-          ) : (
-            <Image
-              source={require('../../../assets/maggi_double_masala_banner.gif')}
-              style={styles.fullWidthBannerImage}
-              resizeMode="cover"
-            />
-          )}
-        </TouchableOpacity>
+        {/* 1. Full-Width Auto-Scrolling Hero Banner Carousel (4 Promotional Banners) */}
+        <HeroBannerCarousel onBannerPress={handleBannerPress} />
 
         {/* 2. Bestsellers Rail (Row 1 - Vegetables, Chips, Dairy) */}
         <View style={styles.sectionContainer}>
