@@ -7,7 +7,21 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "plugins": [
-      "expo-font"
+      "expo-font",
+      "expo-speech-recognition",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Worm Up needs your location to show nearby stores and deliver accurately."
+        }
+      ],
+      "expo-document-picker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Worm Up needs access to your photos to print documents and images."
+        }
+      ]
     ],
     "ios": {
       "supportsTablet": true
@@ -20,6 +34,17 @@
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png"
       },
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "RECORD_AUDIO",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_MEDIA_IMAGES",
+        "READ_MEDIA_VIDEO",
+        "READ_MEDIA_AUDIO"
+      ],
       "predictiveBackGestureEnabled": false
     },
     "web": {

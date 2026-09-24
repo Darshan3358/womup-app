@@ -13,6 +13,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import { COLORS, GRADIENTS } from '../../theme/colors';
 import { TYPOGRAPHY } from '../../theme/typography';
 import { BlinkitHeader } from '../../components/common/BlinkitHeader';
@@ -228,50 +230,132 @@ export const BlinkitPrintScreen: React.FC = () => {
     }
   };
 
+  const handlePickDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: [
+          'application/pdf',
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'image/*',
+        ],
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) return;
+
+      const asset = result.assets[0];
+      const sizeMB = asset.size ? (asset.size / (1024 * 1024)).toFixed(1) : '1.0';
+      const isImg = asset.mimeType?.startsWith('image/') || /\.(png|jpg|jpeg|webp)$/i.test(asset.name);
+      const estPages = isImg ? 1 : Math.max(1, Math.min(50, Math.round((asset.size || 60000) / 60000)));
+
+      const newDoc: SelectedDocument = {
+        name: asset.name,
+        size: `${sizeMB} MB`,
+        pageCount: estPages,
+        fileType: asset.mimeType || (isImg ? 'image/jpeg' : 'application/pdf'),
+        previewUrl: asset.uri,
+        thumbnailUrl: isImg ? asset.uri : undefined,
+        rawFile: asset,
+      };
+
+      setSelectedDoc(newDoc);
+      setPageCount(estPages);
+      setIsConfigModalVisible(true);
+    } catch (err: any) {
+      Alert.alert('Error', 'Could not open document picker. Please try again.');
+    }
+  };
+
+  const handlePickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Please allow photo gallery access to print images.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.9,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) return;
+
+      const asset = result.assets[0];
+      const sizeMB = asset.fileSize ? (asset.fileSize / (1024 * 1024)).toFixed(1) : '1.2';
+      const fileName = asset.fileName || `Photo_${Date.now()}.jpg`;
+
+      const newDoc: SelectedDocument = {
+        name: fileName,
+        size: `${sizeMB} MB`,
+        pageCount: 1,
+        fileType: asset.mimeType || 'image/jpeg',
+        previewUrl: asset.uri,
+        thumbnailUrl: asset.uri,
+        rawFile: asset,
+      };
+
+      setSelectedDoc(newDoc);
+      setPageCount(1);
+      setIsConfigModalVisible(true);
+    } catch (err: any) {
+      Alert.alert('Error', 'Could not open photo library. Please try again.');
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Please allow camera access to scan and print documents.');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        quality: 0.9,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) return;
+
+      const asset = result.assets[0];
+      const sizeMB = asset.fileSize ? (asset.fileSize / (1024 * 1024)).toFixed(1) : '1.5';
+      const fileName = `Scan_${Date.now()}.jpg`;
+
+      const newDoc: SelectedDocument = {
+        name: fileName,
+        size: `${sizeMB} MB`,
+        pageCount: 1,
+        fileType: 'image/jpeg',
+        previewUrl: asset.uri,
+        thumbnailUrl: asset.uri,
+        rawFile: asset,
+      };
+
+      setSelectedDoc(newDoc);
+      setPageCount(1);
+      setIsConfigModalVisible(true);
+    } catch (err: any) {
+      Alert.alert('Error', 'Could not open camera. Please try again.');
+    }
+  };
+
   const promptDocumentSelection = () => {
     Alert.alert(
-      'Select Document / Image to Print',
-      'Choose a sample document or upload from your device:',
+      'Select Document or Photo',
+      'Choose a document or image to print:',
       [
         {
-          text: '📸 Screenshot / Photo (1 page)',
-          onPress: () => {
-            const mockPreview = 'https://images.unsplash.com/photo-1586281380349-632531db7ed4?w=600&auto=format&fit=crop&q=80';
-            setSelectedDoc({
-              name: 'Screenshot 2026-09-08 at 10.56.33 PM.png',
-              size: '1.4 MB',
-              pageCount: 1,
-              previewUrl: mockPreview,
-              thumbnailUrl: mockPreview,
-              fileType: 'image/png',
-            });
-            setPageCount(1);
-            setIsConfigModalVisible(true);
-          },
+          text: '📄 Choose PDF / Document',
+          onPress: handlePickDocument,
         },
         {
-          text: '📄 College_Assignment.pdf (5 pages)',
-          onPress: () => {
-            setSelectedDoc({ name: 'College_Assignment.pdf', size: '1.4 MB', pageCount: 5, fileType: 'application/pdf' });
-            setPageCount(5);
-            setIsConfigModalVisible(true);
-          },
+          text: '🖼️ Choose from Gallery',
+          onPress: handlePickImage,
         },
         {
-          text: '📑 Resume_Final_2026.pdf (2 pages)',
-          onPress: () => {
-            setSelectedDoc({ name: 'Resume_Final_2026.pdf', size: '0.8 MB', pageCount: 2, fileType: 'application/pdf' });
-            setPageCount(2);
-            setIsConfigModalVisible(true);
-          },
-        },
-        {
-          text: '📁 Project_Report_20_Pages.pdf (20 pages)',
-          onPress: () => {
-            setSelectedDoc({ name: 'Project_Report_20_Pages.pdf', size: '3.2 MB', pageCount: 20, fileType: 'application/pdf' });
-            setPageCount(20);
-            setIsConfigModalVisible(true);
-          },
+          text: '📸 Take Photo with Camera',
+          onPress: handleTakePhoto,
         },
         { text: 'Cancel', style: 'cancel' },
       ]

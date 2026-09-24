@@ -1,5 +1,8 @@
+import { Platform } from 'react-native';
+import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
+
 // Real-time Voice Speech Recognition Service for Worm Up App
-// Powered by HTML5 Web Speech API (window.SpeechRecognition / window.webkitSpeechRecognition)
+// Supports Native Android/iOS via expo-speech-recognition and Web via HTML5 SpeechRecognition
 
 export interface VoiceRecognitionCallbacks {
   onStart?: () => void;
@@ -9,14 +12,95 @@ export interface VoiceRecognitionCallbacks {
 }
 
 let activeRecognition: any = null;
+let nativeSubscriptions: Array<{ remove: () => void }> = [];
+
+function cleanupNativeListeners() {
+  nativeSubscriptions.forEach((sub) => {
+    try {
+      sub.remove();
+    } catch (e) {}
+  });
+  nativeSubscriptions = [];
+}
 
 export const VoiceSearchService = {
   isSupported(): boolean {
+    if (Platform.OS !== 'web') {
+      try {
+        return ExpoSpeechRecognitionModule?.isRecognitionAvailable() ?? true;
+      } catch (e) {
+        return true;
+      }
+    }
     if (typeof window === 'undefined') return false;
     return !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
   },
 
   start(callbacks: VoiceRecognitionCallbacks): boolean {
+    if (Platform.OS !== 'web') {
+      this.startNative(callbacks);
+      return true;
+    }
+    return this.startWeb(callbacks);
+  },
+
+  async startNative(callbacks: VoiceRecognitionCallbacks): Promise<boolean> {
+    try {
+      cleanupNativeListeners();
+
+      const permission = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+      if (!permission.granted) {
+        callbacks.onError?.('Microphone permission was denied. Please allow microphone access in device settings.');
+        return false;
+      }
+
+      if (!ExpoSpeechRecognitionModule.isRecognitionAvailable()) {
+        callbacks.onError?.('Voice search is not available on this device. Please type your search.');
+        return false;
+      }
+
+      nativeSubscriptions.push(
+        ExpoSpeechRecognitionModule.addListener('start', () => {
+          callbacks.onStart?.();
+        })
+      );
+
+      nativeSubscriptions.push(
+        ExpoSpeechRecognitionModule.addListener('result', (event: any) => {
+          const text = event.results?.[0]?.transcript || '';
+          callbacks.onResult?.(text.trim(), event.isFinal ?? false);
+        })
+      );
+
+      nativeSubscriptions.push(
+        ExpoSpeechRecognitionModule.addListener('error', (event: any) => {
+          cleanupNativeListeners();
+          callbacks.onError?.(event.message || 'Speech recognition error. Please try again.');
+        })
+      );
+
+      nativeSubscriptions.push(
+        ExpoSpeechRecognitionModule.addListener('end', () => {
+          cleanupNativeListeners();
+          callbacks.onEnd?.();
+        })
+      );
+
+      ExpoSpeechRecognitionModule.start({
+        lang: 'en-IN',
+        interimResults: true,
+        maxAlternatives: 1,
+      });
+
+      return true;
+    } catch (err: any) {
+      cleanupNativeListeners();
+      callbacks.onError?.(err?.message || 'Could not start voice search.');
+      return false;
+    }
+  },
+
+  startWeb(callbacks: VoiceRecognitionCallbacks): boolean {
     if (typeof window === 'undefined') {
       callbacks.onError?.('Speech recognition is not available in this environment.');
       return false;
@@ -34,21 +118,18 @@ export const VoiceSearchService = {
     if (activeRecognition) {
       try {
         activeRecognition.abort();
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) {}
       activeRecognition = null;
     }
 
     try {
       const recognition = new SpeechRecognition();
       recognition.continuous = false;
-      recognition.interimResults = true; // Enables REAL-TIME search updates as you speak!
+      recognition.interimResults = true;
       recognition.maxAlternatives = 1;
 
-      // Prefer Indian English (for grocery products like Atta, Ghee, Paneer, etc.)
       const userLang = typeof navigator !== 'undefined' ? navigator.language : 'en-IN';
-      recognition.lang = userLang.startsWith('en') ? 'en-IN' : userLang;
+      recognition.lang = userLang?.startsWith('en') ? 'en-IN' : userLang || 'en-IN';
 
       recognition.onstart = () => {
         callbacks.onStart?.();
@@ -95,23 +176,29 @@ export const VoiceSearchService = {
   },
 
   stop(): void {
-    if (activeRecognition) {
+    if (Platform.OS !== 'web') {
+      try {
+        ExpoSpeechRecognitionModule.stop();
+      } catch (e) {}
+      cleanupNativeListeners();
+    } else if (activeRecognition) {
       try {
         activeRecognition.stop();
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) {}
       activeRecognition = null;
     }
   },
 
   abort(): void {
-    if (activeRecognition) {
+    if (Platform.OS !== 'web') {
+      try {
+        ExpoSpeechRecognitionModule.abort();
+      } catch (e) {}
+      cleanupNativeListeners();
+    } else if (activeRecognition) {
       try {
         activeRecognition.abort();
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) {}
       activeRecognition = null;
     }
   },

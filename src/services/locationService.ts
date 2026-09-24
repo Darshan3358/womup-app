@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+import * as Location from 'expo-location';
 import { api } from './api';
 import { StorageService } from './storageService';
 
@@ -106,24 +108,56 @@ export const LocationService = {
    * NEVER silently falls back to hardcoded coordinates.
    */
   async getCurrentLocation(): Promise<DetectedLocation | null> {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      throw new Error('Geolocation is not supported by your device or browser.');
+    let lat: number | null = null;
+    let lng: number | null = null;
+
+    if (Platform.OS === 'web') {
+      if (typeof navigator === 'undefined' || !navigator.geolocation) {
+        throw new Error('Geolocation is not supported by your browser.');
+      }
+
+      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          resolve,
+          (err) => reject(err),
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0,
+          }
+        );
+      });
+
+      lat = pos.coords.latitude;
+      lng = pos.coords.longitude;
+    } else {
+      // Native Mobile (Android APK / iOS)
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        throw new Error('Location permission was denied. Please allow location access in your device settings.');
+      }
+
+      const isEnabled = await Location.hasServicesEnabledAsync();
+      if (!isEnabled) {
+        throw new Error('Device location (GPS) is disabled. Please turn on location services in device settings.');
+      }
+
+      let location: Location.LocationObject | null = null;
+      try {
+        location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+      } catch (e) {
+        location = await Location.getLastKnownPositionAsync();
+      }
+
+      if (!location) {
+        throw new Error('Unable to retrieve GPS coordinates. Please move to an open area and try again.');
+      }
+
+      lat = location.coords.latitude;
+      lng = location.coords.longitude;
     }
-
-    const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(
-        resolve,
-        (err) => reject(err),
-        {
-          enableHighAccuracy: true,
-          timeout: 8000,
-          maximumAge: 0,
-        }
-      );
-    });
-
-    const lat = pos.coords.latitude;
-    const lng = pos.coords.longitude;
 
     if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) {
       throw new Error('Invalid GPS coordinates received from device.');
