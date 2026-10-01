@@ -26,6 +26,9 @@ export class Inventory {
 
   @Prop({ default: 5 })
   lowStockThreshold: number;
+
+  @Prop({ default: '', trim: true })
+  shelfLocation?: string;
 }
 
 export const InventorySchema = SchemaFactory.createForClass(Inventory);

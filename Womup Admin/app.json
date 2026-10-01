@@ -27,6 +27,15 @@
       "eas": {
         "projectId": "48151227-8b4b-48e3-8e1c-941787f381c8"
       }
-    }
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Wom Up needs access to your photos to upload product images.",
+          "cameraPermission": "Wom Up needs access to your camera to take product photos."
+        }
+      ]
+    ]
   }
 }

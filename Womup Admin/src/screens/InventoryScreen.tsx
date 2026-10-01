@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  TextInput,
+  Modal,
 } from 'react-native';
 import {
   ChevronDown,
@@ -14,10 +16,17 @@ import {
   CheckCircle,
   Warehouse,
   Package,
+  MapPin,
+  Navigation,
+  Check,
+  Search,
+  X,
+  Lock,
+  Layers,
 } from 'lucide-react-native';
 import { COLORS, RADIUS, SPACING } from '../theme';
 import { useAdminState } from '../context/AdminStateContext';
-import { InventoryItem } from '../types/admin';
+import { InventoryItem, Zone, CityItem, DarkStoreItem } from '../types/admin';
 
 export const InventoryScreen: React.FC = () => {
   const {
@@ -25,42 +34,74 @@ export const InventoryScreen: React.FC = () => {
     darkStores,
     selectedDarkStore,
     setSelectedDarkStore,
+    cities,
     zones,
     products,
     setActiveModal,
+    updateShelfLocation,
   } = useAdminState();
 
   const [activeTab, setActiveTab] = useState<'All Items' | 'Low Stock' | 'Expired'>('All Items');
-  const [showStorePicker, setShowStorePicker] = useState(false);
 
-  // Build full dark store list from MongoDB stores collection with zones fallback
-  const storeList: { id: string; name: string; code?: string; areaName?: string }[] =
-    darkStores.length > 0
-      ? darkStores
-      : [
-          {
-            id: 'central_store',
-            name: 'Wom Up Ahmedabad Central Dark Store',
-            code: 'DARK-STORE-01',
-          },
-          ...zones.map((z) => ({
-            id: z.id,
-            name: z.darkStore || `Wom Up ${z.name} Dark Store`,
-            code: z.code ? `STORE-${z.code}` : undefined,
-            areaName: z.name,
-          })),
-        ];
+  // Cascading City & Area Selection States
+  const [selectedCityId, setSelectedCityId] = useState<string>('');
+  const [selectedAreaId, setSelectedAreaId] = useState<string>('');
+  const [showCityPicker, setShowCityPicker] = useState(false);
+  const [showAreaPicker, setShowAreaPicker] = useState(false);
+  const [citySearch, setCitySearch] = useState('');
+  const [areaSearch, setAreaSearch] = useState('');
 
-  // Currently selected store object
-  const currentStore =
-    storeList.find(
-      (s) =>
-        s.name.trim().toLowerCase() === selectedDarkStore.trim().toLowerCase() ||
-        s.id === selectedDarkStore
-    ) || storeList[0];
+  // Shelf Editing States
+  const [editingShelfItem, setEditingShelfItem] = useState<InventoryItem | null>(null);
+  const [shelfInput, setShelfInput] = useState('');
+  const [isSavingShelf, setIsSavingShelf] = useState(false);
+  const [shelfSuccessMsg, setShelfSuccessMsg] = useState('');
 
-  const currentStoreId = currentStore?.id;
-  const currentStoreName = currentStore?.name || selectedDarkStore;
+  // 1. Resolve Active Cities
+  const activeCities = cities.filter((c) => c.status === 'Active' || !c.status);
+
+  // Default to Ahmedabad or first active city
+  const currentCity =
+    activeCities.find((c) => (c.id && c.id === selectedCityId) || (c._id && c._id === selectedCityId)) ||
+    activeCities.find((c) => c.code === 'AHM' || c.name.toLowerCase() === 'ahmedabad') ||
+    activeCities[0];
+
+  // 2. Resolve Available Areas for Selected City
+  const availableAreas = zones.filter((z) => {
+    if (!currentCity) return true;
+    const currentCityIdStr = currentCity.id || currentCity._id;
+    if (z.cityId && currentCityIdStr && String(z.cityId) === String(currentCityIdStr)) return true;
+    if (z.cityName && currentCity.name && z.cityName.toLowerCase() === currentCity.name.toLowerCase()) return true;
+    if (z.city && currentCity.name && z.city.toLowerCase() === currentCity.name.toLowerCase()) return true;
+    return false;
+  });
+
+  // Current selected area
+  const currentArea =
+    availableAreas.find((a) => (a.id && a.id === selectedAreaId) || (a._id && a._id === selectedAreaId)) ||
+    availableAreas[0];
+
+  // 3. Auto-Select the ONE Dark Store assigned to this area (1-store-per-area rule)
+  const resolvedStore = darkStores.find((s) => {
+    if (currentArea) {
+      const areaIdStr = currentArea.id || currentArea._id;
+      if (s.areaId && areaIdStr && String(s.areaId) === String(areaIdStr)) return true;
+      if (s.areaName && currentArea.name && s.areaName.toLowerCase() === currentArea.name.toLowerCase()) return true;
+      if (currentArea.assignedStore && (s.id === currentArea.assignedStore.id || s.code === currentArea.assignedStore.code)) return true;
+      if (currentArea.darkStore && s.name.toLowerCase().includes(currentArea.name.toLowerCase())) return true;
+    }
+    return false;
+  }) || (currentCity ? darkStores.find(s => (s.cityName || s.city || '').toLowerCase() === currentCity.name.toLowerCase()) : null) || darkStores[0];
+
+  const currentStoreId = resolvedStore?.id;
+  const currentStoreName = resolvedStore?.name || selectedDarkStore || 'Dark Store Hub';
+
+  // Automatically sync with global context when resolvedStore changes
+  useEffect(() => {
+    if (resolvedStore && resolvedStore.name && selectedDarkStore !== resolvedStore.name) {
+      setSelectedDarkStore(resolvedStore.name);
+    }
+  }, [resolvedStore, selectedDarkStore, setSelectedDarkStore]);
 
   // Filter inventory strictly by the selected dark store warehouse
   const storeInventory = inventory.filter((item) => {
@@ -112,67 +153,80 @@ export const InventoryScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* Dark Store Selector */}
+      {/* City → Area → Store Cascading Control Header */}
       <View style={styles.topSection}>
-        <Text style={styles.sectionLabel}>Select Dark Store Warehouse</Text>
-        <TouchableOpacity
-          style={styles.storeDropdown}
-          onPress={() => setShowStorePicker(!showStorePicker)}
-        >
-          <View style={styles.storeDropdownLeft}>
-            <Warehouse size={18} color={COLORS.purple} style={{ marginRight: 8 }} />
-            <Text style={styles.storeDropdownText} numberOfLines={1}>
-              {currentStoreName}
-            </Text>
-          </View>
-          <ChevronDown size={20} color={COLORS.textPrimary} />
-        </TouchableOpacity>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>Warehouse Inventory Control</Text>
+          <Text style={styles.sectionSubtitle}>
+            Filter by City & Area — inventory automatically syncs to that zone's 1:1 Dark Store
+          </Text>
+        </View>
 
-        {/* Dropdown Menu */}
-        {showStorePicker && (
-          <View style={styles.storePickerMenu}>
-            <ScrollView style={styles.storePickerScroll} nestedScrollEnabled={true}>
-              {storeList.map((store) => {
-                const isSelected =
-                  currentStoreName.trim().toLowerCase() === store.name.trim().toLowerCase();
-                return (
-                  <TouchableOpacity
-                    key={store.id}
-                    style={[
-                      styles.storePickerItem,
-                      isSelected && styles.storePickerItemActive,
-                    ]}
-                    onPress={() => {
-                      setSelectedDarkStore(store.name);
-                      setShowStorePicker(false);
-                    }}
-                  >
-                    <View style={styles.storePickerRow}>
-                      <View style={{ flex: 1, marginRight: 8 }}>
-                        <Text
-                          style={[
-                            styles.storePickerText,
-                            isSelected && styles.storePickerTextActive,
-                          ]}
-                        >
-                          {store.name}
-                        </Text>
-                        {store.code ? (
-                          <Text style={styles.storePickerCode}>
-                            {store.code} {store.areaName ? `• ${store.areaName}` : ''}
-                          </Text>
-                        ) : null}
-                      </View>
-                      {isSelected && (
-                        <CheckCircle size={16} color={COLORS.purple} />
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+        {/* Cascading Selector: City (1) + Area (2) */}
+        <View style={styles.cascadingRow}>
+          {/* City Selector */}
+          <View style={styles.cascadingCol}>
+            <Text style={styles.inputLabel}>1. SELECT CITY</Text>
+            <TouchableOpacity
+              style={styles.cascadingBtn}
+              onPress={() => setShowCityPicker(true)}
+              activeOpacity={0.8}
+            >
+              <View style={styles.cascadingBtnLeft}>
+                <MapPin size={16} color={COLORS.purple} />
+                <Text style={styles.cascadingBtnText} numberOfLines={1}>
+                  {currentCity ? `${currentCity.name} (${currentCity.code})` : 'Select City'}
+                </Text>
+              </View>
+              <ChevronDown size={18} color={COLORS.textPrimary} />
+            </TouchableOpacity>
           </View>
-        )}
+
+          {/* Area Selector (Cascaded from City) */}
+          <View style={styles.cascadingCol}>
+            <Text style={styles.inputLabel}>2. SELECT AREA (1:1 STORE)</Text>
+            <TouchableOpacity
+              style={[styles.cascadingBtn, availableAreas.length === 0 && styles.disabledBtn]}
+              onPress={() => {
+                if (availableAreas.length === 0) return;
+                setShowAreaPicker(true);
+              }}
+              activeOpacity={0.8}
+              disabled={availableAreas.length === 0}
+            >
+              <View style={styles.cascadingBtnLeft}>
+                <Navigation size={16} color={COLORS.blue} />
+                <Text style={styles.cascadingBtnText} numberOfLines={1}>
+                  {currentArea ? currentArea.name : availableAreas.length === 0 ? 'No Areas Configured' : 'Select Area'}
+                </Text>
+              </View>
+              <ChevronDown size={18} color={COLORS.textPrimary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* 3. Auto-Resolved Store Info Banner */}
+        <View style={styles.resolvedStoreCard}>
+          <View style={styles.resolvedStoreLeft}>
+            <View style={styles.storeIconBadge}>
+              <Warehouse size={18} color={COLORS.purple} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={styles.resolvedStoreTitleRow}>
+                <Text style={styles.resolvedStoreName} numberOfLines={1}>
+                  {currentStoreName}
+                </Text>
+                <View style={styles.lockBadge}>
+                  <Lock size={10} color="#047857" style={{ marginRight: 3 }} />
+                  <Text style={styles.lockBadgeText}>1:1 AREA LOCKED</Text>
+                </View>
+              </View>
+              <Text style={styles.resolvedStoreMeta}>
+                📍 Area: <Text style={{ fontWeight: '700', color: COLORS.navy }}>{currentArea?.name || resolvedStore?.areaName || 'Zone'}</Text> • City: <Text style={{ fontWeight: '700', color: COLORS.navy }}>{currentCity?.name || resolvedStore?.cityName || 'City'}</Text> • ID: <Text style={{ fontWeight: '700', color: COLORS.purple }}>{resolvedStore?.loginId || resolvedStore?.code}</Text>
+              </Text>
+            </View>
+          </View>
+        </View>
 
         {/* KPI Cards: Total Stock, Available, Reserved */}
         <View style={styles.kpiRow}>
@@ -318,6 +372,31 @@ export const InventoryScreen: React.FC = () => {
                   </Text>
                 </View>
 
+                {/* Shelf Location Slot & Quick Edit */}
+                <View style={styles.shelfRow}>
+                  <View style={styles.shelfInfoRow}>
+                    <Layers size={13} color={item.shelfLocation ? COLORS.purple : COLORS.textMuted} style={{ marginRight: 5 }} />
+                    <Text style={styles.shelfLabel}>
+                      Shelf:{' '}
+                      <Text style={item.shelfLocation ? styles.shelfValueActive : styles.shelfValueEmpty}>
+                        {item.shelfLocation || 'Not set'}
+                      </Text>
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.editShelfBtn}
+                    onPress={() => {
+                      setEditingShelfItem(item);
+                      setShelfInput(item.shelfLocation || '');
+                      setShelfSuccessMsg('');
+                    }}
+                  >
+                    <Text style={styles.editShelfBtnText}>
+                      {item.shelfLocation ? 'Edit Shelf' : '+ Assign Shelf'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
                 {/* Divider */}
                 <View style={styles.cardDivider} />
 
@@ -355,6 +434,264 @@ export const InventoryScreen: React.FC = () => {
         <PlusCircle size={20} color={COLORS.white} />
         <Text style={styles.fabText}>Report Loss / Spoilage</Text>
       </TouchableOpacity>
+
+      {/* ================= MODAL: ASSIGN / EDIT SHELF ================= */}
+      <Modal
+        visible={Boolean(editingShelfItem)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditingShelfItem(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalPanel}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderTitleRow}>
+                <Layers size={20} color={COLORS.purple} />
+                <View>
+                  <Text style={styles.modalTitle}>Assign Shelf Location</Text>
+                  <Text style={styles.modalSubtitle} numberOfLines={1}>
+                    {editingShelfItem?.name} ({editingShelfItem?.darkStoreName || 'Dark Store'})
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setEditingShelfItem(null)}>
+                <X size={20} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              <Text style={styles.shelfInputLabel}>Shelf / Bin Coordinate (e.g. A3-R2, B1-04, COOLER-1)</Text>
+              <TextInput
+                style={styles.shelfTextInput}
+                placeholder="Enter shelf location (e.g. A3-R2)"
+                placeholderTextColor={COLORS.textMuted}
+                value={shelfInput}
+                onChangeText={(text) => setShelfInput(text.toUpperCase())}
+                autoCapitalize="characters"
+                autoFocus
+              />
+
+              {shelfSuccessMsg ? (
+                <Text style={styles.shelfSuccessText}>{shelfSuccessMsg}</Text>
+              ) : null}
+
+              <View style={styles.modalActionsRow}>
+                <TouchableOpacity
+                  style={styles.cancelBtn}
+                  onPress={() => setEditingShelfItem(null)}
+                >
+                  <Text style={styles.cancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.saveShelfBtn, isSavingShelf && { opacity: 0.7 }]}
+                  disabled={isSavingShelf}
+                  onPress={async () => {
+                    if (!editingShelfItem) return;
+                    setIsSavingShelf(true);
+                    try {
+                      const res = await updateShelfLocation({
+                        inventoryId: editingShelfItem.id,
+                        storeId: editingShelfItem.darkStoreId,
+                        productId: editingShelfItem.productId,
+                        shelfLocation: shelfInput.trim().toUpperCase(),
+                      });
+                      if (res.success) {
+                        setShelfSuccessMsg('Shelf updated successfully!');
+                        setTimeout(() => {
+                          setEditingShelfItem(null);
+                          setIsSavingShelf(false);
+                          setShelfSuccessMsg('');
+                        }, 500);
+                      } else {
+                        setIsSavingShelf(false);
+                        alert(res.error || 'Failed to update shelf');
+                      }
+                    } catch {
+                      setIsSavingShelf(false);
+                    }
+                  }}
+                >
+                  <Text style={styles.saveShelfBtnText}>
+                    {isSavingShelf ? 'Saving...' : 'Save Shelf'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ================= MODAL: SELECT CITY ================= */}
+      <Modal
+        visible={showCityPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCityPicker(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalPanel}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderTitleRow}>
+                <MapPin size={20} color={COLORS.purple} />
+                <View>
+                  <Text style={styles.modalTitle}>Select City</Text>
+                  <Text style={styles.modalSubtitle}>Filter dark store warehouses by city</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setShowCityPicker(false)}>
+                <X size={20} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              <View style={styles.searchInnerRow}>
+                <Search size={16} color={COLORS.textMuted} />
+                <TextInput
+                  style={styles.searchInnerInput}
+                  placeholder="Search city by name or code..."
+                  placeholderTextColor={COLORS.textMuted}
+                  value={citySearch}
+                  onChangeText={setCitySearch}
+                />
+                {citySearch ? (
+                  <TouchableOpacity onPress={() => setCitySearch('')}>
+                    <X size={16} color={COLORS.textMuted} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={true}>
+                {activeCities
+                  .filter(
+                    (c) =>
+                      c.name.toLowerCase().includes(citySearch.toLowerCase()) ||
+                      c.code.toLowerCase().includes(citySearch.toLowerCase())
+                  )
+                  .map((city) => {
+                    const isSelected =
+                      currentCity?.id === city.id || currentCity?.code === city.code;
+                    return (
+                      <TouchableOpacity
+                        key={city.id || city._id}
+                        style={[styles.modalItem, isSelected && styles.modalItemActive]}
+                        onPress={() => {
+                          setSelectedCityId(city.id || city._id || '');
+                          setSelectedAreaId('');
+                          setShowCityPicker(false);
+                          setCitySearch('');
+                        }}
+                      >
+                        <View style={styles.modalItemLeft}>
+                          <View style={styles.cityMiniBadge}>
+                            <Text style={styles.cityMiniBadgeText}>{city.code}</Text>
+                          </View>
+                          <Text
+                            style={[
+                              styles.modalItemText,
+                              isSelected && styles.modalItemTextActive,
+                            ]}
+                          >
+                            {city.name}
+                          </Text>
+                        </View>
+                        {isSelected && <Check size={18} color={COLORS.purple} />}
+                      </TouchableOpacity>
+                    );
+                  })}
+              </ScrollView>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ================= MODAL: SELECT AREA (1:1 STORE) ================= */}
+      <Modal
+        visible={showAreaPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowAreaPicker(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalPanel}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderTitleRow}>
+                <Navigation size={20} color={COLORS.blue} />
+                <View>
+                  <Text style={styles.modalTitle}>Select Area (1:1 Store)</Text>
+                  <Text style={styles.modalSubtitle}>
+                    Scoped to {currentCity?.name || 'City'} areas
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setShowAreaPicker(false)}>
+                <X size={20} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              <View style={styles.searchInnerRow}>
+                <Search size={16} color={COLORS.textMuted} />
+                <TextInput
+                  style={styles.searchInnerInput}
+                  placeholder="Search area..."
+                  placeholderTextColor={COLORS.textMuted}
+                  value={areaSearch}
+                  onChangeText={setAreaSearch}
+                />
+                {areaSearch ? (
+                  <TouchableOpacity onPress={() => setAreaSearch('')}>
+                    <X size={16} color={COLORS.textMuted} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={true}>
+                {availableAreas
+                  .filter((a) => a.name.toLowerCase().includes(areaSearch.toLowerCase()))
+                  .map((area) => {
+                    const isSelected =
+                      currentArea?.id === area.id || currentArea?.name === area.name;
+                    const assignedStoreName =
+                      area.assignedStore?.name || area.darkStore || 'Active Hub';
+                    return (
+                      <TouchableOpacity
+                        key={area.id || area._id}
+                        style={[styles.modalItem, isSelected && styles.modalItemActive]}
+                        onPress={() => {
+                          setSelectedAreaId(area.id || area._id || '');
+                          setShowAreaPicker(false);
+                          setAreaSearch('');
+                        }}
+                      >
+                        <View style={styles.modalItemLeft}>
+                          <Lock
+                            size={15}
+                            color={isSelected ? COLORS.purple : COLORS.textMuted}
+                          />
+                          <View style={{ marginLeft: 8 }}>
+                            <Text
+                              style={[
+                                styles.modalItemText,
+                                isSelected && styles.modalItemTextActive,
+                              ]}
+                            >
+                              {area.name}
+                            </Text>
+                            <Text style={styles.modalItemSub}>
+                              🏪 {assignedStoreName}
+                            </Text>
+                          </View>
+                        </View>
+                        {isSelected && <Check size={18} color={COLORS.purple} />}
+                      </TouchableOpacity>
+                    );
+                  })}
+              </ScrollView>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -371,85 +708,265 @@ const styles = StyleSheet.create({
     borderBottomColor: COLORS.border,
     zIndex: 10,
   },
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: COLORS.textMuted,
-    textTransform: 'uppercase',
-    marginBottom: 6,
-    letterSpacing: 0.5,
+  sectionHeaderRow: {
+    marginBottom: 10,
   },
-  storeDropdown: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: COLORS.cardBackground,
-    borderRadius: RADIUS.input,
-    paddingHorizontal: SPACING.md,
-    height: 46,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    marginBottom: SPACING.sm,
-  },
-  storeDropdownLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: 8,
-  },
-  storeDropdownText: {
-    fontSize: 14,
-    fontWeight: '700',
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
     color: COLORS.navy,
   },
-  storePickerMenu: {
-    position: 'absolute',
-    top: 76,
-    left: SPACING.md,
-    right: SPACING.md,
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.card,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    zIndex: 30,
+  sectionSubtitle: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    marginTop: 2,
   },
-  storePickerScroll: {
-    maxHeight: 280,
-  },
-  storePickerItem: {
-    paddingVertical: 12,
-    paddingHorizontal: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  storePickerItemActive: {
-    backgroundColor: '#EEF2FF',
-  },
-  storePickerRow: {
+  cascadingRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 10,
   },
-  storePickerText: {
-    fontSize: 13,
-    color: COLORS.textPrimary,
-    fontWeight: '600',
+  cascadingCol: {
+    flex: 1,
+    position: 'relative',
   },
-  storePickerTextActive: {
-    fontWeight: '700',
-    color: COLORS.purple,
-  },
-  storePickerCode: {
+  inputLabel: {
     fontSize: 10,
     fontWeight: '700',
     color: COLORS.textMuted,
-    marginTop: 2,
+    marginBottom: 4,
     letterSpacing: 0.5,
+  },
+  cascadingBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    borderRadius: RADIUS.input,
+    paddingHorizontal: 12,
+    height: 44,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+  },
+  disabledBtn: {
+    opacity: 0.5,
+    backgroundColor: '#F1F5F9',
+  },
+  cascadingBtnLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+    marginRight: 6,
+  },
+  cascadingBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.navy,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(5, 6, 42, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.md,
+  },
+  modalPanel: {
+    width: '100%',
+    maxWidth: 480,
+    maxHeight: '80%',
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.card,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  modalHeaderTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+  },
+  modalSubtitle: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginTop: 1,
+  },
+  modalBody: {
+    padding: SPACING.md,
+  },
+  modalScroll: {
+    maxHeight: 340,
+  },
+  modalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 6,
+    backgroundColor: '#FAFAFD',
+    borderWidth: 1,
+    borderColor: '#ECEAF3',
+  },
+  modalItemActive: {
+    backgroundColor: '#F3F0FA',
+    borderColor: COLORS.purple,
+  },
+  modalItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  modalItemText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  modalItemTextActive: {
+    color: COLORS.purple,
+  },
+  modalItemSub: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginTop: 1,
+  },
+  searchInnerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    marginBottom: 6,
+    gap: 6,
+  },
+  searchInnerInput: {
+    flex: 1,
+    fontSize: 12,
+    color: COLORS.textPrimary,
+    padding: 0,
+  },
+  pickerScroll: {
+    maxHeight: 220,
+  },
+  pickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    marginBottom: 2,
+  },
+  pickerItemActive: {
+    backgroundColor: '#EEF2FF',
+  },
+  pickerItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  pickerItemText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  pickerItemTextActive: {
+    fontWeight: '700',
+    color: COLORS.purple,
+  },
+  pickerItemSub: {
+    fontSize: 10,
+    color: COLORS.textMuted,
+    marginTop: 1,
+  },
+  cityMiniBadge: {
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  cityMiniBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: COLORS.purple,
+  },
+  resolvedStoreCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: RADIUS.input,
+    padding: 10,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    marginBottom: 10,
+  },
+  resolvedStoreLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  storeIconBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  resolvedStoreTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  resolvedStoreName: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: COLORS.navy,
+    flexShrink: 1,
+  },
+  lockBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  lockBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#065F46',
+    letterSpacing: 0.5,
+  },
+  resolvedStoreMeta: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginTop: 2,
   },
   kpiRow: {
     flexDirection: 'row',
@@ -667,5 +1184,106 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     textAlign: 'center',
     lineHeight: 18,
+  },
+  // Shelf Location Styles
+  shelfRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: RADIUS.sm,
+    marginTop: 6,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  shelfInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  shelfLabel: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    fontWeight: '500',
+  },
+  shelfValueActive: {
+    color: '#7C3AED',
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  shelfValueEmpty: {
+    color: '#94A3B8',
+    fontWeight: '600',
+    fontStyle: 'italic',
+  },
+  editShelfBtn: {
+    backgroundColor: '#EDE9FE',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: RADIUS.sm,
+  },
+  editShelfBtnText: {
+    color: '#7C3AED',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  shelfInputLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.navy,
+    marginBottom: 8,
+  },
+  shelfTextInput: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: RADIUS.input,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 10,
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.navy,
+    letterSpacing: 0.5,
+    marginBottom: 12,
+  },
+  shelfSuccessText: {
+    fontSize: 12,
+    color: '#16A34A',
+    fontWeight: '600',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  modalActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 6,
+  },
+  cancelBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: RADIUS.button,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  cancelBtnText: {
+    fontSize: 13,
+    color: COLORS.textMuted,
+    fontWeight: '600',
+  },
+  saveShelfBtn: {
+    backgroundColor: COLORS.purple,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: RADIUS.button,
+  },
+  saveShelfBtnText: {
+    fontSize: 13,
+    color: COLORS.white,
+    fontWeight: '700',
   },
 });

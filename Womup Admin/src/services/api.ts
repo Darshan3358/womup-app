@@ -15,7 +15,9 @@ import {
   PrintOrder,
   PricingCategory,
   CategoryItem,
+  SubCategoryItem,
   DarkStoreItem,
+  CityItem,
 } from '../types/admin';
 
 const getApiBaseUrl = () => {
@@ -38,6 +40,7 @@ export interface LiveDbData {
   printOrders: PrintOrder[];
   products: ProductItem[];
   categories: CategoryItem[];
+  cities: CityItem[];
   zones: Zone[];
   stores: DarkStoreItem[];
   zonePrices: Record<string, Record<string, number>>;
@@ -59,6 +62,7 @@ export const ApiService = {
       printOrders: [],
       products: [],
       categories: [],
+      cities: [],
       zones: [],
       stores: [],
       zonePrices: {},
@@ -347,17 +351,47 @@ export const ApiService = {
           : [];
 
         // 6. DYNAMICALLY MAP ZONES FROM LIVE MONGODB
+        // 5b. DYNAMICALLY MAP CITIES FROM LIVE MONGODB
+        const dynamicCities: CityItem[] = (data.cities && data.cities.length > 0)
+          ? data.cities.map((c: any) => ({
+              id: c._id?.toString ? c._id.toString() : c._id || c.id,
+              _id: c._id,
+              name: c.name,
+              code: c.code,
+              state: c.state || 'Gujarat',
+              status: c.status || 'Active',
+              sortOrder: c.sortOrder || 0,
+              areaCount: c.areaCount || 0,
+              storeCount: c.storeCount || 0,
+              activeStoreCount: c.activeStoreCount || 0,
+              createdAt: c.createdAt,
+              updatedAt: c.updatedAt,
+            }))
+          : [];
+
+        // 6. DYNAMICALLY MAP OPERATIONAL ZONES (AREAS) FROM LIVE MONGODB
         const dynamicZones: Zone[] = (data.areas && data.areas.length > 0)
           ? data.areas.map((a: any, idx: number) => ({
               id: a._id?.toString ? a._id.toString() : a._id || a.id || `z${idx + 1}`,
+              _id: a._id,
               name: a.name,
               code: a.code || a.name.toUpperCase().replace(/\s+/g, '_'),
               darkStore: a.darkStore || `Wom Up ${a.name} Dark Store`,
               address: a.address || `${a.name}, ${a.city || 'Ahmedabad'}`,
-              city: a.city || 'Ahmedabad',
+              city: a.cityName || a.city || 'Ahmedabad',
+              cityName: a.cityName || a.city || 'Ahmedabad',
+              cityId: a.cityId?.toString ? a.cityId.toString() : (a.cityId || null),
               isActive: a.isActive !== false,
               activeOrders: 0,
               gmvSharePercent: 0,
+              hasActiveStore: !!a.hasActiveStore,
+              assignedStore: a.assignedStore || null,
+              centerLat: a.centerLat,
+              centerLng: a.centerLng,
+              radiusKm: a.radiusKm,
+              defaultDeliveryMinutes: a.defaultDeliveryMinutes,
+              pincodes: a.pincodes,
+              sortOrder: a.sortOrder,
             }))
           : [];
 
@@ -412,10 +446,12 @@ export const ApiService = {
               code: s.code || '',
               loginId: s.loginId || '',
               address: s.address || '',
-              city: s.city || 'Ahmedabad',
+              city: s.cityName || s.city || 'Ahmedabad',
+              cityName: s.cityName || s.city || 'Ahmedabad',
+              cityId: s.cityId?.toString ? s.cityId.toString() : (s.cityId || null),
               pincode: s.pincode || '',
-              areaId: s.areaId?.toString ? s.areaId.toString() : s.areaId,
-              areaName: s.areaName,
+              areaId: s.areaId?.toString ? s.areaId.toString() : (s.areaId || null),
+              areaName: s.areaName || null,
               isActive: s.isActive !== false,
               orderCount: s.orderCount,
               pendingOrders: s.pendingOrders,
@@ -471,6 +507,7 @@ export const ApiService = {
             lowStockThreshold: threshold,
             expiryDate: inv.expiryDate ? new Date(inv.expiryDate).toISOString() : undefined,
             status,
+            shelfLocation: inv.shelfLocation || (matchedProd as any)?.shelfLocation || undefined,
           };
         });
 
@@ -559,6 +596,7 @@ export const ApiService = {
           printOrders: dynamicPrintOrders,
           products: dynamicProducts,
           categories: dynamicCategories,
+          cities: dynamicCities,
           zones: dynamicZones,
           stores: dynamicStores,
           zonePrices: dynamicZonePrices,
@@ -724,10 +762,15 @@ export const ApiService = {
   async addOperationalZone(data: {
     name: string;
     code?: string;
+    cityId?: string;
+    city?: string;
     darkStore?: string;
     address?: string;
-    city?: string;
     isActive?: boolean;
+    centerLat?: number;
+    centerLng?: number;
+    radiusKm?: number;
+    defaultDeliveryMinutes?: number;
   }): Promise<{ success: boolean; data?: any; error?: string; id?: string }> {
     try {
       console.log('[API] Creating operational zone in MongoDB:', data);
@@ -747,6 +790,111 @@ export const ApiService = {
     }
   },
 
+  // 6d. CITIES MANAGEMENT CRUD
+  async getCities(): Promise<CityItem[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/cities`);
+      const data = await res.json();
+      return data.success ? data.data : [];
+    } catch (err) {
+      console.error('[API] Error fetching cities:', err);
+      return [];
+    }
+  },
+
+  async addCity(payload: { name: string; code: string; state?: string; status?: 'Active' | 'Inactive' }): Promise<{ success: boolean; data?: CityItem; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/cities`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      return data;
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error creating city' };
+    }
+  },
+
+  async updateCity(id: string, payload: Partial<CityItem>): Promise<{ success: boolean; data?: CityItem; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/cities/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      return data;
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error updating city' };
+    }
+  },
+
+  async deleteCity(id: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/cities/${id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      return data;
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error deleting city' };
+    }
+  },
+
+  // 6e. AREAS MANAGEMENT CRUD
+  async getAreas(cityId?: string): Promise<Zone[]> {
+    try {
+      const url = cityId ? `${API_BASE_URL}/api/admin/areas?cityId=${encodeURIComponent(cityId)}` : `${API_BASE_URL}/api/admin/areas`;
+      const res = await fetch(url);
+      const data = await res.json();
+      return data.success ? data.data : [];
+    } catch (err) {
+      console.error('[API] Error fetching areas:', err);
+      return [];
+    }
+  },
+
+  async updateArea(id: string, payload: Partial<Zone>): Promise<{ success: boolean; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/areas/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      return data;
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error updating area' };
+    }
+  },
+
+  async deleteArea(id: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/areas/${id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      return data;
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error deleting area' };
+    }
+  },
+
+  async assignStoreToArea(storeId: string, areaId: string, cityId?: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/stores/${storeId}/assign-area`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ areaId, cityId }),
+      });
+      const data = await res.json();
+      return data;
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error assigning store' };
+    }
+  },
+
   // 7. PERSIST INVENTORY STOCK ADJUSTMENT TO LIVE MONGODB
   async adjustStock(storeId: string, productId: string, deltaQty: number, reason: string): Promise<boolean> {
     try {
@@ -758,6 +906,26 @@ export const ApiService = {
       return res.ok;
     } catch {
       return false;
+    }
+  },
+
+  // 7b. ASSIGN / UPDATE SHELF LOCATION IN LIVE MONGODB
+  async updateShelfLocation(params: {
+    inventoryId?: string;
+    storeId?: string;
+    productId?: string;
+    shelfLocation: string;
+  }): Promise<{ success: boolean; shelfLocation?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/stores/inventory/shelf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+      const data = await res.json();
+      return data;
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to update shelf location' };
     }
   },
 
@@ -946,6 +1114,167 @@ export const ApiService = {
       return json;
     } catch (err: any) {
       return { success: false, error: err.message || 'Network error deleting store' };
+    }
+  },
+
+  // 21. FETCH CATEGORIES (with subcategories and stats)
+  async fetchCategories(includeInactive = true): Promise<CategoryItem[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/categories?includeInactive=${includeInactive}`);
+      if (!res.ok) return [];
+      const json = await res.json();
+      return json.data || json || [];
+    } catch (err) {
+      console.error('[API] Error fetching categories:', err);
+      return [];
+    }
+  },
+
+  // 22. CREATE CATEGORY
+  async createCategory(payload: {
+    name: string;
+    code?: string;
+    slug?: string;
+    icon?: string;
+    bgColor?: string;
+    description?: string;
+    sortOrder?: number;
+    displayOrder?: number;
+    isActive?: boolean;
+  }): Promise<{ success: boolean; data?: CategoryItem; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/categories`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      return json;
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error creating category' };
+    }
+  },
+
+  // 23. UPDATE CATEGORY
+  async updateCategory(
+    id: string,
+    payload: Partial<CategoryItem>
+  ): Promise<{ success: boolean; data?: CategoryItem; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/categories/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      return json;
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error updating category' };
+    }
+  },
+
+  // 24. TOGGLE CATEGORY STATUS
+  async toggleCategoryStatus(
+    id: string,
+    isActive?: boolean
+  ): Promise<{ success: boolean; data?: CategoryItem; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/categories/${id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive }),
+      });
+      const json = await res.json();
+      return json;
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error updating status' };
+    }
+  },
+
+  // 25. DELETE CATEGORY (Blocked if products exist)
+  async deleteCategory(id: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/categories/${id}`, {
+        method: 'DELETE',
+      });
+      const json = await res.json();
+      return json;
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error deleting category' };
+    }
+  },
+
+  // 26. FETCH SUBCATEGORIES FOR CATEGORY
+  async fetchSubcategories(categoryId: string): Promise<SubCategoryItem[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/categories/${categoryId}/subcategories`);
+      if (!res.ok) return [];
+      const json = await res.json();
+      return json.data || json || [];
+    } catch (err) {
+      console.error('[API] Error fetching subcategories:', err);
+      return [];
+    }
+  },
+
+  // 27. CREATE SUBCATEGORY
+  async createSubcategory(
+    categoryId: string,
+    payload: {
+      name: string;
+      slug?: string;
+      icon?: string;
+      imageUrl?: string;
+      defaultShelfAisle?: string;
+      sortOrder?: number;
+      isActive?: boolean;
+    }
+  ): Promise<{ success: boolean; data?: SubCategoryItem; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/categories/${categoryId}/subcategories`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      return json;
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error creating subcategory' };
+    }
+  },
+
+  // 28. UPDATE SUBCATEGORY
+  async updateSubcategory(
+    categoryId: string,
+    subId: string,
+    payload: Partial<SubCategoryItem>
+  ): Promise<{ success: boolean; data?: SubCategoryItem; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/categories/${categoryId}/subcategories/${subId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      return json;
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error updating subcategory' };
+    }
+  },
+
+  // 29. DELETE SUBCATEGORY
+  async deleteSubcategory(
+    categoryId: string,
+    subId: string
+  ): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/categories/${categoryId}/subcategories/${subId}`, {
+        method: 'DELETE',
+      });
+      const json = await res.json();
+      return json;
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error deleting subcategory' };
     }
   },
 };

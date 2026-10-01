@@ -212,12 +212,42 @@ export class RiderApiService {
     throw new Error(data?.message || json?.message || 'Invalid OTP. Please enter the code sent to your email.');
   }
 
+  static async fetchCities(): Promise<Array<{ id: string; name: string; code: string; status?: string }>> {
+    try {
+      const res = await fetch(`${this.getApiBaseUrl()}/location/cities`);
+      if (res.ok) {
+        const json = await res.json();
+        const cities = json.data || json;
+        if (Array.isArray(cities) && cities.length > 0) {
+          return cities.map((c: any) => ({
+            id: c.id || c._id?.toString() || c.code,
+            name: c.name,
+            code: c.code,
+            status: c.status || 'Active',
+          }));
+        }
+      }
+    } catch (err) {
+      console.warn('[RiderApiService] Failed to fetch cities from backend, using fallback', err);
+    }
+
+    return [
+      { id: 'city_ahm', name: 'Ahmedabad', code: 'AHM', status: 'Active' },
+      { id: 'city_sur', name: 'Surat', code: 'SUR', status: 'Active' },
+      { id: 'city_bdq', name: 'Vadodara', code: 'BDQ', status: 'Active' },
+      { id: 'city_raj', name: 'Rajkot', code: 'RAJ', status: 'Active' },
+      { id: 'city_gan', name: 'Gandhinagar', code: 'GAN', status: 'Active' },
+    ];
+  }
+
   static async registerRider(data: {
     verificationId: string;
     email: string;
     fullName: string;
     phoneNumber: string;
     city: string;
+    cityId?: string;
+    cityName?: string;
     vehicleType: 'EV_SCOOTER' | 'BIKE' | 'BICYCLE';
     vehicleNumber: string;
     drivingLicenseNumber?: string;
@@ -225,6 +255,7 @@ export class RiderApiService {
   }): Promise<{ token: string; rider: RiderProfile }> {
     const cleanEmail = data.email.trim().toLowerCase();
     const cleanPhone = data.phoneNumber.trim().replace(/\s+/g, '').replace(/^\+91/, '');
+    const chosenCity = data.cityName || data.city || 'Ahmedabad';
 
     const res = await fetch(`${this.getApiBaseUrl()}/auth/delivery-register`, {
       method: 'POST',
@@ -234,7 +265,9 @@ export class RiderApiService {
         email: cleanEmail,
         fullName: data.fullName.trim(),
         phoneNumber: cleanPhone,
-        city: data.city || 'Ahmedabad',
+        city: chosenCity,
+        cityId: data.cityId,
+        cityName: chosenCity,
         vehicleType: data.vehicleType,
         vehicleNumber: data.vehicleNumber.trim().toUpperCase(),
         drivingLicenseNumber: data.drivingLicenseNumber?.trim().toUpperCase(),

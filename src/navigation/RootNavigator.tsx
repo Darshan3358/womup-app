@@ -85,6 +85,7 @@ export const RootNavigator: React.FC = () => {
     activeScreen === 'Blinkit_OrderAgain' ||
     activeScreen === 'Blinkit_Categories' ||
     activeScreen === 'Blinkit_Print' ||
+    activeScreen === 'Blinkit_Profile' ||
     activeScreen === 'C12_Home' ||
     activeScreen === 'C13_Category' ||
     activeScreen === 'C19_Cart' ||
@@ -104,6 +105,9 @@ export const RootNavigator: React.FC = () => {
         return 'Categories';
       case 'Blinkit_Print':
         return 'Print';
+      case 'Blinkit_Profile':
+      case 'C26_Account':
+        return 'Profile';
       default:
         return 'Home';
     }
@@ -122,6 +126,9 @@ export const RootNavigator: React.FC = () => {
         break;
       case 'Print':
         setActiveScreen('Blinkit_Print');
+        break;
+      case 'Profile':
+        setActiveScreen('Blinkit_Profile');
         break;
     }
   };
@@ -232,8 +239,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.white,
+    width: '100%',
+    maxWidth: '100%',
+    overflow: 'hidden',
   },
   screenContainer: {
     flex: 1,
+    width: '100%',
+    maxWidth: '100%',
+    overflow: 'hidden',
   },
 });

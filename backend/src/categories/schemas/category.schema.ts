@@ -9,6 +9,9 @@ export class Category {
   @Prop({ required: true, trim: true })
   name: string;
 
+  @Prop({ trim: true })
+  code?: string;
+
   @Prop({ required: true, unique: true, lowercase: true, trim: true })
   slug: string;
 
@@ -20,6 +23,9 @@ export class Category {
 
   @Prop({ default: '#FCE1F5' })
   bgColor: string;
+
+  @Prop()
+  description?: string;
 
   @Prop({ default: 0 })
   sortOrder: number;
@@ -46,6 +52,12 @@ export class SubCategory {
 
   @Prop({ default: 'grid' })
   icon: string;
+
+  @Prop()
+  defaultShelfAisle?: string;
+
+  @Prop({ default: 0 })
+  sortOrder: number;
 
   @Prop({ default: 0 })
   itemCount: number;

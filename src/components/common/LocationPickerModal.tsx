@@ -10,11 +10,12 @@ import {
   Platform,
   Alert,
 } from 'react-native';
+import { Ionicons, Feather } from '@expo/vector-icons';
 import { COLORS } from '../../theme/colors';
 import { TYPOGRAPHY } from '../../theme/typography';
 import { AppIcon } from './AppIcon';
 import { useApp } from '../../context/AppContext';
-import { LocationService, DetectedLocation } from '../../services/locationService';
+import { LocationService, DetectedLocation, ResolvedArea } from '../../services/locationService';
 import { AddressService } from '../../services/addressService';
 import { StorageService } from '../../services/storageService';
 
@@ -31,13 +32,18 @@ export const LocationPickerModal: React.FC = () => {
     setActiveScreen,
     setCurrentArea,
     setCurrentStore,
+    setCurrentCityName,
     setIsServiceable,
     setDeliveryEtaMinutes,
+    currentStoreName,
+    deliveryEtaMinutes,
   } = useApp();
 
   const [isDetecting, setIsDetecting] = useState<boolean>(false);
   const [currentLocation, setCurrentLocation] = useState<DetectedLocation | null>(null);
   const [detectionError, setDetectionError] = useState<string | null>(null);
+  const [gpsResolvedArea, setGpsResolvedArea] = useState<ResolvedArea | null>(null);
+  const [isResolvingArea, setIsResolvingArea] = useState<boolean>(false);
 
   // Auto-detect GPS location whenever the modal opens
   useEffect(() => {
@@ -53,6 +59,15 @@ export const LocationPickerModal: React.FC = () => {
       const loc = await LocationService.getCurrentLocation();
       if (loc) {
         setCurrentLocation(loc);
+        setIsResolvingArea(true);
+        try {
+          const resolved = await LocationService.resolveArea(loc.latitude, loc.longitude, false);
+          setGpsResolvedArea(resolved);
+        } catch (resErr) {
+          console.warn('[LocationPickerModal] Background resolveArea notice:', resErr);
+        } finally {
+          setIsResolvingArea(false);
+        }
       } else {
         setDetectionError('Permission required or location unavailable');
       }
@@ -99,9 +114,18 @@ export const LocationPickerModal: React.FC = () => {
     try {
       const area = await LocationService.resolveArea(loc.latitude, loc.longitude, true);
       if (area) {
-        setCurrentArea(area.areaId, area.areaName);
+        // Customer's neighborhood (e.g. Vejalpur) vs serving store (e.g. Prahlad Nagar)
+        const customerArea = loc.areaLandmark || loc.shortAddress || area.areaName;
+        setCurrentArea(area.areaId, customerArea);
+        if (area.city) {
+          setCurrentCityName(area.city);
+        }
         if (area.storeId) {
-          setCurrentStore(area.storeId, area.storeName || null);
+          const storeLabel =
+            area.distanceKm && area.distanceKm > 2.5
+              ? `${area.storeName} (${area.distanceKm} km)`
+              : area.storeName || null;
+          setCurrentStore(area.storeId, storeLabel);
         }
         setIsServiceable(area.serviceable === true);
         if (area.deliveryMinutes) {
@@ -242,85 +266,201 @@ export const LocationPickerModal: React.FC = () => {
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollList}>
-            {/* 📍 1. REAL-TIME CURRENT GPS LOCATION CARD (HIGHLIGHTED) */}
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => handleSelectCurrentLocation()}
-              style={[
-                styles.currentLocationCard,
-                deliveryLocation.startsWith('Current Location') && styles.activeCard,
-              ]}
-            >
-              <View style={styles.currentLocHeader}>
-                <View style={styles.gpsIconCircle}>
-                  <AppIcon name="map-pin" size={20} color="#15803D" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <View style={styles.titleRow}>
-                    <Text style={styles.currentLocTitle}>Use Current Location</Text>
-                    {isDetecting ? (
-                      <View style={styles.detectingBadge}>
-                        <ActivityIndicator size="small" color="#15803D" style={{ transform: [{ scale: 0.7 }] }} />
-                        <Text style={styles.detectingText}>Detecting GPS…</Text>
+            {/* 📍 1. REAL-TIME CURRENT GPS LOCATION CARD (3-STATE HONEST GPS) */}
+            {(() => {
+              const isGpsApplied = Boolean(
+                deliveryLocation.startsWith('Current Location') ||
+                  selectedAddress?.type === 'Current' ||
+                  (currentLocation &&
+                    selectedAddress?.latitude != null &&
+                    selectedAddress?.longitude != null &&
+                    Math.abs(selectedAddress.latitude - currentLocation.latitude) < 0.001 &&
+                    Math.abs(selectedAddress.longitude - currentLocation.longitude) < 0.001)
+              );
+
+              const isGpsServiceable = gpsResolvedArea
+                ? gpsResolvedArea.serviceable !== false
+                : true;
+
+              const isFarOrFallback = Boolean(
+                gpsResolvedArea &&
+                  gpsResolvedArea.distanceKm &&
+                  gpsResolvedArea.distanceKm > 2.5
+              );
+
+              const servingStore = gpsResolvedArea?.storeName || currentStoreName || 'Wom Up Dark Store';
+              const distanceDisplay = gpsResolvedArea?.distanceKm ? `${gpsResolvedArea.distanceKm} km` : null;
+              const etaMinutes = gpsResolvedArea?.deliveryMinutes || deliveryEtaMinutes || 9;
+
+              return (
+                <View
+                  style={[
+                    styles.currentLocationCard,
+                    isGpsApplied && styles.activeCard,
+                    !isGpsServiceable && styles.unserviceableCard,
+                  ]}
+                >
+                  <View style={styles.currentLocHeader}>
+                    <View
+                      style={[
+                        styles.gpsIconCircle,
+                        !isGpsServiceable && { backgroundColor: '#FEE2E2' },
+                        !isGpsApplied && isGpsServiceable && { backgroundColor: '#E0F2FE' },
+                      ]}
+                    >
+                      <AppIcon
+                        name="map-pin"
+                        size={20}
+                        color={!isGpsServiceable ? '#DC2626' : !isGpsApplied ? '#0284C7' : '#15803D'}
+                      />
+                    </View>
+
+                    <View style={{ flex: 1 }}>
+                      <View style={styles.titleRow}>
+                        <Text style={styles.currentLocTitle}>Current Device Location</Text>
+
+                        {/* BADGE: 3 HONEST STATES */}
+                        {isDetecting ? (
+                          <View style={styles.detectingBadge}>
+                            <ActivityIndicator
+                              size="small"
+                              color="#15803D"
+                              style={{ transform: [{ scale: 0.7 }] }}
+                            />
+                            <Text style={styles.detectingText}>Detecting GPS…</Text>
+                          </View>
+                        ) : isResolvingArea ? (
+                          <View style={styles.checkingBadge}>
+                            <ActivityIndicator
+                              size="small"
+                              color="#0284C7"
+                              style={{ transform: [{ scale: 0.7 }] }}
+                            />
+                            <Text style={styles.checkingBadgeText}>Checking Store…</Text>
+                          </View>
+                        ) : currentLocation ? (
+                          !isGpsServiceable ? (
+                            /* State 3: Not Serviceable */
+                            <View style={styles.outsideZoneBadge}>
+                              <Ionicons name="warning-outline" size={12} color="#DC2626" />
+                              <Text style={styles.outsideZoneText}>Not Serviceable</Text>
+                            </View>
+                          ) : isGpsApplied ? (
+                            /* State 1: Matched & Applied */
+                            <View style={styles.gpsActiveBadge}>
+                              <View style={styles.greenDot} />
+                              <Text style={styles.gpsActiveText}>Live GPS ✓</Text>
+                            </View>
+                          ) : (
+                            /* State 2: Detected, Not Yet Applied */
+                            <View style={styles.gpsDetectedBadge}>
+                              <Ionicons name="compass-outline" size={13} color="#0284C7" />
+                              <Text style={styles.gpsDetectedText}>GPS Detected</Text>
+                            </View>
+                          )
+                        ) : null}
                       </View>
-                    ) : currentLocation ? (
-                      <View style={styles.gpsActiveBadge}>
-                        <View style={styles.greenDot} />
-                        <Text style={styles.gpsActiveText}>Live GPS</Text>
-                      </View>
-                    ) : null}
+
+                      {/* Detected Address Details */}
+                      {isDetecting ? (
+                        <Text style={styles.currentLocSubtitle}>
+                          Fetching high-accuracy coordinates from device GPS…
+                        </Text>
+                      ) : currentLocation ? (
+                        <View>
+                          <Text style={styles.currentLocAddress} numberOfLines={2}>
+                            {currentLocation.readableAddress}
+                          </Text>
+                          <Text style={styles.coordsText}>
+                            Lat: {currentLocation.latitude.toFixed(4)}, Lng: {currentLocation.longitude.toFixed(4)}
+                          </Text>
+
+                          {/* State Context Message */}
+                          {!isGpsServiceable ? (
+                            <View style={styles.warningBox}>
+                              <Ionicons name="alert-circle-outline" size={14} color="#DC2626" />
+                              <Text style={styles.warningBoxText}>
+                                Wom Up 9-minute delivery is not yet available at your GPS location. Please select a saved address.
+                              </Text>
+                            </View>
+                          ) : gpsResolvedArea ? (
+                            <View
+                              style={[
+                                styles.storeInfoBox,
+                                isFarOrFallback ? styles.fallbackStoreBox : styles.matchedStoreBox,
+                              ]}
+                            >
+                              <Ionicons
+                                name={isFarOrFallback ? 'information-circle-outline' : 'checkmark-circle-outline'}
+                                size={14}
+                                color={isFarOrFallback ? '#0369A1' : '#15803D'}
+                              />
+                              <Text
+                                style={[
+                                  styles.storeInfoText,
+                                  isFarOrFallback ? { color: '#0369A1' } : { color: '#166534' },
+                                ]}
+                              >
+                                {isFarOrFallback
+                                  ? `Serving Hub: ${servingStore}${distanceDisplay ? ` (${distanceDisplay} away)` : ''} · ETA ${etaMinutes} mins`
+                                  : `Serving Hub: ${servingStore} · Express 9-minute drop`}
+                              </Text>
+                            </View>
+                          ) : null}
+
+                          {!isGpsApplied && isGpsServiceable && (
+                            <Text style={styles.unappliedHintText}>
+                              Tap "Deliver Here" below to use this GPS location for delivery.
+                            </Text>
+                          )}
+                        </View>
+                      ) : detectionError ? (
+                        <Text style={styles.errorLocSubtitle}>
+                          {detectionError}. Tap Redetect to retry.
+                        </Text>
+                      ) : (
+                        <Text style={styles.currentLocSubtitle}>
+                          Tap to detect device real-time GPS location
+                        </Text>
+                      )}
+                    </View>
                   </View>
 
-                  {/* Detected Address Details */}
-                  {isDetecting ? (
-                    <Text style={styles.currentLocSubtitle}>
-                      Fetching precise coordinates from device GPS…
-                    </Text>
-                  ) : currentLocation ? (
-                    <View>
-                      <Text style={styles.currentLocAddress} numberOfLines={2}>
-                        {currentLocation.readableAddress}
-                      </Text>
-                      <Text style={styles.coordsText}>
-                        Lat: {currentLocation.latitude.toFixed(4)}, Lng: {currentLocation.longitude.toFixed(4)}
-                      </Text>
-                    </View>
-                  ) : detectionError ? (
-                    <Text style={styles.errorLocSubtitle}>{detectionError}. Tap to retry.</Text>
-                  ) : (
-                    <Text style={styles.currentLocSubtitle}>
-                      Tap to detect device real-time GPS location
-                    </Text>
-                  )}
+                  {/* Action Buttons */}
+                  <View style={styles.currentLocActionRow}>
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        LocationService.clearCache();
+                        handleAutoDetectLocation();
+                      }}
+                      style={styles.refreshLocBtn}
+                    >
+                      <AppIcon name="sparkles" size={14} color="#15803D" />
+                      <Text style={styles.refreshLocText}>Redetect GPS</Text>
+                    </TouchableOpacity>
+
+                    {currentLocation && isGpsServiceable ? (
+                      isGpsApplied ? (
+                        <View style={styles.alreadyActiveBtn}>
+                          <AppIcon name="check" size={13} color="#15803D" />
+                          <Text style={styles.alreadyActiveText}>Delivering Here ✓</Text>
+                        </View>
+                      ) : (
+                        <TouchableOpacity
+                          activeOpacity={0.85}
+                          onPress={() => handleSelectCurrentLocation()}
+                          style={styles.deliverHereBtn}
+                        >
+                          <Text style={styles.deliverHereText}>Deliver Here ✓</Text>
+                        </TouchableOpacity>
+                      )
+                    ) : null}
+                  </View>
                 </View>
-              </View>
-
-              {/* Action Buttons inside Current Location */}
-              <View style={styles.currentLocActionRow}>
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    LocationService.clearCache();
-                    handleAutoDetectLocation();
-                  }}
-                  style={styles.refreshLocBtn}
-                >
-                  <AppIcon name="sparkles" size={14} color="#15803D" />
-                  <Text style={styles.refreshLocText}>Redetect GPS</Text>
-                </TouchableOpacity>
-
-                {currentLocation && (
-                  <TouchableOpacity
-                    activeOpacity={0.85}
-                    onPress={() => handleSelectCurrentLocation()}
-                    style={styles.deliverHereBtn}
-                  >
-                    <Text style={styles.deliverHereText}>Deliver Here ✓</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </TouchableOpacity>
+              );
+            })()}
 
             {/* SECTION DIVIDER: SAVED ADDRESSES */}
             <View style={styles.sectionHeaderRow}>
@@ -620,6 +760,123 @@ const styles = StyleSheet.create({
   refreshLocText: {
     fontSize: 12,
     fontWeight: '600',
+    color: '#15803D',
+  },
+  checkingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F0F9FF',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+  },
+  checkingBadgeText: {
+    fontSize: 11,
+    color: '#0284C7',
+    fontWeight: '600',
+  },
+  gpsDetectedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F0F9FF',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+  },
+  gpsDetectedText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0284C7',
+  },
+  outsideZoneBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+  },
+  outsideZoneText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#DC2626',
+  },
+  unserviceableCard: {
+    borderColor: '#FECACA',
+    backgroundColor: '#FFF8F8',
+  },
+  warningBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginTop: 6,
+  },
+  warningBoxText: {
+    fontSize: 11,
+    color: '#DC2626',
+    fontWeight: '500',
+    flex: 1,
+    lineHeight: 15,
+  },
+  storeInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginTop: 6,
+    borderWidth: 1,
+  },
+  fallbackStoreBox: {
+    backgroundColor: 'rgba(2, 132, 199, 0.08)',
+    borderColor: 'rgba(2, 132, 199, 0.25)',
+  },
+  matchedStoreBox: {
+    backgroundColor: 'rgba(21, 128, 61, 0.08)',
+    borderColor: 'rgba(21, 128, 61, 0.25)',
+  },
+  storeInfoText: {
+    fontSize: 11,
+    fontWeight: '600',
+    flex: 1,
+    lineHeight: 15,
+  },
+  unappliedHintText: {
+    fontSize: 10.5,
+    color: '#64748B',
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  alreadyActiveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#DCFCE7',
+    borderWidth: 1,
+    borderColor: '#86EFAC',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  alreadyActiveText: {
+    fontSize: 12,
+    fontWeight: '700',
     color: '#15803D',
   },
   deliverHereBtn: {

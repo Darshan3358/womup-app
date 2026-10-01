@@ -25,6 +25,8 @@ import { TrackingGateway } from '../../tracking/tracking.gateway';
 import {
   StockAdjustmentDto,
   RestockDto,
+  UpdateShelfLocationDto,
+  StoreAddProductDto,
 } from './dto/store-inventory.dto';
 
 @Injectable()
@@ -111,7 +113,7 @@ export class StoreInventoryService {
         threshold,
         isLowStock,
         isOutOfStock,
-        shelfLocation: prod.shelfLocation || 'UNASSIGNED',
+        shelfLocation: inv?.shelfLocation || prod.shelfLocation || 'UNASSIGNED',
         sku: (prod as any).sku || prod.slug || `SKU-${prod._id.toString().slice(-6)}`,
       });
     }
@@ -303,4 +305,203 @@ export class StoreInventoryService {
       timestamp: log.createdAt,
     }));
   }
+
+  async updateShelfLocation(userId: string, productId: string, dto: UpdateShelfLocationDto) {
+    const staff = await this.getStaff(userId);
+    const storeId = staff.storeId;
+    const cleanShelf = (dto.shelfLocation || '').trim().toUpperCase();
+
+    const product = await this.productModel.findById(productId);
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    let inv = await this.inventoryModel.findOne({
+      storeId,
+      productId: product._id,
+    });
+
+    if (!inv) {
+      inv = await this.inventoryModel.create({
+        storeId,
+        productId: product._id,
+        availableQty: product.stock || 20,
+        reservedQty: 0,
+        soldQty: 0,
+        lowStockThreshold: 5,
+        shelfLocation: cleanShelf,
+      });
+    } else {
+      (inv as any).shelfLocation = cleanShelf;
+      await inv.save();
+    }
+
+    // Also update product shelfLocation as default fallback
+    product.shelfLocation = cleanShelf;
+    await product.save();
+
+    this.logger.log(`[Shelf Update] Store ${storeId} set shelf ${cleanShelf} for product ${product.name}`);
+
+    // Update any active picklists that contain this item for immediate live picker reflection
+    if (storeId) {
+      try {
+        await this.inventoryModel.db.collection('pick_lists').updateMany(
+          {
+            storeId: new Types.ObjectId(storeId.toString()),
+            status: 'ACTIVE',
+            'items.productId': product._id.toString(),
+          },
+          {
+            $set: { 'items.$[elem].shelfLocation': cleanShelf },
+          },
+          {
+            arrayFilters: [{ 'elem.productId': product._id.toString() }],
+          },
+        );
+      } catch (err: any) {
+        this.logger.warn(`[Shelf Update] Pick list item shelf sync skipped: ${err.message}`);
+      }
+    }
+
+    // Broadcast inventory update to store
+    if (storeId) {
+      this.trackingGateway.server?.to(`store_${storeId.toString()}`).emit('inventory_update', {
+        productId: product._id.toString(),
+        shelfLocation: cleanShelf,
+      });
+    }
+
+    return {
+      success: true,
+      productId: product._id.toString(),
+      shelfLocation: cleanShelf,
+      message: `Shelf location set to ${cleanShelf}`,
+    };
+  }
+
+  async addProduct(userId: string, dto: StoreAddProductDto) {
+    const staff = await this.getStaff(userId);
+    const storeId = staff.storeId;
+
+    if (!dto.name || !dto.name.trim()) {
+      throw new BadRequestException('Product name is required');
+    }
+
+    const cleanName = dto.name.trim();
+    const cleanShelf = (dto.shelfLocation || '').trim().toUpperCase();
+    const primaryVariant = dto.variants?.[0] || {};
+    const packSize = primaryVariant.packSize || '1 unit';
+    const sellingPrice = Number(primaryVariant.sellingPrice) || 20;
+    const mrp = Number(primaryVariant.mrp) || Math.max(sellingPrice, 25);
+    const initialQty = Number(dto.initialStock) || 100;
+
+    // Check if category exists or find/create
+    const catName = dto.category || 'General';
+    let category = await this.productModel.db.collection('categories').findOne({
+      name: { $regex: new RegExp(`^${catName}$`, 'i') },
+    });
+    if (!category) {
+      const catRes = await this.productModel.db.collection('categories').insertOne({
+        name: catName,
+        slug: catName.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      category = { _id: catRes.insertedId };
+    }
+
+    // Check if product exists in master catalog
+    const slugBase = cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    let slug = slugBase;
+    let counter = 1;
+    while (await this.productModel.findOne({ slug })) {
+      slug = `${slugBase}-${counter++}`;
+    }
+
+    const defaultImg =
+      dto.imageUrl?.trim() ||
+      'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400';
+
+    const product = await this.productModel.create({
+      name: cleanName,
+      slug,
+      brand: dto.brand?.trim() || 'Wom Up',
+      categoryId: category._id,
+      imageUrl: defaultImg,
+      images: [defaultImg],
+      quantityLabel: packSize,
+      mrp,
+      sellingPrice,
+      discountPercent: mrp > sellingPrice ? Math.round(((mrp - sellingPrice) / mrp) * 100) : 0,
+      stock: initialQty,
+      shelfLocation: cleanShelf,
+      description: dto.description?.trim() || `Fresh ${cleanName}`,
+      isActive: true,
+    });
+
+    // Create or update store inventory entry
+    let inv = await this.inventoryModel.findOne({
+      storeId,
+      productId: product._id,
+    });
+
+    if (!inv) {
+      inv = await this.inventoryModel.create({
+        storeId,
+        productId: product._id,
+        availableQty: initialQty,
+        reservedQty: 0,
+        soldQty: 0,
+        lowStockThreshold: 5,
+        shelfLocation: cleanShelf,
+      });
+    } else {
+      inv.availableQty = initialQty;
+      (inv as any).shelfLocation = cleanShelf;
+      await inv.save();
+    }
+
+    // Also record inventory log
+    await this.inventoryLogModel.create({
+      storeId,
+      productId: product._id,
+      staffId: staff._id,
+      changeType: InventoryChangeType.RESTOCK,
+      quantityDelta: initialQty,
+      beforeQty: 0,
+      afterQty: initialQty,
+      reason: 'Initial local stock added by dark store staff',
+      createdAt: new Date(),
+    });
+
+    this.logger.log(`[Store Add Product] Store ${storeId} added product "${product.name}" with stock ${initialQty}`);
+
+    // Broadcast inventory update
+    if (storeId) {
+      this.trackingGateway.server?.to(`store_${storeId.toString()}`).emit('inventory_update', {
+        productId: product._id.toString(),
+        name: product.name,
+      });
+    }
+
+    return {
+      success: true,
+      product: {
+        id: product._id.toString(),
+        name: product.name,
+        sellingPrice: product.sellingPrice,
+        mrp: product.mrp,
+        quantityLabel: product.quantityLabel,
+        imageUrl: product.imageUrl,
+        shelfLocation: cleanShelf,
+      },
+      inventory: {
+        availableQty: inv.availableQty,
+        shelfLocation: (inv as any).shelfLocation || cleanShelf,
+      },
+      message: 'Product added to master catalog and store inventory successfully',
+    };
+  }
 }
+

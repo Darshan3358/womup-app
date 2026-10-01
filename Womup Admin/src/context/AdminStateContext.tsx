@@ -17,6 +17,7 @@ import {
   PrintOrder,
   CategoryItem,
   DarkStoreItem,
+  CityItem,
 } from '../types/admin';
 import { ApiService } from '../services/api';
 import io from 'socket.io-client';
@@ -30,6 +31,8 @@ export type ActiveTab =
   | 'Staff'
   | 'Marketing'
   | 'Stores'
+  | 'Locations'
+  | 'Categories'
   | 'More';
 
 export type ActiveSubView =
@@ -73,6 +76,14 @@ interface AdminStateContextType {
   toggleSidebar: () => void;
 
   // Data Collections
+  cities: CityItem[];
+  selectedCity: CityItem | null;
+  setSelectedCity: (city: CityItem | null) => void;
+  addCity: (payload: { name: string; code: string; state?: string; status?: 'Active' | 'Inactive' }) => Promise<{ success: boolean; error?: string }>;
+  updateCity: (id: string, payload: Partial<CityItem>) => Promise<{ success: boolean; error?: string }>;
+  deleteCity: (id: string) => Promise<{ success: boolean; error?: string }>;
+  deleteAreaSafe: (id: string) => Promise<{ success: boolean; error?: string }>;
+
   zones: Zone[];
   customers: Customer[];
   selectedCustomer: Customer | null;
@@ -83,6 +94,15 @@ interface AdminStateContextType {
   updateRider: (id: string, updates: Partial<DeliveryPartnerItem>) => Promise<boolean>;
 
   categories: CategoryItem[];
+  refreshCategories: () => Promise<void>;
+  addCategoryItem: (data: Partial<CategoryItem>) => Promise<{ success: boolean; data?: CategoryItem; error?: string }>;
+  updateCategoryItem: (id: string, data: Partial<CategoryItem>) => Promise<{ success: boolean; data?: CategoryItem; error?: string }>;
+  toggleCategoryItemStatus: (id: string, isActive?: boolean) => Promise<{ success: boolean; data?: CategoryItem; error?: string }>;
+  deleteCategoryItem: (id: string) => Promise<{ success: boolean; message?: string; error?: string }>;
+  addSubcategoryItem: (catId: string, data: any) => Promise<{ success: boolean; data?: any; error?: string }>;
+  updateSubcategoryItem: (catId: string, subId: string, data: any) => Promise<{ success: boolean; data?: any; error?: string }>;
+  deleteSubcategoryItem: (catId: string, subId: string) => Promise<{ success: boolean; message?: string; error?: string }>;
+
   products: ProductItem[];
   selectedProduct: ProductItem | null;
   setSelectedProduct: (product: ProductItem | null) => void;
@@ -157,9 +177,20 @@ interface AdminStateContextType {
   toggleBlockCustomer: (id: string) => void;
 
   updateZoneProductPrice: (productName: string, zoneName: string, newSellingPrice: number) => void;
-  applyBulkPriceAdjustment: (category: string, type: 'Increase' | 'Decrease', percent: number) => void;
+  applyBulkPriceAdjustment: (
+    category: string,
+    type: 'Increase' | 'Decrease',
+    percent: number,
+    targetScope?: { type: 'area' | 'city' | 'all'; areaName?: string; cityName?: string; areaNames?: string[] }
+  ) => void;
 
   reportStockDiscrepancy: (itemName: string, type: 'Spoilage' | 'Shrinkage' | 'Discrepancy', quantityKg: number, reason: string) => void;
+  updateShelfLocation: (params: {
+    inventoryId?: string;
+    storeId?: string;
+    productId?: string;
+    shelfLocation: string;
+  }) => Promise<{ success: boolean; shelfLocation?: string; error?: string }>;
 
   updateOrderStatus: (orderId: string, stage: OrderStage, notes?: string) => void;
   reassignOrderStaff: (orderId: string, pickerName?: string, riderName?: string) => void;
@@ -196,6 +227,8 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const toggleSidebar = () => setIsSidebarOpen((prev) => !prev);
 
   const [syncStatus, setSyncStatus] = useState<string>('Live MongoDB Connected');
+  const [cities, setCities] = useState<CityItem[]>([]);
+  const [selectedCity, setSelectedCity] = useState<CityItem | null>(null);
   const [zones, setZones] = useState<Zone[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -264,6 +297,10 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setPrintOrders(live.printOrders || []);
         setCategories(live.categories || []);
         setProducts(live.products || []);
+        setCities(live.cities || []);
+        if (live.cities && live.cities.length > 0) {
+          setSelectedCity((prev) => prev || live.cities[0]);
+        }
         setZones(live.zones || []);
         if (live.zones && live.zones.length > 0) {
           setSelectedZone((prev) => prev || live.zones[0].name);
@@ -592,6 +629,96 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return true;
   };
 
+  const refreshCategories = async () => {
+    try {
+      const fetched = await ApiService.fetchCategories(true);
+      if (fetched && fetched.length > 0) {
+        setCategories(fetched);
+      }
+    } catch (err) {
+      console.error('[AdminStateContext] refreshCategories error:', err);
+    }
+  };
+
+  const addCategoryItem = async (data: Partial<CategoryItem>) => {
+    const res = await ApiService.createCategory({
+      name: data.name || '',
+      code: data.code,
+      slug: data.slug,
+      icon: data.icon,
+      bgColor: data.bgColor,
+      description: data.description,
+      sortOrder: data.sortOrder,
+      displayOrder: data.displayOrder,
+      isActive: data.isActive !== false,
+    });
+
+    if (res.success) {
+      logAudit('Category Created', data.name || '', `Created category with code ${data.code || ''}`);
+      await refreshCategories();
+    }
+    return res;
+  };
+
+  const updateCategoryItem = async (id: string, data: Partial<CategoryItem>) => {
+    const res = await ApiService.updateCategory(id, data);
+    if (res.success) {
+      logAudit('Category Updated', data.name || id, `Updated category properties`);
+      await refreshCategories();
+    }
+    return res;
+  };
+
+  const toggleCategoryItemStatus = async (id: string, isActive?: boolean) => {
+    const res = await ApiService.toggleCategoryStatus(id, isActive);
+    if (res.success) {
+      setCategories((prev) =>
+        prev.map((c) => (c.id === id || (c as any)._id === id ? { ...c, isActive: res.data?.isActive ?? !c.isActive } : c))
+      );
+      logAudit('Category Status Toggled', id, `Status updated`);
+      await refreshCategories();
+    }
+    return res;
+  };
+
+  const deleteCategoryItem = async (id: string) => {
+    const target = categories.find((c) => c.id === id || (c as any)._id === id);
+    const res = await ApiService.deleteCategory(id);
+    if (res.success) {
+      setCategories((prev) => prev.filter((c) => c.id !== id && (c as any)._id !== id));
+      logAudit('Category Deleted', target?.name || id, `Category removed`);
+      await refreshCategories();
+    }
+    return res;
+  };
+
+  const addSubcategoryItem = async (catId: string, data: any) => {
+    const res = await ApiService.createSubcategory(catId, data);
+    if (res.success) {
+      logAudit('Subcategory Added', data.name || '', `Added under category ${catId}`);
+      await refreshCategories();
+    }
+    return res;
+  };
+
+  const updateSubcategoryItem = async (catId: string, subId: string, data: any) => {
+    const res = await ApiService.updateSubcategory(catId, subId, data);
+    if (res.success) {
+      logAudit('Subcategory Updated', data.name || subId, `Updated subcategory in category ${catId}`);
+      await refreshCategories();
+    }
+    return res;
+  };
+
+  const deleteSubcategoryItem = async (catId: string, subId: string) => {
+    const res = await ApiService.deleteSubcategory(catId, subId);
+    if (res.success) {
+      logAudit('Subcategory Deleted', subId, `Deleted subcategory from category ${catId}`);
+      await refreshCategories();
+    }
+    return res;
+  };
+
   const openLabelPrint = (data: any) => {
     setLabelPrintData(data);
     setActiveModal('PrintLabel');
@@ -790,23 +917,55 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
-  const applyBulkPriceAdjustment = (category: string, type: 'Increase' | 'Decrease', percent: number) => {
+  const applyBulkPriceAdjustment = (
+    category: string,
+    type: 'Increase' | 'Decrease',
+    percent: number,
+    targetScope?: { type: 'area' | 'city' | 'all'; areaName?: string; cityName?: string; areaNames?: string[] }
+  ) => {
     const factor = type === 'Increase' ? 1 + percent / 100 : 1 - percent / 100;
+    const allowedAreaNames = targetScope?.areaNames || (targetScope?.areaName ? [targetScope.areaName] : null);
+
     setZonePrices((prev) => {
       const updated = { ...prev };
       Object.keys(updated).forEach((prodName) => {
         const prodObj = products.find((p) => p.name === prodName);
-        if (!category || category === 'All Categories' || (prodObj && prodObj.category === category)) {
+        if (!category || category === 'All Categories' || category === 'All Vegetables' || (prodObj && prodObj.category === category)) {
           const zoneMap = { ...updated[prodName] };
           Object.keys(zoneMap).forEach((z) => {
-            zoneMap[z] = Math.round(zoneMap[z] * factor);
+            if (!allowedAreaNames || allowedAreaNames.includes(z)) {
+              zoneMap[z] = Math.round(zoneMap[z] * factor);
+            }
           });
           updated[prodName] = zoneMap;
         }
       });
       return updated;
     });
-    logAudit('Bulk Price Adjustment', category, `${type} prices by ${percent}% across all zones`);
+
+    // Also adjust areaPricing for active variants
+    setAreaPricing((prev) => {
+      const updated = { ...prev };
+      Object.keys(updated).forEach((variantId) => {
+        const areaMap = { ...updated[variantId] };
+        Object.keys(areaMap).forEach((areaKey) => {
+          if (!allowedAreaNames || allowedAreaNames.includes(areaKey)) {
+            areaMap[areaKey] = Math.round(areaMap[areaKey] * factor);
+          }
+        });
+        updated[variantId] = areaMap;
+      });
+      return updated;
+    });
+
+    const scopeDesc =
+      targetScope?.type === 'area'
+        ? targetScope.areaName
+        : targetScope?.type === 'city'
+        ? `all areas in ${targetScope.cityName}`
+        : 'all areas in all cities';
+
+    logAudit('Bulk Price Adjustment', category, `${type} prices by ${percent}% for ${scopeDesc}`);
   };
 
   const reportStockDiscrepancy = (itemName: string, type: 'Spoilage' | 'Shrinkage' | 'Discrepancy', quantityKg: number, reason: string) => {
@@ -839,6 +998,28 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (invItem) {
       ApiService.adjustStock(invItem.darkStoreId, invItem.productId, -quantityKg, reason);
     }
+  };
+
+  const updateShelfLocation = async (params: {
+    inventoryId?: string;
+    storeId?: string;
+    productId?: string;
+    shelfLocation: string;
+  }): Promise<{ success: boolean; shelfLocation?: string; error?: string }> => {
+    const cleanShelf = (params.shelfLocation || '').trim().toUpperCase();
+    setInventory((prev) =>
+      prev.map((item) => {
+        if (
+          (params.inventoryId && item.id === params.inventoryId) ||
+          (params.storeId && params.productId && item.darkStoreId === params.storeId && item.productId === params.productId)
+        ) {
+          return { ...item, shelfLocation: cleanShelf };
+        }
+        return item;
+      })
+    );
+    logAudit('Shelf Location Update', params.shelfLocation, `Assigned shelf ${cleanShelf}`);
+    return ApiService.updateShelfLocation({ ...params, shelfLocation: cleanShelf });
   };
 
   const updateOrderStatus = (orderId: string, stage: OrderStage, notes?: string) => {
@@ -973,6 +1154,62 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return false;
   };
 
+  const addCity = async (payload: { name: string; code: string; state?: string; status?: 'Active' | 'Inactive' }) => {
+    try {
+      const res = await ApiService.addCity(payload);
+      if (res.success && res.data) {
+        await refreshFromDb();
+        logAudit('ADD_CITY', res.data.name, `Created city ${res.data.name} (${res.data.code})`);
+        return { success: true };
+      }
+      return { success: false, error: res.error || 'Failed to add city' };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  const updateCity = async (id: string, payload: Partial<CityItem>) => {
+    try {
+      const res = await ApiService.updateCity(id, payload);
+      if (res.success) {
+        await refreshFromDb();
+        logAudit('UPDATE_CITY', payload.name || id, `Updated city details`);
+        return { success: true };
+      }
+      return { success: false, error: res.error || 'Failed to update city' };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  const deleteCity = async (id: string) => {
+    try {
+      const res = await ApiService.deleteCity(id);
+      if (res.success) {
+        await refreshFromDb();
+        logAudit('DELETE_CITY', id, `Deleted city`);
+        return { success: true };
+      }
+      return { success: false, error: res.error || 'Failed to delete city' };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  const deleteAreaSafe = async (id: string) => {
+    try {
+      const res = await ApiService.deleteArea(id);
+      if (res.success) {
+        await refreshFromDb();
+        logAudit('DELETE_AREA', id, `Deleted area`);
+        return { success: true };
+      }
+      return { success: false, error: res.error || 'Failed to delete area' };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  };
+
   return (
     <AdminStateContext.Provider
       value={{
@@ -997,6 +1234,14 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setSelectedRider,
         updateRider,
         categories,
+        refreshCategories,
+        addCategoryItem,
+        updateCategoryItem,
+        toggleCategoryItemStatus,
+        deleteCategoryItem,
+        addSubcategoryItem,
+        updateSubcategoryItem,
+        deleteSubcategoryItem,
         products,
         selectedProduct,
         setSelectedProduct,
@@ -1028,6 +1273,13 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         labelPrintData,
         openLabelPrint,
         closeLabelPrint,
+        cities,
+        selectedCity,
+        setSelectedCity,
+        addCity,
+        updateCity,
+        deleteCity,
+        deleteAreaSafe,
         staff,
         campaigns,
         coinLedger,
@@ -1040,6 +1292,7 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         updateZoneProductPrice,
         applyBulkPriceAdjustment,
         reportStockDiscrepancy,
+        updateShelfLocation,
         updateOrderStatus,
         reassignOrderStaff,
         cancelAndRefundOrder,

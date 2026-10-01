@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Area, AreaSchema } from './schemas/area.schema';
 import { AreaPricing, AreaPricingSchema } from './schemas/area-pricing.schema';
+import { City, CitySchema } from './schemas/city.schema';
+import { Store, StoreSchema } from '../stores/schemas/store.schema';
 import { AreasService } from './areas.service';
 import { AreasController } from './areas.controller';
 
@@ -10,6 +12,8 @@ import { AreasController } from './areas.controller';
     MongooseModule.forFeature([
       { name: Area.name, schema: AreaSchema },
       { name: AreaPricing.name, schema: AreaPricingSchema },
+      { name: City.name, schema: CitySchema },
+      { name: Store.name, schema: StoreSchema },
     ]),
   ],
   controllers: [AreasController],

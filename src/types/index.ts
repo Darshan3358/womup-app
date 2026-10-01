@@ -85,6 +85,8 @@ export interface Address {
   houseFlat: string;
   areaLandmark: string;
   city: string;
+  cityId?: string;
+  areaId?: string;
   pincode: string;
   isDefault?: boolean;
   latitude?: number;
@@ -97,6 +99,7 @@ export interface OrderItem {
   quantity: number;
   price: number;
   image?: ImageSourcePropType;
+  imageUrl?: string;
 }
 
 export interface Order {
@@ -142,6 +145,8 @@ export interface UserProfile {
   shoppingCoins: number;
   savedAddresses: Address[];
   birthday?: string; // "07 August 2005" — persisted in MongoDB via PATCH /users/me
+  preferredCityId?: string;
+  preferredCityName?: string;
 }
 
 

@@ -22,7 +22,7 @@ export const ST15_StaffProfileScreen: React.FC = () => {
 
         <View style={styles.badgeRow}>
           <View style={styles.codeBadge}>
-            <Text style={styles.codeText}>{staff?.employeeCode || '—'}</Text>
+            <Text style={styles.codeText}>{staff?.employeeCode || store?.code || 'STF-001'}</Text>
           </View>
           <View style={styles.roleBadge}>
             <Text style={styles.roleText}>{staff?.role || 'STAFF'}</Text>
@@ -30,15 +30,73 @@ export const ST15_StaffProfileScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* Hub Location Card */}
+      {/* Service Location Breakdown Card */}
       <View style={styles.infoCard}>
-        <Text style={styles.cardHeader}>ASSIGNED FULFILLMENT HUB</Text>
-        <View style={styles.hubInfoRow}>
-          <Ionicons name="storefront" size={20} color={COLORS.primary} />
-          <View style={{ flex: 1, marginLeft: 10 }}>
-            <Text style={styles.hubTitle}>{store?.name || 'Unassigned Hub'}</Text>
-            <Text style={styles.hubAddress}>{store?.address || 'No address configured'}</Text>
+        <View style={styles.cardHeaderRow}>
+          <Text style={styles.cardHeader}>SERVICE LOCATION</Text>
+          <View style={styles.lockedStatusBadge}>
+            <Ionicons name="lock-closed" size={10} color={COLORS.accentCyan} />
+            <Text style={styles.lockedStatusText}>LOCKED</Text>
           </View>
+        </View>
+
+        <View style={styles.locationTable}>
+          <View style={styles.locRow}>
+            <View style={styles.locLabelBox}>
+              <Ionicons name="business" size={14} color={COLORS.accentCyan} />
+              <Text style={styles.locLabel}>City</Text>
+            </View>
+            <Text style={styles.locValue}>{store?.cityName || store?.city || 'Ahmedabad'}</Text>
+          </View>
+
+          <View style={styles.locRow}>
+            <View style={styles.locLabelBox}>
+              <Ionicons name="location" size={14} color={COLORS.primary} />
+              <Text style={styles.locLabel}>Area</Text>
+            </View>
+            <Text style={styles.locValue}>
+              {store?.areaName ||
+                (store?.name
+                  ? store.name.replace(/^Wom\s*Up\s*/i, '').replace(/\s*(Dark\s*Store|Store)$/i, '').trim()
+                  : 'Chandlodiya - Tragad')}
+            </Text>
+          </View>
+
+          <View style={styles.locRow}>
+            <View style={styles.locLabelBox}>
+              <Ionicons name="storefront" size={14} color={COLORS.warning} />
+              <Text style={styles.locLabel}>Store</Text>
+            </View>
+            <Text style={[styles.locValue, { fontWeight: '700' }]} numberOfLines={2}>
+              {store?.name || 'Wom Up Dark Store'}
+            </Text>
+          </View>
+
+          <View style={styles.locRow}>
+            <View style={styles.locLabelBox}>
+              <Ionicons name="mail" size={14} color={COLORS.accentPurple} />
+              <Text style={styles.locLabel}>Pincode</Text>
+            </View>
+            <Text style={styles.locValue}>{store?.pincode || '382481'}</Text>
+          </View>
+
+          <View style={[styles.locRow, { borderBottomWidth: 0 }]}>
+            <View style={styles.locLabelBox}>
+              <Ionicons name="shield-checkmark" size={14} color={COLORS.primary} />
+              <Text style={styles.locLabel}>Status</Text>
+            </View>
+            <View style={styles.adminLockBadge}>
+              <Text style={styles.adminLockText}>Locked by Admin</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* 🔐 Admin Rule Notice */}
+        <View style={styles.policyNotice}>
+          <Ionicons name="information-circle" size={16} color={COLORS.accentCyan} />
+          <Text style={styles.policyNoticeText}>
+            Your dark store is permanently locked to this area to guarantee 9-minute deliveries. To request store re-assignment, contact Head Admin.
+          </Text>
         </View>
       </View>
 
@@ -70,10 +128,21 @@ export const ST15_StaffProfileScreen: React.FC = () => {
       <View style={styles.linksCard}>
         <TouchableOpacity
           style={styles.linkRow}
+          onPress={() => setSubScreen('AddProduct')}
+        >
+          <View style={styles.linkLeft}>
+            <Ionicons name="add-circle-outline" size={20} color={COLORS.primary} />
+            <Text style={styles.linkText}>Add Local Product to Catalog</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.linkRow}
           onPress={() => setSubScreen('ShiftHistory')}
         >
           <View style={styles.linkLeft}>
-            <Ionicons name="calendar-outline" size={20} color={COLORS.primary} />
+            <Ionicons name="calendar-outline" size={20} color={COLORS.accentCyan} />
             <Text style={styles.linkText}>Past Shift History</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
@@ -84,7 +153,7 @@ export const ST15_StaffProfileScreen: React.FC = () => {
           onPress={() => setSubScreen('Performance')}
         >
           <View style={styles.linkLeft}>
-            <Ionicons name="podium-outline" size={20} color={COLORS.accentCyan} />
+            <Ionicons name="podium-outline" size={20} color={COLORS.accentPurple} />
             <Text style={styles.linkText}>Dark Store Leaderboard</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
@@ -188,26 +257,98 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     marginBottom: 12,
   },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
   cardHeader: {
     color: COLORS.textMuted,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.5,
-    marginBottom: 10,
   },
-  hubInfoRow: {
+  lockedStatusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(6, 182, 212, 0.12)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(6, 182, 212, 0.25)',
   },
-  hubTitle: {
-    color: COLORS.textPrimary,
-    fontSize: 14,
+  lockedStatusText: {
+    color: COLORS.accentCyan,
+    fontSize: 9.5,
+    fontWeight: '800',
+  },
+  locationTable: {
+    backgroundColor: COLORS.surfaceElevated,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: 10,
+  },
+  locRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  locLabelBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    width: 90,
+  },
+  locLabel: {
+    color: COLORS.textMuted,
+    fontSize: 12,
     fontWeight: '700',
   },
-  hubAddress: {
+  locValue: {
+    color: COLORS.textPrimary,
+    fontSize: 12.5,
+    fontWeight: '600',
+    textAlign: 'right',
+    flex: 1,
+    marginLeft: 10,
+  },
+  adminLockBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  adminLockText: {
+    color: COLORS.primary,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  policyNotice: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: 'rgba(6, 182, 212, 0.08)',
+    borderRadius: 8,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(6, 182, 212, 0.2)',
+  },
+  policyNoticeText: {
     color: COLORS.textSecondary,
     fontSize: 11,
-    marginTop: 2,
+    lineHeight: 16,
+    flex: 1,
   },
   toggleRow: {
     flexDirection: 'row',

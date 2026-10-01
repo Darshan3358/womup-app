@@ -44,6 +44,7 @@ export class StoresController {
       storeCode: res.storeCode,
       city: 'Ahmedabad',
       deliveryMinutes: res.estimatedDeliveryMinutes || 9,
+      distanceKm: (res as any).distanceKm,
       message: res.message,
     };
   }

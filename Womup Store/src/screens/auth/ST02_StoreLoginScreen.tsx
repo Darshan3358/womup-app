@@ -16,7 +16,7 @@ import { useStore } from '../../context/StoreContext';
 import { COLORS } from '../../theme/colors';
 
 export const ST02_StoreLoginScreen: React.FC = () => {
-  const { loginWithStoreCredentials, isLoading, error } = useStore();
+  const { loginWithStoreCredentials, isLoading, error, setAuthStep } = useStore();
   const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -109,6 +109,23 @@ export const ST02_StoreLoginScreen: React.FC = () => {
               Shared store credentials allow all pickers at this hub to log in with 1 account. Contact Admin for resets.
             </Text>
           </View>
+
+          {/* Register New Store CTA */}
+          <View style={styles.registerDivider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>OR</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <TouchableOpacity
+            style={styles.registerBtn}
+            onPress={() => setAuthStep('REGISTER')}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="storefront-outline" size={18} color={COLORS.primary} />
+            <Text style={styles.registerBtnText}>REGISTER NEW DARK STORE</Text>
+            <Ionicons name="arrow-forward" size={16} color={COLORS.primary} />
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -232,4 +249,39 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 16,
   },
+  registerDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginVertical: 18,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: COLORS.border,
+  },
+  dividerText: {
+    color: COLORS.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  registerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(16, 185, 129, 0.35)',
+    borderRadius: 12,
+    paddingVertical: 13,
+  },
+  registerBtnText: {
+    color: COLORS.primary,
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
 });
+

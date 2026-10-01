@@ -12,6 +12,7 @@ import { COLORS } from './src/theme/colors';
 // Auth Screens (ST01 - ST04)
 import { ST01_SplashScreen } from './src/screens/auth/ST01_SplashScreen';
 import { ST02_StoreLoginScreen } from './src/screens/auth/ST02_StoreLoginScreen';
+import { ST02b_StoreRegistrationScreen } from './src/screens/auth/ST02b_StoreRegistrationScreen';
 import { ST03_OtpVerificationScreen } from './src/screens/auth/ST03_OtpVerificationScreen';
 import { ST04_StoreSelectionScreen } from './src/screens/auth/ST04_StoreSelectionScreen';
 
@@ -26,8 +27,10 @@ import { ST11_ReadyForPickupScreen } from './src/screens/pickup/ST11_ReadyForPic
 import { ST11b_HandoverScanScreen } from './src/screens/pickup/ST11b_HandoverScanScreen';
 import { ST12_InventoryScreen } from './src/screens/inventory/ST12_InventoryScreen';
 import { ST13b_InventoryLogsScreen } from './src/screens/inventory/ST13b_InventoryLogsScreen';
+import { ST17_AddProductScreen } from './src/screens/inventory/ST17_AddProductScreen';
 import { ST14_ShiftHistoryScreen } from './src/screens/profile/ST14_ShiftHistoryScreen';
 import { ST15_StaffProfileScreen } from './src/screens/profile/ST15_StaffProfileScreen';
+import { ST17_OrderHistoryScreen } from './src/screens/history/ST17_OrderHistoryScreen';
 
 const MainStoreApp: React.FC = () => {
   const { authStep, currentTab, subScreen } = useStore();
@@ -35,6 +38,7 @@ const MainStoreApp: React.FC = () => {
   // 1. Auth Flow
   if (authStep === 'SPLASH') return <ST01_SplashScreen />;
   if (authStep === 'LOGIN') return <ST02_StoreLoginScreen />;
+  if (authStep === 'REGISTER') return <ST02b_StoreRegistrationScreen />;
   if (authStep === 'OTP') return <ST03_OtpVerificationScreen />;
   if (authStep === 'STORE_SELECT') return <ST04_StoreSelectionScreen />;
 
@@ -48,6 +52,7 @@ const MainStoreApp: React.FC = () => {
     if (subScreen === 'Performance') return <ST16_StorePerformanceScreen />;
     if (subScreen === 'InventoryLogs') return <ST13b_InventoryLogsScreen />;
     if (subScreen === 'ShiftHistory') return <ST14_ShiftHistoryScreen />;
+    if (subScreen === 'AddProduct') return <ST17_AddProductScreen />;
 
     // Primary Tabs
     switch (currentTab) {
@@ -61,6 +66,8 @@ const MainStoreApp: React.FC = () => {
         return <ST11_ReadyForPickupScreen />;
       case 'Inventory':
         return <ST12_InventoryScreen />;
+      case 'History':
+        return <ST17_OrderHistoryScreen />;
       case 'Profile':
         return <ST15_StaffProfileScreen />;
       default:

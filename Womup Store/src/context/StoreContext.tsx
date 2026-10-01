@@ -37,6 +37,7 @@ interface StoreContextType {
   incomingOrders: StoreOrder[];
   pickingOrders: StoreOrder[];
   readyOrders: StoreOrder[];
+  completedOrders: any[];
   activeOrder: StoreOrder | null;
   activePickList: PickList | null;
 
@@ -50,6 +51,7 @@ interface StoreContextType {
   dismissRiderAlert: () => void;
 
   isLoading: boolean;
+  shiftLoading: boolean;
   error: string | null;
 
   pendingEmail: string | null;
@@ -73,8 +75,11 @@ interface StoreContextType {
   refreshIncoming: () => Promise<void>;
   refreshPicking: () => Promise<void>;
   refreshReady: () => Promise<void>;
+  refreshCompletedOrders: () => Promise<void>;
   refreshInventory: () => Promise<void>;
   adjustStock: (productId: string, delta: number, reason: string, changeType?: string) => Promise<void>;
+  updateShelfLocation: (productId: string, shelfLocation: string) => Promise<void>;
+  addNewProduct: (productData: any) => Promise<boolean>;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -91,6 +96,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [incomingOrders, setIncomingOrders] = useState<StoreOrder[]>([]);
   const [pickingOrders, setPickingOrders] = useState<StoreOrder[]>([]);
   const [readyOrders, setReadyOrders] = useState<StoreOrder[]>([]);
+  const [completedOrders, setCompletedOrders] = useState<any[]>([]);
   const [activeOrder, setActiveOrder] = useState<StoreOrder | null>(null);
   const [activePickList, setActivePickList] = useState<PickList | null>(null);
 
@@ -100,9 +106,23 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const [riderArrivalAlert, setRiderArrivalAlert] = useState<RiderArrivalAlert | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [shiftLoading, setShiftLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Initialize Session
+const enrichStore = (rawStore: any): StoreHub | null => {
+  if (!rawStore) return null;
+  return {
+    ...rawStore,
+    cityName: rawStore.cityName || rawStore.city || 'Ahmedabad',
+    areaName:
+      rawStore.areaName ||
+      (rawStore.name?.includes(' - ')
+        ? rawStore.name.split(' - ')[0].replace(/^Wom\s*Up\s*/i, '').trim()
+        : 'Chandlodiya'),
+  };
+};
+
+// Initialize Session
   useEffect(() => {
     const initSession = async () => {
       try {
@@ -115,8 +135,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const me = await StoreApiService.getMe();
         if (me && me.staff) {
           setStaff(me.staff);
-          setStore(me.store);
-          setPerformance(me.performance);
+          setStore(enrichStore(me.store));
+          setPerformance({
+            todayPicked: me.performance?.todayPicked ?? me.staff?.totalOrdersPicked ?? 0,
+            avgPickTime: me.performance?.avgPickTime || null,
+            avgPickTimeSeconds: me.performance?.avgPickTimeSeconds ?? 0,
+            accuracy: me.performance?.accuracy ?? 100,
+            currentStreak: me.performance?.currentStreak ?? 0,
+            totalOrdersPicked: me.performance?.totalOrdersPicked ?? me.performance?.todayPicked ?? 0,
+          });
           setAuthStep('AUTHENTICATED');
 
           if (me.store?.id) {
@@ -164,10 +191,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       refreshInventory();
     });
 
+    // 4. Shift status update
+    storeSocket.on('store_shift_update', (payload: any) => {
+      console.log('[StoreContext] 🔄 WS store_shift_update:', payload);
+      if (typeof payload?.isOnShift === 'boolean') {
+        setStaff((prev) => (prev ? { ...prev, isOnShift: payload.isOnShift } : prev));
+      }
+    });
+
     return () => {
       storeSocket.off('new_order');
       storeSocket.off('rider_at_store');
       storeSocket.off('inventory_update');
+      storeSocket.off('store_shift_update');
     };
   }, [authStep, store?.id]);
 
@@ -199,6 +235,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, []);
 
+  const refreshCompletedOrders = useCallback(async () => {
+    try {
+      const orders = await StoreApiService.getCompletedOrders();
+      setCompletedOrders(orders || []);
+    } catch (e) {
+      console.log('[StoreContext] Failed fetching completed orders:', e);
+    }
+  }, []);
+
   const refreshInventory = useCallback(async () => {
     try {
       const items = await StoreApiService.getInventory(inventorySearch, inventoryFilter);
@@ -225,7 +270,23 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       const data = await StoreApiService.loginWithStoreCredentials(loginId, password);
       if (data?.store) {
-        setStore(data.store);
+        setStore(enrichStore(data.store));
+      }
+
+      // Fetch fresh session profile with real performance numbers
+      const me = await StoreApiService.getMe().catch(() => null);
+      if (me && me.staff) {
+        setStaff(me.staff);
+        if (me.store) setStore(enrichStore(me.store));
+        setPerformance({
+          todayPicked: me.performance?.todayPicked ?? me.staff?.totalOrdersPicked ?? 0,
+          avgPickTime: me.performance?.avgPickTime || null,
+          avgPickTimeSeconds: me.performance?.avgPickTimeSeconds ?? 0,
+          accuracy: me.performance?.accuracy ?? 100,
+          currentStreak: me.performance?.currentStreak ?? 0,
+          totalOrdersPicked: me.performance?.totalOrdersPicked ?? me.performance?.todayPicked ?? 0,
+        });
+      } else if (data?.store) {
         setStaff({
           id: `staff_${data.store.code}`,
           userId: data.store.id,
@@ -239,11 +300,20 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           isOnShift: true,
           activeOrderId: null,
           totalOrdersPicked: 0,
-          avgPickTimeSeconds: 120,
-          accuracy: 99.5,
+          avgPickTimeSeconds: 0,
+          accuracy: 100,
           status: 'ACTIVE',
         });
+        setPerformance({
+          todayPicked: 0,
+          avgPickTime: null,
+          avgPickTimeSeconds: 0,
+          accuracy: 100,
+          currentStreak: 0,
+          totalOrdersPicked: 0,
+        });
       }
+
       setAuthStep('AUTHENTICATED');
       if (data.store?.id) {
         storeSocket.connect(data.store.id);
@@ -279,7 +349,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       const data = await StoreApiService.verifyOtp(email, otp);
       setStaff(data.staff);
-      setStore(data.store);
+      setStore(enrichStore(data.store));
       setAuthStep('AUTHENTICATED');
       if (data.store?.id) {
         storeSocket.connect(data.store.id);
@@ -294,13 +364,21 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const toggleShift = async (isOnShift: boolean) => {
+    setShiftLoading(true);
+    // Optimistic update
+    setStaff((prev) => (prev ? { ...prev, isOnShift } : prev));
     try {
       const res = await StoreApiService.updateShift(isOnShift);
-      if (staff) {
-        setStaff({ ...staff, isOnShift: res.isOnShift });
+      if (typeof res?.isOnShift === 'boolean') {
+        setStaff((prev) => (prev ? { ...prev, isOnShift: res.isOnShift } : prev));
       }
+      setShiftLoading(false);
     } catch (err: any) {
       console.log('[StoreContext] toggleShift error:', err);
+      // Revert on error
+      setStaff((prev) => (prev ? { ...prev, isOnShift: !isOnShift } : prev));
+      setShiftLoading(false);
+      throw err;
     }
   };
 
@@ -393,6 +471,33 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     refreshInventory();
   };
 
+  const updateShelfLocation = async (productId: string, shelfLocation: string) => {
+    const clean = shelfLocation.trim().toUpperCase();
+    await StoreApiService.updateShelfLocation(productId, clean);
+    // Optimistic update
+    setInventory((prev) =>
+      prev.map((item) =>
+        item.productId === productId ? { ...item, shelfLocation: clean } : item
+      )
+    );
+    await refreshInventory();
+  };
+
+  const addNewProduct = async (productData: any): Promise<boolean> => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await StoreApiService.addProduct(productData);
+      await refreshInventory();
+      setIsLoading(false);
+      return true;
+    } catch (err: any) {
+      setIsLoading(false);
+      setError(err.message || 'Failed to add product');
+      throw err;
+    }
+  };
+
   const dismissRiderAlert = () => setRiderArrivalAlert(null);
 
   return (
@@ -410,6 +515,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         incomingOrders,
         pickingOrders,
         readyOrders,
+        completedOrders,
         activeOrder,
         activePickList,
         inventory,
@@ -420,6 +526,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         riderArrivalAlert,
         dismissRiderAlert,
         isLoading,
+        shiftLoading,
         error,
         pendingEmail,
         setPendingEmail,
@@ -438,8 +545,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         refreshIncoming,
         refreshPicking,
         refreshReady,
+        refreshCompletedOrders,
         refreshInventory,
         adjustStock,
+        updateShelfLocation,
+        addNewProduct,
       }}
     >
       {children}

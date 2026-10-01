@@ -5,19 +5,49 @@ import { useStore } from '../../context/StoreContext';
 import { BarcodeScanner } from '../../components/common/BarcodeScanner';
 import { ProgressBar } from '../../components/common/ProgressBar';
 import { SubstituteModal } from '../../components/modals/SubstituteModal';
+import { EditShelfModal } from '../../components/modals/EditShelfModal';
 import { COLORS } from '../../theme/colors';
 
 export const ST08_PickingScreen: React.FC = () => {
-  const { activeOrder, activePickList, scanPickItem, markOutOfStock, setSubScreen } = useStore();
+  const {
+    activeOrder,
+    activePickList,
+    scanPickItem,
+    markOutOfStock,
+    setSubScreen,
+    setCurrentTab,
+    store,
+    updateShelfLocation,
+  } = useStore();
   const [showOOSModal, setShowOOSModal] = useState(false);
+  const [showEditShelfModal, setShowEditShelfModal] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
+
+  const areaName =
+    store?.areaName ||
+    (store?.name
+      ? store.name.replace(/^Wom\s*Up\s*/i, '').replace(/\s*(Dark\s*Store|Store)$/i, '').trim()
+      : 'Chandlodiya');
+  const cityName = store?.cityName || store?.city || 'Ahmedabad';
 
   if (!activeOrder) {
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>No active picking order</Text>
-        <TouchableOpacity style={styles.backBtn} onPress={() => setSubScreen(null)}>
-          <Text style={styles.backText}>Return to Dashboard</Text>
+        <Ionicons name="cart-outline" size={54} color={COLORS.textMuted} />
+        <Text style={styles.emptyText}>No Active Picking Order</Text>
+        <Text style={styles.emptyDesc}>Accept an incoming order from the queue to start picking.</Text>
+        <View style={styles.servingBadge}>
+          <Ionicons name="location" size={13} color={COLORS.primary} />
+          <Text style={styles.servingText}>
+            Serving: {areaName} · {cityName}
+          </Text>
+        </View>
+        <Text style={styles.emptySubDesc}>
+          New orders from this area will appear here.
+        </Text>
+        <TouchableOpacity style={styles.backBtn} onPress={() => setCurrentTab('Incoming')}>
+          <Ionicons name="flash" size={15} color="#FFF" />
+          <Text style={styles.backText}>VIEW INCOMING QUEUE</Text>
         </TouchableOpacity>
       </View>
     );
@@ -27,6 +57,34 @@ export const ST08_PickingScreen: React.FC = () => {
   const pendingItems = items.filter((i) => i.status === 'PENDING');
   const pickedCount = items.filter((i) => i.status === 'PICKED').length;
   const currentItem = pendingItems[0] || items[items.length - 1];
+
+  const isShelfAssigned =
+    Boolean(currentItem?.shelfLocation) &&
+    currentItem.shelfLocation !== 'UNASSIGNED' &&
+    currentItem.shelfLocation !== 'Not set';
+
+  const aisle =
+    isShelfAssigned && currentItem.shelfLocation.includes('-')
+      ? currentItem.shelfLocation.split('-')[0]
+      : null;
+  const rack =
+    isShelfAssigned && currentItem.shelfLocation.includes('-')
+      ? currentItem.shelfLocation.split('-')[1]
+      : null;
+
+  const handleSaveShelf = async (productId: string, newShelf: string) => {
+    try {
+      await updateShelfLocation(productId, newShelf);
+      if (currentItem && currentItem.productId === productId) {
+        currentItem.shelfLocation = newShelf;
+      }
+      setSuccessToast(`Shelf assigned: ${newShelf}`);
+      setTimeout(() => setSuccessToast(null), 2000);
+    } catch (e: any) {
+      setSuccessToast(e.message || 'Failed to update shelf');
+      setTimeout(() => setSuccessToast(null), 2000);
+    }
+  };
 
   // If all picked, transition to packing screen
   const isAllPicked = items.length > 0 && pendingItems.length === 0;
@@ -83,16 +141,30 @@ export const ST08_PickingScreen: React.FC = () => {
 
         {/* Big Shelf Location Card */}
         <View style={styles.shelfCard}>
-          <Text style={styles.shelfHeadline}>TARGET SHELF LOCATION</Text>
-          <View style={styles.shelfBanner}>
-            <Ionicons name="location" size={28} color="#FFF" />
+          <View style={styles.shelfCardHeader}>
+            <Text style={styles.shelfHeadline}>TARGET SHELF LOCATION</Text>
+            <TouchableOpacity
+              style={styles.editShelfQuickBtn}
+              onPress={() => setShowEditShelfModal(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="pencil" size={12} color={COLORS.accentCyan} />
+              <Text style={styles.editShelfQuickText}>
+                {isShelfAssigned ? 'CHANGE' : 'ASSIGN SHELF'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={[styles.shelfBanner, !isShelfAssigned && styles.shelfBannerUnassigned]}>
+            <Ionicons name="location" size={26} color="#FFF" />
             <Text style={styles.shelfLocationText}>
-              {currentItem?.shelfLocation || 'A2-R3'}
+              {isShelfAssigned ? currentItem.shelfLocation : 'Not set'}
             </Text>
           </View>
           <Text style={styles.shelfSub}>
-            Head to Aisle {currentItem?.shelfLocation?.split('-')[0] || 'A2'}, Rack{' '}
-            {currentItem?.shelfLocation?.split('-')[1] || 'R3'}
+            {isShelfAssigned
+              ? (aisle && rack ? `Head to Aisle ${aisle}, Rack ${rack}` : `Shelf slot: ${currentItem.shelfLocation}`)
+              : 'Tap "ASSIGN SHELF" above to set location'}
           </Text>
         </View>
 
@@ -151,6 +223,24 @@ export const ST08_PickingScreen: React.FC = () => {
         itemName={currentItem?.name || 'Product'}
         onConfirmOOS={handleConfirmOOS}
       />
+
+      {/* Quick Edit Shelf Modal */}
+      <EditShelfModal
+        visible={showEditShelfModal}
+        onClose={() => setShowEditShelfModal(false)}
+        item={
+          currentItem
+            ? ({
+                productId: currentItem.productId,
+                name: currentItem.name,
+                shelfLocation: currentItem.shelfLocation,
+                quantityLabel: currentItem.unit,
+                availableQty: currentItem.quantity,
+              } as any)
+            : null
+        }
+        onSave={handleSaveShelf}
+      />
     </View>
   );
 };
@@ -169,22 +259,60 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
+    padding: 24,
   },
   emptyText: {
     color: COLORS.textPrimary,
-    fontSize: 16,
+    fontSize: 17,
+    fontWeight: '800',
+    marginTop: 12,
+  },
+  emptyDesc: {
+    color: COLORS.textMuted,
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 4,
+    maxWidth: 260,
+  },
+  servingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.25)',
+  },
+  servingText: {
+    color: COLORS.primary,
+    fontSize: 12,
     fontWeight: '700',
   },
+  emptySubDesc: {
+    color: COLORS.textSecondary,
+    fontSize: 11.5,
+    textAlign: 'center',
+    marginTop: 6,
+    maxWidth: 260,
+  },
   backBtn: {
-    marginTop: 12,
-    padding: 10,
-    backgroundColor: COLORS.surfaceElevated,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: COLORS.primary,
     borderRadius: 8,
   },
   backText: {
-    color: COLORS.primary,
-    fontWeight: '700',
+    color: '#FFF',
+    fontWeight: '800',
+    fontSize: 12,
+    letterSpacing: 0.5,
   },
   topProgressArea: {
     backgroundColor: COLORS.surfaceCard,
@@ -232,19 +360,46 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     borderWidth: 1,
     borderColor: 'rgba(56, 189, 248, 0.3)',
+    width: '100%',
+  },
+  shelfCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: 6,
   },
   shelfHeadline: {
     color: COLORS.shelfBadgeText,
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1,
-    marginBottom: 6,
+  },
+  editShelfQuickBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(6, 182, 212, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(6, 182, 212, 0.3)',
+  },
+  editShelfQuickText: {
+    color: COLORS.accentCyan,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   shelfBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     marginVertical: 4,
+  },
+  shelfBannerUnassigned: {
+    opacity: 0.85,
   },
   shelfLocationText: {
     color: '#FFF',

@@ -11,6 +11,12 @@ export class Area {
   @Prop({ required: true, trim: true })
   city: string;
 
+  @Prop({ trim: true })
+  cityName?: string;
+
+  @Prop({ type: Object, ref: 'City' })
+  cityId?: any;
+
   @Prop({ type: [String], default: [] })
   pincodes: string[];
 

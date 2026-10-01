@@ -12,6 +12,7 @@ export interface ResolvedArea {
   storeId?: string;
   storeName?: string;
   storeCode?: string;
+  distanceKm?: number;
   message?: string;
 }
 
@@ -79,6 +80,7 @@ export const LocationService = {
           storeId: resData.storeId,
           storeName: resData.storeName || (serviceable ? 'Wom Up Dark Store' : undefined),
           storeCode: resData.storeCode,
+          distanceKm: resData.distanceKm,
           message: resData.message,
         };
         _cachedArea = area;

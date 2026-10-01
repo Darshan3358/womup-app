@@ -6,8 +6,15 @@ import { OrderCard } from '../../components/OrderCard';
 import { COLORS } from '../../theme/colors';
 
 export const ST06_IncomingOrdersScreen: React.FC = () => {
-  const { incomingOrders, acceptOrderAndStartPick, refreshIncoming, isLoading } = useStore();
+  const { incomingOrders, acceptOrderAndStartPick, refreshIncoming, isLoading, store } = useStore();
   const [filter, setFilter] = useState<'all' | 'urgent'>('all');
+
+  const areaName =
+    store?.areaName ||
+    (store?.name
+      ? store.name.replace(/^Wom\s*Up\s*/i, '').replace(/\s*(Dark\s*Store|Store)$/i, '').trim()
+      : 'Chandlodiya');
+  const cityName = store?.cityName || store?.city || 'Ahmedabad';
 
   const filteredOrders = incomingOrders.filter((o) => {
     if (filter === 'urgent') return o.priority === 'HIGH';
@@ -78,7 +85,16 @@ export const ST06_IncomingOrdersScreen: React.FC = () => {
             <Ionicons name="sparkles" size={48} color={COLORS.primary} />
             <Text style={styles.emptyTitle}>All Caught Up!</Text>
             <Text style={styles.emptyDesc}>
-              No incoming orders in this queue. New orders will ping immediately via live WebSocket.
+              No incoming orders in this queue.
+            </Text>
+            <View style={styles.servingBadge}>
+              <Ionicons name="location" size={13} color={COLORS.primary} />
+              <Text style={styles.servingText}>
+                Serving: {areaName} · {cityName}
+              </Text>
+            </View>
+            <Text style={styles.emptySubDesc}>
+              New orders from this area will appear here.
             </Text>
           </View>
         }
@@ -173,5 +189,29 @@ const styles = StyleSheet.create({
     marginTop: 6,
     maxWidth: 260,
     lineHeight: 18,
+  },
+  servingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.25)',
+  },
+  servingText: {
+    color: COLORS.primary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  emptySubDesc: {
+    color: COLORS.textSecondary,
+    fontSize: 11.5,
+    textAlign: 'center',
+    marginTop: 6,
+    maxWidth: 260,
   },
 });

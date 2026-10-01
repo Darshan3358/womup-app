@@ -72,12 +72,16 @@ export const AuthService = {
     name: string,
     phone?: string,
     referralCode?: string,
+    preferredCityId?: string,
+    preferredCityName?: string,
   ): Promise<{ success: boolean; user?: any; token?: string; message?: string }> {
     const res = await api.post<any>('/auth/register', {
       verificationId,
       name,
       phone,
       referralCode,
+      preferredCityId,
+      preferredCityName,
     });
     if (res.success && res.data) {
       if (res.data.accessToken) {
@@ -100,20 +104,64 @@ export const AuthService = {
     };
   },
 
-  async getProfile(): Promise<UserProfile | null> {
-    const res = await api.get<any>('/users/me');
-    if (res.success && res.data) {
-      return {
-        fullName: res.data.name || '',
-        phoneNumber: res.data.phone || '',
-        email: res.data.email || '',
-        referralCode: res.data.referralCode || '',
-        shoppingCoins: res.data.shoppingCoins || 0,
-        savedAddresses: [],
-        birthday: res.data.birthday || undefined,
-      };
+  async getCities(): Promise<{ id: string; name: string; code: string; state?: string }[]> {
+    try {
+      const res = await api.get<any>('/location/cities');
+      if (res.success && Array.isArray(res.data)) {
+        return res.data.map((c: any) => ({
+          id: c._id || c.id,
+          name: c.name,
+          code: c.code,
+          state: c.state || 'Gujarat',
+        }));
+      }
+    } catch (e) {
+      console.warn('Failed to fetch cities from API:', e);
     }
-    return null;
+    return [
+      { id: 'city_ahm', name: 'Ahmedabad', code: 'AHM', state: 'Gujarat' },
+      { id: 'city_sur', name: 'Surat', code: 'SUR', state: 'Gujarat' },
+      { id: 'city_bdq', name: 'Vadodara', code: 'BDQ', state: 'Gujarat' },
+      { id: 'city_raj', name: 'Rajkot', code: 'RAJ', state: 'Gujarat' },
+      { id: 'city_gan', name: 'Gandhinagar', code: 'GAN', state: 'Gujarat' },
+    ];
+  },
+
+  _profilePromise: null as Promise<UserProfile | null> | null,
+
+  async getProfile(): Promise<UserProfile | null> {
+    const token = api.getToken();
+    if (!token) {
+      return null;
+    }
+
+    if (this._profilePromise) {
+      return this._profilePromise;
+    }
+
+    this._profilePromise = (async () => {
+      try {
+        const res = await api.get<any>('/users/me');
+        if (res.success && res.data) {
+          return {
+            fullName: res.data.name || '',
+            phoneNumber: res.data.phone || '',
+            email: res.data.email || '',
+            referralCode: res.data.referralCode || '',
+            shoppingCoins: res.data.shoppingCoins || 0,
+            savedAddresses: [],
+            birthday: res.data.birthday || undefined,
+            preferredCityId: res.data.preferredCityId ? res.data.preferredCityId.toString() : undefined,
+            preferredCityName: res.data.preferredCityName || undefined,
+          };
+        }
+        return null;
+      } finally {
+        this._profilePromise = null;
+      }
+    })();
+
+    return this._profilePromise;
   },
 
   async logout(): Promise<void> {

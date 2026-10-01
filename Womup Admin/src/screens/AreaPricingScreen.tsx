@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Modal,
+  TextInput,
 } from 'react-native';
 import {
   ChevronDown,
@@ -20,6 +22,13 @@ import {
   Package,
   CheckCircle2,
   AlertCircle,
+  MapPin,
+  Navigation,
+  Warehouse,
+  Lock,
+  Search,
+  X,
+  Check,
 } from 'lucide-react-native';
 import { COLORS, RADIUS, SPACING } from '../theme';
 import { useAdminState } from '../context/AdminStateContext';
@@ -27,9 +36,11 @@ import { CategoryItem, ProductItem, ProductVariantItem } from '../types/admin';
 
 export const AreaPricingScreen: React.FC = () => {
   const {
+    cities,
     zones,
     selectedZone,
     setSelectedZone,
+    darkStores,
     categories,
     products,
     areaPricing,
@@ -42,9 +53,62 @@ export const AreaPricingScreen: React.FC = () => {
   } = useAdminState();
 
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
-  const [showZonePicker, setShowZonePicker] = useState(false);
-  // Default all products to expanded so admin immediately sees variant-level pricing
+  const [selectedCityId, setSelectedCityId] = useState<string>('');
+  const [selectedAreaId, setSelectedAreaId] = useState<string>('');
+  const [showCityPicker, setShowCityPicker] = useState(false);
+  const [showAreaPicker, setShowAreaPicker] = useState(false);
+  const [citySearch, setCitySearch] = useState('');
+  const [areaSearch, setAreaSearch] = useState('');
+
+  // Expanded product states
   const [expandedProducts, setExpandedProducts] = useState<Record<string, boolean>>({});
+
+  // 1. Resolve Active Cities
+  const activeCities = cities.filter((c) => c.status === 'Active' || !c.status);
+
+  // Default to Ahmedabad or first active city
+  const currentCity =
+    activeCities.find((c) => (c.id && c.id === selectedCityId) || (c._id && c._id === selectedCityId)) ||
+    activeCities.find((c) => c.code === 'AHM' || c.name.toLowerCase() === 'ahmedabad') ||
+    activeCities[0];
+
+  // 2. Resolve Available Areas for Selected City
+  const availableAreas = zones.filter((z) => {
+    if (!currentCity) return true;
+    const currentCityIdStr = currentCity.id || currentCity._id;
+    if (z.cityId && currentCityIdStr && String(z.cityId) === String(currentCityIdStr)) return true;
+    if (z.cityName && currentCity.name && z.cityName.toLowerCase() === currentCity.name.toLowerCase()) return true;
+    if (z.city && currentCity.name && z.city.toLowerCase() === currentCity.name.toLowerCase()) return true;
+    return false;
+  });
+
+  // Current selected area
+  const currentArea =
+    availableAreas.find((a) => (a.id && a.id === selectedAreaId) || (a._id && a._id === selectedAreaId)) ||
+    availableAreas.find((a) => a.name === selectedZone || a.id === selectedZone) ||
+    availableAreas[0] ||
+    zones[0];
+
+  // Sync selectedZone in global context with currentArea
+  useEffect(() => {
+    if (currentArea && currentArea.name && selectedZone !== currentArea.name) {
+      setSelectedZone(currentArea.name);
+    }
+  }, [currentArea, selectedZone, setSelectedZone]);
+
+  // 3. Auto-Select the ONE Dark Store assigned to this area (1-store-per-area rule)
+  const resolvedStore = darkStores.find((s) => {
+    if (currentArea) {
+      const areaIdStr = currentArea.id || currentArea._id;
+      if (s.areaId && areaIdStr && String(s.areaId) === String(areaIdStr)) return true;
+      if (s.areaName && currentArea.name && s.areaName.toLowerCase() === currentArea.name.toLowerCase()) return true;
+      if (currentArea.assignedStore && (s.id === currentArea.assignedStore.id || s.code === currentArea.assignedStore.code)) return true;
+      if (currentArea.darkStore && s.name.toLowerCase().includes(currentArea.name.toLowerCase())) return true;
+    }
+    return false;
+  }) || (currentCity ? darkStores.find(s => (s.cityName || s.city || '').toLowerCase() === currentCity.name.toLowerCase()) : null) || darkStores[0];
+
+  const currentStoreName = resolvedStore?.name || currentArea?.darkStore || `Wom Up ${currentArea?.name || 'Area'} Dark Store`;
 
   // Active category is resolved dynamically from categories collection
   const activeCategory =
@@ -66,10 +130,8 @@ export const AreaPricingScreen: React.FC = () => {
 
   const filteredProducts = products.filter((p) => isProductInCategory(p, activeCategory));
 
-  const currentZoneObj = zones.find(
-    (z) => z.name === selectedZone || z.id === selectedZone
-  );
-  const currentAreaId = currentZoneObj?.id || selectedZone;
+  const currentAreaId = currentArea?.id || selectedZone;
+  const currentAreaName = currentArea?.name || selectedZone;
 
   const toggleExpand = (productId: string) => {
     setExpandedProducts((prev) => ({
@@ -79,7 +141,6 @@ export const AreaPricingScreen: React.FC = () => {
   };
 
   const isExpanded = (productId: string) => {
-    // Expanded by default
     return expandedProducts[productId] !== false;
   };
 
@@ -87,6 +148,7 @@ export const AreaPricingScreen: React.FC = () => {
     // 1. Look up area_pricing by variantId + areaId or selectedZone
     const override =
       areaPricing[variant.id]?.[currentAreaId] ??
+      areaPricing[variant.id]?.[currentAreaName] ??
       areaPricing[variant.id]?.[selectedZone];
 
     if (override !== undefined && override !== null && override > 0) {
@@ -107,7 +169,7 @@ export const AreaPricingScreen: React.FC = () => {
     setSelectedVariantPricing({
       product,
       variant,
-      zone: selectedZone,
+      zone: currentAreaName,
     });
     setActiveModal('EditZonePrice');
   };
@@ -146,75 +208,92 @@ export const AreaPricingScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* Zone Selector Header */}
+      {/* City -> Area Cascading Controls Header */}
       <View style={styles.topSection}>
-        <Text style={styles.sectionLabel}>Select Operational Zone</Text>
-        <TouchableOpacity
-          style={styles.zoneDropdown}
-          onPress={() => setShowZonePicker(!showZonePicker)}
-        >
-          <View>
-            <Text style={styles.zoneDropdownText}>{selectedZone} Zone</Text>
-            {currentZoneObj?.darkStore && (
-              <Text style={styles.zoneSubtext}>{currentZoneObj.darkStore}</Text>
-            )}
-          </View>
-          <ChevronDown size={20} color={COLORS.textPrimary} />
-        </TouchableOpacity>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>💰 Area Dynamic Pricing</Text>
+          <Text style={styles.sectionSubtitle}>
+            Configure hyper-local selling prices per Area (cascades from City)
+          </Text>
+        </View>
 
-        {/* Zone Dropdown Menu */}
-        {showZonePicker && (
-          <View style={styles.zonePickerMenu}>
-            <ScrollView style={styles.zonePickerScroll} nestedScrollEnabled={true}>
-              {zones.map((z) => (
-                <TouchableOpacity
-                  key={z.id}
-                  style={[
-                    styles.zonePickerItem,
-                    selectedZone === z.name && styles.zonePickerItemActive,
-                  ]}
-                  onPress={() => {
-                    setSelectedZone(z.name);
-                    setShowZonePicker(false);
-                  }}
-                >
-                  <View style={styles.zoneItemRow}>
-                    <View style={{ flex: 1, marginRight: 8 }}>
-                      <Text
-                        style={[
-                          styles.zonePickerText,
-                          selectedZone === z.name && styles.zonePickerTextActive,
-                        ]}
-                      >
-                        {z.name} ({z.darkStore || `Wom Up ${z.name} Dark Store`})
-                      </Text>
-                      {z.code && (
-                        <Text style={styles.zoneItemCode}>
-                          CODE: {z.code}
-                        </Text>
-                      )}
-                    </View>
-                    {selectedZone === z.name && (
-                      <CheckCircle2 size={16} color={COLORS.purple} />
-                    )}
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            {/* + Add New Zone Action at bottom */}
+        {/* Cascading 2-Step Selector */}
+        <View style={styles.cascadingRow}>
+          {/* STEP 1: SELECT CITY */}
+          <View style={styles.cascadingCol}>
+            <Text style={styles.inputLabel}>STEP 1: SELECT CITY</Text>
             <TouchableOpacity
-              style={styles.addZoneDropdownBtn}
-              onPress={() => {
-                setShowZonePicker(false);
-                setActiveModal('AddZone');
-              }}
+              style={styles.cascadingBtn}
+              onPress={() => setShowCityPicker(true)}
+              activeOpacity={0.8}
             >
-              <Plus size={16} color={COLORS.primary} style={{ marginRight: 6 }} />
-              <Text style={styles.addZoneDropdownBtnText}>＋ Add New Zone</Text>
+              <View style={styles.cascadingBtnLeft}>
+                <MapPin size={16} color={COLORS.purple} />
+                <Text style={styles.cascadingBtnText} numberOfLines={1}>
+                  {currentCity ? `${currentCity.name} (${currentCity.code})` : 'Select City'}
+                </Text>
+              </View>
+              <ChevronDown size={18} color={COLORS.textPrimary} />
             </TouchableOpacity>
           </View>
-        )}
+
+          {/* STEP 2: SELECT AREA */}
+          <View style={styles.cascadingCol}>
+            <Text style={styles.inputLabel}>STEP 2: SELECT AREA</Text>
+            <TouchableOpacity
+              style={[styles.cascadingBtn, availableAreas.length === 0 && styles.disabledBtn]}
+              onPress={() => {
+                if (availableAreas.length === 0) return;
+                setShowAreaPicker(true);
+              }}
+              activeOpacity={0.8}
+              disabled={availableAreas.length === 0}
+            >
+              <View style={styles.cascadingBtnLeft}>
+                <Navigation size={16} color={COLORS.blue} />
+                <Text style={styles.cascadingBtnText} numberOfLines={1}>
+                  {currentArea ? currentArea.name : availableAreas.length === 0 ? 'No Areas Found' : 'Select Area'}
+                </Text>
+              </View>
+              <ChevronDown size={18} color={COLORS.textPrimary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Fulfilling Store (auto-selected) */}
+        <View style={styles.autoStoreCard}>
+          <Text style={styles.autoStoreLabel}>Fulfilling Store (auto-selected):</Text>
+          <View style={styles.autoStoreBox}>
+            <View style={styles.autoStoreLeft}>
+              <View style={styles.storeIconBadge}>
+                <Warehouse size={18} color={COLORS.purple} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <View style={styles.autoStoreTitleRow}>
+                  <Text style={styles.autoStoreName} numberOfLines={1}>
+                    {currentStoreName}
+                  </Text>
+                  <View style={styles.lockBadge}>
+                    <Lock size={10} color="#047857" style={{ marginRight: 3 }} />
+                    <Text style={styles.lockBadgeText}>
+                      1:1 AREA LOCKED · {currentCity?.name || 'Active City'}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.autoStoreSubText}>
+                  Bound to area: <Text style={{ fontWeight: '700', color: COLORS.navy }}>{currentAreaName}</Text> ({currentCity?.name})
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Small Breadcrumb above Category Tabs */}
+        <View style={styles.tabsBreadcrumbRow}>
+          <Text style={styles.tabsBreadcrumbText}>
+            🏙️ {currentCity?.name} · 📍 {currentAreaName}
+          </Text>
+        </View>
 
         {/* Category Selector Tabs with Dynamic Counters */}
         <ScrollView
@@ -241,12 +320,12 @@ export const AreaPricingScreen: React.FC = () => {
         </ScrollView>
       </View>
 
-      {/* Sub Header / Add Item Action Bar */}
+      {/* Sub Header / Catalog & Add Item Action Bar */}
       <View style={styles.actionBar}>
         <View>
           <Text style={styles.catalogHeading}>{activeCategory?.name || 'Category'} Catalog</Text>
           <Text style={styles.catalogSubHeading}>
-            {filteredProducts.length} products configured for {selectedZone}
+            {filteredProducts.length} products configured for {currentAreaName} ({currentCity?.name})
           </Text>
         </View>
 
@@ -265,7 +344,7 @@ export const AreaPricingScreen: React.FC = () => {
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>No {activeCategory?.name} items found</Text>
             <Text style={styles.emptySubTitle}>
-              Click "+ Add Item" above to add new {activeCategory?.name.toLowerCase()} items to the catalog.
+              Click "+ Add Item" above to add new {activeCategory?.name?.toLowerCase()} items to the catalog.
             </Text>
             <TouchableOpacity
               style={[styles.addItemBtn, { marginTop: 12 }]}
@@ -281,7 +360,7 @@ export const AreaPricingScreen: React.FC = () => {
             const expanded = isExpanded(p.id);
             const variants = p.variants || [];
 
-            // Calculate "From ₹X" minimum price across variants for this zone
+            // Calculate "From ₹X" minimum price across variants for this area
             let minPrice = 0;
             if (variants.length > 0) {
               const prices = variants.map((v) => getVariantZonePrice(v).price);
@@ -331,9 +410,14 @@ export const AreaPricingScreen: React.FC = () => {
                         </View>
                       </View>
 
+                      {/* City · Area Sub-label */}
+                      <Text style={styles.productBreadcrumb}>
+                        {currentCity?.name} · {currentAreaName}
+                      </Text>
+
                       <View style={styles.metaRow}>
                         <Text style={styles.fromPriceText}>
-                          From <Text style={styles.fromPriceBold}>₹{minPrice}</Text> in {selectedZone}
+                          From <Text style={styles.fromPriceBold}>₹{minPrice}</Text> in {currentCity?.name} → {currentAreaName}
                         </Text>
                         <Text style={styles.metaDot}>•</Text>
                         <TouchableOpacity
@@ -403,15 +487,15 @@ export const AreaPricingScreen: React.FC = () => {
                     ) : (
                       <>
                         <View style={styles.variantTableHeader}>
-                          <Text style={[styles.variantColHeader, { flex: 2 }]}>Pack Size / SKU</Text>
+                          <Text style={[styles.variantColHeader, { flex: 2 }]}>PACK / SKU</Text>
                           <Text style={[styles.variantColHeader, { flex: 1.2, textAlign: 'center' }]}>
-                            Default Price
+                            DEFAULT PRICE
                           </Text>
-                          <Text style={[styles.variantColHeader, { flex: 1.6, textAlign: 'center' }]}>
-                            {selectedZone} Price
+                          <Text style={[styles.variantColHeader, { flex: 1.8, textAlign: 'center' }]}>
+                            AREA PRICE
                           </Text>
                           <Text style={[styles.variantColHeader, { flex: 1, textAlign: 'center' }]}>MRP</Text>
-                          <Text style={[styles.variantColHeader, { flex: 1, textAlign: 'center' }]}>Action</Text>
+                          <Text style={[styles.variantColHeader, { flex: 1, textAlign: 'center' }]}>ACTION</Text>
                         </View>
 
                         {variants.map((v) => {
@@ -428,14 +512,14 @@ export const AreaPricingScreen: React.FC = () => {
                                 <Text style={styles.variantSkuText}>SKU: {v.sku}</Text>
                               </View>
 
-                              {/* Base/Default Price (from product_variants.sellingPrice) */}
+                              {/* Base/Default Price */}
                               <View style={{ flex: 1.2, alignItems: 'center' }}>
                                 <Text style={styles.defaultPriceValue}>₹{v.sellingPrice}</Text>
                                 <Text style={styles.defaultPriceSub}>Catalog Base</Text>
                               </View>
 
-                              {/* Final Zone Selling Price (from area_pricing.price) */}
-                              <View style={{ flex: 1.6, alignItems: 'center' }}>
+                              {/* Final Area Selling Price */}
+                              <View style={{ flex: 1.8, alignItems: 'center' }}>
                                 <TouchableOpacity
                                   style={[
                                     styles.zonePriceBadge,
@@ -461,7 +545,7 @@ export const AreaPricingScreen: React.FC = () => {
                                     hasOverride ? styles.overrideLabelActive : styles.overrideLabelMuted,
                                   ]}
                                 >
-                                  {hasOverride ? 'Zone Override' : 'No Override'}
+                                  {hasOverride ? 'Area Override' : 'Default'}
                                 </Text>
                               </View>
 
@@ -522,6 +606,175 @@ export const AreaPricingScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* ================= MODAL: SELECT CITY ================= */}
+      <Modal
+        visible={showCityPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCityPicker(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalPanel}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderTitleRow}>
+                <MapPin size={20} color={COLORS.purple} />
+                <View>
+                  <Text style={styles.modalTitle}>Select City</Text>
+                  <Text style={styles.modalSubtitle}>Filter pricing areas by city</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setShowCityPicker(false)}>
+                <X size={20} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              <View style={styles.searchInnerRow}>
+                <Search size={16} color={COLORS.textMuted} />
+                <TextInput
+                  style={styles.searchInnerInput}
+                  placeholder="Search city by name or code..."
+                  placeholderTextColor={COLORS.textMuted}
+                  value={citySearch}
+                  onChangeText={setCitySearch}
+                />
+                {citySearch ? (
+                  <TouchableOpacity onPress={() => setCitySearch('')}>
+                    <X size={16} color={COLORS.textMuted} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={true}>
+                {activeCities
+                  .filter(
+                    (c) =>
+                      c.name.toLowerCase().includes(citySearch.toLowerCase()) ||
+                      c.code.toLowerCase().includes(citySearch.toLowerCase())
+                  )
+                  .map((city) => {
+                    const isSelected =
+                      currentCity?.id === city.id || currentCity?.code === city.code;
+                    return (
+                      <TouchableOpacity
+                        key={city.id || city._id}
+                        style={[styles.modalItem, isSelected && styles.modalItemActive]}
+                        onPress={() => {
+                          setSelectedCityId(city.id || city._id || '');
+                          setSelectedAreaId('');
+                          setShowCityPicker(false);
+                          setCitySearch('');
+                        }}
+                      >
+                        <View style={styles.modalItemLeft}>
+                          <View style={styles.cityMiniBadge}>
+                            <Text style={styles.cityMiniBadgeText}>{city.code}</Text>
+                          </View>
+                          <Text
+                            style={[
+                              styles.modalItemText,
+                              isSelected && styles.modalItemTextActive,
+                            ]}
+                          >
+                            {city.name}
+                          </Text>
+                        </View>
+                        {isSelected && <Check size={18} color={COLORS.purple} />}
+                      </TouchableOpacity>
+                    );
+                  })}
+              </ScrollView>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ================= MODAL: SELECT AREA ================= */}
+      <Modal
+        visible={showAreaPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowAreaPicker(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalPanel}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderTitleRow}>
+                <Navigation size={20} color={COLORS.blue} />
+                <View>
+                  <Text style={styles.modalTitle}>Select Area in {currentCity?.name}</Text>
+                  <Text style={styles.modalSubtitle}>Pick an operational area to set dynamic prices</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setShowAreaPicker(false)}>
+                <X size={20} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              <View style={styles.searchInnerRow}>
+                <Search size={16} color={COLORS.textMuted} />
+                <TextInput
+                  style={styles.searchInnerInput}
+                  placeholder="Search area name or code..."
+                  placeholderTextColor={COLORS.textMuted}
+                  value={areaSearch}
+                  onChangeText={setAreaSearch}
+                />
+                {areaSearch ? (
+                  <TouchableOpacity onPress={() => setAreaSearch('')}>
+                    <X size={16} color={COLORS.textMuted} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={true}>
+                {availableAreas
+                  .filter(
+                    (a) =>
+                      a.name.toLowerCase().includes(areaSearch.toLowerCase()) ||
+                      (a.code && a.code.toLowerCase().includes(areaSearch.toLowerCase()))
+                  )
+                  .map((area) => {
+                    const isSelected =
+                      currentArea?.id === area.id || currentArea?.name === area.name;
+                    return (
+                      <TouchableOpacity
+                        key={area.id || area._id}
+                        style={[styles.modalItem, isSelected && styles.modalItemActive]}
+                        onPress={() => {
+                          setSelectedAreaId(area.id || area._id || '');
+                          setSelectedZone(area.name);
+                          setShowAreaPicker(false);
+                          setAreaSearch('');
+                        }}
+                      >
+                        <View style={styles.modalItemLeft}>
+                          <View style={styles.areaMiniDot} />
+                          <View>
+                            <Text
+                              style={[
+                                styles.modalItemText,
+                                isSelected && styles.modalItemTextActive,
+                              ]}
+                            >
+                              {area.name}
+                            </Text>
+                            <Text style={styles.modalItemSub}>
+                              {area.darkStore || `Wom Up ${area.name} Dark Store`}
+                            </Text>
+                          </View>
+                        </View>
+                        {isSelected && <Check size={18} color={COLORS.purple} />}
+                      </TouchableOpacity>
+                    );
+                  })}
+              </ScrollView>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -536,103 +789,142 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
-    zIndex: 10,
   },
-  sectionLabel: {
+  sectionHeaderRow: {
+    marginBottom: SPACING.sm,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.navy,
+  },
+  sectionSubtitle: {
     fontSize: 11,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+  cascadingRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: SPACING.sm,
+  },
+  cascadingCol: {
+    flex: 1,
+  },
+  inputLabel: {
+    fontSize: 10,
     fontWeight: '800',
     color: COLORS.textMuted,
-    textTransform: 'uppercase',
-    marginBottom: 6,
     letterSpacing: 0.5,
+    marginBottom: 4,
   },
-  zoneDropdown: {
+  cascadingBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: COLORS.cardBackground,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 10,
-    borderRadius: RADIUS.input,
     borderWidth: 1,
     borderColor: COLORS.border,
-    marginBottom: SPACING.md,
+    borderRadius: RADIUS.input,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
-  zoneDropdownText: {
-    fontSize: 14,
+  disabledBtn: {
+    opacity: 0.6,
+    backgroundColor: '#F3F4F6',
+  },
+  cascadingBtnLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+    marginRight: 4,
+  },
+  cascadingBtnText: {
+    fontSize: 13,
     fontWeight: '700',
     color: COLORS.textPrimary,
   },
-  zoneSubtext: {
-    fontSize: 11,
-    color: COLORS.textMuted,
-    marginTop: 1,
-  },
-  zonePickerMenu: {
-    position: 'absolute',
-    top: 75,
-    left: SPACING.md,
-    right: SPACING.md,
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.sm,
+  autoStoreCard: {
+    backgroundColor: '#FAF5FF',
+    borderRadius: RADIUS.card,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
-    zIndex: 50,
+    borderColor: '#E9D5FF',
+    padding: 10,
+    marginBottom: SPACING.sm,
   },
-  zonePickerItem: {
-    paddingVertical: 12,
-    paddingHorizontal: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  zonePickerItemActive: {
-    backgroundColor: '#EEF2FF',
-  },
-  zonePickerText: {
-    fontSize: 13,
-    color: COLORS.textPrimary,
-    fontWeight: '600',
-  },
-  zonePickerTextActive: {
-    color: COLORS.purple,
+  autoStoreLabel: {
+    fontSize: 10,
     fontWeight: '800',
+    color: COLORS.purple,
+    letterSpacing: 0.5,
+    marginBottom: 6,
+    textTransform: 'uppercase',
   },
-  zonePickerScroll: {
-    maxHeight: 260,
+  autoStoreBox: {
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.input,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#F3E8FF',
   },
-  zoneItemRow: {
+  autoStoreLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  storeIconBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: '#EDE9FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  autoStoreTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 6,
   },
-  zoneItemCode: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: COLORS.textMuted,
-    marginTop: 2,
-    letterSpacing: 0.5,
+  autoStoreName: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: COLORS.navy,
   },
-  addZoneDropdownBtn: {
+  lockBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: SPACING.md,
-    backgroundColor: '#F0FDF4',
-    borderTopWidth: 1.5,
-    borderTopColor: '#BBF7D0',
-    borderBottomLeftRadius: RADIUS.sm,
-    borderBottomRightRadius: RADIUS.sm,
+    backgroundColor: '#D1FAE5',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
-  addZoneDropdownBtnText: {
-    fontSize: 13,
+  lockBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#065F46',
+  },
+  autoStoreSubText: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+  tabsBreadcrumbRow: {
+    paddingVertical: 5,
+    marginBottom: 4,
+  },
+  tabsBreadcrumbText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: COLORS.navy,
+  },
+  productBreadcrumb: {
+    fontSize: 11,
     fontWeight: '700',
-    color: COLORS.primary,
+    color: COLORS.purple,
+    marginTop: 2,
   },
   categoryScrollView: {
     backgroundColor: COLORS.cardBackground,
@@ -751,45 +1043,41 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: SPACING.md,
-    backgroundColor: '#FAFAFA',
+    padding: SPACING.sm,
+    backgroundColor: COLORS.white,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
   },
   productInfoRow: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
   },
   expandIconContainer: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#F3F4F6',
+    width: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
+    marginRight: 6,
   },
   titleWithBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
     flexWrap: 'wrap',
+    gap: 6,
   },
   productNameText: {
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: 14,
+    fontWeight: '700',
     color: COLORS.textPrimary,
   },
   variantCountBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F3FF',
+    backgroundColor: '#EDE9FE',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: RADIUS.pill,
-    borderWidth: 1,
-    borderColor: '#E9D5FF',
   },
   variantCountText: {
     fontSize: 10,
@@ -799,11 +1087,12 @@ const styles = StyleSheet.create({
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: 3,
+    flexWrap: 'wrap',
     gap: 6,
-    marginTop: 4,
   },
   fromPriceText: {
-    fontSize: 12,
+    fontSize: 11,
     color: COLORS.textMuted,
   },
   fromPriceBold: {
@@ -811,7 +1100,7 @@ const styles = StyleSheet.create({
     color: COLORS.purple,
   },
   metaDot: {
-    fontSize: 12,
+    fontSize: 10,
     color: COLORS.textMuted,
   },
   statusPill: {
@@ -822,76 +1111,78 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.pill,
   },
   statusDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     marginRight: 4,
   },
   statusPillText: {
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   masterActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginLeft: 8,
+    gap: 4,
   },
   actionIconBtn: {
     padding: 6,
-    borderRadius: RADIUS.sm,
-    backgroundColor: '#F3F4F6',
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.cardBackground,
   },
-
-  // Variants Inner Table
   variantsContainer: {
-    backgroundColor: COLORS.white,
-    paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.sm,
+    backgroundColor: '#FAFAFA',
+    padding: SPACING.sm,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
   },
   noVariantsNotice: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: SPACING.md,
-    backgroundColor: '#FFFBEB',
+    padding: 10,
+    backgroundColor: '#FEF3C7',
     borderRadius: RADIUS.sm,
-    marginVertical: SPACING.sm,
   },
   noVariantsText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#92400E',
     flex: 1,
   },
   variantTableHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    backgroundColor: '#F3F4F6',
+    borderRadius: RADIUS.sm,
+    marginBottom: 6,
   },
   variantColHeader: {
     fontSize: 10,
     fontWeight: '800',
     color: COLORS.textMuted,
     textTransform: 'uppercase',
-    letterSpacing: 0.3,
   },
   variantRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: '#E5E7EB',
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.sm,
+    marginBottom: 4,
   },
   variantWeightText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: COLORS.textPrimary,
   },
   defaultLabel: {
     fontSize: 10,
-    fontWeight: '600',
     color: COLORS.purple,
+    fontWeight: '800',
   },
   variantSkuText: {
     fontSize: 10,
@@ -899,8 +1190,8 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   defaultPriceValue: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
     color: COLORS.textPrimary,
   },
   defaultPriceSub: {
@@ -908,27 +1199,27 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
   },
   zonePriceBadge: {
-    paddingVertical: 4,
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: RADIUS.pill,
-    borderWidth: 1,
-    minWidth: 50,
     alignItems: 'center',
   },
   overrideBadge: {
-    backgroundColor: '#ECFDF5',
-    borderColor: '#A7F3D0',
+    backgroundColor: '#EDE9FE',
+    borderWidth: 1,
+    borderColor: '#C4B5FD',
   },
   noOverrideBadge: {
     backgroundColor: '#F3F4F6',
+    borderWidth: 1,
     borderColor: '#E5E7EB',
   },
   zonePriceValue: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
   },
   overridePriceText: {
-    color: '#047857',
+    color: COLORS.purple,
   },
   noOverridePriceText: {
     color: COLORS.textPrimary,
@@ -936,10 +1227,10 @@ const styles = StyleSheet.create({
   overrideLabel: {
     fontSize: 9,
     marginTop: 2,
-    fontWeight: '600',
   },
   overrideLabelActive: {
-    color: '#059669',
+    color: COLORS.purple,
+    fontWeight: '700',
   },
   overrideLabelMuted: {
     color: COLORS.textMuted,
@@ -954,41 +1245,156 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: COLORS.purple,
     paddingHorizontal: 8,
-    paddingVertical: 5,
+    paddingVertical: 4,
     borderRadius: RADIUS.pill,
   },
   editVariantBtnText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     color: COLORS.white,
   },
-
-  // Footer Actions
   footerActions: {
-    padding: SPACING.md,
     backgroundColor: COLORS.white,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
+    padding: SPACING.sm,
   },
   subActionRow: {
     flexDirection: 'row',
-    gap: SPACING.sm,
+    justifyContent: 'space-around',
+    alignItems: 'center',
   },
   subActionBtn: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.cardBackground,
-    paddingVertical: 9,
-    borderRadius: RADIUS.button,
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#FAF5FF',
+    borderRadius: RADIUS.pill,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: '#E9D5FF',
   },
   subActionText: {
     fontSize: 11,
     fontWeight: '700',
     color: COLORS.purple,
-    marginLeft: 4,
+  },
+
+  // Modal Styles
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.md,
+  },
+  modalPanel: {
+    width: '100%',
+    maxWidth: 440,
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.card,
+    overflow: 'hidden',
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  modalHeaderTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  modalTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: COLORS.navy,
+  },
+  modalSubtitle: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+  },
+  modalBody: {
+    padding: SPACING.md,
+  },
+  searchInnerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.cardBackground,
+    borderRadius: RADIUS.input,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: SPACING.sm,
+    gap: 8,
+  },
+  searchInnerInput: {
+    flex: 1,
+    fontSize: 13,
+    color: COLORS.textPrimary,
+    padding: 0,
+  },
+  modalScroll: {
+    maxHeight: 280,
+  },
+  modalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: RADIUS.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  modalItemActive: {
+    backgroundColor: '#FAF5FF',
+  },
+  modalItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  cityMiniBadge: {
+    backgroundColor: '#EDE9FE',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  cityMiniBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: COLORS.purple,
+  },
+  areaMiniDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.blue,
+  },
+  modalItemText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  modalItemTextActive: {
+    color: COLORS.purple,
+    fontWeight: '800',
+  },
+  modalItemSub: {
+    fontSize: 10,
+    color: COLORS.textMuted,
   },
 });

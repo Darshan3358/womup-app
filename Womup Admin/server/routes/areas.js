@@ -8,8 +8,70 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const db = getDB();
-    const areas = await db.collection('areas').find({}).sort({ sortOrder: 1 }).toArray();
-    res.json({ success: true, count: areas.length, data: areas });
+    const { cityId } = req.query;
+
+    const query = {};
+    if (cityId) {
+      if (ObjectId.isValid(cityId)) {
+        query.$or = [{ cityId: new ObjectId(cityId) }, { cityId: cityId.toString() }];
+      } else {
+        query.cityId = cityId;
+      }
+    }
+
+    const areas = await db.collection('areas').find(query).sort({ sortOrder: 1, name: 1 }).toArray();
+
+    // Enrich each area with assigned store info and city info
+    const enriched = await Promise.all(
+      areas.map(async (area) => {
+        const areaId = area._id;
+        const assignedStore = await db.collection('stores').findOne({
+          $or: [{ areaId }, { areaId: areaId.toString() }],
+          isActive: true,
+        });
+
+        // Resolve city name if cityId exists
+        let resolvedCityName = area.cityName || area.city || 'Ahmedabad';
+        if (area.cityId && ObjectId.isValid(area.cityId)) {
+          const cityDoc = await db.collection('cities').findOne({ _id: new ObjectId(area.cityId.toString()) });
+          if (cityDoc) resolvedCityName = cityDoc.name;
+        }
+
+        return {
+          id: area._id.toString(),
+          _id: area._id,
+          name: area.name,
+          code: area.code,
+          darkStore: area.darkStore,
+          address: area.address,
+          city: resolvedCityName,
+          cityName: resolvedCityName,
+          cityId: area.cityId ? area.cityId.toString() : null,
+          pincodes: area.pincodes || [],
+          centerLat: area.centerLat,
+          centerLng: area.centerLng,
+          radiusKm: area.radiusKm || 4.5,
+          defaultDeliveryMinutes: area.defaultDeliveryMinutes || 9,
+          sortOrder: area.sortOrder || 0,
+          isActive: area.isActive !== false,
+          hasActiveStore: Boolean(assignedStore),
+          assignedStore: assignedStore
+            ? {
+                id: assignedStore._id.toString(),
+                _id: assignedStore._id,
+                name: assignedStore.name,
+                code: assignedStore.code,
+                loginId: assignedStore.loginId,
+                address: assignedStore.address,
+              }
+            : null,
+          createdAt: area.createdAt,
+          updatedAt: area.updatedAt,
+        };
+      })
+    );
+
+    res.json({ success: true, count: enriched.length, data: enriched });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -21,9 +83,10 @@ router.post('/', async (req, res) => {
     let {
       name,
       code,
+      cityId,
+      city,
       darkStore,
       address,
-      city,
       pincodes,
       centerLat,
       centerLng,
@@ -34,7 +97,7 @@ router.post('/', async (req, res) => {
     } = req.body;
 
     if (!name || typeof name !== 'string' || !name.trim()) {
-      return res.status(400).json({ success: false, error: 'Zone Name is required' });
+      return res.status(400).json({ success: false, error: 'Area Name is required' });
     }
 
     const trimmedName = name.trim();
@@ -47,17 +110,41 @@ router.post('/', async (req, res) => {
       .replace(/[^A-Z0-9_]/g, '');
 
     if (!formattedCode) {
-      return res.status(400).json({ success: false, error: 'Zone Code is required' });
+      return res.status(400).json({ success: false, error: 'Area Code is required' });
     }
 
-    // 1. Check for duplicates: name (case-insensitive) or code
+    // Resolve City document
+    let targetCity = null;
+    if (cityId) {
+      if (ObjectId.isValid(cityId)) {
+        targetCity = await db.collection('cities').findOne({ _id: new ObjectId(cityId) });
+      } else {
+        targetCity = await db.collection('cities').findOne({ code: cityId.toUpperCase() });
+      }
+    }
+    if (!targetCity && city) {
+      targetCity = await db.collection('cities').findOne({
+        name: { $regex: new RegExp(`^${city.trim()}$`, 'i') },
+      });
+    }
+    if (!targetCity) {
+      // Default to first active city (Ahmedabad)
+      targetCity = (await db.collection('cities').findOne({ status: 'Active' })) || {
+        _id: new ObjectId(),
+        name: 'Ahmedabad',
+        code: 'AHM',
+      };
+    }
+
+    // Check duplicate area name within the SAME city
     const existingName = await db.collection('areas').findOne({
+      $or: [{ cityId: targetCity._id }, { cityId: targetCity._id.toString() }, { cityName: targetCity.name }],
       name: { $regex: `^${trimmedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' },
     });
     if (existingName) {
       return res.status(400).json({
         success: false,
-        error: `A zone with the name "${trimmedName}" already exists.`,
+        error: `An area with the name "${trimmedName}" already exists in ${targetCity.name}.`,
       });
     }
 
@@ -65,7 +152,7 @@ router.post('/', async (req, res) => {
     if (existingCode) {
       return res.status(400).json({
         success: false,
-        error: `A zone with code "${formattedCode}" already exists.`,
+        error: `An area with code "${formattedCode}" already exists.`,
       });
     }
 
@@ -74,7 +161,7 @@ router.post('/', async (req, res) => {
         ? darkStore.trim()
         : `Wom Up ${trimmedName} Dark Store`;
 
-    const trimmedCity = city && typeof city === 'string' && city.trim() ? city.trim() : 'Ahmedabad';
+    const trimmedCity = targetCity.name;
     const trimmedAddress =
       address && typeof address === 'string' && address.trim()
         ? address.trim()
@@ -82,20 +169,22 @@ router.post('/', async (req, res) => {
 
     if (sortOrder === undefined) {
       const count = await db.collection('areas').countDocuments({});
-      sortOrder = count;
+      sortOrder = count + 1;
     }
 
     const newArea = {
       name: trimmedName,
       code: formattedCode,
+      cityId: targetCity._id,
+      cityName: targetCity.name,
+      city: targetCity.name,
       darkStore: trimmedDarkStore,
       address: trimmedAddress,
-      city: trimmedCity,
       pincodes: Array.isArray(pincodes) ? pincodes : pincodes ? [String(pincodes)] : ['380015'],
       centerLat: centerLat !== undefined && !isNaN(Number(centerLat)) ? Number(centerLat) : 23.0225,
       centerLng: centerLng !== undefined && !isNaN(Number(centerLng)) ? Number(centerLng) : 72.5714,
       radiusKm: Number(radiusKm) || 4.5,
-      defaultDeliveryMinutes: Number(defaultDeliveryMinutes) || 10,
+      defaultDeliveryMinutes: Number(defaultDeliveryMinutes) || 9,
       sortOrder: Number(sortOrder) || 0,
       isActive: isActive !== false,
       createdAt: new Date(),
@@ -104,35 +193,17 @@ router.post('/', async (req, res) => {
 
     const result = await db.collection('areas').insertOne(newArea);
     newArea._id = result.insertedId;
-
-    // Connect and upsert dark store in stores collection
-    await db.collection('stores').updateOne(
-      { areaId: result.insertedId },
-      {
-        $set: {
-          name: trimmedDarkStore,
-          code: `STORE-${formattedCode}`,
-          address: trimmedAddress,
-          city: trimmedCity,
-          areaId: result.insertedId,
-          areaName: trimmedName,
-          isActive: newArea.isActive,
-          serviceRadiusKm: newArea.radiusKm,
-          estimatedDeliveryMinutes: newArea.defaultDeliveryMinutes,
-          updatedAt: new Date(),
-        },
-        $setOnInsert: {
-          createdAt: new Date(),
-        },
-      },
-      { upsert: true }
-    );
+    newArea.id = result.insertedId.toString();
 
     res.status(201).json({
       success: true,
-      id: result.insertedId,
-      data: newArea,
-      message: 'Operational zone created successfully',
+      id: result.insertedId.toString(),
+      data: {
+        ...newArea,
+        hasActiveStore: false,
+        assignedStore: null,
+      },
+      message: `Area "${trimmedName}" created successfully under ${targetCity.name}`,
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -147,15 +218,28 @@ router.put('/:id', async (req, res) => {
     delete body._id;
     body.updatedAt = new Date();
 
+    if (body.cityId && ObjectId.isValid(body.cityId)) {
+      const cityDoc = await db.collection('cities').findOne({ _id: new ObjectId(body.cityId) });
+      if (cityDoc) {
+        body.cityId = cityDoc._id;
+        body.cityName = cityDoc.name;
+        body.city = cityDoc.name;
+      }
+    }
+
     const filter = ObjectId.isValid(id) ? { _id: new ObjectId(id) } : { _id: id };
     await db.collection('areas').updateOne(filter, { $set: body });
 
-    // Also update associated store if darkStore/address/isActive changed
-    if (body.darkStore || body.name || body.address || body.isActive !== undefined) {
+    // Also update associated store if darkStore/address/name/city changed
+    if (body.darkStore || body.name || body.address || body.isActive !== undefined || body.cityName) {
       const storeUpdate = { updatedAt: new Date() };
       if (body.darkStore) storeUpdate.name = body.darkStore;
       if (body.name) storeUpdate.areaName = body.name;
       if (body.address) storeUpdate.address = body.address;
+      if (body.cityName) {
+        storeUpdate.city = body.cityName;
+        storeUpdate.cityName = body.cityName;
+      }
       if (body.isActive !== undefined) storeUpdate.isActive = body.isActive;
 
       await db.collection('stores').updateOne(
@@ -176,10 +260,24 @@ router.delete('/:id', async (req, res) => {
     const { id } = req.params;
     const filter = ObjectId.isValid(id) ? { _id: new ObjectId(id) } : { _id: id };
 
-    await db.collection('areas').deleteOne(filter);
-    await db.collection('stores').deleteOne({ areaId: ObjectId.isValid(id) ? new ObjectId(id) : id });
+    // Prevent deletion if an active store is assigned
+    const activeStore = await db.collection('stores').findOne({
+      $or: [
+        { areaId: ObjectId.isValid(id) ? new ObjectId(id) : id },
+        { areaId: id.toString() },
+      ],
+      isActive: true,
+    });
 
-    res.json({ success: true, message: 'Area and associated store removed successfully' });
+    if (activeStore) {
+      return res.status(400).json({
+        success: false,
+        error: `Cannot delete this area because active store "${activeStore.name}" is assigned to it. Reassign or delete the store first.`,
+      });
+    }
+
+    await db.collection('areas').deleteOne(filter);
+    res.json({ success: true, message: 'Area removed successfully' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

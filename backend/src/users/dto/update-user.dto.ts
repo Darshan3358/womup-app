@@ -26,4 +26,14 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   birthday?: string;
+
+  @ApiPropertyOptional({ description: 'Preferred operational city ID' })
+  @IsOptional()
+  @IsString()
+  preferredCityId?: string;
+
+  @ApiPropertyOptional({ description: 'Preferred operational city name' })
+  @IsOptional()
+  @IsString()
+  preferredCityName?: string;
 }

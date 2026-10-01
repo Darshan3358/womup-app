@@ -42,6 +42,8 @@ interface RiderContextType {
     phoneNumber?: string;
     phone?: string;
     city: string;
+    cityId?: string;
+    cityName?: string;
     vehicleType: 'EV_SCOOTER' | 'BIKE' | 'BICYCLE';
     vehicleNumber: string;
     drivingLicenseNumber?: string;
@@ -336,6 +338,8 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     phoneNumber?: string;
     phone?: string;
     city: string;
+    cityId?: string;
+    cityName?: string;
     vehicleType: 'EV_SCOOTER' | 'BIKE' | 'BICYCLE';
     vehicleNumber: string;
     drivingLicenseNumber?: string;
@@ -353,6 +357,8 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       fullName: finalFullName,
       phoneNumber: finalPhone,
       city: data.city,
+      cityId: data.cityId,
+      cityName: data.cityName,
       vehicleType: data.vehicleType,
       vehicleNumber: data.vehicleNumber,
       drivingLicenseNumber: data.drivingLicenseNumber,

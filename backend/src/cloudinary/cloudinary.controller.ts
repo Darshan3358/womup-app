@@ -25,14 +25,14 @@ import { User, UserDocument } from '../users/schemas/user.schema';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @ApiTags('Cloudinary Media Storage')
-@Controller('api/v1/media')
+@Controller(['api/v1/media', 'api/v1/upload'])
 export class CloudinaryController {
   constructor(
     private readonly cloudinaryService: CloudinaryService,
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
   ) {}
 
-  @Post('upload')
+  @Post(['upload', 'image'])
   @UseInterceptors(FileInterceptor('file'))
   async uploadSingle(
     @UploadedFile() file: Express.Multer.File,

@@ -32,6 +32,9 @@ import {
   Clock,
   ArrowLeft,
   Power,
+  ChevronDown,
+  Navigation,
+  Check,
 } from 'lucide-react-native';
 import { COLORS, RADIUS, SPACING } from '../theme';
 import { useAdminState } from '../context/AdminStateContext';
@@ -49,12 +52,84 @@ interface RiderEditForm {
 }
 
 export const CustomersScreen: React.FC = () => {
-  const { customers, riders, setSelectedCustomer, setSubView, setActiveModal, updateRider } = useAdminState();
+  const {
+    customers,
+    riders,
+    cities,
+    zones,
+    darkStores,
+    setSelectedCustomer,
+    setSubView,
+    setActiveModal,
+    updateRider,
+  } = useAdminState();
 
   const [activeTabMode, setActiveTabMode] = useState<'CUSTOMERS' | 'RIDERS'>('CUSTOMERS');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCustomerFilter, setActiveCustomerFilter] = useState<'All' | 'Active' | 'Blocked'>('All');
   const [activeRiderFilter, setActiveRiderFilter] = useState<'All' | 'Online' | 'Approved' | 'Pending'>('All');
+  const [selectedCityId, setSelectedCityId] = useState<string>('ALL');
+  const [selectedAreaId, setSelectedAreaId] = useState<string>('ALL');
+
+  // Modal pickers
+  const [showCityPicker, setShowCityPicker] = useState(false);
+  const [showAreaPicker, setShowAreaPicker] = useState(false);
+  const [citySearch, setCitySearch] = useState('');
+  const [areaSearch, setAreaSearch] = useState('');
+
+  // 1. Resolve Active Cities
+  const activeCities = cities.filter((c) => c.status === 'Active' || !c.status);
+  const currentCity = activeCities.find(
+    (c) => (c.id && c.id === selectedCityId) || (c._id && c._id === selectedCityId)
+  );
+
+  // 2. Resolve Available Areas for Selected City
+  const availableAreas = zones.filter((z) => {
+    if (selectedCityId === 'ALL') return true;
+    if (!currentCity) return true;
+    const currentCityIdStr = currentCity.id || currentCity._id;
+    if (z.cityId && currentCityIdStr && String(z.cityId) === String(currentCityIdStr)) return true;
+    if (z.cityName && currentCity.name && z.cityName.toLowerCase() === currentCity.name.toLowerCase()) return true;
+    if (z.city && currentCity.name && z.city.toLowerCase() === currentCity.name.toLowerCase()) return true;
+    return false;
+  });
+
+  const currentArea = availableAreas.find(
+    (a) => (a.id && a.id === selectedAreaId) || (a._id && a._id === selectedAreaId)
+  );
+
+  // Helper: Resolve Customer location
+  const resolveCustomerHierarchy = (c: Customer) => {
+    let areaName = c.zoneName || 'Area';
+    let matchedZone = zones.find(
+      (z) =>
+        z.name.toLowerCase() === (c.zoneName || '').toLowerCase() ||
+        (c.address && c.address.toLowerCase().includes(z.name.toLowerCase()))
+    );
+    if (matchedZone) areaName = matchedZone.name;
+    let cityName = matchedZone?.cityName || matchedZone?.city || 'Ahmedabad';
+    return { cityName, areaName };
+  };
+
+  // Helper: Resolve Rider location
+  const resolveRiderHierarchy = (r: DeliveryPartnerItem) => {
+    let matchedStore = darkStores.find(
+      (s) =>
+        (r.hubId && (s.id === r.hubId || s.code === r.hubId)) ||
+        (r.hubName && s.name.toLowerCase() === r.hubName.toLowerCase()) ||
+        (r.hubName && s.name.toLowerCase().includes(r.hubName.toLowerCase()))
+    );
+    let matchedZone = zones.find(
+      (z) =>
+        (matchedStore?.areaId && (z.id === matchedStore.areaId || z._id === matchedStore.areaId)) ||
+        (r.hubName && z.name.toLowerCase().includes(r.hubName.toLowerCase())) ||
+        (r.hubName && r.hubName.toLowerCase().includes(z.name.toLowerCase()))
+    );
+    let cityName = matchedStore?.cityName || matchedStore?.city || matchedZone?.cityName || 'Ahmedabad';
+    let areaName = matchedStore?.areaName || matchedZone?.name || r.hubName || 'Hub Area';
+    let hubDisplay = matchedStore?.name || r.hubName || `Wom Up ${areaName} Store`;
+    return { cityName, areaName, hubDisplay };
+  };
 
   // Rider Detail & Edit Modal State
   const [selectedRider, setSelectedRider] = useState<(DeliveryPartnerItem & { email?: string; bankAccount?: any }) | null>(null);
@@ -79,7 +154,23 @@ export const CustomersScreen: React.FC = () => {
       c.phone.includes(searchQuery) ||
       c.id.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesFilter = activeCustomerFilter === 'All' || c.status === activeCustomerFilter;
-    return matchesSearch && matchesFilter;
+    if (!matchesSearch || !matchesFilter) return false;
+
+    const { cityName, areaName } = resolveCustomerHierarchy(c);
+
+    if (selectedCityId !== 'ALL' && currentCity) {
+      const matchCity = cityName.toLowerCase() === currentCity.name.toLowerCase();
+      if (!matchCity) return false;
+    }
+
+    if (selectedAreaId !== 'ALL' && currentArea) {
+      const matchArea =
+        areaName.toLowerCase() === currentArea.name.toLowerCase() ||
+        (c.zoneName && c.zoneName.toLowerCase() === currentArea.name.toLowerCase());
+      if (!matchArea) return false;
+    }
+
+    return true;
   });
 
   const filteredRiders = (riders || []).filter((r) => {
@@ -94,7 +185,23 @@ export const CustomersScreen: React.FC = () => {
     else if (activeRiderFilter === 'Approved') matchesFilter = r.status === 'APPROVED';
     else if (activeRiderFilter === 'Pending') matchesFilter = r.status === 'PENDING';
 
-    return matchesSearch && matchesFilter;
+    if (!matchesSearch || !matchesFilter) return false;
+
+    const { cityName, areaName } = resolveRiderHierarchy(r);
+
+    if (selectedCityId !== 'ALL' && currentCity) {
+      const matchCity = cityName.toLowerCase() === currentCity.name.toLowerCase();
+      if (!matchCity) return false;
+    }
+
+    if (selectedAreaId !== 'ALL' && currentArea) {
+      const matchArea =
+        areaName.toLowerCase() === currentArea.name.toLowerCase() ||
+        (r.hubName && r.hubName.toLowerCase().includes(currentArea.name.toLowerCase()));
+      if (!matchArea) return false;
+    }
+
+    return true;
   });
 
   const handleSelectCustomer = (customer: Customer) => {
@@ -238,6 +345,42 @@ export const CustomersScreen: React.FC = () => {
           />
         </View>
 
+        {/* Cascading Filter Bar: City + Area */}
+        <View style={styles.filtersBar}>
+          {/* City Filter */}
+          <TouchableOpacity
+            style={[styles.filterDropdownBtn, selectedCityId !== 'ALL' && styles.activeFilterDropdown]}
+            onPress={() => setShowCityPicker(true)}
+            activeOpacity={0.8}
+          >
+            <MapPin size={13} color={selectedCityId !== 'ALL' ? COLORS.purple : COLORS.textMuted} />
+            <Text style={[styles.filterDropdownText, selectedCityId !== 'ALL' && styles.activeDropdownText]} numberOfLines={1}>
+              City: {currentCity ? currentCity.name : 'All'}
+            </Text>
+            <ChevronDown size={14} color={COLORS.textMuted} />
+          </TouchableOpacity>
+
+          {/* Area Filter */}
+          <TouchableOpacity
+            style={[
+              styles.filterDropdownBtn,
+              selectedAreaId !== 'ALL' && styles.activeFilterDropdown,
+              selectedCityId === 'ALL' && availableAreas.length === 0 && styles.disabledFilterBtn,
+            ]}
+            onPress={() => {
+              if (selectedCityId === 'ALL' && availableAreas.length === 0) return;
+              setShowAreaPicker(true);
+            }}
+            activeOpacity={0.8}
+          >
+            <Navigation size={13} color={selectedAreaId !== 'ALL' ? COLORS.blue : COLORS.textMuted} />
+            <Text style={[styles.filterDropdownText, selectedAreaId !== 'ALL' && styles.activeDropdownText]} numberOfLines={1}>
+              Area: {currentArea ? currentArea.name : 'All'}
+            </Text>
+            <ChevronDown size={14} color={COLORS.textMuted} />
+          </TouchableOpacity>
+        </View>
+
         {/* Filter Pills */}
         {activeTabMode === 'CUSTOMERS' ? (
           <View style={styles.filterRow}>
@@ -324,7 +467,9 @@ export const CustomersScreen: React.FC = () => {
                       {c.status}
                     </Text>
                     <Text style={styles.dotSeparator}>•</Text>
-                    <Text style={styles.zoneText}>{c.zoneName}</Text>
+                    <Text style={styles.zoneText}>
+                      🏙️ {resolveCustomerHierarchy(c).cityName} • 📍 {resolveCustomerHierarchy(c).areaName}
+                    </Text>
                   </View>
                 </View>
 
@@ -388,7 +533,9 @@ export const CustomersScreen: React.FC = () => {
                       {r.isOnline ? 'ONLINE' : 'OFFLINE'}
                     </Text>
                     <Text style={styles.dotSeparator}>•</Text>
-                    <Text style={styles.zoneText}>{r.hubName}</Text>
+                    <Text style={styles.zoneText}>
+                      📍 Hub: {resolveRiderHierarchy(r).areaName} • City: {resolveRiderHierarchy(r).cityName}
+                    </Text>
                   </View>
                 </View>
 
@@ -841,11 +988,350 @@ export const CustomersScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+      {/* ================= MODAL: SELECT CITY ================= */}
+      <Modal
+        visible={showCityPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCityPicker(false)}
+      >
+        <View style={styles.cityModalBackdrop}>
+          <View style={styles.cityModalPanel}>
+            <View style={styles.cityModalHeader}>
+              <View style={styles.modalHeaderTitleRow}>
+                <MapPin size={20} color={COLORS.purple} />
+                <View>
+                  <Text style={styles.cityModalTitle}>Filter by City</Text>
+                  <Text style={styles.cityModalSubtitle}>Scope users by registered city</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setShowCityPicker(false)}>
+                <X size={20} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.cityModalBody}>
+              <View style={styles.searchInnerRow}>
+                <Search size={16} color={COLORS.textMuted} />
+                <TextInput
+                  style={styles.searchInnerInput}
+                  placeholder="Search city by name or code..."
+                  placeholderTextColor={COLORS.textMuted}
+                  value={citySearch}
+                  onChangeText={setCitySearch}
+                />
+                {citySearch ? (
+                  <TouchableOpacity onPress={() => setCitySearch('')}>
+                    <X size={16} color={COLORS.textMuted} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              <ScrollView style={styles.cityModalScroll} showsVerticalScrollIndicator={true}>
+                <TouchableOpacity
+                  style={[styles.cityModalItem, selectedCityId === 'ALL' && styles.cityModalItemActive]}
+                  onPress={() => {
+                    setSelectedCityId('ALL');
+                    setSelectedAreaId('ALL');
+                    setShowCityPicker(false);
+                    setCitySearch('');
+                  }}
+                >
+                  <View style={styles.cityModalItemLeft}>
+                    <View style={[styles.cityMiniBadge, { backgroundColor: '#F3F4F6' }]}>
+                      <Text style={[styles.cityMiniBadgeText, { color: COLORS.textMuted }]}>ALL</Text>
+                    </View>
+                    <Text style={[styles.cityModalItemText, selectedCityId === 'ALL' && styles.cityModalItemTextActive]}>
+                      All Cities
+                    </Text>
+                  </View>
+                  {selectedCityId === 'ALL' && <Check size={18} color={COLORS.purple} />}
+                </TouchableOpacity>
+
+                {activeCities
+                  .filter(
+                    (c) =>
+                      c.name.toLowerCase().includes(citySearch.toLowerCase()) ||
+                      c.code.toLowerCase().includes(citySearch.toLowerCase())
+                  )
+                  .map((city) => {
+                    const isSelected = selectedCityId === (city.id || city._id);
+                    return (
+                      <TouchableOpacity
+                        key={city.id || city._id}
+                        style={[styles.cityModalItem, isSelected && styles.cityModalItemActive]}
+                        onPress={() => {
+                          setSelectedCityId(city.id || city._id || '');
+                          setSelectedAreaId('ALL');
+                          setShowCityPicker(false);
+                          setCitySearch('');
+                        }}
+                      >
+                        <View style={styles.cityModalItemLeft}>
+                          <View style={styles.cityMiniBadge}>
+                            <Text style={styles.cityMiniBadgeText}>{city.code}</Text>
+                          </View>
+                          <Text style={[styles.cityModalItemText, isSelected && styles.cityModalItemTextActive]}>
+                            {city.name}
+                          </Text>
+                        </View>
+                        {isSelected && <Check size={18} color={COLORS.purple} />}
+                      </TouchableOpacity>
+                    );
+                  })}
+              </ScrollView>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ================= MODAL: SELECT AREA ================= */}
+      <Modal
+        visible={showAreaPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowAreaPicker(false)}
+      >
+        <View style={styles.cityModalBackdrop}>
+          <View style={styles.cityModalPanel}>
+            <View style={styles.cityModalHeader}>
+              <View style={styles.modalHeaderTitleRow}>
+                <Navigation size={20} color={COLORS.blue} />
+                <View>
+                  <Text style={styles.cityModalTitle}>
+                    Filter by Area {currentCity ? `(${currentCity.name})` : ''}
+                  </Text>
+                  <Text style={styles.cityModalSubtitle}>Scope users by area / assigned store</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setShowAreaPicker(false)}>
+                <X size={20} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.cityModalBody}>
+              <View style={styles.searchInnerRow}>
+                <Search size={16} color={COLORS.textMuted} />
+                <TextInput
+                  style={styles.searchInnerInput}
+                  placeholder="Search area name or code..."
+                  placeholderTextColor={COLORS.textMuted}
+                  value={areaSearch}
+                  onChangeText={setAreaSearch}
+                />
+                {areaSearch ? (
+                  <TouchableOpacity onPress={() => setAreaSearch('')}>
+                    <X size={16} color={COLORS.textMuted} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              <ScrollView style={styles.cityModalScroll} showsVerticalScrollIndicator={true}>
+                <TouchableOpacity
+                  style={[styles.cityModalItem, selectedAreaId === 'ALL' && styles.cityModalItemActive]}
+                  onPress={() => {
+                    setSelectedAreaId('ALL');
+                    setShowAreaPicker(false);
+                    setAreaSearch('');
+                  }}
+                >
+                  <View style={styles.cityModalItemLeft}>
+                    <View style={[styles.areaMiniDot, { backgroundColor: COLORS.textMuted }]} />
+                    <Text style={[styles.cityModalItemText, selectedAreaId === 'ALL' && styles.cityModalItemTextActive]}>
+                      All Areas {currentCity ? `in ${currentCity.name}` : ''}
+                    </Text>
+                  </View>
+                  {selectedAreaId === 'ALL' && <Check size={18} color={COLORS.purple} />}
+                </TouchableOpacity>
+
+                {availableAreas
+                  .filter(
+                    (a) =>
+                      a.name.toLowerCase().includes(areaSearch.toLowerCase()) ||
+                      (a.code && a.code.toLowerCase().includes(areaSearch.toLowerCase()))
+                  )
+                  .map((area) => {
+                    const isSelected = selectedAreaId === (area.id || area._id);
+                    return (
+                      <TouchableOpacity
+                        key={area.id || area._id}
+                        style={[styles.cityModalItem, isSelected && styles.cityModalItemActive]}
+                        onPress={() => {
+                          setSelectedAreaId(area.id || area._id || '');
+                          setShowAreaPicker(false);
+                          setAreaSearch('');
+                        }}
+                      >
+                        <View style={styles.cityModalItemLeft}>
+                          <View style={styles.areaMiniDot} />
+                          <View>
+                            <Text style={[styles.cityModalItemText, isSelected && styles.cityModalItemTextActive]}>
+                              {area.name}
+                            </Text>
+                            <Text style={styles.cityModalItemSub}>
+                              {area.cityName || currentCity?.name} • {area.darkStore || 'Dark Store Hub'}
+                            </Text>
+                          </View>
+                        </View>
+                        {isSelected && <Check size={18} color={COLORS.purple} />}
+                      </TouchableOpacity>
+                    );
+                  })}
+              </ScrollView>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  filtersBar: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: SPACING.sm,
+    marginBottom: 4,
+  },
+  filterDropdownBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: COLORS.cardBackground,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: RADIUS.pill,
+    flex: 1,
+  },
+  activeFilterDropdown: {
+    backgroundColor: '#FAF5FF',
+    borderColor: COLORS.purple,
+  },
+  disabledFilterBtn: {
+    opacity: 0.6,
+  },
+  filterDropdownText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    flex: 1,
+  },
+  activeDropdownText: {
+    color: COLORS.purple,
+    fontWeight: '700',
+  },
+  cityModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.md,
+  },
+  cityModalPanel: {
+    width: '100%',
+    maxWidth: 440,
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.card,
+    overflow: 'hidden',
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  cityModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  cityModalTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: COLORS.navy,
+  },
+  cityModalSubtitle: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+  },
+  cityModalBody: {
+    padding: SPACING.md,
+  },
+  searchInnerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.cardBackground,
+    borderRadius: RADIUS.input,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: SPACING.sm,
+    gap: 8,
+  },
+  searchInnerInput: {
+    flex: 1,
+    fontSize: 13,
+    color: COLORS.textPrimary,
+    padding: 0,
+  },
+  cityModalScroll: {
+    maxHeight: 280,
+  },
+  cityModalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: RADIUS.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  cityModalItemActive: {
+    backgroundColor: '#FAF5FF',
+  },
+  cityModalItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  cityMiniBadge: {
+    backgroundColor: '#EDE9FE',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  cityMiniBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: COLORS.purple,
+  },
+  areaMiniDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.blue,
+  },
+  cityModalItemText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  cityModalItemTextActive: {
+    color: COLORS.purple,
+    fontWeight: '800',
+  },
+  cityModalItemSub: {
+    fontSize: 10,
+    color: COLORS.textMuted,
+  },
   container: {
     flex: 1,
     backgroundColor: COLORS.background,

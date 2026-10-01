@@ -173,9 +173,29 @@ interface AppContextType {
   handleOnboardingSkip: () => void;
   authVerificationId: string | null;
   setAuthVerificationId: (id: string | null) => void;
-  tempRegistration: { fullName: string; email: string; phone?: string; referralCode?: string };
-  setTempRegistration: (data: { fullName: string; email: string; phone?: string; referralCode?: string }) => void;
+  tempRegistration: {
+    fullName: string;
+    email: string;
+    phone?: string;
+    referralCode?: string;
+    preferredCityId?: string;
+    preferredCityName?: string;
+  };
+  setTempRegistration: (data: {
+    fullName: string;
+    email: string;
+    phone?: string;
+    referralCode?: string;
+    preferredCityId?: string;
+    preferredCityName?: string;
+  }) => void;
   logout: () => Promise<void>;
+
+  // Delivery City
+  currentCityName: string | null;
+  setCurrentCityName: (name: string | null) => void;
+  currentCityId: string | null;
+  setCurrentCityId: (id: string | null) => void;
 }
 
 const DEFAULT_FILTERS: FilterSortState = {
@@ -221,20 +241,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     email: string;
     phone?: string;
     referralCode?: string;
+    preferredCityId?: string;
+    preferredCityName?: string;
   }>({
     fullName: '',
     email: '',
     phone: '',
     referralCode: '',
+    preferredCityId: undefined,
+    preferredCityName: 'Ahmedabad',
   });
 
   // User Profile
   const [user, setUser] = useState<UserProfile>(INITIAL_USER);
   const [selectedAddress, setSelectedAddress] = useState<Address>(INITIAL_ADDRESS);
 
-  // Delivery Area & Dark Store Resolution
+  // Delivery Area, City & Dark Store Resolution
   const [currentAreaId, setCurrentAreaId] = useState<string | null>(null);
   const [currentAreaName, setCurrentAreaName] = useState<string | null>(null);
+  const [currentCityName, setCurrentCityName] = useState<string | null>(null);
+  const [currentCityId, setCurrentCityId] = useState<string | null>(null);
   const [currentStoreId, setCurrentStoreId] = useState<string | null>(null);
   const [currentStoreName, setCurrentStoreName] = useState<string | null>(null);
   const [isServiceable, setIsServiceable] = useState<boolean>(false);
@@ -413,16 +439,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         if (token) {
           api.setToken(token);
+          let isTokenValid = false;
           try {
             const profile = await AuthService.getProfile();
             if (profile && (profile.email || profile.phoneNumber || profile.fullName)) {
               // Live database user profile
               setUser(profile);
               StorageService.saveItem(StorageService.KEYS.USER, profile);
+              isTokenValid = true;
+            } else {
+              // Token was invalid or expired (401)
+              api.setToken(null);
+              await StorageService.removeItem(StorageService.KEYS.AUTH_TOKEN);
+              await StorageService.removeItem(StorageService.KEYS.REFRESH_TOKEN);
             }
           } catch (e) {
             console.warn('Profile fetch error on init:', e);
+            api.setToken(null);
           }
+
+          if (isTokenValid) {
 
             // Fetch Live Addresses for Authenticated User from MongoDB
             try {
@@ -462,22 +498,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 setWalletBalance(walletRes.data.balance || 0);
               }
             } catch (e) {}
-
-            // Restore Active Screen on refresh
-            const savedScreen = await StorageService.getItem<ScreenId | null>(
-              StorageService.KEYS.ACTIVE_SCREEN,
-              null
-            );
-            const validTarget =
-              savedScreen &&
-              savedScreen !== 'C01_Splash' &&
-              savedScreen !== 'C02_Onboarding1' &&
-              savedScreen !== 'C06_MobileNumber' &&
-              savedScreen !== 'C07_OtpVerification'
-                ? savedScreen
-                : 'Blinkit_Home';
-            setActiveScreenState(validTarget);
+          }
         }
+
+        // Restore Active Screen on refresh
+        const savedScreen = await StorageService.getItem<ScreenId | null>(
+          StorageService.KEYS.ACTIVE_SCREEN,
+          null
+        );
+        const validTarget =
+          savedScreen &&
+          savedScreen !== 'C01_Splash' &&
+          savedScreen !== 'C02_Onboarding1' &&
+          savedScreen !== 'C06_MobileNumber' &&
+          savedScreen !== 'C07_OtpVerification'
+            ? savedScreen
+            : 'Blinkit_Home';
+        setActiveScreenState(validTarget);
       } catch (e) {
         console.warn('Session restoration error:', e);
       }
@@ -615,6 +652,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                     if (area) {
                       setCurrentAreaId(area.areaId);
                       setCurrentAreaName(area.areaName);
+                      setCurrentCityName(area.city || user.preferredCityName || 'Ahmedabad');
                       setCurrentStoreId(area.storeId || null);
                       setCurrentStoreName(area.storeName || null);
                       setIsServiceable(area.serviceable === true);
@@ -637,6 +675,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (areaRes) {
             setCurrentAreaId(areaRes.areaId);
             setCurrentAreaName(areaRes.areaName);
+            setCurrentCityName(areaRes.city || user.preferredCityName || 'Ahmedabad');
             setCurrentStoreId(areaRes.storeId || null);
             setCurrentStoreName(areaRes.storeName || null);
             setIsServiceable(areaRes.serviceable === true);
@@ -683,6 +722,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (area) {
             setCurrentAreaId(area.areaId);
             setCurrentAreaName(area.areaName);
+            setCurrentCityName(area.city || user.preferredCityName || 'Ahmedabad');
             setCurrentStoreId(area.storeId || null);
             setCurrentStoreName(area.storeName || null);
             setIsServiceable(area.serviceable ?? false);
@@ -851,12 +891,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               name: `${i.product.name} ${i.product.quantityLabel}`,
               quantity: i.quantity,
               price: i.product.sellingPrice,
+              image: i.product.image,
+              imageUrl: i.product.imageUrl,
             }))
           : blinkitCartList.map((i) => ({
               productId: i.product.id,
               name: `${i.product.name} ${i.product.packSize}`,
               quantity: i.quantity,
               price: i.product.sellingPrice,
+              image: (i.product as any).image,
+              imageUrl: (i.product as any).imageUrl,
             })),
       subtotal: cartCount > 0 ? cartSummary.subtotalSelling : blinkitCartTotal,
       discount: cartCount > 0 ? cartSummary.productDiscount : Math.max(0, blinkitMrpTotal - blinkitCartTotal),
@@ -1032,6 +1076,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         clearWishlist,
         currentAreaId,
         currentAreaName,
+        currentCityName,
+        setCurrentCityName,
+        currentCityId,
+        setCurrentCityId,
         currentStoreId,
         currentStoreName,
         isServiceable,

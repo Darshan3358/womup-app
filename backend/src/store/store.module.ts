@@ -15,6 +15,9 @@ import { Product, ProductSchema } from '../products/schemas/product.schema';
 import { DeliveryPartner, DeliveryPartnerSchema } from '../delivery/schemas/delivery-partner.schema';
 import { OtpVerification, OtpVerificationSchema } from '../auth/schemas/otp.schema';
 
+import { Area, AreaSchema } from '../areas/schemas/area.schema';
+import { City, CitySchema } from '../areas/schemas/city.schema';
+
 import { MailService } from '../common/services/mail.service';
 import { TrackingModule } from '../tracking/tracking.module';
 
@@ -39,6 +42,8 @@ import { StoreInventoryService } from './inventory/store-inventory.service';
       { name: Product.name, schema: ProductSchema },
       { name: DeliveryPartner.name, schema: DeliveryPartnerSchema },
       { name: OtpVerification.name, schema: OtpVerificationSchema },
+      { name: Area.name, schema: AreaSchema },
+      { name: City.name, schema: CitySchema },
     ]),
     JwtModule.registerAsync({
       imports: [ConfigModule],

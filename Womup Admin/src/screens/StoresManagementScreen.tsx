@@ -8,7 +8,6 @@ import {
   TextInput,
   Modal,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -28,21 +27,32 @@ import {
   Eye,
   EyeOff,
   Radio,
+  ChevronDown,
+  Check,
+  Lock,
+  Building2,
+  Navigation,
   Sliders,
 } from 'lucide-react-native';
 import { COLORS, GRADIENTS, RADIUS, SPACING } from '../theme';
 import { ApiService } from '../services/api';
-import { DarkStoreItem } from '../types/admin';
+import { DarkStoreItem, CityItem, Zone } from '../types/admin';
 import { useAdminState } from '../context/AdminStateContext';
 
 export const StoresManagementScreen: React.FC = () => {
-  const { refreshFromDb } = useAdminState();
+  const { refreshFromDb, cities, zones } = useAdminState();
 
   const [stores, setStores] = useState<DarkStoreItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'All' | 'Active' | 'Logged In'>('All');
+
+  // Cascading City & Area Filters
+  const [selectedCityFilter, setSelectedCityFilter] = useState<string>('ALL');
+  const [selectedAreaFilter, setSelectedAreaFilter] = useState<string>('ALL');
+  const [showCityFilterModal, setShowCityFilterModal] = useState(false);
+  const [showAreaFilterModal, setShowAreaFilterModal] = useState(false);
 
   // Create Modal State
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -52,12 +62,17 @@ export const StoresManagementScreen: React.FC = () => {
   const [newLoginId, setNewLoginId] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newAddress, setNewAddress] = useState('');
-  const [newCity, setNewCity] = useState('Ahmedabad');
+  const [newCityId, setNewCityId] = useState('');
+  const [newCityName, setNewCityName] = useState('Ahmedabad');
+  const [newAreaId, setNewAreaId] = useState('');
+  const [newAreaName, setNewAreaName] = useState('');
   const [newPincode, setNewPincode] = useState('380015');
   const [newLatitude, setNewLatitude] = useState('23.0300');
   const [newLongitude, setNewLongitude] = useState('72.5300');
   const [newRadius, setNewRadius] = useState('4.5');
   const [newDeliveryMins, setNewDeliveryMins] = useState('9');
+  const [showCreateCityPicker, setShowCreateCityPicker] = useState(false);
+  const [showCreateAreaPicker, setShowCreateAreaPicker] = useState(false);
 
   // Created Success Banner State
   const [createdCredentials, setCreatedCredentials] = useState<{
@@ -76,6 +91,23 @@ export const StoresManagementScreen: React.FC = () => {
   // Delete Confirm Modal State
   const [deleteConfirmStore, setDeleteConfirmStore] = useState<DarkStoreItem | null>(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+
+  // Active Cities from Admin Context
+  const activeCities = cities.filter((c) => c.status === 'Active' || !c.status);
+
+  // Filterable Areas for the currently selected city filter
+  const filterableAreas = zones.filter((z) => {
+    if (selectedCityFilter === 'ALL') return true;
+    const matchedCity = activeCities.find(
+      (c) => c.id === selectedCityFilter || c._id === selectedCityFilter || c.name.toLowerCase() === selectedCityFilter.toLowerCase()
+    );
+    if (!matchedCity) return true;
+    const cityIdStr = matchedCity.id || matchedCity._id;
+    if (z.cityId && cityIdStr && String(z.cityId) === String(cityIdStr)) return true;
+    if (z.cityName && matchedCity.name && z.cityName.toLowerCase() === matchedCity.name.toLowerCase()) return true;
+    if (z.city && matchedCity.name && z.city.toLowerCase() === matchedCity.name.toLowerCase()) return true;
+    return false;
+  });
 
   // Load stores from API
   const loadStores = useCallback(async () => {
@@ -123,12 +155,19 @@ export const StoresManagementScreen: React.FC = () => {
 
   const openCreateModal = () => {
     const defaultPwd = generateRandomPassword();
+    const defaultCity = activeCities.find((c) => c.code === 'AHM' || c.name.toLowerCase() === 'ahmedabad') || activeCities[0];
+    const defaultCityId = defaultCity ? (defaultCity.id || defaultCity._id || '') : '';
+    const defaultCityName = defaultCity ? defaultCity.name : 'Ahmedabad';
+
     setNewStoreName('');
     setNewStoreCode('');
     setNewLoginId('');
     setNewPassword(defaultPwd);
     setNewAddress('');
-    setNewCity('Ahmedabad');
+    setNewCityId(defaultCityId);
+    setNewCityName(defaultCityName);
+    setNewAreaId('');
+    setNewAreaName('');
     setNewPincode('380015');
     setNewLatitude('23.0300');
     setNewLongitude('72.5300');
@@ -136,6 +175,54 @@ export const StoresManagementScreen: React.FC = () => {
     setNewDeliveryMins('9');
     setCreatedCredentials(null);
     setShowCreateModal(true);
+  };
+
+  const handleSelectCreateCity = (city: CityItem) => {
+    const cityIdStr = city.id || city._id || '';
+    setNewCityId(cityIdStr);
+    setNewCityName(city.name);
+    setNewAreaId('');
+    setNewAreaName('');
+    setShowCreateCityPicker(false);
+  };
+
+  const handleSelectCreateArea = (area: Zone) => {
+    const areaIdStr = area.id || area._id || '';
+    setNewAreaId(areaIdStr);
+    setNewAreaName(area.name);
+    setShowCreateAreaPicker(false);
+
+    // Auto-populate store details according to selected area
+    const areaCleanName = area.name.replace(/[^a-zA-Z0-9 ]/g, '').trim();
+    if (!newStoreName || newStoreName.includes('Dark Store')) {
+      setNewStoreName(`Wom Up ${areaCleanName} Dark Store`);
+    }
+    const derivedCode = `STORE-${(area.code || areaCleanName).toUpperCase().replace(/\s+/g, '_')}`;
+    setNewStoreCode(derivedCode);
+
+    if (!newLoginId || newLoginId.startsWith('womup')) {
+      setNewLoginId(`womup${areaCleanName.replace(/\s+/g, '')}`);
+    }
+
+    if (!newAddress || newAddress.includes('Dark Store Hub')) {
+      setNewAddress(`Dark Store Hub, ${area.name}, ${newCityName}`);
+    }
+
+    if (area.pincodes && area.pincodes.length > 0) {
+      setNewPincode(area.pincodes[0]);
+    }
+    if (area.centerLat) {
+      setNewLatitude(String(area.centerLat));
+    }
+    if (area.centerLng) {
+      setNewLongitude(String(area.centerLng));
+    }
+    if (area.radiusKm) {
+      setNewRadius(String(area.radiusKm));
+    }
+    if (area.defaultDeliveryMinutes) {
+      setNewDeliveryMins(String(area.defaultDeliveryMinutes));
+    }
   };
 
   const handleNameOrCodeChange = (name: string, code: string) => {
@@ -152,7 +239,7 @@ export const StoresManagementScreen: React.FC = () => {
   };
 
   const handleCreateStore = async () => {
-    if (!newStoreName.trim() || !newStoreCode.trim() || !newAddress.trim() || !newCity.trim()) {
+    if (!newStoreName.trim() || !newStoreCode.trim() || !newAddress.trim() || !newCityName.trim()) {
       alert('Please fill in Store Name, Code, Address, and City.');
       return;
     }
@@ -165,7 +252,11 @@ export const StoresManagementScreen: React.FC = () => {
         loginId: newLoginId.trim() || undefined,
         password: newPassword.trim() || undefined,
         address: newAddress.trim(),
-        city: newCity.trim(),
+        city: newCityName.trim(),
+        cityName: newCityName.trim(),
+        cityId: newCityId || undefined,
+        areaId: newAreaId || undefined,
+        areaName: newAreaName || undefined,
         pincode: newPincode.trim(),
         latitude: parseFloat(newLatitude) || 23.03,
         longitude: parseFloat(newLongitude) || 72.53,
@@ -241,7 +332,7 @@ export const StoresManagementScreen: React.FC = () => {
     }
   };
 
-  // Filtered store list
+  // Filtered store list respecting City, Area, Status, and Search
   const filteredStores = stores.filter((s) => {
     const q = searchQuery.toLowerCase().trim();
     const matchesQuery =
@@ -249,20 +340,80 @@ export const StoresManagementScreen: React.FC = () => {
       s.name.toLowerCase().includes(q) ||
       s.code.toLowerCase().includes(q) ||
       (s.loginId && s.loginId.toLowerCase().includes(q)) ||
-      (s.city && s.city.toLowerCase().includes(q));
+      (s.city && s.city.toLowerCase().includes(q)) ||
+      (s.cityName && s.cityName.toLowerCase().includes(q)) ||
+      (s.areaName && s.areaName.toLowerCase().includes(q));
 
     if (!matchesQuery) return false;
 
-    if (filterStatus === 'Active') return s.isActive !== false;
-    if (filterStatus === 'Logged In') return !!s.lastLoginAt;
+    if (filterStatus === 'Active' && s.isActive === false) return false;
+    if (filterStatus === 'Logged In' && !s.lastLoginAt) return false;
+
+    // Filter by City
+    if (selectedCityFilter !== 'ALL') {
+      const matchedCity = activeCities.find(
+        (c) => c.id === selectedCityFilter || c._id === selectedCityFilter || c.name.toLowerCase() === selectedCityFilter.toLowerCase()
+      );
+      const targetCityName = matchedCity ? matchedCity.name.toLowerCase() : selectedCityFilter.toLowerCase();
+      const targetCityId = matchedCity ? String(matchedCity.id || matchedCity._id) : '';
+      const storeCity = (s.cityName || s.city || '').toLowerCase();
+      const storeCityId = s.cityId ? String(s.cityId) : '';
+
+      const matchesCity = (targetCityId && storeCityId === targetCityId) || (storeCity && storeCity === targetCityName);
+      if (!matchesCity) return false;
+    }
+
+    // Filter by Area
+    if (selectedAreaFilter !== 'ALL') {
+      const matchedArea = zones.find(
+        (z) => z.id === selectedAreaFilter || z._id === selectedAreaFilter || z.name.toLowerCase() === selectedAreaFilter.toLowerCase()
+      );
+      const targetAreaName = matchedArea ? matchedArea.name.toLowerCase() : selectedAreaFilter.toLowerCase();
+      const targetAreaId = matchedArea ? String(matchedArea.id || matchedArea._id) : '';
+      const storeAreaId = s.areaId ? String(s.areaId) : '';
+      const storeAreaName = (s.areaName || '').toLowerCase();
+
+      const matchesArea = (targetAreaId && storeAreaId === targetAreaId) || (storeAreaName && storeAreaName === targetAreaName);
+      if (!matchesArea) return false;
+    }
 
     return true;
   });
 
+  // Group filtered stores by City
+  const storesByCity = filteredStores.reduce((acc, store) => {
+    const rawCity = (store.cityName || store.city || 'Other').trim();
+    const normalizedCity = rawCity.charAt(0).toUpperCase() + rawCity.slice(1);
+    if (!acc[normalizedCity]) {
+      acc[normalizedCity] = [];
+    }
+    acc[normalizedCity].push(store);
+    return acc;
+  }, {} as Record<string, DarkStoreItem[]>);
+
+  // Sort city names so Ahmedabad comes first, followed by others alphabetically
+  const cityGroups = Object.keys(storesByCity).sort((a, b) => {
+    if (a.toLowerCase() === 'ahmedabad') return -1;
+    if (b.toLowerCase() === 'ahmedabad') return 1;
+    return a.localeCompare(b);
+  });
+
+  // Overall metrics
   const totalStores = stores.length;
   const totalOrders = stores.reduce((sum, s) => sum + (s.orderCount || 0), 0);
   const totalPending = stores.reduce((sum, s) => sum + (s.pendingOrders || 0), 0);
   const totalRiders = stores.reduce((sum, s) => sum + (s.riderCount || 0), 0);
+
+  // Selected filter labels
+  const selectedCityObj = activeCities.find(
+    (c) => c.id === selectedCityFilter || c._id === selectedCityFilter || c.name.toLowerCase() === selectedCityFilter.toLowerCase()
+  );
+  const selectedCityLabel = selectedCityFilter === 'ALL' ? 'All Cities' : selectedCityObj ? selectedCityObj.name : selectedCityFilter;
+
+  const selectedAreaObj = zones.find(
+    (z) => z.id === selectedAreaFilter || z._id === selectedAreaFilter || z.name.toLowerCase() === selectedAreaFilter.toLowerCase()
+  );
+  const selectedAreaLabel = selectedAreaFilter === 'ALL' ? 'All Areas' : selectedAreaObj ? selectedAreaObj.name : selectedAreaFilter;
 
   return (
     <View style={styles.container}>
@@ -277,7 +428,7 @@ export const StoresManagementScreen: React.FC = () => {
               <View>
                 <Text style={styles.screenTitle}>Dark Stores & Hubs</Text>
                 <Text style={styles.screenSubtitle}>
-                  Store ID + Password authentication & fulfillment metrics
+                  City → Area → Store (1:1 Architecture) & fulfillment metrics
                 </Text>
               </View>
             </View>
@@ -339,13 +490,14 @@ export const StoresManagementScreen: React.FC = () => {
         </View>
       </LinearGradient>
 
-      {/* Search & Filter Bar */}
+      {/* ================= CASCADING FILTER CONTROLS & SEARCH BAR ================= */}
       <View style={styles.filterSection}>
+        {/* Row 1: Search Box */}
         <View style={styles.searchBox}>
           <Search size={18} color={COLORS.textMuted} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search by Store Name, Code, or Store ID (e.g. womupTragad)..."
+            placeholder="Search by Store Name, Area, Code, or Store ID..."
             placeholderTextColor={COLORS.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -357,6 +509,84 @@ export const StoresManagementScreen: React.FC = () => {
           ) : null}
         </View>
 
+        {/* Row 2: Cascading City & Area Filter Buttons */}
+        <View style={styles.cascadeFilterRow}>
+          {/* City Filter Selector */}
+          <View style={styles.cascadeDropdownCol}>
+            <Text style={styles.cascadeFilterLabel}>CITY HIERARCHY</Text>
+            <TouchableOpacity
+              style={[
+                styles.cascadeDropdownBtn,
+                selectedCityFilter !== 'ALL' && styles.cascadeDropdownBtnActive,
+              ]}
+              onPress={() => setShowCityFilterModal(true)}
+              activeOpacity={0.8}
+            >
+              <View style={styles.cascadeBtnContent}>
+                <Building2
+                  size={14}
+                  color={selectedCityFilter !== 'ALL' ? COLORS.hotPink : COLORS.textMuted}
+                />
+                <Text
+                  style={[
+                    styles.cascadeBtnText,
+                    selectedCityFilter !== 'ALL' && styles.cascadeBtnTextActive,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {selectedCityLabel}
+                </Text>
+              </View>
+              <ChevronDown size={14} color={COLORS.textMuted} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Area Filter Selector (Cascades from City) */}
+          <View style={styles.cascadeDropdownCol}>
+            <Text style={styles.cascadeFilterLabel}>AREA (1:1 STORE)</Text>
+            <TouchableOpacity
+              style={[
+                styles.cascadeDropdownBtn,
+                selectedAreaFilter !== 'ALL' && styles.cascadeDropdownBtnActive,
+              ]}
+              onPress={() => setShowAreaFilterModal(true)}
+              activeOpacity={0.8}
+            >
+              <View style={styles.cascadeBtnContent}>
+                <MapPin
+                  size={14}
+                  color={selectedAreaFilter !== 'ALL' ? COLORS.purple : COLORS.textMuted}
+                />
+                <Text
+                  style={[
+                    styles.cascadeBtnText,
+                    selectedAreaFilter !== 'ALL' && styles.cascadeBtnTextActive,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {selectedAreaLabel}
+                </Text>
+              </View>
+              <ChevronDown size={14} color={COLORS.textMuted} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Reset Filters Pill */}
+          {(selectedCityFilter !== 'ALL' || selectedAreaFilter !== 'ALL') && (
+            <TouchableOpacity
+              style={styles.clearFiltersBtn}
+              onPress={() => {
+                setSelectedCityFilter('ALL');
+                setSelectedAreaFilter('ALL');
+              }}
+            >
+              <X size={12} color={COLORS.error} />
+              <Text style={styles.clearFiltersText}>Reset</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Row 3: Status Filter Chips */}
         <View style={styles.filterChipsRow}>
           {(['All', 'Active', 'Logged In'] as const).map((filter) => (
             <TouchableOpacity
@@ -370,14 +600,14 @@ export const StoresManagementScreen: React.FC = () => {
                   filterStatus === filter && styles.filterChipTextActive,
                 ]}
               >
-                {filter} {filter === 'All' ? `(${stores.length})` : ''}
+                {filter} {filter === 'All' ? `(${filteredStores.length})` : ''}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
       </View>
 
-      {/* Stores List */}
+      {/* ================= STORES LIST GROUPED BY CITY ================= */}
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.hotPink} />
@@ -388,12 +618,19 @@ export const StoresManagementScreen: React.FC = () => {
           <Store size={48} color={COLORS.textMuted} />
           <Text style={styles.emptyTitle}>No Dark Stores Found</Text>
           <Text style={styles.emptySubtitle}>
-            {searchQuery
-              ? `No dark store matches query "${searchQuery}"`
+            {searchQuery || selectedCityFilter !== 'ALL' || selectedAreaFilter !== 'ALL'
+              ? 'No dark store matches the selected city, area, or search query.'
               : 'Create your first dark store to get started.'}
           </Text>
-          <TouchableOpacity style={styles.emptyActionBtn} onPress={openCreateModal}>
-            <Text style={styles.emptyActionText}>+ Create New Store</Text>
+          <TouchableOpacity
+            style={styles.emptyActionBtn}
+            onPress={() => {
+              setSelectedCityFilter('ALL');
+              setSelectedAreaFilter('ALL');
+              setSearchQuery('');
+            }}
+          >
+            <Text style={styles.emptyActionText}>Clear All Filters</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -402,119 +639,165 @@ export const StoresManagementScreen: React.FC = () => {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={true}
         >
-          {filteredStores.map((store) => {
-            const hasLogin = !!store.loginId;
-            const hasLoggedIn = !!store.lastLoginAt;
-
+          {cityGroups.map((cityName) => {
+            const cityStores = storesByCity[cityName] || [];
             return (
-              <View key={store.id} style={styles.storeCard}>
-                {/* Store Header Row */}
-                <View style={styles.cardHeader}>
-                  <View style={styles.storeMainInfo}>
-                    <View style={styles.storeTitleRow}>
-                      <Text style={styles.storeName}>{store.name}</Text>
-                      {store.isActive ? (
-                        <View style={styles.activeTag}>
-                          <View style={styles.activeDot} />
-                          <Text style={styles.activeTagText}>ONLINE</Text>
-                        </View>
-                      ) : (
-                        <View style={[styles.activeTag, { backgroundColor: '#FDE8E8' }]}>
-                          <Text style={[styles.activeTagText, { color: COLORS.error }]}>INACTIVE</Text>
-                        </View>
-                      )}
-                    </View>
-                    <Text style={styles.storeCode}>CODE: {store.code}</Text>
-                  </View>
-                </View>
-
-                {/* Authentication Credentials Highlight Box */}
-                <View style={styles.credentialsBox}>
-                  <View style={styles.credLeft}>
-                    <KeyRound size={16} color={COLORS.purple} style={{ marginRight: 8 }} />
-                    <View>
-                      <Text style={styles.credLabel}>STORE LOGIN ID</Text>
-                      <Text style={styles.credValue}>
-                        {hasLogin ? store.loginId : 'No Login ID Assigned'}
+              <View key={cityName} style={styles.citySectionGroup}>
+                {/* 🏙️ City Section Header */}
+                <View style={styles.citySectionHeader}>
+                  <View style={styles.citySectionHeaderLeft}>
+                    <Text style={styles.citySectionEmoji}>🏙️</Text>
+                    <Text style={styles.citySectionTitle}>{cityName.toUpperCase()}</Text>
+                    <View style={styles.cityStoreCountBadge}>
+                      <Text style={styles.cityStoreCountText}>
+                        {cityStores.length} {cityStores.length === 1 ? 'Store' : 'Stores'}
                       </Text>
                     </View>
                   </View>
-
-                  <View style={styles.credActions}>
-                    {hasLogin && (
-                      <TouchableOpacity
-                        style={styles.copyBtn}
-                        onPress={() => copyToClipboard(store.loginId!, 'Store ID')}
-                      >
-                        <Copy size={13} color={COLORS.textPrimary} />
-                        <Text style={styles.copyBtnText}>Copy ID</Text>
-                      </TouchableOpacity>
-                    )}
-
-                    <TouchableOpacity
-                      style={styles.resetBtn}
-                      onPress={() => openResetPasswordModal(store)}
-                    >
-                      <KeyRound size={13} color={COLORS.purple} />
-                      <Text style={styles.resetBtnText}>Reset Password</Text>
-                    </TouchableOpacity>
+                  <View style={styles.cityHubStatusTag}>
+                    <View style={styles.activeDot} />
+                    <Text style={styles.cityHubStatusText}>Active Cluster</Text>
                   </View>
                 </View>
 
-                {/* Metrics Pill Grid */}
-                <View style={styles.cardMetricsGrid}>
-                  <View style={styles.cardMetricItem}>
-                    <Package size={14} color={COLORS.hotPink} />
-                    <Text style={styles.cardMetricText}>
-                      <Text style={styles.cardMetricBold}>{store.orderCount || 0}</Text> Orders
-                    </Text>
-                  </View>
+                {/* Stores in this city */}
+                <View style={styles.cityStoresList}>
+                  {cityStores.map((store) => {
+                    const hasLogin = !!store.loginId;
+                    const hasLoggedIn = !!store.lastLoginAt;
 
-                  <View style={styles.cardMetricItem}>
-                    <Bike size={14} color={COLORS.blue} />
-                    <Text style={styles.cardMetricText}>
-                      <Text style={styles.cardMetricBold}>{store.riderCount || 0}</Text> Riders
-                    </Text>
-                  </View>
+                    return (
+                      <View key={store.id} style={styles.storeCard}>
+                        {/* Store Header Row */}
+                        <View style={styles.cardHeader}>
+                          <View style={styles.storeMainInfo}>
+                            <View style={styles.storeTitleRow}>
+                              <Text style={styles.storeName}>{store.name}</Text>
+                              {store.isActive ? (
+                                <View style={styles.activeTag}>
+                                  <View style={styles.activeDot} />
+                                  <Text style={styles.activeTagText}>ONLINE</Text>
+                                </View>
+                              ) : (
+                                <View style={[styles.activeTag, { backgroundColor: '#FDE8E8' }]}>
+                                  <Text style={[styles.activeTagText, { color: COLORS.error }]}>INACTIVE</Text>
+                                </View>
+                              )}
+                            </View>
+                            <Text style={styles.storeCode}>CODE: {store.code}</Text>
+                          </View>
+                        </View>
 
-                  <View style={styles.cardMetricItem}>
-                    <Radio size={14} color={COLORS.purple} />
-                    <Text style={styles.cardMetricText}>
-                      <Text style={styles.cardMetricBold}>{store.serviceRadiusKm || 4.5}</Text> km Radius
-                    </Text>
-                  </View>
+                        {/* 🔒 1:1 Area Lock and City Identity Banner */}
+                        <View style={styles.cardAreaLockBanner}>
+                          <View style={styles.cardAreaLockLeft}>
+                            <Lock size={12} color={COLORS.purple} />
+                            <Text style={styles.cardAreaLockLabel}>1:1 AREA LOCKED:</Text>
+                            <Text style={styles.cardAreaLockValue}>
+                              {store.areaName || 'Paldi / Central'}
+                            </Text>
+                          </View>
+                          <View style={styles.cardCityBadge}>
+                            <MapPin size={11} color={COLORS.hotPink} />
+                            <Text style={styles.cardCityBadgeText}>
+                              {store.cityName || store.city || cityName}
+                            </Text>
+                          </View>
+                        </View>
 
-                  <View style={styles.cardMetricItem}>
-                    <Clock size={14} color={COLORS.success} />
-                    <Text style={styles.cardMetricText}>
-                      <Text style={styles.cardMetricBold}>{store.estimatedDeliveryMinutes || 9}</Text> min SLA
-                    </Text>
-                  </View>
-                </View>
+                        {/* Authentication Credentials Highlight Box */}
+                        <View style={styles.credentialsBox}>
+                          <View style={styles.credLeft}>
+                            <KeyRound size={16} color={COLORS.purple} style={{ marginRight: 8 }} />
+                            <View>
+                              <Text style={styles.credLabel}>STORE LOGIN ID</Text>
+                              <Text style={styles.credValue}>
+                                {hasLogin ? store.loginId : 'No Login ID Assigned'}
+                              </Text>
+                            </View>
+                          </View>
 
-                {/* Location & Status Footer */}
-                <View style={styles.cardFooter}>
-                  <View style={styles.addressRow}>
-                    <MapPin size={13} color={COLORS.textMuted} style={{ marginRight: 4 }} />
-                    <Text style={styles.addressText} numberOfLines={1}>
-                      {store.address ? `${store.address}, ${store.city} - ${store.pincode || ''}` : `${store.city} Hub`}
-                    </Text>
-                  </View>
+                          <View style={styles.credActions}>
+                            {hasLogin && (
+                              <TouchableOpacity
+                                style={styles.copyBtn}
+                                onPress={() => copyToClipboard(store.loginId!, 'Store ID')}
+                              >
+                                <Copy size={13} color={COLORS.textPrimary} />
+                                <Text style={styles.copyBtnText}>Copy ID</Text>
+                              </TouchableOpacity>
+                            )}
 
-                  <View style={styles.footerActions}>
-                    <Text style={styles.lastLoginText}>
-                      {hasLoggedIn
-                        ? `Last Login: ${new Date(store.lastLoginAt!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                        : 'Shift: Shared Store Tablet'}
-                    </Text>
+                            <TouchableOpacity
+                              style={styles.resetBtn}
+                              onPress={() => openResetPasswordModal(store)}
+                            >
+                              <KeyRound size={13} color={COLORS.purple} />
+                              <Text style={styles.resetBtnText}>Reset Password</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
 
-                    <TouchableOpacity
-                      style={styles.deleteBtn}
-                      onPress={() => setDeleteConfirmStore(store)}
-                    >
-                      <Trash2 size={14} color={COLORS.error} />
-                    </TouchableOpacity>
-                  </View>
+                        {/* Metrics Pill Grid */}
+                        <View style={styles.cardMetricsGrid}>
+                          <View style={styles.cardMetricItem}>
+                            <Package size={14} color={COLORS.hotPink} />
+                            <Text style={styles.cardMetricText}>
+                              <Text style={styles.cardMetricBold}>{store.orderCount || 0}</Text> Orders
+                            </Text>
+                          </View>
+
+                          <View style={styles.cardMetricItem}>
+                            <Bike size={14} color={COLORS.blue} />
+                            <Text style={styles.cardMetricText}>
+                              <Text style={styles.cardMetricBold}>{store.riderCount || 0}</Text> Riders
+                            </Text>
+                          </View>
+
+                          <View style={styles.cardMetricItem}>
+                            <Radio size={14} color={COLORS.purple} />
+                            <Text style={styles.cardMetricText}>
+                              <Text style={styles.cardMetricBold}>{store.serviceRadiusKm || 4.5}</Text> km Radius
+                            </Text>
+                          </View>
+
+                          <View style={styles.cardMetricItem}>
+                            <Clock size={14} color={COLORS.success} />
+                            <Text style={styles.cardMetricText}>
+                              <Text style={styles.cardMetricBold}>{store.estimatedDeliveryMinutes || 9}</Text> min SLA
+                            </Text>
+                          </View>
+                        </View>
+
+                        {/* Location & Status Footer */}
+                        <View style={styles.cardFooter}>
+                          <View style={styles.addressRow}>
+                            <Navigation size={13} color={COLORS.textMuted} style={{ marginRight: 4 }} />
+                            <Text style={styles.addressText} numberOfLines={1}>
+                              {store.address
+                                ? `${store.address}, ${store.city} - ${store.pincode || ''}`
+                                : `${store.city} Hub`}
+                            </Text>
+                          </View>
+
+                          <View style={styles.footerActions}>
+                            <Text style={styles.lastLoginText}>
+                              {hasLoggedIn
+                                ? `Last Login: ${new Date(store.lastLoginAt!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                                : 'Shift: Shared Store Tablet'}
+                            </Text>
+
+                            <TouchableOpacity
+                              style={styles.deleteBtn}
+                              onPress={() => setDeleteConfirmStore(store)}
+                            >
+                              <Trash2 size={14} color={COLORS.error} />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      </View>
+                    );
+                  })}
                 </View>
               </View>
             );
@@ -522,7 +805,208 @@ export const StoresManagementScreen: React.FC = () => {
         </ScrollView>
       )}
 
-      {/* ================= MODAL: CREATE DARK STORE ================= */}
+      {/* ================= MODAL: CITY FILTER SELECTOR ================= */}
+      <Modal
+        visible={showCityFilterModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCityFilterModal(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalPanel, { maxHeight: 420 }]}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleRow}>
+                <Building2 size={20} color={COLORS.hotPink} />
+                <Text style={styles.modalTitle}>Filter Stores by City</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowCityFilterModal(false)}>
+                <X size={20} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalBody}>
+              {/* Option: All Cities */}
+              <TouchableOpacity
+                style={[
+                  styles.filterOptionItem,
+                  selectedCityFilter === 'ALL' && styles.filterOptionItemActive,
+                ]}
+                onPress={() => {
+                  setSelectedCityFilter('ALL');
+                  setSelectedAreaFilter('ALL');
+                  setShowCityFilterModal(false);
+                }}
+              >
+                <View style={styles.filterOptionLeft}>
+                  <Building2 size={16} color={selectedCityFilter === 'ALL' ? COLORS.hotPink : COLORS.textMuted} />
+                  <Text
+                    style={[
+                      styles.filterOptionText,
+                      selectedCityFilter === 'ALL' && styles.filterOptionTextActive,
+                    ]}
+                  >
+                    All Cities (All Stores)
+                  </Text>
+                </View>
+                {selectedCityFilter === 'ALL' && <Check size={16} color={COLORS.hotPink} />}
+              </TouchableOpacity>
+
+              {/* Each Active City */}
+              {activeCities.map((city) => {
+                const cityIdStr = city.id || city._id || '';
+                const isSelected =
+                  selectedCityFilter === cityIdStr ||
+                  selectedCityFilter.toLowerCase() === city.name.toLowerCase();
+                const count = stores.filter(
+                  (s) =>
+                    (s.cityId && cityIdStr && String(s.cityId) === String(cityIdStr)) ||
+                    (s.cityName || s.city || '').toLowerCase() === city.name.toLowerCase()
+                ).length;
+
+                return (
+                  <TouchableOpacity
+                    key={cityIdStr || city.name}
+                    style={[
+                      styles.filterOptionItem,
+                      isSelected && styles.filterOptionItemActive,
+                    ]}
+                    onPress={() => {
+                      setSelectedCityFilter(cityIdStr || city.name);
+                      setSelectedAreaFilter('ALL'); // Reset area when city changes
+                      setShowCityFilterModal(false);
+                    }}
+                  >
+                    <View style={styles.filterOptionLeft}>
+                      <Text style={styles.cityOptionEmoji}>🏙️</Text>
+                      <View>
+                        <Text
+                          style={[
+                            styles.filterOptionText,
+                            isSelected && styles.filterOptionTextActive,
+                          ]}
+                        >
+                          {city.name}
+                        </Text>
+                        <Text style={styles.filterOptionSubtext}>
+                          {count} {count === 1 ? 'Dark Store' : 'Dark Stores'} Assigned
+                        </Text>
+                      </View>
+                    </View>
+                    {isSelected && <Check size={16} color={COLORS.hotPink} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ================= MODAL: AREA FILTER SELECTOR ================= */}
+      <Modal
+        visible={showAreaFilterModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowAreaFilterModal(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalPanel, { maxHeight: 480 }]}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleRow}>
+                <MapPin size={20} color={COLORS.purple} />
+                <View>
+                  <Text style={styles.modalTitle}>Filter Stores by Area</Text>
+                  <Text style={styles.modalSubtitle}>
+                    {selectedCityFilter === 'ALL'
+                      ? 'Showing all areas across all cities'
+                      : `Scoped to ${selectedCityLabel} areas`}
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setShowAreaFilterModal(false)}>
+                <X size={20} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalBody}>
+              {/* Option: All Areas */}
+              <TouchableOpacity
+                style={[
+                  styles.filterOptionItem,
+                  selectedAreaFilter === 'ALL' && styles.filterOptionItemActive,
+                ]}
+                onPress={() => {
+                  setSelectedAreaFilter('ALL');
+                  setShowAreaFilterModal(false);
+                }}
+              >
+                <View style={styles.filterOptionLeft}>
+                  <MapPin size={16} color={selectedAreaFilter === 'ALL' ? COLORS.purple : COLORS.textMuted} />
+                  <Text
+                    style={[
+                      styles.filterOptionText,
+                      selectedAreaFilter === 'ALL' && styles.filterOptionTextActive,
+                    ]}
+                  >
+                    All Areas
+                  </Text>
+                </View>
+                {selectedAreaFilter === 'ALL' && <Check size={16} color={COLORS.purple} />}
+              </TouchableOpacity>
+
+              {/* Each Area */}
+              {filterableAreas.map((area) => {
+                const areaIdStr = area.id || area._id || '';
+                const isSelected =
+                  selectedAreaFilter === areaIdStr ||
+                  selectedAreaFilter.toLowerCase() === area.name.toLowerCase();
+
+                // Find store assigned to this area
+                const assignedStore = stores.find(
+                  (s) =>
+                    (s.areaId && areaIdStr && String(s.areaId) === String(areaIdStr)) ||
+                    (s.areaName && s.areaName.toLowerCase() === area.name.toLowerCase())
+                );
+
+                return (
+                  <TouchableOpacity
+                    key={areaIdStr || area.name}
+                    style={[
+                      styles.filterOptionItem,
+                      isSelected && styles.filterOptionItemActive,
+                    ]}
+                    onPress={() => {
+                      setSelectedAreaFilter(areaIdStr || area.name);
+                      setShowAreaFilterModal(false);
+                    }}
+                  >
+                    <View style={styles.filterOptionLeft}>
+                      <Lock size={14} color={assignedStore ? COLORS.purple : COLORS.textMuted} />
+                      <View>
+                        <Text
+                          style={[
+                            styles.filterOptionText,
+                            isSelected && styles.filterOptionTextActive,
+                          ]}
+                        >
+                          {area.name}
+                        </Text>
+                        <Text style={styles.filterOptionSubtext}>
+                          {assignedStore
+                            ? `Store: ${assignedStore.name}`
+                            : 'No Store Currently Assigned'}
+                        </Text>
+                      </View>
+                    </View>
+                    {isSelected && <Check size={16} color={COLORS.purple} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ================= MODAL: CREATE DARK STORE (WITH CITY & AREA CASCADE) ================= */}
       <Modal
         visible={showCreateModal}
         transparent
@@ -534,7 +1018,10 @@ export const StoresManagementScreen: React.FC = () => {
             <View style={styles.modalHeader}>
               <View style={styles.modalTitleRow}>
                 <Store size={20} color={COLORS.hotPink} />
-                <Text style={styles.modalTitle}>Create New Dark Store</Text>
+                <View>
+                  <Text style={styles.modalTitle}>Create New Dark Store</Text>
+                  <Text style={styles.modalSubtitle}>City → Area → Store 1:1 Architecture</Text>
+                </View>
               </View>
               <TouchableOpacity onPress={() => setShowCreateModal(false)}>
                 <X size={20} color={COLORS.textMuted} />
@@ -590,12 +1077,55 @@ export const StoresManagementScreen: React.FC = () => {
               </View>
             ) : (
               <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-                <Text style={styles.inputSectionTitle}>Basic Details</Text>
+                {/* Section 1: City & Area Cascading Selectors */}
+                <Text style={styles.inputSectionTitle}>1. City & Area Assignment (1:1 Lock)</Text>
+                <Text style={styles.helperText}>
+                  Each dark store must belong to a verified City and strictly lock to ONE Area.
+                </Text>
+
+                {/* City Picker in Modal */}
+                <Text style={styles.inputLabel}>Select City *</Text>
+                <TouchableOpacity
+                  style={styles.modalSelectorBtn}
+                  onPress={() => setShowCreateCityPicker(true)}
+                >
+                  <View style={styles.cascadeBtnContent}>
+                    <Building2 size={16} color={COLORS.hotPink} />
+                    <Text style={styles.modalSelectorText}>{newCityName}</Text>
+                  </View>
+                  <ChevronDown size={16} color={COLORS.textMuted} />
+                </TouchableOpacity>
+
+                {/* Area Picker in Modal */}
+                <Text style={styles.inputLabel}>Select Area (Locks 1:1) *</Text>
+                <TouchableOpacity
+                  style={[
+                    styles.modalSelectorBtn,
+                    !newAreaName && styles.modalSelectorBtnPlaceholder,
+                  ]}
+                  onPress={() => setShowCreateAreaPicker(true)}
+                >
+                  <View style={styles.cascadeBtnContent}>
+                    <MapPin size={16} color={newAreaName ? COLORS.purple : COLORS.textMuted} />
+                    <Text
+                      style={[
+                        styles.modalSelectorText,
+                        !newAreaName && { color: COLORS.textMuted },
+                      ]}
+                    >
+                      {newAreaName ? newAreaName : 'Select an unassigned area...'}
+                    </Text>
+                  </View>
+                  <ChevronDown size={16} color={COLORS.textMuted} />
+                </TouchableOpacity>
+
+                {/* Section 2: Basic Store Identity */}
+                <Text style={[styles.inputSectionTitle, { marginTop: 14 }]}>2. Store Details</Text>
 
                 <Text style={styles.inputLabel}>Store Name *</Text>
                 <TextInput
                   style={styles.textInput}
-                  placeholder="e.g. Wom Up Gandhinagar Dark Store"
+                  placeholder="e.g. Wom Up Satellite Dark Store"
                   value={newStoreName}
                   onChangeText={(v) => handleNameOrCodeChange(v, newStoreCode)}
                 />
@@ -603,13 +1133,14 @@ export const StoresManagementScreen: React.FC = () => {
                 <Text style={styles.inputLabel}>Store Code * (Used in order prefixes)</Text>
                 <TextInput
                   style={styles.textInput}
-                  placeholder="e.g. STORE-GANDHINAGAR"
+                  placeholder="e.g. STORE-SATELLITE"
                   value={newStoreCode}
                   onChangeText={(v) => handleNameOrCodeChange(newStoreName, v)}
                   autoCapitalize="characters"
                 />
 
-                <Text style={styles.inputSectionTitle}>Store Login Credentials</Text>
+                {/* Section 3: Credentials */}
+                <Text style={styles.inputSectionTitle}>3. Store Login Credentials</Text>
                 <Text style={styles.helperText}>
                   All pickers & tablets at this dark store will use this Store ID and Password.
                 </Text>
@@ -617,7 +1148,7 @@ export const StoresManagementScreen: React.FC = () => {
                 <Text style={styles.inputLabel}>Store Login ID *</Text>
                 <TextInput
                   style={styles.textInput}
-                  placeholder="e.g. womupGandhinagar"
+                  placeholder="e.g. womupSatellite"
                   value={newLoginId}
                   onChangeText={setNewLoginId}
                   autoCapitalize="none"
@@ -633,17 +1164,18 @@ export const StoresManagementScreen: React.FC = () => {
                 </View>
                 <TextInput
                   style={styles.textInput}
-                  placeholder="e.g. Gandhinagar@2026"
+                  placeholder="e.g. Womup@2026"
                   value={newPassword}
                   onChangeText={setNewPassword}
                   autoCapitalize="none"
                 />
 
-                <Text style={styles.inputSectionTitle}>Location & Delivery SLA</Text>
+                {/* Section 4: Physical Address & SLA */}
+                <Text style={styles.inputSectionTitle}>4. Location & Delivery SLA</Text>
 
                 <Text style={styles.inputLabel}>Physical Address *</Text>
                 <TextInput
-                  style={[styles.textInput, { height: 60 }]}
+                  style={[styles.textInput, { height: 50 }]}
                   placeholder="Shop No, Building, Road, Area"
                   value={newAddress}
                   onChangeText={setNewAddress}
@@ -651,14 +1183,6 @@ export const StoresManagementScreen: React.FC = () => {
                 />
 
                 <View style={styles.formRow}>
-                  <View style={styles.formCol}>
-                    <Text style={styles.inputLabel}>City *</Text>
-                    <TextInput
-                      style={styles.textInput}
-                      value={newCity}
-                      onChangeText={setNewCity}
-                    />
-                  </View>
                   <View style={styles.formCol}>
                     <Text style={styles.inputLabel}>Pincode</Text>
                     <TextInput
@@ -668,9 +1192,6 @@ export const StoresManagementScreen: React.FC = () => {
                       keyboardType="numeric"
                     />
                   </View>
-                </View>
-
-                <View style={styles.formRow}>
                   <View style={styles.formCol}>
                     <Text style={styles.inputLabel}>Service Radius (km)</Text>
                     <TextInput
@@ -680,6 +1201,9 @@ export const StoresManagementScreen: React.FC = () => {
                       keyboardType="numeric"
                     />
                   </View>
+                </View>
+
+                <View style={styles.formRow}>
                   <View style={styles.formCol}>
                     <Text style={styles.inputLabel}>Est. Delivery (mins)</Text>
                     <TextInput
@@ -689,24 +1213,12 @@ export const StoresManagementScreen: React.FC = () => {
                       keyboardType="numeric"
                     />
                   </View>
-                </View>
-
-                <View style={styles.formRow}>
                   <View style={styles.formCol}>
                     <Text style={styles.inputLabel}>Latitude</Text>
                     <TextInput
                       style={styles.textInput}
                       value={newLatitude}
                       onChangeText={setNewLatitude}
-                      keyboardType="numeric"
-                    />
-                  </View>
-                  <View style={styles.formCol}>
-                    <Text style={styles.inputLabel}>Longitude</Text>
-                    <TextInput
-                      style={styles.textInput}
-                      value={newLongitude}
-                      onChangeText={setNewLongitude}
                       keyboardType="numeric"
                     />
                   </View>
@@ -723,13 +1235,125 @@ export const StoresManagementScreen: React.FC = () => {
                     ) : (
                       <>
                         <Plus size={16} color={COLORS.white} style={{ marginRight: 6 }} />
-                        <Text style={styles.submitBtnText}>Create & Bootstrap Inventory</Text>
+                        <Text style={styles.submitBtnText}>Create & Link 1:1 Area Store</Text>
                       </>
                     )}
                   </LinearGradient>
                 </TouchableOpacity>
               </ScrollView>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Picker Modal for City in Create Flow */}
+      <Modal
+        visible={showCreateCityPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCreateCityPicker(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalPanel, { maxHeight: 380 }]}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleRow}>
+                <Building2 size={18} color={COLORS.hotPink} />
+                <Text style={styles.modalTitle}>Choose City for Store</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowCreateCityPicker(false)}>
+                <X size={18} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalBody}>
+              {activeCities.map((c) => (
+                <TouchableOpacity
+                  key={c.id || c._id || c.name}
+                  style={[
+                    styles.filterOptionItem,
+                    newCityName === c.name && styles.filterOptionItemActive,
+                  ]}
+                  onPress={() => handleSelectCreateCity(c)}
+                >
+                  <View style={styles.filterOptionLeft}>
+                    <Text style={styles.cityOptionEmoji}>🏙️</Text>
+                    <Text style={styles.filterOptionText}>{c.name}</Text>
+                  </View>
+                  {newCityName === c.name && <Check size={16} color={COLORS.hotPink} />}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Picker Modal for Area in Create Flow */}
+      <Modal
+        visible={showCreateAreaPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCreateAreaPicker(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalPanel, { maxHeight: 460 }]}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleRow}>
+                <MapPin size={18} color={COLORS.purple} />
+                <View>
+                  <Text style={styles.modalTitle}>Choose Area for Store</Text>
+                  <Text style={styles.modalSubtitle}>1 Area = 1 Dark Store Rule</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setShowCreateAreaPicker(false)}>
+                <X size={18} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalBody}>
+              {zones
+                .filter((z) => {
+                  if (!newCityName) return true;
+                  if (z.cityName && z.cityName.toLowerCase() === newCityName.toLowerCase()) return true;
+                  if (z.city && z.city.toLowerCase() === newCityName.toLowerCase()) return true;
+                  if (z.cityId && newCityId && String(z.cityId) === String(newCityId)) return true;
+                  return false;
+                })
+                .map((a) => {
+                  const areaIdStr = a.id || a._id || '';
+                  const assignedStore = stores.find(
+                    (s) =>
+                      (s.areaId && areaIdStr && String(s.areaId) === String(areaIdStr)) ||
+                      (s.areaName && s.areaName.toLowerCase() === a.name.toLowerCase())
+                  );
+
+                  return (
+                    <TouchableOpacity
+                      key={areaIdStr || a.name}
+                      style={[
+                        styles.filterOptionItem,
+                        newAreaName === a.name && styles.filterOptionItemActive,
+                      ]}
+                      onPress={() => handleSelectCreateArea(a)}
+                    >
+                      <View style={styles.filterOptionLeft}>
+                        <Lock size={14} color={assignedStore ? COLORS.error : COLORS.success} />
+                        <View>
+                          <Text style={styles.filterOptionText}>{a.name}</Text>
+                          <Text
+                            style={[
+                              styles.filterOptionSubtext,
+                              assignedStore && { color: COLORS.error },
+                            ]}
+                          >
+                            {assignedStore
+                              ? `⚠️ Already has store: ${assignedStore.name}`
+                              : '🟢 Available for new Dark Store'}
+                          </Text>
+                        </View>
+                      </View>
+                      {newAreaName === a.name && <Check size={16} color={COLORS.purple} />}
+                    </TouchableOpacity>
+                  );
+                })}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -983,6 +1607,7 @@ const styles = StyleSheet.create({
   filterSection: {
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
+    backgroundColor: COLORS.cardBackground,
   },
   searchBox: {
     flexDirection: 'row',
@@ -990,10 +1615,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.input,
     paddingHorizontal: 12,
-    height: 42,
+    height: 40,
     borderWidth: 1,
     borderColor: COLORS.border,
-    marginBottom: SPACING.xs,
+    marginBottom: 8,
   },
   searchIcon: {
     marginRight: 8,
@@ -1003,10 +1628,71 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.textPrimary,
   },
+  cascadeFilterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  cascadeDropdownCol: {
+    flex: 1,
+  },
+  cascadeFilterLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: COLORS.textMuted,
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  cascadeDropdownBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  cascadeDropdownBtnActive: {
+    borderColor: COLORS.purple,
+    backgroundColor: '#F8F6FF',
+  },
+  cascadeBtnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+    marginRight: 4,
+  },
+  cascadeBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  cascadeBtnTextActive: {
+    color: COLORS.purple,
+    fontWeight: '700',
+  },
+  clearFiltersBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+    backgroundColor: '#FEE2E2',
+    alignSelf: 'flex-end',
+  },
+  clearFiltersText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.error,
+  },
   filterChipsRow: {
     flexDirection: 'row',
     gap: 8,
-    marginTop: 6,
   },
   filterChip: {
     paddingHorizontal: 12,
@@ -1075,6 +1761,65 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: SPACING.md,
     paddingBottom: SPACING.xl,
+    gap: 16,
+  },
+  citySectionGroup: {
+    marginBottom: 8,
+  },
+  citySectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.hotPink,
+    borderWidth: 1,
+    borderColor: '#ECEAF3',
+    marginBottom: 10,
+  },
+  citySectionHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  citySectionEmoji: {
+    fontSize: 18,
+  },
+  citySectionTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+    letterSpacing: 0.5,
+  },
+  cityStoreCountBadge: {
+    backgroundColor: '#F3F0FA',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: RADIUS.pill,
+  },
+  cityStoreCountText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.purple,
+  },
+  cityHubStatusTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#E6F9F0',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: RADIUS.pill,
+  },
+  cityHubStatusText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.success,
+  },
+  cityStoresList: {
     gap: 12,
   },
   storeCard: {
@@ -1093,7 +1838,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   storeMainInfo: {
     flex: 1,
@@ -1136,6 +1881,49 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.textMuted,
     letterSpacing: 0.5,
+  },
+  cardAreaLockBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8F6FF',
+    borderWidth: 1,
+    borderColor: '#E9E4F5',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 10,
+  },
+  cardAreaLockLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  cardAreaLockLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: COLORS.purple,
+    letterSpacing: 0.5,
+  },
+  cardAreaLockValue: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+  },
+  cardCityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FFEBF3',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: RADIUS.pill,
+  },
+  cardCityBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.hotPink,
   },
   credentialsBox: {
     flexDirection: 'row',
@@ -1295,8 +2083,51 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: COLORS.textPrimary,
   },
+  modalSubtitle: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginTop: 1,
+  },
   modalBody: {
     padding: SPACING.md,
+  },
+  filterOptionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 6,
+    backgroundColor: '#FAFAFD',
+    borderWidth: 1,
+    borderColor: '#ECEAF3',
+  },
+  filterOptionItemActive: {
+    backgroundColor: '#F3F0FA',
+    borderColor: COLORS.purple,
+  },
+  filterOptionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  cityOptionEmoji: {
+    fontSize: 16,
+  },
+  filterOptionText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  filterOptionTextActive: {
+    color: COLORS.purple,
+  },
+  filterOptionSubtext: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginTop: 1,
   },
   inputSectionTitle: {
     fontSize: 12,
@@ -1318,6 +2149,27 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     marginBottom: 4,
     marginTop: 6,
+  },
+  modalSelectorBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.cardBackground,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.input,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 8,
+  },
+  modalSelectorBtnPlaceholder: {
+    borderColor: '#D4CEE8',
+    backgroundColor: '#FAF9FE',
+  },
+  modalSelectorText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
   },
   labelWithAction: {
     flexDirection: 'row',

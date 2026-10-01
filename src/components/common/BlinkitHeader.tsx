@@ -2,22 +2,23 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
+  Image,
   TouchableOpacity,
   TextInput,
   StyleSheet,
-  ScrollView,
+  useWindowDimensions,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, GRADIENTS } from '../../theme/colors';
+import { Feather, Ionicons } from '@expo/vector-icons';
+import { COLORS } from '../../theme/colors';
 import { TYPOGRAPHY } from '../../theme/typography';
-import { AppIcon, IconName } from './AppIcon';
+import { AppIcon } from './AppIcon';
 import { useApp } from '../../context/AppContext';
 
 interface BlinkitHeaderProps {
   variant?: 'gradient' | 'plain';
-  etaLabel?: string; // e.g. "Delivery in" or "Prints in"
-  etaTime?: string;  // e.g. "9 minutes" or "10 minutes"
+  etaLabel?: string;
+  etaTime?: string;
   searchPlaceholder?: string;
   activeCategoryTab?: string;
   onSelectCategoryTab?: (tab: string) => void;
@@ -26,25 +27,33 @@ interface BlinkitHeaderProps {
   onBackPress?: () => void;
   showSettings?: boolean;
   onSettingsPress?: () => void;
+  children?: React.ReactNode;
 }
 
 export const BlinkitHeader: React.FC<BlinkitHeaderProps> = ({
   variant = 'gradient',
   etaLabel = 'Delivery in',
   etaTime = '9 minutes',
-  searchPlaceholder = 'Search "birthday gift"',
-  activeCategoryTab = 'All',
+  searchPlaceholder = 'Search "milk, chips, maggi"',
+  activeCategoryTab = 'Home',
   onSelectCategoryTab,
   showCategoryTabs = true,
   plainTitle,
   onBackPress,
   showSettings = false,
   onSettingsPress,
+  children,
 }) => {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const isCompact = width < 768;
+  const isVerySmall = width < 480;
+
   const {
     walletBalance,
     deliveryLocation,
+    currentAreaName,
+    currentCityName,
     currentStoreName,
     isServiceable,
     deliveryEtaMinutes,
@@ -52,31 +61,28 @@ export const BlinkitHeader: React.FC<BlinkitHeaderProps> = ({
     setActiveScreen,
     goBack,
     wishlist,
+    blinkitCartCount,
     setIsVoiceSearchActive,
+    user,
   } = useApp();
 
-  // Search placeholder animation simulation
+  const totalCartCount = blinkitCartCount;
+
+  // Search placeholder animation queries
   const placeholderQueries = [
     searchPlaceholder,
-    'Search "amul milk"',
-    'Search "cold drinks"',
-    'Search "atta & rice"',
+    'Search "milk, chips, maggi"',
+    'Search "fresh milk, butter"',
+    'Search "fruits, vegetables"',
   ];
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
 
   useEffect(() => {
     const timer = setInterval(() => {
       setPlaceholderIndex((prev) => (prev + 1) % placeholderQueries.length);
-    }, 3500);
+    }, 4000);
     return () => clearInterval(timer);
   }, [placeholderQueries.length]);
-
-  const categoryTabs: { id: string; label: string; icon: IconName }[] = [
-    { id: 'All', label: 'All', icon: 'shopping-bag' },
-    { id: 'Ganeshotsav', label: 'Ganeshotsav', icon: 'ganesh' },
-    { id: 'Electronics', label: 'Electronics', icon: 'headphones' },
-    { id: 'Beauty', label: 'Beauty', icon: 'beauty' },
-  ];
 
   if (variant === 'plain') {
     return (
@@ -112,174 +118,362 @@ export const BlinkitHeader: React.FC<BlinkitHeaderProps> = ({
     );
   }
 
+  const areaName = currentAreaName || 'Chandlodiya';
+  const cityName = currentCityName || user?.preferredCityName || 'Ahmedabad';
+  const cleanStoreName = (currentStoreName || 'Wom Up Chandlodiya Dark Store')
+    .replace(/^🟢\s*/, '')
+    .trim();
+
   return (
-    <LinearGradient
-      colors={GRADIENTS.navyHeader}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 0, y: 1 }}
-      style={[styles.gradientContainer, { paddingTop: insets.top + 8 }]}
-    >
-      {/* Top Row: ETA + Right Buttons */}
-      <View style={styles.topRow}>
-        <View style={styles.etaContainer}>
-          <Text style={styles.etaLabelText}>
-            {!isServiceable ? 'Status' : (!etaLabel || etaLabel.toLowerCase().includes('blinkit')) ? 'Delivery in' : etaLabel}
-          </Text>
-          <Text style={[styles.etaHeroText, !isServiceable && { fontSize: 20, color: '#FCD34D' }]}>
-            {isServiceable ? (etaTime || `${deliveryEtaMinutes || 9} minutes`) : 'Outside Zone'}
-          </Text>
+    <View style={[styles.headerContainer, { paddingTop: Math.max(insets.top, 8) }]}>
+      <View style={styles.containerInner}>
+        {/* Row 1: Logo & Location (Left) | Action Icons (Right) */}
+        <View style={styles.headerTopRow}>
+          {/* Left Group: WOM UP Brand Logo & Location */}
+          <View style={styles.topLeftGroup}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => setActiveScreen('Blinkit_Home')}
+              style={styles.logoContainer}
+              accessibilityLabel="WOM UP Home"
+            >
+              <Image
+                source={require('../../../assets/Wormup.png')}
+                style={styles.headerLogoImage}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
 
-          {/* Location Row */}
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => setLocationModalVisible(true)}
-            style={styles.locationButton}
-            accessibilityLabel="Select delivery address"
-          >
-            <Text style={styles.locationText} numberOfLines={1}>
-              {deliveryLocation}
-            </Text>
-            <AppIcon name="chevron-down" size={16} color={COLORS.white} />
-          </TouchableOpacity>
+            {/* Location Selector */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setLocationModalVisible(true)}
+              style={styles.locationWrapper}
+              accessibilityLabel="Select delivery address"
+            >
+              <View style={styles.locationTextColumn}>
+                <Text style={styles.etaText} numberOfLines={1}>
+                  {etaLabel} {etaTime}
+                </Text>
 
-          {/* Dark Store Hub Indicator */}
-          <View style={styles.storeHubPill}>
-            <View style={[styles.statusDot, { backgroundColor: isServiceable ? '#10B981' : '#EF4444' }]} />
-            <Text style={styles.storeHubText} numberOfLines={1}>
-              {isServiceable ? (currentStoreName || 'Ahmedabad Dark Store') : 'No Dark Store Nearby'}
-            </Text>
+                <View style={styles.locationRow}>
+                  <Text style={styles.locationSubtitle} numberOfLines={1}>
+                    {areaName}, {cityName}
+                  </Text>
+                  <Feather
+                    name="chevron-down"
+                    size={13}
+                    color="rgba(255,255,255,0.85)"
+                    style={{ marginLeft: 3 }}
+                  />
+                </View>
+
+                <View style={styles.storeStatusRow}>
+                  <View style={styles.storeStatusDot} />
+                  <Text style={styles.locationTitle} numberOfLines={1}>
+                    {cleanStoreName}
+                  </Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          {/* Right Group: Wishlist & Wallet */}
+          <View style={styles.headerActions}>
+            {/* Wishlist */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setActiveScreen('Blinkit_Wishlist')}
+              style={styles.actionIconButton}
+              accessibilityLabel="Wishlist"
+            >
+              <Feather
+                name="heart"
+                size={17}
+                color={wishlist.length > 0 ? COLORS.hotPink : '#FFFFFF'}
+              />
+              {wishlist.length > 0 && (
+                <View style={styles.badgePill}>
+                  <Text style={styles.badgeText}>{wishlist.length}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {/* Wallet with balance badge */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setActiveScreen('Blinkit_Money')}
+              style={styles.actionIconButton}
+              accessibilityLabel="Wallet"
+            >
+              <Ionicons name="wallet-outline" size={17} color="#FFFFFF" />
+              <View style={styles.walletBadge}>
+                <Text style={styles.walletBadgeText}>
+                  ₹{walletBalance || 50}
+                </Text>
+              </View>
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Action buttons: Wishlist, Wallet & Profile */}
-        <View style={styles.topRightActions}>
-          {/* Wishlist button */}
+        {/* Row 2: Search Bar & Cart Icon (Replaces deleted tabs) */}
+        <View style={styles.headerSearchRow}>
+          {/* Search Bar */}
           <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setActiveScreen('Blinkit_Wishlist')}
-            style={styles.actionButtonContainer}
-            accessibilityLabel="Your Wishlist"
+            activeOpacity={0.9}
+            onPress={() => setActiveScreen('C17_Search')}
+            style={styles.searchBar}
           >
-            <View style={styles.whiteCircleButton}>
-              <AppIcon
-                name="heart"
-                size={20}
-                color={wishlist.length > 0 ? '#E11D48' : COLORS.textPrimary}
-              />
-            </View>
-            {wishlist.length > 0 && (
-              <View style={[styles.walletBadge, { backgroundColor: '#E11D48', borderColor: '#E11D48' }]}>
-                <Text style={[styles.walletBadgeText, { color: COLORS.white }]}>{wishlist.length}</Text>
+            <Feather
+              name="search"
+              size={16}
+              color="#9296A7"
+              style={{ marginRight: 8 }}
+            />
+            <TextInput
+              style={styles.searchInput}
+              placeholder={searchPlaceholder || placeholderQueries[placeholderIndex]}
+              placeholderTextColor="#9296A7"
+              editable={false}
+              pointerEvents="none"
+            />
+            <View style={styles.searchDivider} />
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                setIsVoiceSearchActive(true);
+                setActiveScreen('C17_Search');
+              }}
+              style={styles.micButton}
+              accessibilityLabel="Voice search"
+            >
+              <Feather name="mic" size={16} color={COLORS.hotPink} />
+            </TouchableOpacity>
+          </TouchableOpacity>
+
+          {/* Cart Icon */}
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => setActiveScreen('Blinkit_Cart')}
+            style={styles.cartButton}
+            accessibilityLabel="Shopping Cart"
+          >
+            <Feather name="shopping-cart" size={18} color="#FFFFFF" />
+            {totalCartCount > 0 && (
+              <View style={styles.cartBadge}>
+                <Text style={styles.cartBadgeText}>{totalCartCount}</Text>
               </View>
             )}
           </TouchableOpacity>
-
-          {/* Wallet circular button with balance badge */}
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setActiveScreen('Blinkit_Money')}
-            style={styles.actionButtonContainer}
-            accessibilityLabel="Blinkit Money Wallet"
-          >
-            <View style={styles.whiteCircleButton}>
-              <AppIcon name="wallet" size={20} color={COLORS.textPrimary} />
-            </View>
-            <View style={styles.walletBadge}>
-              <Text style={styles.walletBadgeText}>₹{walletBalance}</Text>
-            </View>
-          </TouchableOpacity>
-
-          {/* Profile circular button */}
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setActiveScreen('Blinkit_Profile')}
-            style={styles.actionButtonContainer}
-            accessibilityLabel="Your Profile"
-          >
-            <View style={styles.whiteCircleButton}>
-              <AppIcon name="user" size={20} color={COLORS.textPrimary} />
-            </View>
-          </TouchableOpacity>
         </View>
+
+        {children}
       </View>
-
-      {/* Search Bar */}
-      <TouchableOpacity
-        activeOpacity={0.9}
-        onPress={() => setActiveScreen('C17_Search')}
-        style={styles.searchBarWrapper}
-      >
-        <View style={styles.searchIconLeft}>
-          <AppIcon name="search" size={20} color={COLORS.textMuted} />
-        </View>
-        <TextInput
-          style={styles.searchInput}
-          placeholder={placeholderQueries[placeholderIndex]}
-          placeholderTextColor={COLORS.textMuted}
-          editable={true}
-          onFocus={() => setActiveScreen('C17_Search')}
-        />
-        <View style={styles.searchDivider} />
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => {
-            setIsVoiceSearchActive(true);
-            setActiveScreen('C17_Search');
-          }}
-          style={styles.micButton}
-          accessibilityLabel="Voice search"
-        >
-          <AppIcon name="mic" size={20} color={COLORS.textMuted} />
-        </TouchableOpacity>
-      </TouchableOpacity>
-
-      {/* Category Tab Strip */}
-      {/* Category Tab Strip matching Image 2 */}
-      {showCategoryTabs && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoryTabScroll}
-        >
-          {categoryTabs.map((tab) => {
-            const isActive = activeCategoryTab === tab.id;
-            const itemColor = isActive ? COLORS.hotPink : 'rgba(255, 255, 255, 0.75)';
-            return (
-              <TouchableOpacity
-                key={tab.id}
-                activeOpacity={0.75}
-                onPress={() => onSelectCategoryTab && onSelectCategoryTab(tab.id)}
-                style={styles.tabItem}
-              >
-                <AppIcon
-                  name={tab.icon}
-                  size={24}
-                  color={itemColor}
-                  isActive={isActive}
-                />
-                <Text
-                  style={[
-                    styles.tabLabel,
-                    { color: itemColor },
-                    isActive && styles.activeTabLabel,
-                  ]}
-                >
-                  {tab.label}
-                </Text>
-                {isActive && <View style={styles.activeIndicator} />}
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      )}
-    </LinearGradient>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  gradientContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 8,
+  headerContainer: {
+    backgroundColor: '#0B1755',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    zIndex: 100,
+    width: '100%',
+    maxWidth: '100%',
+    overflow: 'hidden',
+  },
+  containerInner: {
+    maxWidth: 1440,
+    width: '100%',
+    alignSelf: 'center',
+    paddingHorizontal: 12,
+    paddingBottom: 4,
+    overflow: 'hidden',
+  },
+
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+    width: '100%',
+    maxWidth: '100%',
+  },
+  topLeftGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+    marginRight: 8,
+  },
+  logoContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+    paddingRight: 2,
+  },
+  headerLogoImage: {
+    width: 36,
+    height: 36,
+  },
+  locationWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    maxWidth: 260,
+    paddingVertical: 1,
+    flexShrink: 1,
+  },
+  locationTextColumn: {
+    flexShrink: 1,
+  },
+  etaText: {
+    color: '#FFD700',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 1,
+  },
+  locationSubtitle: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 16,
+  },
+  storeStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 1,
+  },
+  storeStatusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#22C55E',
+  },
+  locationTitle: {
+    color: 'rgba(255, 255, 255, 0.75)',
+    fontSize: 10,
+    fontWeight: '500',
+    lineHeight: 13,
+  },
+  headerSearchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingTop: 2,
+    paddingBottom: 6,
+    width: '100%',
+    maxWidth: '100%',
+  },
+  searchBar: {
+    flex: 1,
+    height: 46,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 9999,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+  },
+  searchInput: {
+    flex: 1,
+    height: '100%',
+    fontSize: 14,
+    color: '#101A4D',
+    padding: 0,
+  },
+  searchDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: '#E9EAF1',
+    marginHorizontal: 8,
+  },
+  micButton: {
+    padding: 3,
+  },
+  cartButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+  },
+  cartBadge: {
+    position: 'absolute',
+    top: -3,
+    right: -3,
+    backgroundColor: '#EC4A9D',
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
+    borderColor: '#0B1755',
+  },
+  cartBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexShrink: 0,
+  },
+  actionIconButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  badgePill: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#EC4A9D',
+    borderRadius: 10,
+    minWidth: 15,
+    height: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 8.5,
+    fontWeight: '800',
+  },
+  walletBadge: {
+    position: 'absolute',
+    bottom: -5,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 5,
+    paddingHorizontal: 4,
+    paddingVertical: 0.5,
+    borderWidth: 1,
+    borderColor: '#E9EAF1',
+  },
+  walletBadgeText: {
+    color: '#101A4D',
+    fontSize: 8,
+    fontWeight: '800',
   },
   plainHeader: {
     flexDirection: 'row',
@@ -287,196 +481,36 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingBottom: 12,
-    backgroundColor: COLORS.cardBackground,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: '#E9EAF1',
   },
   circularBackButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: COLORS.white,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: '#E9EAF1',
   },
   circularRightButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: COLORS.white,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: '#E9EAF1',
   },
   circularRightPlaceholder: {
     width: 40,
     height: 40,
   },
   plainTitleText: {
-    color: COLORS.textPrimary,
+    color: '#101A4D',
     textAlign: 'center',
-  },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  etaContainer: {
-    flex: 1,
-  },
-  etaLabelText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: COLORS.white,
-    opacity: 0.9,
-    lineHeight: 16,
-  },
-  etaHeroText: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: COLORS.white,
-    lineHeight: 34,
-    letterSpacing: -0.5,
-  },
-  locationButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 2,
-    maxWidth: '85%',
-  },
-  locationText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.white,
-    marginRight: 4,
-  },
-  storeHubPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
-    marginTop: 4,
-    maxWidth: '90%',
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 5,
-  },
-  storeHubText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: COLORS.white,
-  },
-  topRightActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  actionButtonContainer: {
-    alignItems: 'center',
-  },
-  whiteCircleButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  walletBadge: {
-    position: 'absolute',
-    bottom: -6,
-    backgroundColor: COLORS.white,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  walletBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-  },
-  searchBarWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    height: 48,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  searchIconLeft: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    height: 48,
-    fontSize: 14,
-    color: COLORS.textPrimary,
-  },
-  searchDivider: {
-    width: 1,
-    height: 20,
-    backgroundColor: COLORS.border,
-    marginHorizontal: 8,
-  },
-  micButton: {
-    padding: 4,
-  },
-  categoryTabScroll: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: 8,
-    paddingBottom: 6,
-    gap: 24,
-  },
-  tabItem: {
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 2,
-    paddingHorizontal: 6,
-    position: 'relative',
-    gap: 4,
-    minWidth: 54,
-  },
-  tabLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.75)',
-  },
-  activeTabLabel: {
-    fontWeight: '800',
-    color: COLORS.hotPink,
-  },
-  activeIndicator: {
-    position: 'absolute',
-    bottom: -6,
-    left: 2,
-    right: 2,
-    height: 3.5,
-    backgroundColor: COLORS.hotPink,
-    borderRadius: 2,
   },
 });

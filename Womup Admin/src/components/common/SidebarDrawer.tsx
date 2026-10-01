@@ -27,6 +27,9 @@ import {
   ChevronRight,
   LogOut,
   Store,
+  MapPin,
+  Layers,
+  FolderTree,
 } from 'lucide-react-native';
 import { COLORS, GRADIENTS, RADIUS, SPACING } from '../../theme';
 import { useAdminState, ActiveTab, ActiveSubView } from '../../context/AdminStateContext';
@@ -252,6 +255,40 @@ export const SidebarDrawer: React.FC = () => {
               </View>
               <Text style={[styles.menuLabel, activeTab === 'Stores' && subView === 'none' && styles.menuLabelActive]}>
                 Dark Stores & Hubs
+              </Text>
+              <ChevronRight size={16} color={COLORS.secondaryText} />
+            </TouchableOpacity>
+
+            {/* 9. Cities & Operational Areas (1 Store per Area) */}
+            <TouchableOpacity
+              style={[
+                styles.menuItem,
+                activeTab === 'Locations' && subView === 'none' && styles.menuItemActive,
+              ]}
+              onPress={() => handleNavigateTab('Locations')}
+            >
+              <View style={[styles.iconContainer, activeTab === 'Locations' && subView === 'none' && styles.iconActive]}>
+                <MapPin size={18} color={activeTab === 'Locations' && subView === 'none' ? COLORS.white : COLORS.success} />
+              </View>
+              <Text style={[styles.menuLabel, activeTab === 'Locations' && subView === 'none' && styles.menuLabelActive]}>
+                Cities & Areas (1:1 Store)
+              </Text>
+              <ChevronRight size={16} color={COLORS.secondaryText} />
+            </TouchableOpacity>
+
+            {/* 10. Categories & Subcategories */}
+            <TouchableOpacity
+              style={[
+                styles.menuItem,
+                activeTab === 'Categories' && subView === 'none' && styles.menuItemActive,
+              ]}
+              onPress={() => handleNavigateTab('Categories')}
+            >
+              <View style={[styles.iconContainer, activeTab === 'Categories' && subView === 'none' && styles.iconActive]}>
+                <FolderTree size={18} color={activeTab === 'Categories' && subView === 'none' ? COLORS.white : COLORS.purple} />
+              </View>
+              <Text style={[styles.menuLabel, activeTab === 'Categories' && subView === 'none' && styles.menuLabelActive]}>
+                Categories & Sub-Cats
               </Text>
               <ChevronRight size={16} color={COLORS.secondaryText} />
             </TouchableOpacity>

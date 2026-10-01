@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,12 +7,30 @@ import {
   StyleSheet,
   Modal,
   ActivityIndicator,
+  Platform,
+  Animated,
+  Easing,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../theme/colors';
 import { TYPOGRAPHY } from '../../theme/typography';
 import { AppIcon } from '../../components/common/AppIcon';
 import { useApp } from '../../context/AppContext';
+
+// Resolve full-screen order celebration video asset
+const orderVideoAsset = require('../../../assets/gemini_generated_video_2981966f.mp4');
+
+const getVideoSource = () => {
+  if (typeof orderVideoAsset === 'string') return orderVideoAsset;
+  if (orderVideoAsset?.uri) return orderVideoAsset.uri;
+  if (orderVideoAsset?.default) return orderVideoAsset.default;
+  try {
+    const resolved = Image.resolveAssetSource(orderVideoAsset);
+    if (resolved?.uri) return resolved.uri;
+  } catch (e) {}
+  return '/assets/assets/gemini_generated_video_2981966f.mp4';
+};
 
 export const BlinkitCheckoutScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -33,6 +51,15 @@ export const BlinkitCheckoutScreen: React.FC = () => {
   const [tipAmount, setTipAmount] = useState<number>(0);
   const [isOrderConfirmed, setOrderConfirmed] = useState(false);
 
+  // Full-screen 5-second video state
+  const [showCelebrationVideo, setShowCelebrationVideo] = useState(false);
+  const [videoSecondsLeft, setVideoSecondsLeft] = useState(5);
+  const videoFadeAnim = useRef(new Animated.Value(1)).current;
+  const videoProgressAnim = useRef(new Animated.Value(0)).current;
+  const videoRef = useRef<any>(null);
+  const videoTimerRef = useRef<any>(null);
+  const isVideoFinishedRef = useRef(false);
+
   const TIP_OPTIONS = [0, 10, 20, 30, 50];
 
   const deliveryFee = blinkitCartTotal > 199 ? 0 : 15;
@@ -43,13 +70,78 @@ export const BlinkitCheckoutScreen: React.FC = () => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Gracefully complete the 5s video and transition to Order Confirmed state
+  const finishCelebrationVideo = useCallback(() => {
+    if (isVideoFinishedRef.current) return;
+    isVideoFinishedRef.current = true;
+
+    if (videoTimerRef.current) {
+      clearInterval(videoTimerRef.current);
+      videoTimerRef.current = null;
+    }
+
+    if (videoRef.current) {
+      try {
+        videoRef.current.pause();
+      } catch (e) {}
+    }
+
+    Animated.timing(videoFadeAnim, {
+      toValue: 0,
+      duration: 350,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    }).start(() => {
+      setShowCelebrationVideo(false);
+      setOrderConfirmed(true);
+    });
+  }, [videoFadeAnim]);
+
+  const startCelebrationVideo = () => {
+    isVideoFinishedRef.current = false;
+    setVideoSecondsLeft(5);
+    videoFadeAnim.setValue(1);
+    videoProgressAnim.setValue(0);
+    setShowCelebrationVideo(true);
+
+    // Smooth 5-second progress animation
+    Animated.timing(videoProgressAnim, {
+      toValue: 1,
+      duration: 5000,
+      easing: Easing.linear,
+      useNativeDriver: false,
+    }).start();
+
+    // 5-second countdown timer
+    let count = 5;
+    if (videoTimerRef.current) clearInterval(videoTimerRef.current);
+    videoTimerRef.current = setInterval(() => {
+      count -= 1;
+      setVideoSecondsLeft(Math.max(count, 0));
+      if (count <= 0) {
+        finishCelebrationVideo();
+      }
+    }, 1000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (videoTimerRef.current) {
+        clearInterval(videoTimerRef.current);
+      }
+    };
+  }, []);
+
   const handlePlaceOrder = async () => {
     if (isSubmitting) return;
     const paymentMethod = useWalletBalance && finalPayable === 0 ? 'WALLET' : selectedPayment.toUpperCase();
     setIsSubmitting(true);
     try {
       await placeOrder(paymentMethod, { tip: tipAmount, deliveryInstructions: deliveryInstruction });
-      setOrderConfirmed(true);
+      // Play full screen video for 5 seconds on order place
+      startCelebrationVideo();
+    } catch (error) {
+      console.error('Failed to place order:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -353,6 +445,95 @@ export const BlinkitCheckoutScreen: React.FC = () => {
           )}
         </TouchableOpacity>
       </View>
+
+      {/* 1. Full-Screen Order Celebration Video (First 5 Seconds Only) */}
+      <Modal
+        visible={showCelebrationVideo}
+        transparent={false}
+        animationType="fade"
+      >
+        <Animated.View
+          style={[
+            styles.fullscreenVideoOverlay,
+            {
+              opacity: videoFadeAnim,
+            },
+          ]}
+        >
+          {Platform.OS === 'web' ? (
+            // @ts-ignore
+            <video
+              ref={videoRef}
+              src={getVideoSource()}
+              autoPlay
+              playsInline
+              muted
+              onTimeUpdate={(e: any) => {
+                if (e.target && e.target.currentTime >= 5.0) {
+                  e.target.pause();
+                  finishCelebrationVideo();
+                }
+              }}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                backgroundColor: '#05052A',
+              }}
+            />
+          ) : (
+            <View style={styles.nativeVideoPlaceholder}>
+              <View style={styles.videoGlowCircle}>
+                <AppIcon name="check" size={48} color={COLORS.white} />
+              </View>
+              <Text style={styles.videoOverlayBrand}>WOM UP</Text>
+              <Text style={styles.videoOverlaySub}>Order Placed Successfully!</Text>
+            </View>
+          )}
+
+          {/* Top 5-second progress bar */}
+          <View style={styles.videoProgressContainer}>
+            <Animated.View
+              style={[
+                styles.videoProgressBar,
+                {
+                  width: videoProgressAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0%', '100%'],
+                  }),
+                },
+              ]}
+            />
+          </View>
+
+          {/* Top Controls: 5s Timer Countdown Chip + Skip Button */}
+          <View style={[styles.videoControlsRow, { top: Math.max(insets.top, 16) + 12 }]}>
+            <View style={styles.videoCountdownChip}>
+              <AppIcon name="zap" size={14} color={COLORS.hotPink} />
+              <Text style={styles.videoCountdownText}>
+                Confirmed • {videoSecondsLeft}s
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={finishCelebrationVideo}
+              style={styles.videoSkipBtn}
+            >
+              <Text style={styles.videoSkipText}>Skip</Text>
+              <AppIcon name="chevron-right" size={16} color={COLORS.white} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Bottom Floating Banner */}
+          <View style={[styles.videoBottomBanner, { paddingBottom: Math.max(insets.bottom, 24) }]}>
+            <Text style={styles.videoBannerTitle}>Order Confirmed! 🎉</Text>
+            <Text style={styles.videoBannerSub}>
+              Preparing your items for lightning-fast delivery in 9 mins
+            </Text>
+          </View>
+        </Animated.View>
+      </Modal>
 
       {/* Order Confirmed Celebration Modal */}
       <Modal
@@ -737,5 +918,127 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     fontSize: 15,
     fontWeight: '600',
+  },
+  fullscreenVideoOverlay: {
+    flex: 1,
+    backgroundColor: '#05052A',
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  nativeVideoPlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#05052A',
+  },
+  videoGlowCircle: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    shadowColor: COLORS.hotPink,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  videoOverlayBrand: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: COLORS.white,
+    letterSpacing: 2,
+    marginBottom: 6,
+  },
+  videoOverlaySub: {
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.75)',
+    fontWeight: '500',
+  },
+  videoProgressContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    zIndex: 20,
+  },
+  videoProgressBar: {
+    height: '100%',
+    backgroundColor: COLORS.hotPink,
+  },
+  videoControlsRow: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    zIndex: 20,
+  },
+  videoCountdownChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(5, 5, 42, 0.75)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 45, 120, 0.4)',
+  },
+  videoCountdownText: {
+    color: COLORS.white,
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  videoSkipBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  videoSkipText: {
+    color: COLORS.white,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  videoBottomBanner: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(5, 5, 42, 0.85)',
+    paddingHorizontal: 24,
+    paddingTop: 18,
+    alignItems: 'center',
+    zIndex: 20,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  videoBannerTitle: {
+    color: COLORS.white,
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  videoBannerSub: {
+    color: 'rgba(255, 255, 255, 0.75)',
+    fontSize: 13,
+    fontWeight: '500',
+    textAlign: 'center',
+    maxWidth: 320,
   },
 });

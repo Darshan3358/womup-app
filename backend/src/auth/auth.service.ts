@@ -19,6 +19,7 @@ import { CoinTransaction, CoinTransactionDocument } from '../coins/schemas/coin-
 import { DeliveryPartner, DeliveryPartnerDocument } from '../delivery/schemas/delivery-partner.schema';
 import { EmailService } from './email.service';
 import { Role } from '../common/enums/role.enum';
+import { City, CityDocument } from '../areas/schemas/city.schema';
 
 @Injectable()
 export class AuthService {
@@ -34,6 +35,8 @@ export class AuthService {
     private coinTxModel: Model<CoinTransactionDocument>,
     @InjectModel(DeliveryPartner.name)
     private partnerModel: Model<DeliveryPartnerDocument>,
+    @InjectModel(City.name)
+    private cityModel: Model<CityDocument>,
     private jwtService: JwtService,
     private configService: ConfigService,
     private emailService: EmailService,
@@ -265,6 +268,8 @@ export class AuthService {
         shoppingCoins: user.shoppingCoins,
         role: user.role,
         birthday: user.birthday,
+        preferredCityId: (user as any).preferredCityId?.toString(),
+        preferredCityName: (user as any).preferredCityName,
       },
       ...tokens,
     };
@@ -336,13 +341,55 @@ export class AuthService {
       await user.save();
     }
 
-    // 6. Assign to active Hub
-    const defaultHub = await this.partnerModel.db.collection('stores').findOne({
-      $or: [
-        { name: { $regex: new RegExp(city || 'Ahmedabad', 'i') } },
-        { isActive: true },
-      ],
-    });
+    // 6. Validate city and assign to active Hub
+    const cityInput = (dto.cityName || dto.city || '').trim();
+    let cityDoc: any = null;
+
+    if (dto.cityId && Types.ObjectId.isValid(dto.cityId)) {
+      cityDoc = await this.partnerModel.db.collection('cities').findOne({
+        _id: new Types.ObjectId(dto.cityId),
+      });
+    }
+
+    if (!cityDoc && cityInput) {
+      cityDoc = await this.partnerModel.db.collection('cities').findOne({
+        $or: [
+          { name: { $regex: new RegExp(`^${cityInput}$`, 'i') } },
+          { code: cityInput.toUpperCase() },
+        ],
+      });
+    }
+
+    // If city is found, ensure it is active
+    if (cityDoc && cityDoc.status && cityDoc.status !== 'Active') {
+      throw new BadRequestException(`City "${cityDoc.name}" is currently inactive for operations.`);
+    }
+
+    const resolvedCityName = cityDoc ? cityDoc.name : (cityInput || 'Ahmedabad');
+    const resolvedCityId = cityDoc?._id || (dto.cityId && Types.ObjectId.isValid(dto.cityId) ? new Types.ObjectId(dto.cityId) : undefined);
+
+    // Auto-assign hub in that city
+    let defaultHub: any = null;
+    if (resolvedCityId) {
+      defaultHub = await this.partnerModel.db.collection('stores').findOne({
+        cityId: resolvedCityId,
+        isActive: true,
+      });
+    }
+
+    if (!defaultHub && resolvedCityName) {
+      defaultHub = await this.partnerModel.db.collection('stores').findOne({
+        $or: [
+          { cityName: { $regex: new RegExp(resolvedCityName, 'i') }, isActive: true },
+          { city: { $regex: new RegExp(resolvedCityName, 'i') }, isActive: true },
+          { name: { $regex: new RegExp(resolvedCityName, 'i') }, isActive: true },
+        ],
+      });
+    }
+
+    if (!defaultHub) {
+      defaultHub = await this.partnerModel.db.collection('stores').findOne({ isActive: true });
+    }
 
     const partnerCode = `RDR-${Math.floor(1000 + Math.random() * 9000)}`;
     const partner = await this.partnerModel.create({
@@ -351,9 +398,11 @@ export class AuthService {
       fullName: fullName.trim(),
       phoneNumber: formattedPhone,
       email: verifiedEmail,
-      city: city?.trim() || 'Ahmedabad',
+      cityId: resolvedCityId,
+      city: resolvedCityName,
+      cityName: resolvedCityName,
       hubId: defaultHub?._id,
-      hubName: defaultHub?.name || `${city?.trim() || 'Ahmedabad'} Hub`,
+      hubName: defaultHub?.name || `${resolvedCityName} Hub`,
       status: 'APPROVED',
       verificationStatus: 'VERIFIED',
       isOnline: true,
@@ -405,7 +454,7 @@ export class AuthService {
   }
 
   async register(dto: RegisterDto) {
-    const { verificationId, name, phone, referralCode } = dto;
+    const { verificationId, name, phone, referralCode, preferredCityId } = dto;
     const otpRecord = await this.otpModel.findOne({ verificationId });
 
     if (!otpRecord || !otpRecord.isVerified) {
@@ -414,6 +463,22 @@ export class AuthService {
 
     const email = otpRecord.phone; // stored as phone field
 
+    // Validate preferredCityId if provided
+    let validCityObjectId: Types.ObjectId | undefined = undefined;
+    let preferredCityName = dto.preferredCityName?.trim();
+
+    if (preferredCityId) {
+      if (!Types.ObjectId.isValid(preferredCityId)) {
+        throw new BadRequestException('Invalid city identifier provided');
+      }
+      const cityDoc = await this.cityModel.findById(preferredCityId);
+      if (!cityDoc || cityDoc.status !== 'Active') {
+        throw new BadRequestException('Selected city is not available or inactive');
+      }
+      validCityObjectId = new Types.ObjectId(preferredCityId);
+      preferredCityName = cityDoc.name;
+    }
+
     // ── Smart Account Linking & Uniqueness ────────────────────────
     // 1. If account with this email already exists, update & log in
     const emailExists = await this.userModel.findOne({ email });
@@ -421,6 +486,10 @@ export class AuthService {
       if (name && name !== 'Customer') emailExists.name = name;
       if (phone && (!emailExists.phone || emailExists.phone.startsWith('email_'))) {
         emailExists.phone = phone;
+      }
+      if (validCityObjectId) {
+        emailExists.preferredCityId = validCityObjectId;
+        emailExists.preferredCityName = preferredCityName;
       }
       emailExists.isEmailVerified = true;
       await emailExists.save();
@@ -432,6 +501,8 @@ export class AuthService {
           name: emailExists.name,
           phone: emailExists.phone,
           email: emailExists.email,
+          preferredCityId: emailExists.preferredCityId?.toString(),
+          preferredCityName: emailExists.preferredCityName,
           walletBalance: emailExists.walletBalance,
           shoppingCoins: emailExists.shoppingCoins,
           role: emailExists.role,
@@ -447,6 +518,10 @@ export class AuthService {
         phoneExists.email = email;
         phoneExists.isEmailVerified = true;
         if (name && name !== 'Customer') phoneExists.name = name;
+        if (validCityObjectId) {
+          phoneExists.preferredCityId = validCityObjectId;
+          phoneExists.preferredCityName = preferredCityName;
+        }
         await phoneExists.save();
         const tokens = await this.generateTokens(phoneExists);
         return {
@@ -456,6 +531,8 @@ export class AuthService {
             name: phoneExists.name,
             phone: phoneExists.phone,
             email: phoneExists.email,
+            preferredCityId: phoneExists.preferredCityId?.toString(),
+            preferredCityName: phoneExists.preferredCityName,
             walletBalance: phoneExists.walletBalance,
             shoppingCoins: phoneExists.shoppingCoins,
             role: phoneExists.role,
@@ -479,6 +556,8 @@ export class AuthService {
       name,
       email,
       phone: phone || `email_${crypto.randomBytes(4).toString('hex')}`, // placeholder if no phone
+      preferredCityId: validCityObjectId,
+      preferredCityName,
       referralCode: generatedRefCode,
       referredBy: referredByUser ? referredByUser._id : undefined,
       isPhoneVerified: false,
@@ -507,6 +586,8 @@ export class AuthService {
         name: user.name,
         phone: user.phone,
         email: user.email,
+        preferredCityId: user.preferredCityId?.toString(),
+        preferredCityName: user.preferredCityName,
         walletBalance: user.walletBalance,
         shoppingCoins: user.shoppingCoins,
         referralCode: user.referralCode,

@@ -55,6 +55,12 @@ export class StoreOrdersController {
     return this.storeOrdersService.getAvailableStores();
   }
 
+  @Get('history')
+  @ApiOperation({ summary: 'Get completed/delivered past orders for dark store' })
+  async getOrderHistory(@Request() req: any) {
+    return this.storeOrdersService.getOrderHistory(req.user.id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get order details and item picklist with shelf slots' })
   async getOrderDetail(@Request() req: any, @Param('id') orderId: string) {

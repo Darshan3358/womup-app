@@ -13,6 +13,7 @@ import {
   StoreSendOtpDto,
   StoreVerifyOtpDto,
   UpdateShiftDto,
+  RegisterStoreDto,
 } from './dto/store-auth.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
@@ -20,6 +21,12 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 @Controller(['api/v1/store', 'store'])
 export class StoreAuthController {
   constructor(private readonly storeAuthService: StoreAuthService) {}
+
+  @Post('auth/register')
+  @ApiOperation({ summary: 'Self-register a new Dark Store with admin master city and available area' })
+  async register(@Body() dto: RegisterStoreDto) {
+    return this.storeAuthService.registerStore(dto);
+  }
 
   @Post('auth/login')
   @ApiOperation({ summary: 'Login with Store ID and Password (Shared store tablet credentials)' })

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,11 +9,13 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, GRADIENTS } from '../../theme/colors';
 import { useRider } from '../../context/RiderContext';
+import { RiderApiService } from '../../services/riderApi';
 
 export const R04_RiderRegistrationScreen: React.FC = () => {
   const { authEmail, registerNewRider } = useRider();
@@ -21,6 +23,11 @@ export const R04_RiderRegistrationScreen: React.FC = () => {
   const [name, setName] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
   const [city, setCity] = useState<string>('Ahmedabad');
+  const [cities, setCities] = useState<Array<{ id: string; name: string; code: string; status?: string }>>([]);
+  const [selectedCity, setSelectedCity] = useState<{ id: string; name: string; code: string } | null>(null);
+  const [showCityPicker, setShowCityPicker] = useState<boolean>(false);
+  const [loadingCities, setLoadingCities] = useState<boolean>(true);
+
   const [vehicleType, setVehicleType] = useState<'EV_SCOOTER' | 'BIKE' | 'BICYCLE'>('EV_SCOOTER');
   const [vehicleNumber, setVehicleNumber] = useState<string>('');
   const [drivingLicenseNumber, setDrivingLicenseNumber] = useState<string>('');
@@ -29,6 +36,39 @@ export const R04_RiderRegistrationScreen: React.FC = () => {
 
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Load active cities from Admin's cities collection on mount
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        setLoadingCities(true);
+        const list = await RiderApiService.fetchCities();
+        if (isMounted) {
+          const activeList = list.filter((c) => c.status === 'Active' || !c.status);
+          setCities(activeList);
+
+          // Pre-select Ahmedabad or first active city
+          const defaultCity =
+            activeList.find((c) => c.name.toLowerCase() === 'ahmedabad') ||
+            activeList[0] ||
+            null;
+          if (defaultCity) {
+            setSelectedCity(defaultCity);
+            setCity(defaultCity.name);
+          }
+        }
+      } catch (err) {
+        console.warn('[R04] Error fetching cities:', err);
+      } finally {
+        if (isMounted) setLoadingCities(false);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleSubmit = async () => {
     if (!name.trim()) {
@@ -39,8 +79,8 @@ export const R04_RiderRegistrationScreen: React.FC = () => {
       setErrorMsg('Please enter a valid 10-digit mobile number');
       return;
     }
-    if (!city.trim()) {
-      setErrorMsg('Please enter your operating city');
+    if (!selectedCity || !city.trim()) {
+      setErrorMsg('Please select your operating city from the list');
       return;
     }
     if (vehicleType !== 'BICYCLE' && !vehicleNumber.trim()) {
@@ -58,7 +98,9 @@ export const R04_RiderRegistrationScreen: React.FC = () => {
       await registerNewRider({
         name: name.trim(),
         phone: phone.trim(),
-        city: city.trim(),
+        city: selectedCity.name,
+        cityId: selectedCity.id,
+        cityName: selectedCity.name,
         vehicleType,
         vehicleNumber: vehicleNumber.trim().toUpperCase(),
         drivingLicenseNumber: drivingLicenseNumber.trim().toUpperCase(),
@@ -133,15 +175,35 @@ export const R04_RiderRegistrationScreen: React.FC = () => {
             />
           </View>
 
-          {/* City */}
+          {/* City Dropdown (Non-editable list selector) */}
           <Text style={styles.inputLabel}>CITY *</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ahmedabad"
-            placeholderTextColor={COLORS.secondaryText}
-            value={city}
-            onChangeText={setCity}
-          />
+          <TouchableOpacity
+            style={[styles.cityDropdownButton, !selectedCity && styles.cityDropdownButtonEmpty]}
+            onPress={() => setShowCityPicker(true)}
+            activeOpacity={0.8}
+          >
+            <View style={styles.cityDropdownLeft}>
+              <Text style={styles.cityDropdownEmoji}>🏙️</Text>
+              <Text style={[styles.cityDropdownText, !selectedCity && styles.cityDropdownPlaceholder]}>
+                {selectedCity ? selectedCity.name : 'Select City'}
+              </Text>
+            </View>
+            <View style={styles.cityDropdownRight}>
+              {loadingCities ? (
+                <ActivityIndicator size="small" color={COLORS.navy} />
+              ) : (
+                <Ionicons name="chevron-down" size={18} color={COLORS.navy} />
+              )}
+            </View>
+          </TouchableOpacity>
+
+          {/* Informational Hint */}
+          <View style={styles.cityHelperBox}>
+            <Ionicons name="information-circle" size={14} color="#515FEA" style={{ marginTop: 1 }} />
+            <Text style={styles.cityHelperText}>
+              Only cities where Wom Up operates are available. You'll be assigned to a hub in your selected city.
+            </Text>
+          </View>
 
           {/* Vehicle Selector */}
           <Text style={styles.inputLabel}>VEHICLE TYPE *</Text>
@@ -287,6 +349,102 @@ export const R04_RiderRegistrationScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* City Selection Modal */}
+      <Modal
+        visible={showCityPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCityPicker(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setShowCityPicker(false)}
+          />
+
+          <View style={styles.modalCard}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderLeft}>
+                <Text style={styles.modalHeaderEmoji}>🏙️</Text>
+                <View>
+                  <Text style={styles.modalTitle}>Select Your City</Text>
+                  <Text style={styles.modalSubtitle}>Only operational cities shown</Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setShowCityPicker(false)}
+              >
+                <Ionicons name="close" size={20} color={COLORS.navy} />
+              </TouchableOpacity>
+            </View>
+
+            {/* City Options List */}
+            <ScrollView style={styles.cityListScroll} showsVerticalScrollIndicator={false}>
+              {cities.length === 0 ? (
+                <View style={styles.emptyCitiesBox}>
+                  <ActivityIndicator size="small" color={COLORS.hotPink} />
+                  <Text style={styles.emptyCitiesText}>Loading available cities...</Text>
+                </View>
+              ) : (
+                cities.map((item) => {
+                  const isSelected =
+                    selectedCity?.name?.toLowerCase() === item.name.toLowerCase();
+
+                  return (
+                    <TouchableOpacity
+                      key={item.id || item.code}
+                      style={[styles.cityItem, isSelected && styles.cityItemSelected]}
+                      onPress={() => {
+                        setSelectedCity(item);
+                        setCity(item.name);
+                        setShowCityPicker(false);
+                        if (errorMsg) setErrorMsg(null);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.cityItemLeft}>
+                        <View
+                          style={[
+                            styles.radioIndicator,
+                            isSelected && styles.radioIndicatorSelected,
+                          ]}
+                        >
+                          {isSelected && <View style={styles.radioDot} />}
+                        </View>
+                        <Text
+                          style={[
+                            styles.cityNameText,
+                            isSelected && styles.cityNameTextSelected,
+                          ]}
+                        >
+                          {item.name}
+                        </Text>
+                      </View>
+
+                      {isSelected ? (
+                        <View style={styles.checkPill}>
+                          <Ionicons name="checkmark" size={14} color="#059669" />
+                          <Text style={styles.checkPillText}>Selected</Text>
+                        </View>
+                      ) : (
+                        item.code ? (
+                          <View style={styles.cityCodeBadge}>
+                            <Text style={styles.cityCodeText}>{item.code}</Text>
+                          </View>
+                        ) : null
+                      )}
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
@@ -485,5 +643,203 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     letterSpacing: 0.8,
+  },
+
+  // City Dropdown Styles
+  cityDropdownButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: COLORS.cardBackground,
+  },
+  cityDropdownButtonEmpty: {
+    borderColor: COLORS.border,
+  },
+  cityDropdownLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  cityDropdownEmoji: {
+    fontSize: 18,
+  },
+  cityDropdownText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  cityDropdownPlaceholder: {
+    color: COLORS.secondaryText,
+    fontWeight: '500',
+  },
+  cityDropdownRight: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cityHelperBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    backgroundColor: '#EEF2FF',
+    borderRadius: 8,
+    padding: 8,
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: '#E0E7FF',
+  },
+  cityHelperText: {
+    fontSize: 11,
+    color: '#3730A3',
+    lineHeight: 15,
+    flex: 1,
+    fontWeight: '500',
+  },
+
+  // City Selection Modal Styles
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(5, 6, 42, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: COLORS.white,
+    borderRadius: 20,
+    overflow: 'hidden',
+    maxHeight: '80%',
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.2, shadowRadius: 10 },
+      android: { elevation: 6 },
+    }),
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F2F6',
+  },
+  modalHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  modalHeaderEmoji: {
+    fontSize: 22,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.navy,
+  },
+  modalSubtitle: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F2F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cityListScroll: {
+    padding: 14,
+  },
+  emptyCitiesBox: {
+    paddingVertical: 30,
+    alignItems: 'center',
+    gap: 8,
+  },
+  emptyCitiesText: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+  },
+  cityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    marginBottom: 6,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  cityItemSelected: {
+    backgroundColor: '#FDF2F8',
+    borderColor: COLORS.hotPink,
+  },
+  cityItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  radioIndicator: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: COLORS.secondaryText,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  radioIndicatorSelected: {
+    borderColor: COLORS.hotPink,
+  },
+  radioDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.hotPink,
+  },
+  cityNameText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.navy,
+  },
+  cityNameTextSelected: {
+    fontWeight: '800',
+    color: COLORS.hotPink,
+  },
+  checkPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  checkPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  cityCodeBadge: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  cityCodeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.textMuted,
   },
 });

@@ -74,6 +74,13 @@ export const S06_MobileNumberScreen: React.FC = () => {
             We'll send a 6-digit OTP to your email inbox
           </Text>
 
+          {/* Operating Cities Pill */}
+          <View style={styles.operatingCitiesPill}>
+            <Text style={styles.operatingCitiesText}>
+              🏙️ Now Delivering in <Text style={styles.boldCity}>Ahmedabad</Text> · <Text style={styles.boldCity}>Surat</Text> · <Text style={styles.boldCity}>Vadodara</Text>
+            </Text>
+          </View>
+
           {/* Email Input */}
           <View style={[styles.inputContainer, error ? styles.inputError : null]}>
             <Ionicons name="mail-outline" size={20} color={COLORS.textMuted} style={styles.inputIcon} />
@@ -165,9 +172,27 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     color: COLORS.textMuted,
-    marginBottom: SPACING.xxl,
+    marginBottom: SPACING.md,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  operatingCitiesPill: {
+    backgroundColor: '#FFF0F7',
+    borderWidth: 1,
+    borderColor: '#FCE7F3',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: RADIUS.pill,
+    marginBottom: SPACING.xl,
+    alignSelf: 'center',
+  },
+  operatingCitiesText: {
+    fontSize: 12,
+    color: COLORS.navy,
+  },
+  boldCity: {
+    fontWeight: '700',
+    color: COLORS.hotPink,
   },
   inputContainer: {
     flexDirection: 'row',

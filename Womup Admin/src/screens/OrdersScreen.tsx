@@ -5,22 +5,147 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Modal,
+  TextInput,
 } from 'react-native';
-import { Clock, MapPin, ChevronRight, AlertCircle, RefreshCw } from 'lucide-react-native';
+import {
+  Clock,
+  MapPin,
+  ChevronRight,
+  AlertCircle,
+  RefreshCw,
+  Navigation,
+  Warehouse,
+  ChevronDown,
+  Search,
+  X,
+  Check,
+  Calendar,
+  Filter,
+} from 'lucide-react-native';
 import { COLORS, RADIUS, SPACING } from '../theme';
 import { useAdminState } from '../context/AdminStateContext';
 import { Order, OrderStage } from '../types/admin';
 
 export const OrdersScreen: React.FC = () => {
-  const { orders, setSelectedOrder, setSubView, setActiveModal } = useAdminState();
+  const {
+    orders,
+    cities,
+    zones,
+    darkStores,
+    setSelectedOrder,
+    setSubView,
+    setActiveModal,
+  } = useAdminState();
 
   const [topTab, setTopTab] = useState<'Live Orders' | 'Order History'>('Live Orders');
+  const [selectedCityId, setSelectedCityId] = useState<string>('ALL');
+  const [selectedAreaId, setSelectedAreaId] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('All');
+  const [dateFilter, setDateFilter] = useState<'All' | 'Today' | 'This Week'>('All');
+
+  // Modals for filters
+  const [showCityPicker, setShowCityPicker] = useState(false);
+  const [showAreaPicker, setShowAreaPicker] = useState(false);
+  const [citySearch, setCitySearch] = useState('');
+  const [areaSearch, setAreaSearch] = useState('');
+
+  // 1. Resolve Active Cities
+  const activeCities = cities.filter((c) => c.status === 'Active' || !c.status);
+  const currentCity = activeCities.find(
+    (c) => (c.id && c.id === selectedCityId) || (c._id && c._id === selectedCityId)
+  );
+
+  // 2. Resolve Available Areas for Selected City
+  const availableAreas = zones.filter((z) => {
+    if (selectedCityId === 'ALL') return true;
+    if (!currentCity) return true;
+    const currentCityIdStr = currentCity.id || currentCity._id;
+    if (z.cityId && currentCityIdStr && String(z.cityId) === String(currentCityIdStr)) return true;
+    if (z.cityName && currentCity.name && z.cityName.toLowerCase() === currentCity.name.toLowerCase()) return true;
+    if (z.city && currentCity.name && z.city.toLowerCase() === currentCity.name.toLowerCase()) return true;
+    return false;
+  });
+
+  const currentArea = availableAreas.find(
+    (a) => (a.id && a.id === selectedAreaId) || (a._id && a._id === selectedAreaId)
+  );
+
+  // Helper to resolve an order's City, Area, and Store
+  const resolveOrderHierarchy = (order: Order) => {
+    // Area
+    let areaName = order.areaName || order.zoneName || 'Area';
+    let matchedZone = zones.find(
+      (z) =>
+        (order.areaId && (z.id === order.areaId || z._id === order.areaId)) ||
+        (order.zoneName && z.name.toLowerCase() === order.zoneName.toLowerCase()) ||
+        (order.address && order.address.toLowerCase().includes(z.name.toLowerCase()))
+    );
+
+    if (matchedZone) {
+      areaName = matchedZone.name;
+    }
+
+    // City
+    let cityName = order.cityName || matchedZone?.cityName || matchedZone?.city;
+    if (!cityName && matchedZone?.cityId) {
+      const c = cities.find((ct) => ct.id === matchedZone.cityId || ct._id === matchedZone.cityId);
+      if (c) cityName = c.name;
+    }
+    if (!cityName) cityName = 'Ahmedabad';
+
+    // Store
+    let storeName = order.darkStore || matchedZone?.assignedStore?.name || matchedZone?.darkStore;
+    if (!storeName) {
+      const foundStore = darkStores.find((s) => {
+        if (matchedZone && s.areaId && (s.areaId === matchedZone.id || s.areaId === matchedZone._id)) return true;
+        if (matchedZone && s.areaName && s.areaName.toLowerCase() === matchedZone.name.toLowerCase()) return true;
+        return false;
+      });
+      storeName = foundStore?.name || `Wom Up ${areaName} Dark Store`;
+    }
+
+    return { cityName, areaName, storeName };
+  };
 
   const filteredOrders = orders.filter((o) => {
-    if (topTab === 'Live Orders' && o.status === 'Delivered') return false;
+    // Live vs History
+    if (topTab === 'Live Orders' && (o.status === 'Delivered' || o.status === 'Cancelled')) return false;
     if (topTab === 'Order History' && o.status !== 'Delivered' && o.status !== 'Cancelled') return false;
+
+    // Status Filter
     if (statusFilter !== 'All' && o.status !== statusFilter) return false;
+
+    const { cityName, areaName } = resolveOrderHierarchy(o);
+
+    // City Filter
+    if (selectedCityId !== 'ALL' && currentCity) {
+      const matchCity =
+        (o.cityId && String(o.cityId) === String(currentCity.id || currentCity._id)) ||
+        cityName.toLowerCase() === currentCity.name.toLowerCase();
+      if (!matchCity) return false;
+    }
+
+    // Area Filter
+    if (selectedAreaId !== 'ALL' && currentArea) {
+      const matchArea =
+        (o.areaId && String(o.areaId) === String(currentArea.id || currentArea._id)) ||
+        areaName.toLowerCase() === currentArea.name.toLowerCase() ||
+        (o.zoneName && o.zoneName.toLowerCase() === currentArea.name.toLowerCase());
+      if (!matchArea) return false;
+    }
+
+    // Date Filter
+    if (dateFilter === 'Today') {
+      const orderDate = new Date(o.timestamp);
+      const today = new Date();
+      if (orderDate.toDateString() !== today.toDateString()) return false;
+    } else if (dateFilter === 'This Week') {
+      const orderTime = new Date(o.timestamp).getTime();
+      const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      if (orderTime < oneWeekAgo) return false;
+    }
+
     return true;
   });
 
@@ -48,8 +173,9 @@ export const OrdersScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* Top Segmented Tabs */}
+      {/* Top Section: Tabs & Cascading Hierarchy Filters */}
       <View style={styles.topSection}>
+        {/* Main Tab Switcher */}
         <View style={styles.mainTabRow}>
           <TouchableOpacity
             style={[styles.mainTab, topTab === 'Live Orders' && styles.activeMainTab]}
@@ -58,7 +184,7 @@ export const OrdersScreen: React.FC = () => {
             <Text
               style={[styles.mainTabText, topTab === 'Live Orders' && styles.activeMainTabText]}
             >
-              Live Orders ({orders.filter((o) => o.status !== 'Delivered').length})
+              Live Orders ({orders.filter((o) => o.status !== 'Delivered' && o.status !== 'Cancelled').length})
             </Text>
           </TouchableOpacity>
 
@@ -72,14 +198,64 @@ export const OrdersScreen: React.FC = () => {
                 topTab === 'Order History' && styles.activeMainTabText,
               ]}
             >
-              Order History
+              Order History ({orders.filter((o) => o.status === 'Delivered' || o.status === 'Cancelled').length})
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* 11-Stage Filter Pills */}
+        {/* Cascading Filter Bar: City + Area + Date */}
+        <View style={styles.filtersBar}>
+          {/* City Filter Button */}
+          <TouchableOpacity
+            style={[styles.filterDropdownBtn, selectedCityId !== 'ALL' && styles.activeFilterDropdown]}
+            onPress={() => setShowCityPicker(true)}
+            activeOpacity={0.8}
+          >
+            <MapPin size={13} color={selectedCityId !== 'ALL' ? COLORS.purple : COLORS.textMuted} />
+            <Text style={[styles.filterDropdownText, selectedCityId !== 'ALL' && styles.activeFilterText]} numberOfLines={1}>
+              City: {currentCity ? currentCity.name : 'All'}
+            </Text>
+            <ChevronDown size={14} color={COLORS.textMuted} />
+          </TouchableOpacity>
+
+          {/* Area Filter Button (Cascades) */}
+          <TouchableOpacity
+            style={[
+              styles.filterDropdownBtn,
+              selectedAreaId !== 'ALL' && styles.activeFilterDropdown,
+              selectedCityId === 'ALL' && availableAreas.length === 0 && styles.disabledFilterBtn,
+            ]}
+            onPress={() => {
+              if (selectedCityId === 'ALL' && availableAreas.length === 0) return;
+              setShowAreaPicker(true);
+            }}
+            activeOpacity={0.8}
+          >
+            <Navigation size={13} color={selectedAreaId !== 'ALL' ? COLORS.blue : COLORS.textMuted} />
+            <Text style={[styles.filterDropdownText, selectedAreaId !== 'ALL' && styles.activeFilterText]} numberOfLines={1}>
+              Area: {currentArea ? currentArea.name : 'All'}
+            </Text>
+            <ChevronDown size={14} color={COLORS.textMuted} />
+          </TouchableOpacity>
+
+          {/* Date Filter Button */}
+          <TouchableOpacity
+            style={[styles.filterDropdownBtn, dateFilter !== 'All' && styles.activeFilterDropdown]}
+            onPress={() => {
+              setDateFilter((prev) => (prev === 'All' ? 'Today' : prev === 'Today' ? 'This Week' : 'All'));
+            }}
+            activeOpacity={0.8}
+          >
+            <Calendar size={13} color={dateFilter !== 'All' ? COLORS.hotPink : COLORS.textMuted} />
+            <Text style={[styles.filterDropdownText, dateFilter !== 'All' && styles.activeFilterText]} numberOfLines={1}>
+              Date: {dateFilter}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Status Filter Horizontal Pills */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
-          {['All', 'Pending', 'Picking', 'Packing', 'Ready for Dispatch', 'Out for Delivery', 'Delivered', 'Cancelled'].map((st) => {
+          {['All', 'Pending', 'Picking', 'Packed', 'Ready for Dispatch', 'Out for Delivery', 'Delivered', 'Cancelled'].map((st) => {
             const isSelected = statusFilter === st;
             return (
               <TouchableOpacity
@@ -100,52 +276,64 @@ export const OrdersScreen: React.FC = () => {
       <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
         {filteredOrders.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No orders found in this category</Text>
+            <Warehouse size={40} color={COLORS.border} style={{ marginBottom: 10 }} />
+            <Text style={styles.emptyTitle}>No orders found</Text>
+            <Text style={styles.emptySubTitle}>
+              No orders match the selected filters ({currentCity ? currentCity.name : 'All Cities'}, {currentArea ? currentArea.name : 'All Areas'}, {statusFilter}).
+            </Text>
           </View>
         ) : (
           filteredOrders.map((order) => {
             const badge = getStatusBadgeStyle(order.status);
+            const hierarchy = resolveOrderHierarchy(order);
+
             return (
               <TouchableOpacity
                 key={order.id}
                 style={styles.orderCard}
                 onPress={() => handleOpenInspector(order)}
-                activeOpacity={0.8}
+                activeOpacity={0.85}
               >
-                {/* Header Row */}
+                {/* Header Row: Order ID + Status + Time */}
                 <View style={styles.orderHeader}>
                   <View style={styles.idRow}>
                     <Text style={styles.orderId}>{order.id}</Text>
-                    <View style={styles.locationTag}>
-                      <MapPin size={10} color={COLORS.textMuted} style={{ marginRight: 2 }} />
-                      <Text style={styles.locationText}>{order.zoneName}</Text>
+                    <View style={[styles.statusPillBadge, { backgroundColor: badge.bg }]}>
+                      <View style={[styles.statusDot, { backgroundColor: badge.dot }]} />
+                      <Text style={[styles.statusBadgeText, { color: badge.text }]}>
+                        {order.status}
+                      </Text>
                     </View>
                   </View>
 
                   <View style={styles.timeTag}>
                     <Clock size={11} color={COLORS.secondaryText} style={{ marginRight: 3 }} />
-                    <Text style={styles.timeText}>{order.timeAgo}</Text>
+                    <Text style={styles.timeText}>{order.timeAgo || 'Just now'}</Text>
                   </View>
                 </View>
 
-                {/* Status & Amount Row */}
+                {/* Breadcrumb Hierarchy Row: City -> Area -> Store */}
+                <View style={styles.breadcrumbCard}>
+                  <Text style={styles.breadcrumbText} numberOfLines={1}>
+                    🏙️ <Text style={styles.crumbBold}>{hierarchy.cityName}</Text> → 📍 <Text style={styles.crumbBold}>{hierarchy.areaName}</Text> → 🏪 <Text style={styles.crumbStore}>{hierarchy.storeName}</Text>
+                  </Text>
+                </View>
+
+                {/* Amount & Items Row */}
                 <View style={styles.orderBody}>
-                  <View style={[styles.statusPillBadge, { backgroundColor: badge.bg }]}>
-                    <View style={[styles.statusDot, { backgroundColor: badge.dot }]} />
-                    <Text style={[styles.statusBadgeText, { color: badge.text }]}>
-                      {order.status}
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.customerName}>{order.customerName}</Text>
+                    <Text style={styles.itemSummary} numberOfLines={1}>
+                      {order.items?.length || 0} items ({order.items?.map((i) => i.name).join(', ')})
                     </Text>
                   </View>
 
-                  <Text style={styles.orderAmount}>₹{order.total}</Text>
-                </View>
-
-                {/* Items & Staff Meta */}
-                <View style={styles.orderFooter}>
-                  <Text style={styles.customerName}>{order.customerName}</Text>
-                  <Text style={styles.itemSummary}>
-                    {order.items.length} items ({order.items.map((i) => i.name).join(', ')})
-                  </Text>
+                  <View style={styles.priceContainer}>
+                    <Text style={styles.orderAmount}>₹{order.total}</Text>
+                    <Text style={styles.paymentMethodText}>
+                      {order.paymentMethod || 'COD'}
+                    </Text>
+                  </View>
                 </View>
 
                 {/* Action Shortcuts */}
@@ -174,7 +362,7 @@ export const OrdersScreen: React.FC = () => {
 
                   <View style={styles.inspectBtn}>
                     <Text style={styles.inspectText}>Inspector</Text>
-                    <ChevronRight size={14} color={COLORS.hotPink} />
+                    <ChevronRight size={14} color={COLORS.purple} />
                   </View>
                 </View>
               </TouchableOpacity>
@@ -182,6 +370,203 @@ export const OrdersScreen: React.FC = () => {
           })
         )}
       </ScrollView>
+
+      {/* ================= MODAL: SELECT CITY ================= */}
+      <Modal
+        visible={showCityPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCityPicker(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalPanel}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderTitleRow}>
+                <MapPin size={20} color={COLORS.purple} />
+                <View>
+                  <Text style={styles.modalTitle}>Filter by City</Text>
+                  <Text style={styles.modalSubtitle}>Scope orders to a specific city</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setShowCityPicker(false)}>
+                <X size={20} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              <View style={styles.searchInnerRow}>
+                <Search size={16} color={COLORS.textMuted} />
+                <TextInput
+                  style={styles.searchInnerInput}
+                  placeholder="Search city by name or code..."
+                  placeholderTextColor={COLORS.textMuted}
+                  value={citySearch}
+                  onChangeText={setCitySearch}
+                />
+                {citySearch ? (
+                  <TouchableOpacity onPress={() => setCitySearch('')}>
+                    <X size={16} color={COLORS.textMuted} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={true}>
+                {/* All Cities Option */}
+                <TouchableOpacity
+                  style={[styles.modalItem, selectedCityId === 'ALL' && styles.modalItemActive]}
+                  onPress={() => {
+                    setSelectedCityId('ALL');
+                    setSelectedAreaId('ALL');
+                    setShowCityPicker(false);
+                    setCitySearch('');
+                  }}
+                >
+                  <View style={styles.modalItemLeft}>
+                    <View style={[styles.cityMiniBadge, { backgroundColor: '#F3F4F6' }]}>
+                      <Text style={[styles.cityMiniBadgeText, { color: COLORS.textMuted }]}>ALL</Text>
+                    </View>
+                    <Text style={[styles.modalItemText, selectedCityId === 'ALL' && styles.modalItemTextActive]}>
+                      All Cities (National)
+                    </Text>
+                  </View>
+                  {selectedCityId === 'ALL' && <Check size={18} color={COLORS.purple} />}
+                </TouchableOpacity>
+
+                {activeCities
+                  .filter(
+                    (c) =>
+                      c.name.toLowerCase().includes(citySearch.toLowerCase()) ||
+                      c.code.toLowerCase().includes(citySearch.toLowerCase())
+                  )
+                  .map((city) => {
+                    const isSelected = selectedCityId === (city.id || city._id);
+                    return (
+                      <TouchableOpacity
+                        key={city.id || city._id}
+                        style={[styles.modalItem, isSelected && styles.modalItemActive]}
+                        onPress={() => {
+                          setSelectedCityId(city.id || city._id || '');
+                          setSelectedAreaId('ALL');
+                          setShowCityPicker(false);
+                          setCitySearch('');
+                        }}
+                      >
+                        <View style={styles.modalItemLeft}>
+                          <View style={styles.cityMiniBadge}>
+                            <Text style={styles.cityMiniBadgeText}>{city.code}</Text>
+                          </View>
+                          <Text style={[styles.modalItemText, isSelected && styles.modalItemTextActive]}>
+                            {city.name}
+                          </Text>
+                        </View>
+                        {isSelected && <Check size={18} color={COLORS.purple} />}
+                      </TouchableOpacity>
+                    );
+                  })}
+              </ScrollView>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ================= MODAL: SELECT AREA ================= */}
+      <Modal
+        visible={showAreaPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowAreaPicker(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalPanel}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderTitleRow}>
+                <Navigation size={20} color={COLORS.blue} />
+                <View>
+                  <Text style={styles.modalTitle}>
+                    Filter by Area {currentCity ? `(${currentCity.name})` : ''}
+                  </Text>
+                  <Text style={styles.modalSubtitle}>Scope orders to a specific area</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setShowAreaPicker(false)}>
+                <X size={20} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              <View style={styles.searchInnerRow}>
+                <Search size={16} color={COLORS.textMuted} />
+                <TextInput
+                  style={styles.searchInnerInput}
+                  placeholder="Search area name or code..."
+                  placeholderTextColor={COLORS.textMuted}
+                  value={areaSearch}
+                  onChangeText={setAreaSearch}
+                />
+                {areaSearch ? (
+                  <TouchableOpacity onPress={() => setAreaSearch('')}>
+                    <X size={16} color={COLORS.textMuted} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={true}>
+                {/* All Areas Option */}
+                <TouchableOpacity
+                  style={[styles.modalItem, selectedAreaId === 'ALL' && styles.modalItemActive]}
+                  onPress={() => {
+                    setSelectedAreaId('ALL');
+                    setShowAreaPicker(false);
+                    setAreaSearch('');
+                  }}
+                >
+                  <View style={styles.modalItemLeft}>
+                    <View style={[styles.areaMiniDot, { backgroundColor: COLORS.textMuted }]} />
+                    <Text style={[styles.modalItemText, selectedAreaId === 'ALL' && styles.modalItemTextActive]}>
+                      All Areas {currentCity ? `in ${currentCity.name}` : ''}
+                    </Text>
+                  </View>
+                  {selectedAreaId === 'ALL' && <Check size={18} color={COLORS.purple} />}
+                </TouchableOpacity>
+
+                {availableAreas
+                  .filter(
+                    (a) =>
+                      a.name.toLowerCase().includes(areaSearch.toLowerCase()) ||
+                      (a.code && a.code.toLowerCase().includes(areaSearch.toLowerCase()))
+                  )
+                  .map((area) => {
+                    const isSelected = selectedAreaId === (area.id || area._id);
+                    return (
+                      <TouchableOpacity
+                        key={area.id || area._id}
+                        style={[styles.modalItem, isSelected && styles.modalItemActive]}
+                        onPress={() => {
+                          setSelectedAreaId(area.id || area._id || '');
+                          setShowAreaPicker(false);
+                          setAreaSearch('');
+                        }}
+                      >
+                        <View style={styles.modalItemLeft}>
+                          <View style={styles.areaMiniDot} />
+                          <View>
+                            <Text style={[styles.modalItemText, isSelected && styles.modalItemTextActive]}>
+                              {area.name}
+                            </Text>
+                            <Text style={styles.modalItemSub}>
+                              {area.cityName || currentCity?.name} • {area.darkStore || 'Dark Store Hub'}
+                            </Text>
+                          </View>
+                        </View>
+                        {isSelected && <Check size={18} color={COLORS.purple} />}
+                      </TouchableOpacity>
+                    );
+                  })}
+              </ScrollView>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -222,18 +607,54 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontWeight: '700',
   },
+  filtersBar: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: SPACING.sm,
+    flexWrap: 'wrap',
+  },
+  filterDropdownBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: COLORS.cardBackground,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: RADIUS.pill,
+    flex: 1,
+    minWidth: 110,
+  },
+  activeFilterDropdown: {
+    backgroundColor: '#FAF5FF',
+    borderColor: COLORS.purple,
+  },
+  disabledFilterBtn: {
+    opacity: 0.6,
+  },
+  filterDropdownText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    flex: 1,
+  },
+  activeFilterText: {
+    color: COLORS.purple,
+    fontWeight: '700',
+  },
   filterScroll: {
     flexDirection: 'row',
   },
   statusPill: {
     paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: RADIUS.pill,
     backgroundColor: COLORS.cardBackground,
     marginRight: 6,
   },
   activeStatusPill: {
-    backgroundColor: COLORS.hotPink,
+    backgroundColor: COLORS.purple,
   },
   statusPillText: {
     fontSize: 12,
@@ -242,34 +663,46 @@ const styles = StyleSheet.create({
   },
   activeStatusPillText: {
     color: COLORS.white,
+    fontWeight: '700',
   },
   list: {
     flex: 1,
   },
   listContent: {
     padding: SPACING.md,
-    paddingBottom: 40,
+    paddingBottom: 24,
   },
   emptyState: {
-    padding: SPACING.xxl,
+    padding: SPACING.xl,
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.card,
+    marginTop: SPACING.md,
   },
-  emptyText: {
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+  },
+  emptySubTitle: {
+    fontSize: 12,
     color: COLORS.textMuted,
-    fontSize: 14,
+    marginTop: 4,
+    textAlign: 'center',
   },
   orderCard: {
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.card,
-    padding: SPACING.md,
-    marginBottom: SPACING.sm,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    elevation: 2,
+    borderColor: '#E5E7EB',
+    padding: SPACING.md,
+    marginBottom: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
+    shadowOpacity: 0.05,
     shadowRadius: 3,
+    elevation: 2,
   },
   orderHeader: {
     flexDirection: 'row',
@@ -280,25 +713,29 @@ const styles = StyleSheet.create({
   idRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
   orderId: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '800',
     color: COLORS.textPrimary,
-    marginRight: 8,
   },
-  locationTag: {
+  statusPillBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.lightBlueLavender,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: RADIUS.sm,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: RADIUS.pill,
   },
-  locationText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: COLORS.darkBlue,
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 4,
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   timeTag: {
     flexDirection: 'row',
@@ -306,45 +743,38 @@ const styles = StyleSheet.create({
   },
   timeText: {
     fontSize: 11,
-    color: COLORS.secondaryText,
+    color: COLORS.textMuted,
+  },
+  breadcrumbCard: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    marginBottom: 8,
+  },
+  breadcrumbText: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+  },
+  crumbBold: {
+    fontWeight: '800',
+    color: COLORS.navy,
+  },
+  crumbStore: {
+    fontWeight: '700',
+    color: COLORS.purple,
   },
   orderBody: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginVertical: 4,
-  },
-  statusPillBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: RADIUS.pill,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 6,
-  },
-  statusBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  orderAmount: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: COLORS.textPrimary,
-  },
-  orderFooter: {
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    paddingTop: 8,
-    marginTop: 8,
+    marginBottom: 10,
   },
   customerName: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
     color: COLORS.textPrimary,
   },
   itemSummary: {
@@ -352,37 +782,167 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     marginTop: 2,
   },
+  priceContainer: {
+    alignItems: 'flex-end',
+  },
+  orderAmount: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: COLORS.purple,
+  },
+  paymentMethodText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
   cardActionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 10,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: COLORS.border,
+    borderTopColor: '#F3F4F6',
   },
   actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.lightBlueLavender,
+    backgroundColor: '#FAF5FF',
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: RADIUS.pill,
+    gap: 4,
   },
   actionBtnText: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
     color: COLORS.purple,
-    marginLeft: 4,
   },
   inspectBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 2,
   },
   inspectText: {
     fontSize: 12,
     fontWeight: '700',
-    color: COLORS.hotPink,
-    marginRight: 2,
+    color: COLORS.purple,
+  },
+
+  // Modal Styles
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.md,
+  },
+  modalPanel: {
+    width: '100%',
+    maxWidth: 440,
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.card,
+    overflow: 'hidden',
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  modalHeaderTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  modalTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: COLORS.navy,
+  },
+  modalSubtitle: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+  },
+  modalBody: {
+    padding: SPACING.md,
+  },
+  searchInnerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.cardBackground,
+    borderRadius: RADIUS.input,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: SPACING.sm,
+    gap: 8,
+  },
+  searchInnerInput: {
+    flex: 1,
+    fontSize: 13,
+    color: COLORS.textPrimary,
+    padding: 0,
+  },
+  modalScroll: {
+    maxHeight: 280,
+  },
+  modalItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: RADIUS.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  modalItemActive: {
+    backgroundColor: '#FAF5FF',
+  },
+  modalItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  cityMiniBadge: {
+    backgroundColor: '#EDE9FE',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  cityMiniBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: COLORS.purple,
+  },
+  areaMiniDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.blue,
+  },
+  modalItemText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  modalItemTextActive: {
+    color: COLORS.purple,
+    fontWeight: '800',
+  },
+  modalItemSub: {
+    fontSize: 10,
+    color: COLORS.textMuted,
   },
 });

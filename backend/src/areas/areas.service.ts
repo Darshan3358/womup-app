@@ -3,6 +3,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Area, AreaDocument } from './schemas/area.schema';
 import { AreaPricing, AreaPricingDocument } from './schemas/area-pricing.schema';
+import { City, CityDocument } from './schemas/city.schema';
+import { Store, StoreDocument } from '../stores/schemas/store.schema';
 
 /** Haversine formula: distance in km between two GPS points */
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -20,7 +22,13 @@ export class AreasService {
   constructor(
     @InjectModel(Area.name) private areaModel: Model<AreaDocument>,
     @InjectModel(AreaPricing.name) private areaPricingModel: Model<AreaPricingDocument>,
+    @InjectModel(City.name) private cityModel: Model<CityDocument>,
+    @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
   ) {}
+
+  async getAllCities() {
+    return this.cityModel.find({ status: 'Active' }).sort({ sortOrder: 1, name: 1 }).exec();
+  }
 
   async resolveAreaByCoords(lat: number, lng: number): Promise<AreaDocument | null> {
     const activeAreas = await this.areaModel.find({ isActive: true }).exec();
@@ -54,8 +62,44 @@ export class AreasService {
     return this.areaModel.findOne({ isActive: true }).sort({ sortOrder: 1 }).exec();
   }
 
-  async getAllAreas() {
-    return this.areaModel.find({ isActive: true }).sort({ sortOrder: 1 }).exec();
+  async getAllAreas(cityId?: string) {
+    const query: any = { isActive: true };
+    if (cityId) {
+      if (Types.ObjectId.isValid(cityId)) {
+        query.$or = [{ cityId: new Types.ObjectId(cityId) }, { cityId: cityId.toString() }];
+      } else {
+        query.cityId = cityId;
+      }
+    }
+
+    const [areas, activeStores] = await Promise.all([
+      this.areaModel.find(query).sort({ sortOrder: 1, name: 1 }).exec(),
+      this.storeModel.find({ isActive: true }, { areaId: 1, name: 1, code: 1 }).exec(),
+    ]);
+
+    const assignedMap = new Map<string, { storeId: string; storeName: string; storeCode?: string }>();
+    for (const store of activeStores) {
+      if (store.areaId) {
+        assignedMap.set(store.areaId.toString(), {
+          storeId: store._id.toString(),
+          storeName: store.name,
+          storeCode: store.code,
+        });
+      }
+    }
+
+    return areas.map((area) => {
+      const areaObj = area.toObject();
+      const areaIdStr = area._id.toString();
+      const assigned = assignedMap.get(areaIdStr);
+      return {
+        ...areaObj,
+        id: areaIdStr,
+        hasActiveStore: Boolean(assigned),
+        isAvailable: !assigned,
+        assignedStore: assigned || null,
+      };
+    });
   }
 
   /** Get area-specific pricing for a batch of variantIds */

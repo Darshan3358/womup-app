@@ -8,6 +8,9 @@ const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_URL ||
   (isLocalWeb ? 'http://localhost:5050/api/v1/store' : 'https://womup-app.onrender.com/api/v1/store');
 
+const LOCATION_API_BASE_URL =
+  isLocalWeb ? 'http://localhost:5050/api/v1/location' : 'https://womup-app.onrender.com/api/v1/location';
+
 export const TOKEN_STORAGE_KEY = '@womup_store_access_token';
 export const STAFF_STORAGE_KEY = '@womup_store_staff';
 
@@ -49,7 +52,65 @@ export class StoreApiService {
     return resJson as T;
   }
 
+  // Master Location APIs (for Registration)
+  static async getCities(): Promise<any[]> {
+    try {
+      const response = await fetch(`${LOCATION_API_BASE_URL}/cities`);
+      const json = await response.json();
+      if (!response.ok) {
+        throw new Error(json.message || 'Failed to fetch cities');
+      }
+      return json.data || json || [];
+    } catch (err: any) {
+      console.warn('[StoreApiService] getCities error:', err.message);
+      return [];
+    }
+  }
+
+  static async getAreasByCity(cityId: string): Promise<any[]> {
+    try {
+      const response = await fetch(`${LOCATION_API_BASE_URL}/areas?cityId=${encodeURIComponent(cityId)}`);
+      const json = await response.json();
+      if (!response.ok) {
+        throw new Error(json.message || 'Failed to fetch areas');
+      }
+      return json.data || json || [];
+    } catch (err: any) {
+      console.warn('[StoreApiService] getAreasByCity error:', err.message);
+      return [];
+    }
+  }
+
   // Auth APIs
+  static async registerStore(payload: {
+    storeName: string;
+    ownerName: string;
+    phone: string;
+    email: string;
+    cityId: string;
+    areaId: string;
+    password: string;
+  }) {
+    return this.request<{
+      success: boolean;
+      message: string;
+      store: {
+        id: string;
+        name: string;
+        code: string;
+        loginId: string;
+        city: string;
+        areaName: string;
+        ownerName: string;
+        email: string;
+        phone: string;
+      };
+    }>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
   static async loginWithStoreCredentials(loginId: string, password: string) {
     const data = await this.request<any>('/auth/login', {
       method: 'POST',
@@ -136,6 +197,10 @@ export class StoreApiService {
     return this.request<any[]>('/orders/ready');
   }
 
+  static async getCompletedOrders() {
+    return this.request<any[]>('/orders/history');
+  }
+
   static async getOrderDetail(orderId: string) {
     return this.request<any>(`/orders/${orderId}`);
   }
@@ -199,6 +264,29 @@ export class StoreApiService {
     });
   }
 
+  static async updateShelfLocation(productId: string, shelfLocation: string) {
+    return this.request<any>(`/inventory/${productId}/shelf`, {
+      method: 'PATCH',
+      body: JSON.stringify({ shelfLocation: shelfLocation.trim().toUpperCase() }),
+    });
+  }
+
+  static async addProduct(payload: {
+    name: string;
+    category?: string;
+    brand?: string;
+    description?: string;
+    imageUrl?: string;
+    variants?: { packSize?: string; sellingPrice?: number; mrp?: number; sku?: string }[];
+    initialStock?: number;
+    shelfLocation?: string;
+  }) {
+    return this.request<any>('/inventory/add-product', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
   static async restock(productId: string, quantity: number, batchNumber?: string) {
     return this.request<any>(`/inventory/${productId}/restock`, {
       method: 'POST',
@@ -223,5 +311,61 @@ export class StoreApiService {
     return this.request<{ success: boolean; bagBarcode: string }>(`/orders/${orderId}/bag-barcode`, {
       method: 'POST',
     });
+  }
+
+  static async uploadImage(asset: { uri: string; fileName?: string | null; mimeType?: string | null }): Promise<string> {
+    const isWeb = typeof window !== 'undefined' && typeof document !== 'undefined';
+    const fileName = asset.fileName || `store_prod_${Date.now()}.jpg`;
+    const mimeType = asset.mimeType || 'image/jpeg';
+
+    const formData = new FormData();
+    if (isWeb) {
+      const resp = await fetch(asset.uri);
+      const blob = await resp.blob();
+      formData.append('file', blob, fileName);
+    } else {
+      formData.append('file', {
+        uri: asset.uri,
+        name: fileName,
+        type: mimeType,
+      } as any);
+    }
+
+    const token = await AsyncStorage.getItem(TOKEN_STORAGE_KEY);
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const mediaBaseUrl = API_BASE_URL.replace(/\/store\/?$/, '');
+    const endpoints = [
+      `${mediaBaseUrl}/media/upload?folder=wormup/products`,
+      `${mediaBaseUrl}/upload/image?folder=wormup/products`,
+    ];
+
+    let lastError: any = null;
+    for (const url of endpoints) {
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: formData,
+        });
+        const resJson = await response.json();
+        if (response.ok) {
+          const cloudUrl =
+            resJson?.url ||
+            resJson?.secure_url ||
+            resJson?.data?.url ||
+            resJson?.data?.secure_url;
+          if (cloudUrl) return cloudUrl;
+        } else {
+          lastError = new Error(resJson?.message || `Upload failed with status ${response.status}`);
+        }
+      } catch (err) {
+        lastError = err;
+      }
+    }
+    throw lastError || new Error('Failed to upload image to server');
   }
 }

@@ -1,11 +1,18 @@
-import { Controller, Post, Get, Body, BadRequestException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBody } from '@nestjs/swagger';
+import { Controller, Post, Get, Body, Query, BadRequestException } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { AreasService } from './areas.service';
 
 @ApiTags('Location & Areas')
 @Controller('api/v1/location')
 export class AreasController {
   constructor(private readonly areasService: AreasService) {}
+
+  @Get('cities')
+  @ApiOperation({ summary: 'List all active cities' })
+  async listCities() {
+    const cities = await this.areasService.getAllCities();
+    return { success: true, data: cities };
+  }
 
   @Post('resolve')
   @ApiOperation({ summary: 'Resolve GPS coordinates to a delivery area/zone' })
@@ -25,6 +32,8 @@ export class AreasController {
         areaId: (defaultArea as any)._id.toString(),
         areaName: defaultArea.name,
         city: defaultArea.city,
+        cityName: (defaultArea as any).cityName || defaultArea.city,
+        cityId: (defaultArea as any).cityId ? (defaultArea as any).cityId.toString() : null,
         deliveryMinutes: defaultArea.defaultDeliveryMinutes,
         isDefault: true,
       };
@@ -40,15 +49,18 @@ export class AreasController {
       areaId: (area as any)._id.toString(),
       areaName: area.name,
       city: area.city,
+      cityName: (area as any).cityName || area.city,
+      cityId: (area as any).cityId ? (area as any).cityId.toString() : null,
       deliveryMinutes: area.defaultDeliveryMinutes,
       isDefault: false,
     };
   }
 
   @Get('areas')
-  @ApiOperation({ summary: 'List all active delivery areas/zones' })
-  async listAreas() {
-    const areas = await this.areasService.getAllAreas();
+  @ApiOperation({ summary: 'List all active delivery areas/zones (optionally filtered by cityId)' })
+  @ApiQuery({ name: 'cityId', required: false })
+  async listAreas(@Query('cityId') cityId?: string) {
+    const areas = await this.areasService.getAllAreas(cityId);
     return { success: true, data: areas };
   }
 }

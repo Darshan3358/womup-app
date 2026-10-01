@@ -588,16 +588,16 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   cardVariantChipActive: {
-    borderColor: '#15803D',
-    backgroundColor: '#F0FDF4',
+    borderColor: '#EC4A9D',
+    backgroundColor: '#FCEAF5',
   },
   cardVariantChipText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#64748B',
+    color: '#62677A',
   },
   cardVariantChipTextActive: {
-    color: '#15803D',
+    color: '#EC4A9D',
     fontWeight: '700',
   },
   packSizeText: {

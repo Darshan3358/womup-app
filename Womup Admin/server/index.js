@@ -13,6 +13,8 @@ const printOrdersRouter = require('./routes/printOrders');
 const marketingRouter = require('./routes/marketing');
 const financeRouter = require('./routes/finance');
 const securityRouter = require('./routes/security');
+const citiesRouter = require('./routes/cities');
+const categoriesRouter = require('./routes/categories');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -71,7 +73,8 @@ app.get('/api/realtime-data', async (req, res) => {
     const printOrders = await db.collection('print_orders').find({}).toArray();
     const productVariants = await db.collection('product_variants').find({}).toArray();
     const areaPricing = await db.collection('area_pricing').find({}).toArray();
-    const banners = await db.collection('banners').find({}).toArray();
+    const cities = await db.collection('cities').find({}).sort({ sortOrder: 1, name: 1 }).toArray();
+    const banners = await db.collection('banners').find({}).sort({ sortOrder: 1 }).toArray();
 
     res.json({
       users,
@@ -81,6 +84,7 @@ app.get('/api/realtime-data', async (req, res) => {
       productVariants,
       areaPricing,
       categories,
+      cities,
       areas,
       stores,
       inventory,
@@ -234,6 +238,8 @@ app.patch('/api/admin/riders/:id', async (req, res) => {
 app.use('/api/admin/dashboard', dashboardRouter);
 app.use('/api/admin/users', usersRouter);
 app.use('/api/admin/catalog', catalogRouter);
+app.use('/api/admin/categories', categoriesRouter);
+app.use('/api/admin/cities', citiesRouter);
 app.use('/api/admin/areas', areasRouter);
 app.use('/api/admin/stores', storesRouter);
 app.use('/api/admin/orders', ordersRouter);

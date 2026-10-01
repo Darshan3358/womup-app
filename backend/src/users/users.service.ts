@@ -27,6 +27,8 @@ export class UsersService {
     if (updateData.email !== undefined) updateOps.$set.email = updateData.email;
     if (updateData.avatar !== undefined) updateOps.$set.avatar = updateData.avatar;
     if (updateData.hideSensitiveItems !== undefined) updateOps.$set.hideSensitiveItems = updateData.hideSensitiveItems;
+    if (updateData.preferredCityId !== undefined) updateOps.$set.preferredCityId = updateData.preferredCityId;
+    if (updateData.preferredCityName !== undefined) updateOps.$set.preferredCityName = updateData.preferredCityName;
 
     if (updateData.birthday) {
       updateOps.$set.birthday = updateData.birthday;

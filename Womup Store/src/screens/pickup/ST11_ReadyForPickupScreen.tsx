@@ -6,7 +6,14 @@ import { OrderCard } from '../../components/OrderCard';
 import { COLORS } from '../../theme/colors';
 
 export const ST11_ReadyForPickupScreen: React.FC = () => {
-  const { readyOrders, selectOrderForDetail, setSubScreen, refreshReady, isLoading } = useStore();
+  const { readyOrders, selectOrderForDetail, setSubScreen, setCurrentTab, refreshReady, isLoading, store } = useStore();
+
+  const areaName =
+    store?.areaName ||
+    (store?.name
+      ? store.name.replace(/^Wom\s*Up\s*/i, '').replace(/\s*(Dark\s*Store|Store)$/i, '').trim()
+      : 'Chandlodiya');
+  const cityName = store?.cityName || store?.city || 'Ahmedabad';
 
   const handleHandoverPress = (orderId: string) => {
     selectOrderForDetail(orderId);
@@ -24,10 +31,14 @@ export const ST11_ReadyForPickupScreen: React.FC = () => {
           </Text>
         </View>
 
-        <View style={styles.shelvesBadge}>
-          <Ionicons name="cube" size={14} color={COLORS.shelfBadgeText} />
-          <Text style={styles.shelvesBadgeText}>SHELF SLOTS</Text>
-        </View>
+        <TouchableOpacity
+          style={styles.historyShortcutBtn}
+          onPress={() => setCurrentTab('History')}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="time-outline" size={13} color={COLORS.accentCyan} />
+          <Text style={styles.historyShortcutText}>HISTORY</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Orders List */}
@@ -51,7 +62,16 @@ export const ST11_ReadyForPickupScreen: React.FC = () => {
             <Ionicons name="cube-outline" size={48} color={COLORS.textMuted} />
             <Text style={styles.emptyTitle}>No Orders on Shelves</Text>
             <Text style={styles.emptyDesc}>
-              When pickers complete packing bags, they will appear here ready for rider collection.
+              No sealed bags waiting on pickup shelves.
+            </Text>
+            <View style={styles.servingBadge}>
+              <Ionicons name="location" size={13} color={COLORS.primary} />
+              <Text style={styles.servingText}>
+                Serving: {areaName} · {cityName}
+              </Text>
+            </View>
+            <Text style={styles.emptySubDesc}>
+              Packed orders awaiting pickup will appear here.
             </Text>
           </View>
         }
@@ -104,6 +124,24 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
   },
+  historyShortcutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(6, 182, 212, 0.12)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(6, 182, 212, 0.25)',
+    flexShrink: 0,
+  },
+  historyShortcutText: {
+    color: COLORS.accentCyan,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
   listContent: {
     padding: 16,
     paddingBottom: 24,
@@ -126,5 +164,29 @@ const styles = StyleSheet.create({
     marginTop: 6,
     maxWidth: 260,
     lineHeight: 18,
+  },
+  servingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.25)',
+  },
+  servingText: {
+    color: COLORS.primary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  emptySubDesc: {
+    color: COLORS.textSecondary,
+    fontSize: 11.5,
+    textAlign: 'center',
+    marginTop: 6,
+    maxWidth: 260,
   },
 });

@@ -221,6 +221,52 @@ export class StoreOrdersService {
     return results;
   }
 
+  async getOrderHistory(userId: string) {
+    const staff = await this.getStaff(userId);
+    if (!staff.storeId) {
+      return [];
+    }
+
+    const orders = await this.orderModel
+      .find({
+        storeId: staff.storeId,
+        status: { $in: [OrderStatus.DELIVERED, 'COMPLETED'] },
+      })
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .limit(60)
+      .populate('userId', 'name phone')
+      .populate('deliveryPartnerId', 'fullName phoneNumber vehicleNumber')
+      .exec();
+
+    return orders.map((o: any) => ({
+      orderId: o._id.toString(),
+      orderNumber: o.orderNumber,
+      itemCount: o.items?.length || 0,
+      totalAmount: o.totalAmount,
+      status: o.status || 'DELIVERED',
+      createdAt: o.createdAt,
+      deliveredAt: o.deliveredAt || o.updatedAt || o.createdAt,
+      items: o.items?.map((item: any) => ({
+        productId: item.productId?.toString(),
+        name: item.name,
+        quantity: item.quantity,
+        quantityLabel: item.quantityLabel,
+        price: item.price,
+        imageUrl: item.imageUrl,
+      })),
+      customerName: o.userId?.name || 'Customer',
+      customerPhone: o.userId?.phone || null,
+      deliveryPartner: o.deliveryPartnerId
+        ? {
+            name: o.deliveryPartnerId.fullName,
+            phone: o.deliveryPartnerId.phoneNumber,
+            vehicle: o.deliveryPartnerId.vehicleNumber,
+          }
+        : null,
+      deliveryAddress: o.deliveryAddress,
+    }));
+  }
+
   async getOrderDetail(userId: string, orderId: string) {
     const staff = await this.getStaff(userId);
     const order = await this.orderModel.findById(orderId);
@@ -235,6 +281,31 @@ export class StoreOrdersService {
     let pickList = await this.pickListModel.findOne({ orderId: order._id });
     if (!pickList && (order.status === OrderStatus.PACKING || order.status === OrderStatus.PACKED)) {
       pickList = await this.createPickListForOrder(order, staff);
+    }
+
+    // Live update shelf location if pickList items still have UNASSIGNED or Not set
+    if (pickList && pickList.items) {
+      let changed = false;
+      for (const item of pickList.items) {
+        if (!item.shelfLocation || item.shelfLocation === 'UNASSIGNED') {
+          const inv = await this.inventoryModel.findOne({
+            storeId: order.storeId || staff.storeId,
+            productId: item.productId,
+          });
+          const prod = await this.productModel.findById(item.productId);
+          const shelf = inv?.shelfLocation || prod?.shelfLocation;
+          if (shelf && shelf !== 'UNASSIGNED') {
+            item.shelfLocation = shelf;
+            changed = true;
+          } else {
+            item.shelfLocation = 'Not set';
+            changed = true;
+          }
+        }
+      }
+      if (changed) {
+        await pickList.save().catch(() => {});
+      }
     }
 
     let assignedRider = null;
@@ -340,6 +411,13 @@ export class StoreOrdersService {
 
     for (const item of order.items || []) {
       const product = await this.productModel.findById(item.productId);
+      const inv = await this.inventoryModel.findOne({
+        storeId: order.storeId || staff.storeId,
+        productId: item.productId,
+      });
+
+      const shelf = inv?.shelfLocation || product?.shelfLocation;
+      const cleanShelf = shelf && shelf !== 'UNASSIGNED' ? shelf : 'Not set';
 
       pickItems.push({
         productId: item.productId,
@@ -347,7 +425,7 @@ export class StoreOrdersService {
         name: item.name,
         quantity: item.quantity || 1,
         unit: item.quantityLabel || 'pack',
-        shelfLocation: product?.shelfLocation || 'UNASSIGNED',
+        shelfLocation: cleanShelf,
         barcode: product?.barcode || (product as any)?.sku || '',
         status: PickItemStatus.PENDING,
         notes: '',

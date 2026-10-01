@@ -66,10 +66,20 @@ export class RegisterRiderDto {
   @Matches(/^[6-9]\d{9}$/, { message: 'Please enter a valid 10-digit Indian mobile number' })
   phoneNumber: string;
 
+  @ApiProperty({ example: '66f...city_id', required: false })
+  @IsString()
+  @IsOptional()
+  cityId?: string;
+
   @ApiProperty({ example: 'Ahmedabad' })
   @IsString()
   @IsNotEmpty()
   city: string;
+
+  @ApiProperty({ example: 'Ahmedabad', required: false })
+  @IsString()
+  @IsOptional()
+  cityName?: string;
 
   @ApiProperty({ example: 'EV_SCOOTER' })
   @IsString()
@@ -112,6 +122,16 @@ export class RegisterDto {
   @IsString()
   @IsOptional()
   referralCode?: string;
+
+  @ApiProperty({ example: '65f...cityId', required: false })
+  @IsString()
+  @IsOptional()
+  preferredCityId?: string;
+
+  @ApiProperty({ example: 'Ahmedabad', required: false })
+  @IsString()
+  @IsOptional()
+  preferredCityName?: string;
 }
 
 export class RefreshTokenDto {

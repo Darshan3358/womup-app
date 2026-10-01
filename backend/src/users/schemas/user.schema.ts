@@ -47,6 +47,12 @@ export class User {
   birthday?: string; // Stored as "DD MonthName YYYY" e.g. "07 August 2005"
 
 
+  @Prop({ type: Types.ObjectId, ref: 'City' })
+  preferredCityId?: Types.ObjectId;
+
+  @Prop({ trim: true })
+  preferredCityName?: string;
+
   @Prop({ type: Types.ObjectId, ref: 'Store' })
   assignedStoreId?: Types.ObjectId;
 

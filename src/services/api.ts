@@ -12,20 +12,52 @@ export const API_BASE_URL =
 
 class ApiClient {
   private token: string | null = null;
+  private isRefreshing = false;
+  private refreshCooldownUntil: number = 0; // Cooldown timestamp to prevent 401 refresh loops
+  private inFlightGetRequests: Map<string, Promise<any>> = new Map();
 
   setToken(token: string | null) {
     this.token = token;
+    if (!token) {
+      this.refreshCooldownUntil = 0;
+    }
   }
 
   getToken(): string | null {
     return this.token;
   }
 
-  private isRefreshing = false;
-
+  /**
+   * Main HTTP request entry point with in-flight GET de-duplication,
+   * single-retry limit, circuit breaker, and automatic session cleanup.
+   */
   async request<T>(
     endpoint: string,
-    options: RequestInit = {},
+    options: RequestInit & { _isRetry?: boolean } = {},
+  ): Promise<{ success: boolean; data?: T; message?: string }> {
+    const isGet = !options.method || options.method.toUpperCase() === 'GET';
+    const cacheKey = `${endpoint}_${this.token || 'anon'}`;
+
+    // De-duplicate concurrent in-flight GET requests (prevents 10+ components spamming simultaneously)
+    if (isGet && !options._isRetry && this.inFlightGetRequests.has(cacheKey)) {
+      return this.inFlightGetRequests.get(cacheKey)!;
+    }
+
+    const requestPromise = this.executeRequest<T>(endpoint, options);
+
+    if (isGet && !options._isRetry) {
+      this.inFlightGetRequests.set(cacheKey, requestPromise);
+      requestPromise.finally(() => {
+        this.inFlightGetRequests.delete(cacheKey);
+      });
+    }
+
+    return requestPromise;
+  }
+
+  private async executeRequest<T>(
+    endpoint: string,
+    options: RequestInit & { _isRetry?: boolean } = {},
   ): Promise<{ success: boolean; data?: T; message?: string }> {
     const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
@@ -40,7 +72,7 @@ class ApiClient {
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000);
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     try {
       const res = await fetch(url, {
@@ -50,47 +82,80 @@ class ApiClient {
       });
       clearTimeout(timeoutId);
 
-      // Handle 401 Unauthorized by attempting to refresh token
-      if (
-        res.status === 401 &&
-        !endpoint.includes('/auth/refresh-token') &&
-        !endpoint.includes('/auth/login') &&
-        !endpoint.includes('/auth/verify-otp') &&
-        !endpoint.includes('/auth/register')
-      ) {
+      // Handle 401 Unauthorized with strict cycle break:
+      // 1. If already retried once -> DO NOT retry again! Immediately clear session.
+      // 2. If endpoint is auth/refresh-token or auth/login -> DO NOT attempt refresh.
+      // 3. If refresh cooldown is active -> DO NOT attempt refresh, clear session.
+      if (res.status === 401) {
+        const isAuthEndpoint =
+          endpoint.includes('/auth/refresh-token') ||
+          endpoint.includes('/auth/login') ||
+          endpoint.includes('/auth/verify-otp') ||
+          endpoint.includes('/auth/register');
+
+        if (options._isRetry || isAuthEndpoint) {
+          await this.handleSessionExpired();
+          return {
+            success: false,
+            message: 'Session expired or invalid credentials.',
+          };
+        }
+
+        // Check if refresh is on cooldown (prevents rapid retry loops)
+        if (Date.now() < this.refreshCooldownUntil) {
+          await this.handleSessionExpired();
+          return {
+            success: false,
+            message: 'Session expired. Please log in again.',
+          };
+        }
+
         const refreshed = await this.tryRefreshToken();
         if (refreshed && this.token) {
           headers['Authorization'] = `Bearer ${this.token}`;
-          const retryRes = await fetch(url, { ...options, headers });
-          const retryJson = await retryRes.json();
-          if (!retryRes.ok) {
-            return {
-              success: false,
-              message: retryJson.message || `Request failed with status ${retryRes.status}`,
-            };
-          }
-          return retryJson;
+          // Retry ONCE with _isRetry: true to prevent any further recursion
+          return this.request<T>(endpoint, {
+            ...options,
+            headers,
+            _isRetry: true,
+          });
+        } else {
+          // Refresh failed -> Set 30s cooldown and clear expired session
+          this.refreshCooldownUntil = Date.now() + 30000;
+          await this.handleSessionExpired();
+          return {
+            success: false,
+            message: 'Session expired. Please log in again.',
+          };
         }
       }
 
-      const json = await res.json();
+      let json: any = null;
+      try {
+        json = await res.json();
+      } catch (_) {
+        // Non-JSON response (e.g. 502 Bad Gateway HTML)
+        return {
+          success: res.ok,
+          message: res.ok ? 'Success' : `Request failed with status ${res.status}`,
+        };
+      }
+
       if (!res.ok) {
         return {
           success: false,
-          message: json.message || `Request failed with status ${res.status}`,
+          message: json?.message || `Request failed with status ${res.status}`,
         };
       }
       return json;
     } catch (err: any) {
       clearTimeout(timeoutId);
       if (err.name === 'AbortError') {
-        console.warn(`[API Timeout] ${endpoint} exceeded 20s limit`);
         return {
           success: false,
-          message: 'Connection timed out. Please check your network and try again.',
+          message: 'Connection timed out. Please try again.',
         };
       }
-      console.warn(`[API Connection Error] ${endpoint}:`, err.message);
       return {
         success: false,
         message: err.message || 'Network connection failed',
@@ -138,6 +203,18 @@ class ApiClient {
       this.isRefreshing = false;
     }
     return false;
+  }
+
+  /**
+   * Immediate cleanup of expired credentials across memory and persistent storage
+   */
+  private async handleSessionExpired(): Promise<void> {
+    this.token = null;
+    try {
+      await StorageService.removeItem(StorageService.KEYS.AUTH_TOKEN);
+      await StorageService.removeItem(StorageService.KEYS.REFRESH_TOKEN);
+      await StorageService.removeItem(StorageService.KEYS.USER);
+    } catch (_) {}
   }
 
   // HTTP Helpers

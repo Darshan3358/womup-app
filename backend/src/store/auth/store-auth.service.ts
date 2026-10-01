@@ -2,6 +2,7 @@ import {
   Injectable,
   BadRequestException,
   UnauthorizedException,
+  ConflictException,
   Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -18,12 +19,17 @@ import {
   StaffStatus,
 } from '../schemas/store-staff.schema';
 import { Store, StoreDocument } from '../../stores/schemas/store.schema';
+import { Area, AreaDocument } from '../../areas/schemas/area.schema';
+import { City, CityDocument } from '../../areas/schemas/city.schema';
+import { Inventory, InventoryDocument } from '../../inventory/schemas/inventory.schema';
+import { Product, ProductDocument } from '../../products/schemas/product.schema';
 import {
   OtpVerification,
   OtpVerificationDocument,
 } from '../../auth/schemas/otp.schema';
 import { Role } from '../../common/enums/role.enum';
 import { MailService } from '../../common/services/mail.service';
+import { RegisterStoreDto } from './dto/store-auth.dto';
 
 @Injectable()
 export class StoreAuthService {
@@ -34,12 +40,170 @@ export class StoreAuthService {
     @InjectModel(StoreStaff.name)
     private staffModel: Model<StoreStaffDocument>,
     @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
+    @InjectModel(Area.name) private areaModel: Model<AreaDocument>,
+    @InjectModel(City.name) private cityModel: Model<CityDocument>,
+    @InjectModel(Inventory.name) private inventoryModel: Model<InventoryDocument>,
+    @InjectModel(Product.name) private productModel: Model<ProductDocument>,
     @InjectModel(OtpVerification.name)
     private otpModel: Model<OtpVerificationDocument>,
     private jwtService: JwtService,
     private configService: ConfigService,
     private mailService: MailService,
   ) {}
+
+  async registerStore(dto: RegisterStoreDto) {
+    if (!dto.storeName?.trim() || !dto.ownerName?.trim() || !dto.phone?.trim() || !dto.email?.trim()) {
+      throw new BadRequestException('Store name, owner name, phone, and email are required');
+    }
+    if (!dto.cityId || !dto.areaId) {
+      throw new BadRequestException('City and Area selection are required');
+    }
+    if (!dto.password || dto.password.length < 6) {
+      throw new BadRequestException('Password must be at least 6 characters');
+    }
+
+    const cleanEmail = dto.email.trim().toLowerCase();
+    const cleanPhone = dto.phone.trim();
+
+    // 1. Validate City exists and is active
+    let city: CityDocument | null = null;
+    if (Types.ObjectId.isValid(dto.cityId)) {
+      city = await this.cityModel.findById(dto.cityId).exec();
+    } else {
+      city = await this.cityModel.findOne({
+        $or: [{ code: dto.cityId.toUpperCase() }, { name: dto.cityId }],
+      }).exec();
+    }
+    if (!city || city.status !== 'Active') {
+      throw new BadRequestException('Selected city is invalid or inactive');
+    }
+
+    // 2. Validate Area exists and belongs to the city
+    let area: AreaDocument | null = null;
+    if (Types.ObjectId.isValid(dto.areaId)) {
+      area = await this.areaModel.findById(dto.areaId).exec();
+    } else {
+      area = await this.areaModel.findOne({ name: dto.areaId }).exec();
+    }
+    if (!area || !area.isActive) {
+      throw new BadRequestException('Selected area is invalid or inactive');
+    }
+
+    const areaCityIdStr = area.cityId ? area.cityId.toString() : null;
+    const cityIdStr = city._id.toString();
+    if (areaCityIdStr && areaCityIdStr !== cityIdStr) {
+      throw new BadRequestException(`Selected area "${area.name}" does not belong to city "${city.name}"`);
+    }
+
+    // 3. Strict 1-store-per-area rule check
+    const existingStore = await this.storeModel.findOne({
+      $or: [{ areaId: area._id }, { areaId: area._id.toString() }],
+      isActive: true,
+    }).exec();
+    if (existingStore) {
+      throw new ConflictException(
+        `Area "${area.name}" is already assigned to active dark store "${existingStore.name}". Each delivery zone can only have 1 active store.`
+      );
+    }
+
+    // 4. Check uniqueness of email and phone
+    const duplicate = await this.storeModel.findOne({
+      $or: [{ email: cleanEmail }, { phone: cleanPhone }],
+    }).exec();
+    if (duplicate) {
+      throw new ConflictException('A store with this email or phone number is already registered.');
+    }
+
+    // 5. Generate unique loginId
+    const cleanAreaCode = (area.code || area.name).toLowerCase().replace(/[^a-z0-9]/g, '');
+    let loginId = `womup_${cleanAreaCode}`;
+    let loginCounter = 1;
+    while (await this.storeModel.findOne({ loginId })) {
+      loginId = `womup_${cleanAreaCode}_${loginCounter++}`;
+    }
+
+    // 6. Generate unique Store Code (e.g. STR-SAT)
+    const codePrefix = area.code ? area.code.toUpperCase().replace(/[^A-Z0-9]/g, '') : cleanAreaCode.toUpperCase().slice(0, 4);
+    let storeCode = `STR-${codePrefix}`;
+    let codeCounter = 1;
+    while (await this.storeModel.findOne({ code: storeCode })) {
+      storeCode = `STR-${codePrefix}-${codeCounter++}`;
+    }
+
+    // 7. Hash password with bcrypt
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+
+    // 8. Create Dark Store
+    const defaultPincode = (area.pincodes && area.pincodes[0]) || '380001';
+    const store = await this.storeModel.create({
+      name: dto.storeName.trim(),
+      ownerName: dto.ownerName.trim(),
+      managerName: dto.ownerName.trim(),
+      managerPhone: cleanPhone,
+      phone: cleanPhone,
+      email: cleanEmail,
+      code: storeCode,
+      loginId,
+      loginPasswordHash: passwordHash,
+      passwordUpdatedAt: new Date(),
+      city: city.name,
+      cityName: city.name,
+      cityId: city._id,
+      areaId: area._id,
+      areaName: area.name,
+      address: `${dto.storeName.trim()}, ${area.name}, ${city.name}`,
+      pincode: defaultPincode,
+      location: {
+        type: 'Point',
+        coordinates: [area.centerLng, area.centerLat],
+      },
+      serviceRadiusKm: area.radiusKm || 4.5,
+      estimatedDeliveryMinutes: area.defaultDeliveryMinutes || 9,
+      isActive: true,
+      status: 'ACTIVE',
+      openingTime: '07:00',
+      closingTime: '23:00',
+    });
+
+    // 9. Link area to this store
+    await this.areaModel.updateOne({ _id: area._id }, { $set: { hubStoreId: store._id } });
+
+    // 10. Seed baseline inventory from active products if any exist
+    try {
+      const activeProducts = await this.productModel.find({ isActive: true }).limit(50).exec();
+      if (activeProducts.length > 0) {
+        const initialInventory = activeProducts.map((p) => ({
+          storeId: store._id,
+          productId: p._id,
+          availableQty: 25,
+          reservedQty: 0,
+          soldQty: 0,
+          lowStockThreshold: 5,
+        }));
+        await this.inventoryModel.insertMany(initialInventory, { ordered: false }).catch(() => {});
+      }
+    } catch (seedErr: any) {
+      this.logger.warn(`[Store Register] Initial inventory seed skipped: ${seedErr.message}`);
+    }
+
+    this.logger.log(`[Store Register] New store registered: ${store.code} (${store.name}) for Area: ${area.name}`);
+
+    return {
+      success: true,
+      message: `Store registered successfully! Your Store Login ID is: ${loginId}`,
+      store: {
+        id: store._id.toString(),
+        name: store.name,
+        code: store.code,
+        loginId: store.loginId,
+        city: city.name,
+        areaName: area.name,
+        ownerName: store.ownerName,
+        email: store.email,
+        phone: store.phone,
+      },
+    };
+  }
 
   async loginWithStoreCredentials(loginId: string, password: string) {
     if (!loginId || !password) {
@@ -100,8 +264,12 @@ export class StoreAuthService {
         name: store.name,
         loginId: store.loginId,
         address: store.address,
-        city: store.city,
-        pincode: store.pincode,
+        city: store.cityName || store.city || 'Ahmedabad',
+        cityName: store.cityName || store.city || 'Ahmedabad',
+        areaName: store.areaName || (store.name.includes(' - ') ? store.name.split(' - ')[0].replace(/^Wom\s*Up\s*/i, '').trim() : 'Chandlodiya'),
+        areaId: store.areaId?.toString(),
+        cityId: store.cityId?.toString(),
+        pincode: store.pincode || '382481',
         serviceRadiusKm: store.serviceRadiusKm,
         estimatedDeliveryMinutes: store.estimatedDeliveryMinutes || 9,
       },
@@ -125,8 +293,12 @@ export class StoreAuthService {
         name: store.name,
         loginId: store.loginId,
         address: store.address,
-        city: store.city,
-        pincode: store.pincode,
+        city: store.cityName || store.city || 'Ahmedabad',
+        cityName: store.cityName || store.city || 'Ahmedabad',
+        areaName: store.areaName || (store.name.includes(' - ') ? store.name.split(' - ')[0].replace(/^Wom\s*Up\s*/i, '').trim() : 'Chandlodiya'),
+        areaId: store.areaId?.toString(),
+        cityId: store.cityId?.toString(),
+        pincode: store.pincode || '382481',
         serviceRadiusKm: store.serviceRadiusKm,
         estimatedDeliveryMinutes: store.estimatedDeliveryMinutes || 9,
       },
@@ -328,6 +500,16 @@ export class StoreAuthService {
     if (userId && Types.ObjectId.isValid(userId)) {
       const directStore = await this.storeModel.findById(userId);
       if (directStore) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const todayPicked = await this.staffModel.db
+          .collection('orders')
+          .countDocuments({
+            storeId: directStore._id,
+            status: { $in: ['PACKING', 'PACKED', 'READY_FOR_PICKUP', 'OUT_FOR_DELIVERY', 'DELIVERED'] },
+            createdAt: { $gte: today },
+          });
+
         return {
           staff: {
             id: `staff_${directStore.code}`,
@@ -336,14 +518,14 @@ export class StoreAuthService {
             employeeCode: `STF-${directStore.code}`,
             fullName: `${directStore.name} Staff`,
             email: `${directStore.loginId || 'store'}@wormup.com`,
-            phoneNumber: directStore.managerPhone || null,
+            phoneNumber: directStore.managerPhone || directStore.phone || null,
             role: 'PICKER',
             shift: 'MORNING',
-            isOnShift: true,
+            isOnShift: directStore.isOnShift !== false,
             activeOrderId: null,
-            totalOrdersPicked: 0,
-            avgPickTimeSeconds: 120,
-            accuracy: 99.5,
+            totalOrdersPicked: todayPicked,
+            avgPickTimeSeconds: todayPicked > 0 ? 135 : 0,
+            accuracy: 100,
             status: 'ACTIVE',
           },
           store: {
@@ -352,10 +534,21 @@ export class StoreAuthService {
             code: directStore.code,
             loginId: directStore.loginId,
             address: directStore.address,
-            city: directStore.city,
-            pincode: directStore.pincode,
+            city: directStore.cityName || directStore.city || 'Ahmedabad',
+            cityName: directStore.cityName || directStore.city || 'Ahmedabad',
+            areaName: directStore.areaName || (directStore.name.includes(' - ') ? directStore.name.split(' - ')[0].replace(/^Wom\s*Up\s*/i, '').trim() : 'Chandlodiya'),
+            areaId: directStore.areaId?.toString(),
+            cityId: directStore.cityId?.toString(),
+            pincode: directStore.pincode || '382481',
             serviceRadiusKm: directStore.serviceRadiusKm,
             estimatedDeliveryMinutes: directStore.estimatedDeliveryMinutes || 9,
+          },
+          performance: {
+            todayPicked,
+            avgPickTime: todayPicked > 0 ? '2m 15s' : null,
+            avgPickTimeSeconds: todayPicked > 0 ? 135 : 0,
+            accuracy: 100,
+            currentStreak: todayPicked > 0 ? todayPicked : 0,
           },
         };
       }
@@ -406,7 +599,7 @@ export class StoreAuthService {
         activeOrderId: staff.activeOrderId ? staff.activeOrderId.toString() : null,
         totalOrdersPicked: staff.totalOrdersPicked,
         avgPickTimeSeconds: staff.avgPickTimeSeconds,
-        accuracy: staff.accuracy,
+        accuracy: staff.totalOrdersPicked > 0 ? (staff.accuracy || 100) : 100,
         status: staff.status,
       },
       store: {
@@ -414,16 +607,20 @@ export class StoreAuthService {
         name: store.name,
         code: store.code,
         address: store.address,
-        city: store.city,
-        pincode: store.pincode,
+        city: store.cityName || store.city || 'Ahmedabad',
+        cityName: store.cityName || store.city || 'Ahmedabad',
+        areaName: store.areaName || (store.name.includes(' - ') ? store.name.split(' - ')[0].replace(/^Wom\s*Up\s*/i, '').trim() : 'Chandlodiya'),
+        areaId: store.areaId?.toString(),
+        cityId: store.cityId?.toString(),
+        pincode: store.pincode || '382481',
       },
       performance: {
         todayPicked,
         avgPickTime: staff.avgPickTimeSeconds > 0
           ? `${Math.floor(staff.avgPickTimeSeconds / 60)}m ${staff.avgPickTimeSeconds % 60}s`
-          : '—',
+          : null,
         avgPickTimeSeconds: staff.avgPickTimeSeconds || 0,
-        accuracy: staff.totalOrdersPicked > 0 ? `${staff.accuracy}%` : '100%',
+        accuracy: todayPicked > 0 ? (staff.accuracy || 100) : 100,
         currentStreak: staff.currentStreak || 0,
       },
     };
@@ -433,11 +630,22 @@ export class StoreAuthService {
     if (Types.ObjectId.isValid(userId)) {
       const store = await this.storeModel.findById(userId);
       if (store) {
+        store.isOnShift = Boolean(isOnShift);
+        await store.save();
+
+        // Also update any staff under this store
+        await this.staffModel.updateMany(
+          { storeId: store._id },
+          { $set: { isOnShift: Boolean(isOnShift) } }
+        ).catch(() => {});
+
+        this.logger.log(`[Shift Update] Store ${store.code} shifted to ${store.isOnShift ? 'ON SHIFT' : 'OFF SHIFT'}`);
+
         return {
           success: true,
-          isOnShift: true,
-          shiftStartedAt: new Date(),
-          message: 'Store hub active.',
+          isOnShift: store.isOnShift,
+          shiftStartedAt: store.isOnShift ? new Date() : null,
+          message: store.isOnShift ? 'Shift started. You can now receive orders.' : 'Shift ended. Store is off-duty.',
         };
       }
     }
@@ -449,6 +657,8 @@ export class StoreAuthService {
 
     staff.isOnShift = Boolean(isOnShift);
     await staff.save();
+
+    this.logger.log(`[Shift Update] Staff ${staff.employeeCode} shifted to ${staff.isOnShift ? 'ON SHIFT' : 'OFF SHIFT'}`);
 
     return {
       success: true,
@@ -468,16 +678,16 @@ export class StoreAuthService {
           .collection('orders')
           .countDocuments({
             storeId: store._id,
-            status: { $in: ['READY_FOR_PICKUP', 'OUT_FOR_DELIVERY', 'DELIVERED'] },
+            status: { $in: ['PACKING', 'PACKED', 'READY_FOR_PICKUP', 'OUT_FOR_DELIVERY', 'DELIVERED'] },
             createdAt: { $gte: today },
           });
 
         return {
           todayPicked,
-          avgPickTime: '2m 15s',
-          avgPickTimeSeconds: 135,
-          accuracy: 99.8,
-          currentStreak: 12,
+          avgPickTime: todayPicked > 0 ? '2m 15s' : null,
+          avgPickTimeSeconds: todayPicked > 0 ? 135 : 0,
+          accuracy: 100,
+          currentStreak: todayPicked > 0 ? 12 : 0,
           totalOrdersPicked: todayPicked,
         };
       }
@@ -502,9 +712,9 @@ export class StoreAuthService {
       todayPicked,
       avgPickTime: staff.avgPickTimeSeconds > 0
         ? `${Math.floor(staff.avgPickTimeSeconds / 60)}m ${staff.avgPickTimeSeconds % 60}s`
-        : '—',
+        : null,
       avgPickTimeSeconds: staff.avgPickTimeSeconds || 0,
-      accuracy: staff.totalOrdersPicked > 0 ? staff.accuracy : 100,
+      accuracy: todayPicked > 0 ? (staff.accuracy || 100) : 100,
       currentStreak: staff.currentStreak || 0,
       totalOrdersPicked: staff.totalOrdersPicked || 0,
     };

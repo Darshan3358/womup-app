@@ -49,6 +49,7 @@ export const BlinkitProfileScreen: React.FC = () => {
   // Sync live profile data directly from MongoDB Atlas when Profile screen opens
   useEffect(() => {
     let isMounted = true;
+    if (!api.getToken()) return;
     (async () => {
       try {
         const liveProfile = await AuthService.getProfile();

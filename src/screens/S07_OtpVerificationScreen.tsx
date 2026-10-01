@@ -23,6 +23,7 @@ export const S07_OtpVerificationScreen: React.FC = () => {
     goBack,
     authVerificationId,
     setAuthVerificationId,
+    tempRegistration,
   } = useApp();
   const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
   const [timer, setTimer] = useState(30);
@@ -173,6 +174,21 @@ export const S07_OtpVerificationScreen: React.FC = () => {
               <Text style={styles.resendAction}>Resend OTP</Text>
             </TouchableOpacity>
           )}
+        </View>
+
+        {/* ── YOU'LL BE REGISTERED IN ── */}
+        <View style={styles.cityContextSection}>
+          <View style={styles.cityContextDivider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.cityContextLabel}>YOU'LL BE REGISTERED IN</Text>
+            <View style={styles.dividerLine} />
+          </View>
+          <View style={styles.cityContextBadge}>
+            <Text style={styles.cityContextEmoji}>🏙️</Text>
+            <Text style={styles.cityContextCityName}>
+              {user.preferredCityName || tempRegistration.preferredCityName || 'Ahmedabad'}
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -354,5 +370,47 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '600',
     color: COLORS.textPrimary,
+  },
+  cityContextSection: {
+    marginTop: 18,
+    alignItems: 'center',
+    width: '100%',
+  },
+  cityContextDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    width: '80%',
+    marginBottom: 8,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E5E7EB',
+  },
+  cityContextLabel: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+    letterSpacing: 0.8,
+  },
+  cityContextBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF0F7',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
+    borderColor: '#FCE7F3',
+    gap: 6,
+  },
+  cityContextEmoji: {
+    fontSize: 14,
+  },
+  cityContextCityName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.hotPink,
   },
 });

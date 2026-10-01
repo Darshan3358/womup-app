@@ -15,6 +15,8 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import {
   StockAdjustmentDto,
   RestockDto,
+  UpdateShelfLocationDto,
+  StoreAddProductDto,
 } from './dto/store-inventory.dto';
 
 @ApiTags('Store App Operations')
@@ -76,4 +78,24 @@ export class StoreInventoryController {
   ) {
     return this.storeInventoryService.restock(req.user.id, productId, dto);
   }
+
+  @Patch(':productId/shelf')
+  @ApiOperation({ summary: 'Update shelf location for a product in this dark store' })
+  async updateShelfLocation(
+    @Request() req: any,
+    @Param('productId') productId: string,
+    @Body() dto: UpdateShelfLocationDto,
+  ) {
+    return this.storeInventoryService.updateShelfLocation(req.user.id, productId, dto);
+  }
+
+  @Post('add-product')
+  @ApiOperation({ summary: 'Add a new product to master catalog and store inventory' })
+  async addProduct(
+    @Request() req: any,
+    @Body() dto: StoreAddProductDto,
+  ) {
+    return this.storeInventoryService.addProduct(req.user.id, dto);
+  }
 }
+

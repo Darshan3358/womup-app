@@ -1,5 +1,5 @@
-export type AuthStep = 'SPLASH' | 'LOGIN' | 'OTP' | 'STORE_SELECT' | 'AUTHENTICATED';
-export type CurrentTab = 'Dashboard' | 'Incoming' | 'Picking' | 'Ready' | 'Inventory' | 'Profile';
+export type AuthStep = 'SPLASH' | 'LOGIN' | 'REGISTER' | 'OTP' | 'STORE_SELECT' | 'AUTHENTICATED';
+export type CurrentTab = 'Dashboard' | 'Incoming' | 'Picking' | 'Ready' | 'Inventory' | 'History' | 'Profile';
 export type SubScreen =
   | null
   | 'OrderDetail'
@@ -8,7 +8,8 @@ export type SubScreen =
   | 'HandoverScan'
   | 'Performance'
   | 'InventoryLogs'
-  | 'ShiftHistory';
+  | 'ShiftHistory'
+  | 'AddProduct';
 
 export interface StoreStaffProfile {
   id: string;
@@ -35,6 +36,13 @@ export interface StoreHub {
   address: string;
   city: string;
   pincode: string;
+  cityName?: string;
+  areaName?: string;
+  areaId?: string;
+  cityId?: string;
+  loginId?: string;
+  ownerName?: string;
+  phone?: string;
 }
 
 export interface PickItem {
@@ -134,9 +142,9 @@ export interface InventoryLogItem {
 
 export interface StorePerformance {
   todayPicked: number;
-  avgPickTime: string;
+  avgPickTime?: string | null;
   avgPickTimeSeconds: number;
   accuracy: string | number;
   currentStreak: number;
-  totalOrdersPicked: number;
+  totalOrdersPicked?: number;
 }

@@ -1,4 +1,5 @@
 import { COLORS } from '../theme/colors';
+import { ProductVariantPriced } from '../types';
 
 export interface BlinkitProduct {
   id: string;
@@ -26,7 +27,9 @@ export interface BlinkitProduct {
     effectivePrice: number;
   };
   specifications?: Record<string, string>;
+  variants?: ProductVariantPriced[];
 }
+
 
 export interface BlinkitCategoryCard {
   id: string;
@@ -250,6 +253,245 @@ export const ORDER_AGAIN_PRODUCTS: BlinkitProduct[] = [
   },
 ];
 
+// Exact Deals of the Day matching SRS Section 7.4
+export const DEALS_OF_THE_DAY_PRODUCTS: BlinkitProduct[] = [
+  {
+    id: 'deal_tomato',
+    name: 'Fresh Tomato',
+    brand: 'Farm Fresh',
+    category: 'Vegetables',
+    packSize: '500 g',
+    sellingPrice: 13,
+    mrp: 15,
+    discountBadge: '13% OFF',
+    deliveryMinutes: 9,
+    rating: 4.8,
+    reviewCount: 3120,
+    stock: 50,
+    imageUrl: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=400&q=80',
+    variants: [
+      { id: 'v1', label: '250 g', price: 7, mrp: 8, discountPercent: 12, stock: 50, isAvailable: true, isDefault: false },
+      { id: 'v2', label: '500 g', price: 13, mrp: 15, discountPercent: 13, stock: 50, isAvailable: true, isDefault: true },
+      { id: 'v3', label: '1 kg', price: 25, mrp: 30, discountPercent: 16, stock: 50, isAvailable: true, isDefault: false },
+      { id: 'v4', label: '2 kg', price: 48, mrp: 58, discountPercent: 17, stock: 50, isAvailable: true, isDefault: false },
+    ],
+  },
+  {
+    id: 'deal_fortune_oil',
+    name: 'Fortune Sunflower Oil',
+    brand: 'Fortune',
+    category: 'Cooking Essentials',
+    packSize: '1 L',
+    sellingPrice: 65,
+    mrp: 78,
+    discountBadge: '17% OFF',
+    deliveryMinutes: 9,
+    rating: 4.8,
+    reviewCount: 1450,
+    stock: 30,
+    imageUrl: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&w=400&q=80',
+    variants: [
+      { id: 'v1', label: '500 ml', price: 35, mrp: 42, discountPercent: 16, stock: 30, isAvailable: true, isDefault: false },
+      { id: 'v2', label: '1 L', price: 65, mrp: 78, discountPercent: 17, stock: 30, isAvailable: true, isDefault: true },
+      { id: 'v3', label: '2 L', price: 128, mrp: 155, discountPercent: 17, stock: 30, isAvailable: true, isDefault: false },
+      { id: 'v4', label: '5 L', price: 310, mrp: 375, discountPercent: 17, stock: 20, isAvailable: true, isDefault: false },
+    ],
+  },
+  {
+    id: 'deal_oats',
+    name: 'Oats',
+    brand: 'Quaker',
+    category: 'Breakfast',
+    packSize: '500 g',
+    sellingPrice: 89,
+    mrp: 102,
+    discountBadge: '12% OFF',
+    deliveryMinutes: 9,
+    rating: 4.7,
+    reviewCount: 890,
+    stock: 25,
+    imageUrl: 'https://images.unsplash.com/photo-1586444248902-2f64eddc13df?auto=format&fit=crop&w=400&q=80',
+    variants: [
+      { id: 'v1', label: '500 g', price: 89, mrp: 102, discountPercent: 12, stock: 25, isAvailable: true, isDefault: true },
+      { id: 'v2', label: '1 kg', price: 169, mrp: 199, discountPercent: 15, stock: 25, isAvailable: true, isDefault: false },
+    ],
+  },
+  {
+    id: 'deal_paneer',
+    name: 'Paneer',
+    brand: 'Amul',
+    category: 'Dairy',
+    packSize: '200 g',
+    sellingPrice: 72,
+    mrp: 80,
+    discountBadge: '10% OFF',
+    deliveryMinutes: 9,
+    rating: 4.8,
+    reviewCount: 2420,
+    stock: 40,
+    imageUrl: 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=400&q=80',
+    variants: [
+      { id: 'v1', label: '200 g', price: 72, mrp: 80, discountPercent: 10, stock: 40, isAvailable: true, isDefault: true },
+      { id: 'v2', label: '500 g', price: 175, mrp: 195, discountPercent: 10, stock: 40, isAvailable: true, isDefault: false },
+      { id: 'v3', label: '1 kg', price: 340, mrp: 380, discountPercent: 10, stock: 40, isAvailable: true, isDefault: false },
+    ],
+  },
+  {
+    id: 'deal_banana',
+    name: 'Banana',
+    brand: 'Farm Fresh',
+    category: 'Fruits',
+    packSize: '1 kg',
+    sellingPrice: 28,
+    mrp: 32,
+    discountBadge: '14% OFF',
+    deliveryMinutes: 9,
+    rating: 4.6,
+    reviewCount: 1840,
+    stock: 60,
+    imageUrl: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?auto=format&fit=crop&w=400&q=80',
+    variants: [
+      { id: 'v1', label: '1 pc', price: 6, mrp: 7, discountPercent: 14, stock: 60, isAvailable: true, isDefault: false },
+      { id: 'v2', label: '1 kg', price: 28, mrp: 32, discountPercent: 14, stock: 60, isAvailable: true, isDefault: true },
+    ],
+  },
+  {
+    id: 'deal_amul_milk',
+    name: 'Amul Taaza Toned Milk',
+    brand: 'Amul',
+    category: 'Dairy',
+    packSize: '500 ml',
+    sellingPrice: 27,
+    mrp: 28,
+    discountBadge: '4% OFF',
+    deliveryMinutes: 9,
+    rating: 4.9,
+    reviewCount: 5200,
+    stock: 80,
+    imageUrl: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=400&q=80',
+    variants: [
+      { id: 'v1', label: '500 ml', price: 27, mrp: 28, discountPercent: 4, stock: 80, isAvailable: true, isDefault: true },
+      { id: 'v2', label: '1 L', price: 54, mrp: 56, discountPercent: 4, stock: 50, isAvailable: true, isDefault: false },
+    ],
+  },
+  {
+    id: 'deal_lays_chips',
+    name: "Lay's Magic Masala Chips",
+    brand: "Lay's",
+    category: 'Snacks',
+    packSize: '50 g',
+    sellingPrice: 18,
+    mrp: 20,
+    discountBadge: '10% OFF',
+    deliveryMinutes: 9,
+    rating: 4.7,
+    reviewCount: 3890,
+    stock: 45,
+    imageUrl: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?auto=format&fit=crop&w=400&q=80',
+    variants: [
+      { id: 'v1', label: '50 g', price: 18, mrp: 20, discountPercent: 10, stock: 45, isAvailable: true, isDefault: true },
+      { id: 'v2', label: '90 g', price: 32, mrp: 35, discountPercent: 9, stock: 30, isAvailable: true, isDefault: false },
+    ],
+  },
+  {
+    id: 'deal_dairy_milk',
+    name: 'Cadbury Dairy Milk Silk',
+    brand: 'Cadbury',
+    category: 'Chocolates',
+    packSize: '60 g',
+    sellingPrice: 75,
+    mrp: 90,
+    discountBadge: '17% OFF',
+    deliveryMinutes: 9,
+    rating: 4.9,
+    reviewCount: 4620,
+    stock: 35,
+    imageUrl: 'https://images.unsplash.com/photo-1549007994-cb92caebd54b?auto=format&fit=crop&w=400&q=80',
+    variants: [
+      { id: 'v1', label: '60 g', price: 75, mrp: 90, discountPercent: 17, stock: 35, isAvailable: true, isDefault: true },
+      { id: 'v2', label: '150 g', price: 165, mrp: 195, discountPercent: 15, stock: 20, isAvailable: true, isDefault: false },
+    ],
+  },
+  {
+    id: 'deal_maggi_noodles',
+    name: 'Maggi 2-Minute Masala Noodles',
+    brand: 'Maggi',
+    category: 'Instant Food',
+    packSize: '70 g',
+    sellingPrice: 12,
+    mrp: 14,
+    discountBadge: '14% OFF',
+    deliveryMinutes: 9,
+    rating: 4.9,
+    reviewCount: 7850,
+    stock: 100,
+    imageUrl: 'https://images.unsplash.com/photo-1612927601601-6638404737ce?auto=format&fit=crop&w=400&q=80',
+    variants: [
+      { id: 'v1', label: '70 g', price: 12, mrp: 14, discountPercent: 14, stock: 100, isAvailable: true, isDefault: true },
+      { id: 'v2', label: '4 x 70 g', price: 46, mrp: 56, discountPercent: 18, stock: 60, isAvailable: true, isDefault: false },
+    ],
+  },
+  {
+    id: 'deal_coca_cola',
+    name: 'Coca-Cola Refreshing Can',
+    brand: 'Coca-Cola',
+    category: 'Cold Drinks',
+    packSize: '300 ml',
+    sellingPrice: 38,
+    mrp: 40,
+    discountBadge: '5% OFF',
+    deliveryMinutes: 9,
+    rating: 4.8,
+    reviewCount: 3410,
+    stock: 50,
+    imageUrl: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=400&q=80',
+    variants: [
+      { id: 'v1', label: '300 ml', price: 38, mrp: 40, discountPercent: 5, stock: 50, isAvailable: true, isDefault: true },
+      { id: 'v2', label: '750 ml', price: 42, mrp: 45, discountPercent: 7, stock: 40, isAvailable: true, isDefault: false },
+    ],
+  },
+  {
+    id: 'deal_aloo_bhujia',
+    name: "Haldiram's Aloo Bhujia",
+    brand: "Haldiram's",
+    category: 'Snacks',
+    packSize: '200 g',
+    sellingPrice: 48,
+    mrp: 55,
+    discountBadge: '13% OFF',
+    deliveryMinutes: 9,
+    rating: 4.8,
+    reviewCount: 2980,
+    stock: 40,
+    imageUrl: 'https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=400&q=80',
+    variants: [
+      { id: 'v1', label: '200 g', price: 48, mrp: 55, discountPercent: 13, stock: 40, isAvailable: true, isDefault: true },
+      { id: 'v2', label: '400 g', price: 92, mrp: 105, discountPercent: 12, stock: 30, isAvailable: true, isDefault: false },
+    ],
+  },
+  {
+    id: 'deal_greek_yogurt',
+    name: 'Epigamia Greek Yogurt Blueberry',
+    brand: 'Epigamia',
+    category: 'Dairy',
+    packSize: '90 g',
+    sellingPrice: 45,
+    mrp: 50,
+    discountBadge: '10% OFF',
+    deliveryMinutes: 9,
+    rating: 4.7,
+    reviewCount: 1650,
+    stock: 30,
+    imageUrl: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=400&q=80',
+    variants: [
+      { id: 'v1', label: '90 g', price: 45, mrp: 50, discountPercent: 10, stock: 30, isAvailable: true, isDefault: true },
+      { id: 'v2', label: '2 x 90 g', price: 88, mrp: 100, discountPercent: 12, stock: 20, isAvailable: true, isDefault: false },
+    ],
+  },
+];
+
+
+
 export interface BestSellerCategoryGroup {
   id: string;
   title: string;
@@ -418,40 +660,40 @@ export const BESTSELLER_CATEGORY_CARDS_ROW2: BlinkitCategoryCard[] = [
   },
 ];
 
-// 4-Column Main Category Grid (Grocery) with Real Online Images
+// 4-Column Main Category Grid (Grocery) with Authentic Transparent 3D Assets
 export const MAIN_CATEGORY_GRID: BlinkitIconTile[] = [
-  { id: 'cat_veg', title: 'Vegetables & Fruits', imageUrl: 'https://images.unsplash.com/photo-1610348725531-843dff563e2c?auto=format&fit=crop&w=300&q=80' },
-  { id: 'cat_atta', title: 'Atta, Rice & Dal', imageUrl: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=300&q=80' },
-  { id: 'cat_oil', title: 'Oil, Ghee & Masala', imageUrl: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&w=300&q=80' },
-  { id: 'cat_dairy', title: 'Dairy, Bread & Eggs', imageUrl: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=300&q=80' },
-  { id: 'cat_bakery', title: 'Bakery & Biscuits', imageUrl: 'https://images.unsplash.com/photo-1499636136210-6f4ee915583e?auto=format&fit=crop&w=300&q=80' },
-  { id: 'cat_dryfruits', title: 'Dry Fruits & Cereals', imageUrl: 'https://images.unsplash.com/photo-1508061253366-f7da158b6d46?auto=format&fit=crop&w=300&q=80' },
-  { id: 'cat_meat', title: 'Chicken, Meat & Fish', imageUrl: 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?auto=format&fit=crop&w=300&q=80' },
-  { id: 'cat_kitchen', title: 'Kitchenware & Appliances', imageUrl: 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=300&q=80' },
+  { id: 'cat_veg', title: 'Vegetables & Fruits', imageUrl: '', localImage: require('../../assets/cat_1_trans.png'), bgColor: '#ECF5F7' },
+  { id: 'cat_atta', title: 'Atta, Rice & Dal', imageUrl: '', localImage: require('../../assets/cat_4_trans.png'), bgColor: '#FDF7EE' },
+  { id: 'cat_oil', title: 'Oil, Ghee & Masala', imageUrl: '', localImage: require('../../assets/cat_4_trans.png'), bgColor: '#FCF6F0' },
+  { id: 'cat_dairy', title: 'Dairy, Bread & Eggs', imageUrl: '', localImage: require('../../assets/cat_3_trans.png'), bgColor: '#F3F4FC' },
+  { id: 'cat_bakery', title: 'Bakery & Biscuits', imageUrl: '', localImage: require('../../assets/cat_5_trans.png'), bgColor: '#F7F1FC' },
+  { id: 'cat_dryfruits', title: 'Dry Fruits & Cereals', imageUrl: '', localImage: require('../../assets/cat_2_trans.png'), bgColor: '#FCF6F0' },
+  { id: 'cat_meat', title: 'Chicken, Meat & Fish', imageUrl: '', localImage: require('../../assets/cat_11_trans.png'), bgColor: '#EAF1FD' },
+  { id: 'cat_kitchen', title: 'Kitchenware & Appliances', imageUrl: '', localImage: require('../../assets/cat_7_trans.png'), bgColor: '#EAF1FD' },
 ];
 
-// Snacks & Drinks Section with Real Online Images
+// Snacks & Drinks Section with Authentic Transparent 3D Assets
 export const SNACKS_DRINKS_GRID: BlinkitIconTile[] = [
-  { id: 'snk_chips', title: 'Chips & Crisps', imageUrl: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?auto=format&fit=crop&w=300&q=80' },
-  { id: 'snk_drinks', title: 'Cold Drinks & Juices', imageUrl: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=300&q=80' },
-  { id: 'snk_chocolates', title: 'Chocolates & Candies', imageUrl: 'https://images.unsplash.com/photo-1548907040-4baa42d10919?auto=format&fit=crop&w=300&q=80' },
-  { id: 'snk_noodles', title: 'Noodles & Pasta', imageUrl: 'https://images.unsplash.com/photo-1612927601601-6638404737ce?auto=format&fit=crop&w=300&q=80' },
+  { id: 'snk_chips', title: 'Chips & Crisps', imageUrl: '', localImage: require('../../assets/cat_2_trans.png'), bgColor: '#FCF6F0' },
+  { id: 'snk_drinks', title: 'Cold Drinks & Juices', imageUrl: '', localImage: require('../../assets/cat_6_trans.png'), bgColor: '#FCF2F2' },
+  { id: 'snk_chocolates', title: 'Chocolates & Candies', imageUrl: '', localImage: require('../../assets/cat_5_trans.png'), bgColor: '#F7F1FC' },
+  { id: 'snk_noodles', title: 'Noodles & Pasta', imageUrl: '', localImage: require('../../assets/cat_11_trans.png'), bgColor: '#EAF1FD' },
 ];
 
-// Beauty & Personal Care Section with Real Online Images
+// Beauty & Personal Care Section with Authentic Transparent 3D Assets
 export const BEAUTY_GRID: BlinkitIconTile[] = [
-  { id: 'bt_bath', title: 'Bath & Body', imageUrl: 'https://images.unsplash.com/photo-1607006314639-65e381014e30?auto=format&fit=crop&w=300&q=80' },
-  { id: 'bt_hair', title: 'Hair Care', imageUrl: 'https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?auto=format&fit=crop&w=300&q=80' },
-  { id: 'bt_skin', title: 'Skin Care', imageUrl: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=300&q=80' },
-  { id: 'bt_oral', title: 'Oral Care', imageUrl: 'https://images.unsplash.com/photo-1559591937-e17f54c9c7bf?auto=format&fit=crop&w=300&q=80' },
+  { id: 'bt_bath', title: 'Bath & Body', imageUrl: '', localImage: require('../../assets/cat_8_trans.png'), bgColor: '#FAF2FB' },
+  { id: 'bt_hair', title: 'Hair Care', imageUrl: '', localImage: require('../../assets/cat_8_trans.png'), bgColor: '#FAF2FB' },
+  { id: 'bt_skin', title: 'Skin Care', imageUrl: '', localImage: require('../../assets/cat_8_trans.png'), bgColor: '#FAF2FB' },
+  { id: 'bt_baby', title: 'Baby Care', imageUrl: '', localImage: require('../../assets/cat_9_trans.png'), bgColor: '#F5F0FC' },
 ];
 
-// Household Essentials Section with Real Online Images matching Blinkit
+// Household Essentials Section with Authentic Transparent 3D Assets
 export const HOUSEHOLD_GRID: BlinkitIconTile[] = [
-  { id: 'hh_home', title: 'Home & Lifestyle', imageUrl: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=300&q=80' },
-  { id: 'hh_clean', title: 'Cleaners & Repellents', imageUrl: 'https://images.unsplash.com/photo-1585421514738-01798e348b17?auto=format&fit=crop&w=300&q=80' },
-  { id: 'hh_elec', title: 'Electronics', imageUrl: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=300&q=80' },
-  { id: 'hh_games', title: 'Stationery & Games', imageUrl: 'https://images.unsplash.com/photo-1610890716171-6b1bb98ffd09?auto=format&fit=crop&w=300&q=80' },
+  { id: 'hh_home', title: 'Household Essentials', imageUrl: '', localImage: require('../../assets/cat_7_trans.png'), bgColor: '#EAF1FD' },
+  { id: 'hh_clean', title: 'Personal Care', imageUrl: '', localImage: require('../../assets/cat_8_trans.png'), bgColor: '#FAF2FB' },
+  { id: 'hh_pet', title: 'Pet Care', imageUrl: '', localImage: require('../../assets/cat_10_trans.png'), bgColor: '#EFF9F6' },
+  { id: 'hh_frozen', title: 'Frozen Foods', imageUrl: '', localImage: require('../../assets/cat_11_trans.png'), bgColor: '#EAF1FD' },
 ];
 
 // Stores in Spotlight with 3D Cutout Illustrations & Authentic Pastel Backgrounds matching Blinkit

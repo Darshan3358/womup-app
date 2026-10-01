@@ -10,6 +10,8 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  Platform,
+  FlatList,
 } from 'react-native';
 import {
   PlusCircle,
@@ -20,7 +22,14 @@ import {
   Check,
   Package,
   AlertCircle,
+  Info,
+  Camera,
+  Image as ImageIcon,
+  ChevronDown,
+  Search,
+  Link as LinkIcon,
 } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { COLORS, RADIUS, SPACING } from '../../theme';
 import { useAdminState } from '../../context/AdminStateContext';
 import { PricingCategory } from '../../types/admin';
@@ -35,6 +44,42 @@ interface FormVariant {
   isActive: boolean;
 }
 
+// Map categories to modern emojis for a polished presentation
+const CATEGORY_EMOJIS: Record<string, string> = {
+  vegetables: '🥬',
+  fruits: '🍎',
+  dairy: '🥛',
+  bakery: '🍞',
+  beverages: '🥤',
+  snacks: '🍿',
+  cooking: '🍳',
+  essentials: '🛒',
+  personal: '🧼',
+  cleaning: '🧹',
+  household: '🏠',
+  meat: '🍗',
+  seafood: '🐟',
+};
+
+const getCategoryEmoji = (name?: string) => {
+  if (!name) return '📦';
+  const lower = name.toLowerCase();
+  for (const [key, emoji] of Object.entries(CATEGORY_EMOJIS)) {
+    if (lower.includes(key)) return emoji;
+  }
+  return '📦';
+};
+
+const getBackendUploadUrl = () => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return 'http://localhost:5050/api/v1/media/upload?folder=wormup/products';
+    }
+  }
+  return 'http://localhost:5050/api/v1/media/upload?folder=wormup/products';
+};
+
 export const AddProductModal: React.FC = () => {
   const { activeModal, setActiveModal, addProductItem, categories } = useAdminState();
 
@@ -42,10 +87,20 @@ export const AddProductModal: React.FC = () => {
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [brand, setBrand] = useState('Womup Fresh');
   const [description, setDescription] = useState('');
+  const [shelfLocation, setShelfLocation] = useState('');
+
+  // Image Upload State
   const [imageUrl, setImageUrl] = useState('');
   const [cloudinaryPublicId, setCloudinaryPublicId] = useState('');
   const [imagePreview, setImagePreview] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [customUrl, setCustomUrl] = useState('');
+
+  // Category Dropdown Modal State
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [categorySearchQuery, setCategorySearchQuery] = useState('');
+
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -83,6 +138,10 @@ export const AddProductModal: React.FC = () => {
     return null;
   }
 
+  const activeCategory =
+    categories.find((c) => c.id === selectedCategoryId) ||
+    categories[0] || { id: 'default', name: 'Vegetables' };
+
   const handleClose = () => {
     setName('');
     setSelectedCategoryId(categories[0]?.id || '');
@@ -91,6 +150,9 @@ export const AddProductModal: React.FC = () => {
     setImageUrl('');
     setCloudinaryPublicId('');
     setImagePreview('');
+    setShowUrlInput(false);
+    setCustomUrl('');
+    setShowCategoryModal(false);
     setErrorMsg(null);
     setVariants([
       {
@@ -106,57 +168,119 @@ export const AddProductModal: React.FC = () => {
     setActiveModal('none');
   };
 
-  const handlePickImage = () => {
-    if (typeof document !== 'undefined') {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/jpeg,image/png,image/webp,image/jpg';
-      input.onchange = async (e: any) => {
-        const file = e.target?.files?.[0];
-        if (!file) return;
+  // ── Native Image Picker Handlers (Works on Android APK, iOS, Web) ──
+  const uploadImageFile = async (asset: ImagePicker.ImagePickerAsset) => {
+    setImagePreview(asset.uri);
+    setUploadingImage(true);
+    setErrorMsg(null);
 
-        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
-        if (!allowedTypes.includes(file.type)) {
-          setErrorMsg('Only JPG, JPEG, PNG, and WEBP formats are allowed.');
-          return;
-        }
+    try {
+      const formData = new FormData();
+      if (Platform.OS === 'web') {
+        const response = await fetch(asset.uri);
+        const blob = await response.blob();
+        formData.append('file', blob, asset.fileName || 'product.jpg');
+      } else {
+        // Native APK (Android/iOS)
+        formData.append('file', {
+          uri: asset.uri,
+          name: asset.fileName || `prod_${Date.now()}.jpg`,
+          type: asset.mimeType || 'image/jpeg',
+        } as any);
+      }
 
-        if (file.size > 5 * 1024 * 1024) {
-          setErrorMsg('Maximum allowed image size is 5MB.');
-          return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = () => {
-          setImagePreview(reader.result as string);
-        };
-        reader.readAsDataURL(file);
-
-        try {
-          setUploadingImage(true);
-          const formData = new FormData();
-          formData.append('file', file);
-          const res = await fetch('http://localhost:5050/api/v1/media/upload?folder=wormup/products', {
-            method: 'POST',
-            body: formData,
-          });
-          const json = await res.json();
-          if (json.success && json.data) {
-            const uploadedUrl = json.data.url || json.data.secureUrl;
-            setImageUrl(uploadedUrl);
-            setCloudinaryPublicId(json.data.publicId || '');
-            setErrorMsg(null);
-          }
-        } catch (err) {
-          console.warn('Cloudinary upload error:', err);
-        } finally {
-          setUploadingImage(false);
-        }
-      };
-      input.click();
+      const uploadUrl = getBackendUploadUrl();
+      const res = await fetch(uploadUrl, {
+        method: 'POST',
+        body: formData,
+      });
+      const json = await res.json();
+      if (json.success && json.data) {
+        const finalUrl = json.data.url || json.data.secureUrl;
+        setImageUrl(finalUrl);
+        setCloudinaryPublicId(json.data.publicId || '');
+        setErrorMsg(null);
+      } else {
+        // Fallback to local URI so admin can continue previewing
+        setImageUrl(asset.uri);
+      }
+    } catch (err: any) {
+      console.warn('Image upload error:', err);
+      // Keep local preview intact
+      setImageUrl(asset.uri);
+    } finally {
+      setUploadingImage(false);
     }
   };
 
+  const handlePickFromGallery = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Needed',
+          'Photo gallery access is required to upload product images.'
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.85,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        await uploadImageFile(result.assets[0]);
+      }
+    } catch (e: any) {
+      console.warn('Gallery pick error:', e);
+      setErrorMsg('Failed to open gallery. Please try again.');
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Needed',
+          'Camera access is required to take product photos.'
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.85,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        await uploadImageFile(result.assets[0]);
+      }
+    } catch (e: any) {
+      console.warn('Camera error:', e);
+      setErrorMsg('Failed to open camera. Please try again.');
+    }
+  };
+
+  const handleApplyCustomUrl = () => {
+    if (!customUrl.trim()) return;
+    setImageUrl(customUrl.trim());
+    setImagePreview(customUrl.trim());
+    setShowUrlInput(false);
+  };
+
+  const handleRemoveImage = () => {
+    setImageUrl('');
+    setImagePreview('');
+    setCloudinaryPublicId('');
+    setCustomUrl('');
+  };
+
+  // ── Variant Helpers ──
   const handleAddVariant = () => {
     setVariants((prev) => [
       ...prev,
@@ -195,6 +319,7 @@ export const AddProductModal: React.FC = () => {
     );
   };
 
+  // ── Save Product ──
   const handleSave = async () => {
     setErrorMsg(null);
 
@@ -233,7 +358,7 @@ export const AddProductModal: React.FC = () => {
 
     setSaving(true);
     try {
-      const formattedVariants = variants.map((v, idx) => ({
+      const formattedVariants = variants.map((v) => ({
         sku: v.sku.trim() || `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${v.weightOrVolume.replace(/[^a-z0-9]+/gi, '').toLowerCase()}`,
         weightOrVolume: v.weightOrVolume.trim(),
         mrp: parseFloat(v.mrp),
@@ -257,6 +382,7 @@ export const AddProductModal: React.FC = () => {
         sellingPrice: defaultVar.sellingPrice,
         mrp: defaultVar.mrp,
         basePrice: defaultVar.sellingPrice,
+        shelfLocation: shelfLocation.trim().toUpperCase() || undefined,
         isActive: true,
         variants: formattedVariants as any,
       });
@@ -272,6 +398,10 @@ export const AddProductModal: React.FC = () => {
       setSaving(false);
     }
   };
+
+  const filteredCategories = categories.filter((c) =>
+    c.name.toLowerCase().includes(categorySearchQuery.toLowerCase())
+  );
 
   return (
     <Modal visible={true} transparent animationType="fade" onRequestClose={handleClose}>
@@ -297,42 +427,124 @@ export const AddProductModal: React.FC = () => {
           )}
 
           <ScrollView style={styles.formScroll} contentContainerStyle={{ paddingBottom: 24 }}>
-            {/* Image Upload / Preview */}
+            {/* Master Catalog Context Hint */}
+            <View style={styles.masterNoticeBox}>
+              <Info size={16} color={COLORS.purple} style={{ marginRight: 8, marginTop: 1 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.masterNoticeTitle}>Global Master Catalog Item</Text>
+                <Text style={styles.masterNoticeText}>
+                  This product will be added to the master catalog with default fallback prices. Configure area-specific selling prices after saving using the Area Pricing screen.
+                </Text>
+              </View>
+            </View>
+
+            {/* 📸 CHANGE 1: Product Image Upload (Native Gallery + Camera + Fallback) */}
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Product Image (Cloudinary)</Text>
-              <View style={styles.imageUploadRow}>
-                {imagePreview || imageUrl ? (
-                  <View style={styles.previewContainer}>
-                    <Image
-                      source={{ uri: imageUrl || imagePreview }}
-                      style={styles.previewImage}
-                      resizeMode="cover"
-                    />
-                    <TouchableOpacity
-                      style={styles.changeImageBtn}
-                      onPress={handlePickImage}
-                    >
-                      <Text style={styles.changeImageText}>Change</Text>
-                    </TouchableOpacity>
+
+              {imageUrl || imagePreview ? (
+                /* Selected Image Preview with Actions */
+                <View style={styles.previewContainer}>
+                  <Image
+                    source={{ uri: imageUrl || imagePreview }}
+                    style={styles.previewImage}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.previewDetails}>
+                    <Text style={styles.previewTitle} numberOfLines={1}>
+                      {imageUrl.startsWith('http') ? 'Cloudinary Hosted Image' : 'Local Image Selected'}
+                    </Text>
+                    <Text style={styles.previewSubtitle} numberOfLines={1}>
+                      {imageUrl || imagePreview}
+                    </Text>
+                    <View style={styles.previewActionsRow}>
+                      <TouchableOpacity
+                        style={styles.changeActionBtn}
+                        onPress={handlePickFromGallery}
+                        disabled={uploadingImage}
+                      >
+                        <Text style={styles.changeActionText}>Change Photo</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.removeActionBtn}
+                        onPress={handleRemoveImage}
+                      >
+                        <Trash2 size={14} color={COLORS.error} />
+                        <Text style={styles.removeActionText}>Remove</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.uploadBox}
-                    onPress={handlePickImage}
-                    disabled={uploadingImage}
-                  >
-                    {uploadingImage ? (
+                </View>
+              ) : (
+                /* Native Upload Options Card */
+                <View style={styles.uploadCardContainer}>
+                  {uploadingImage ? (
+                    <View style={styles.uploadLoadingBox}>
                       <ActivityIndicator size="small" color={COLORS.purple} />
-                    ) : (
-                      <>
-                        <Upload size={22} color={COLORS.purple} style={{ marginBottom: 6 }} />
-                        <Text style={styles.uploadText}>Select Image to Upload</Text>
-                        <Text style={styles.uploadSubtext}>JPG, JPEG, PNG, WEBP (Max 5MB)</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                )}
-              </View>
+                      <Text style={styles.uploadLoadingText}>Uploading to Cloudinary...</Text>
+                    </View>
+                  ) : (
+                    <>
+                      <View style={styles.uploadButtonsGrid}>
+                        {/* 1. Choose from Gallery */}
+                        <TouchableOpacity
+                          style={styles.actionPickBtn}
+                          onPress={handlePickFromGallery}
+                          activeOpacity={0.8}
+                        >
+                          <ImageIcon size={20} color={COLORS.purple} />
+                          <Text style={styles.actionPickText}>Choose from Gallery</Text>
+                        </TouchableOpacity>
+
+                        {/* 2. Take Photo with Camera */}
+                        <TouchableOpacity
+                          style={styles.actionPickBtn}
+                          onPress={handleTakePhoto}
+                          activeOpacity={0.8}
+                        >
+                          <Camera size={20} color={COLORS.purple} />
+                          <Text style={styles.actionPickText}>Take Photo</Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Divider with 'OR' */}
+                      <View style={styles.orDividerRow}>
+                        <View style={styles.dividerLine} />
+                        <Text style={styles.orText}>OR PASTE URL</Text>
+                        <View style={styles.dividerLine} />
+                      </View>
+
+                      {/* Paste URL Option */}
+                      {showUrlInput ? (
+                        <View style={styles.urlInputRow}>
+                          <TextInput
+                            style={styles.urlTextInput}
+                            placeholder="https://images.unsplash.com/..."
+                            placeholderTextColor={COLORS.textMuted}
+                            value={customUrl}
+                            onChangeText={setCustomUrl}
+                            autoCapitalize="none"
+                          />
+                          <TouchableOpacity
+                            style={styles.urlApplyBtn}
+                            onPress={handleApplyCustomUrl}
+                          >
+                            <Text style={styles.urlApplyBtnText}>Apply</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <TouchableOpacity
+                          style={styles.showUrlBtn}
+                          onPress={() => setShowUrlInput(true)}
+                        >
+                          <LinkIcon size={14} color={COLORS.purple} style={{ marginRight: 6 }} />
+                          <Text style={styles.showUrlBtnText}>Enter Image Web URL directly</Text>
+                        </TouchableOpacity>
+                      )}
+                    </>
+                  )}
+                </View>
+              )}
             </View>
 
             {/* Item Name */}
@@ -358,30 +570,26 @@ export const AddProductModal: React.FC = () => {
               )}
             </View>
 
-            {/* Category Selector */}
+            {/* 🥬 CHANGE 2: Category Dropdown (Redesigned from wrapping chips) */}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Category *</Text>
-              <View style={styles.categoryRow}>
-                {categories.map((cat) => {
-                  const isSelected = (selectedCategoryId ? selectedCategoryId === cat.id : categories[0]?.id === cat.id);
-                  return (
-                    <TouchableOpacity
-                      key={cat.id}
-                      style={[styles.categoryBtn, isSelected && styles.categoryBtnActive]}
-                      onPress={() => setSelectedCategoryId(cat.id)}
-                    >
-                      <Text
-                        style={[
-                          styles.categoryBtnText,
-                          isSelected && styles.categoryBtnTextActive,
-                        ]}
-                      >
-                        {cat.name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+              <Text style={styles.inputLabel}>
+                Category <Text style={{ color: COLORS.error }}>*</Text>
+              </Text>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={styles.categoryDropdownTrigger}
+                onPress={() => setShowCategoryModal(true)}
+              >
+                <View style={styles.categoryDropdownLeft}>
+                  <Text style={styles.categoryDropdownIcon}>
+                    {getCategoryEmoji(activeCategory?.name)}
+                  </Text>
+                  <Text style={styles.categoryDropdownText}>
+                    {activeCategory?.name || 'Select Category'}
+                  </Text>
+                </View>
+                <ChevronDown size={18} color={COLORS.textMuted} />
+              </TouchableOpacity>
             </View>
 
             {/* Brand & Description */}
@@ -408,50 +616,58 @@ export const AddProductModal: React.FC = () => {
               </View>
             </View>
 
+            {/* Warehouse Shelf Location */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Shelf / Bin Coordinate (Optional)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. A3-R2 (Aisle 3, Rack 2), B1-04, COOLER-1"
+                placeholderTextColor={COLORS.textMuted}
+                value={shelfLocation}
+                onChangeText={(val) => setShelfLocation(val.toUpperCase())}
+                autoCapitalize="characters"
+              />
+              <Text style={styles.inlineFieldHelp}>Pickers in Dark Store will walk directly to this coordinate when fulfilling orders.</Text>
+            </View>
+
             {/* Variants Section */}
             <View style={styles.variantsHeaderRow}>
               <View>
-                <Text style={styles.variantsHeading}>SKU Pack Variants *</Text>
+                <Text style={styles.variantsHeading}>Weight & Pack Size Variants</Text>
                 <Text style={styles.variantsSubheading}>
-                  Catalog default prices. Zone pricing overrides can be set per zone.
+                  At least 1 variant required with base selling price
                 </Text>
               </View>
-              <TouchableOpacity
-                style={styles.addVariantBtn}
-                onPress={handleAddVariant}
-              >
-                <Plus size={14} color={COLORS.white} style={{ marginRight: 4 }} />
-                <Text style={styles.addVariantText}>Add Variant</Text>
+              <TouchableOpacity style={styles.addVariantBtn} onPress={handleAddVariant}>
+                <Plus size={14} color={COLORS.purple} style={{ marginRight: 4 }} />
+                <Text style={styles.addVariantBtnText}>Add Pack Size</Text>
               </TouchableOpacity>
             </View>
 
             {variants.map((v, index) => (
               <View key={v.id} style={styles.variantCard}>
                 <View style={styles.variantCardHeader}>
-                  <View style={styles.variantBadge}>
-                    <Package size={13} color={COLORS.purple} style={{ marginRight: 4 }} />
+                  <View style={styles.variantBadgeRow}>
                     <Text style={styles.variantBadgeText}>Variant #{index + 1}</Text>
+                    {v.isDefault && (
+                      <View style={styles.defaultBadge}>
+                        <Check size={10} color={COLORS.purple} style={{ marginRight: 2 }} />
+                        <Text style={styles.defaultBadgeText}>Default</Text>
+                      </View>
+                    )}
                   </View>
-
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <TouchableOpacity
-                      style={[styles.defaultPill, v.isDefault && styles.defaultPillActive]}
-                      onPress={() => handleUpdateVariant(v.id, 'isDefault', true)}
-                    >
-                      {v.isDefault && <Check size={11} color={COLORS.white} style={{ marginRight: 2 }} />}
-                      <Text
-                        style={[
-                          styles.defaultPillText,
-                          v.isDefault && styles.defaultPillTextActive,
-                        ]}
+                  <View style={styles.variantHeaderActions}>
+                    {!v.isDefault && (
+                      <TouchableOpacity
+                        style={styles.setDefaultBtn}
+                        onPress={() => handleUpdateVariant(v.id, 'isDefault', true)}
                       >
-                        {v.isDefault ? 'Default Variant' : 'Set Default'}
-                      </Text>
-                    </TouchableOpacity>
-
+                        <Text style={styles.setDefaultBtnText}>Set Default</Text>
+                      </TouchableOpacity>
+                    )}
                     {variants.length > 1 && (
                       <TouchableOpacity
-                        style={styles.removeVariantBtn}
+                        style={styles.deleteVariantBtn}
                         onPress={() => handleRemoveVariant(v.id)}
                       >
                         <Trash2 size={14} color={COLORS.error} />
@@ -460,13 +676,12 @@ export const AddProductModal: React.FC = () => {
                   </View>
                 </View>
 
-                {/* Variant fields */}
-                <View style={styles.variantGrid}>
-                  <View style={{ flex: 1.2 }}>
+                <View style={styles.variantInputsRow}>
+                  <View style={{ flex: 1.4 }}>
                     <Text style={styles.variantFieldLabel}>Pack Size *</Text>
                     <TextInput
                       style={styles.variantInput}
-                      placeholder="e.g. 250 g, 1 kg"
+                      placeholder="e.g. 500 g"
                       placeholderTextColor={COLORS.textMuted}
                       value={v.weightOrVolume}
                       onChangeText={(val) => handleUpdateVariant(v.id, 'weightOrVolume', val)}
@@ -474,9 +689,9 @@ export const AddProductModal: React.FC = () => {
                   </View>
 
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.variantFieldLabel}>Default Selling Price (₹) *</Text>
+                    <Text style={styles.variantFieldLabel}>Selling (₹) *</Text>
                     <TextInput
-                      style={[styles.variantInput, { borderColor: COLORS.purple, borderWidth: 1.5 }]}
+                      style={styles.variantInput}
                       placeholder="e.g. 12"
                       placeholderTextColor={COLORS.textMuted}
                       keyboardType="numeric"
@@ -540,6 +755,123 @@ export const AddProductModal: React.FC = () => {
           </View>
         </View>
       </View>
+
+      {/* 🥬 CATEGORY SELECTOR MODAL (Option A - Dropdown List with Search) */}
+      <Modal
+        visible={showCategoryModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowCategoryModal(false)}
+      >
+        <View style={styles.catModalOverlay}>
+          <View style={styles.catModalCard}>
+            {/* Modal Header */}
+            <View style={styles.catModalHeader}>
+              <View>
+                <Text style={styles.catModalTitle}>Select Category</Text>
+                <Text style={styles.catModalSubtitle}>Choose the product department</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowCategoryModal(false)}
+                style={styles.catModalCloseBtn}
+              >
+                <X size={18} color={COLORS.textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Search Input */}
+            <View style={styles.catSearchBox}>
+              <Search size={16} color={COLORS.textMuted} style={{ marginRight: 8 }} />
+              <TextInput
+                style={styles.catSearchInput}
+                placeholder="Search categories..."
+                placeholderTextColor={COLORS.textMuted}
+                value={categorySearchQuery}
+                onChangeText={setCategorySearchQuery}
+                autoCorrect={false}
+              />
+              {categorySearchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setCategorySearchQuery('')}>
+                  <X size={14} color={COLORS.textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Category Items List */}
+            <FlatList
+              data={filteredCategories}
+              keyExtractor={(item) => item.id}
+              showsVerticalScrollIndicator={false}
+              style={{ maxHeight: 320 }}
+              renderItem={({ item }) => {
+                const isSelected = selectedCategoryId
+                  ? selectedCategoryId === item.id
+                  : categories[0]?.id === item.id;
+                return (
+                  <TouchableOpacity
+                    style={[
+                      styles.catListItem,
+                      isSelected && styles.catListItemSelected,
+                    ]}
+                    onPress={() => {
+                      setSelectedCategoryId(item.id);
+                      setShowCategoryModal(false);
+                      setCategorySearchQuery('');
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.catListItemLeft}>
+                      <Text style={styles.catListEmoji}>
+                        {getCategoryEmoji(item.name)}
+                      </Text>
+                      <View>
+                        <Text
+                          style={[
+                            styles.catListName,
+                            isSelected && styles.catListNameSelected,
+                          ]}
+                        >
+                          {item.name}
+                        </Text>
+                        {item.itemCount !== undefined && (
+                          <Text style={styles.catListItemCount}>
+                            {item.itemCount} items in catalog
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+
+                    {isSelected ? (
+                      <View style={styles.catSelectedCheck}>
+                        <Check size={14} color={COLORS.purple} />
+                      </View>
+                    ) : (
+                      <View style={styles.catUnselectedCheck} />
+                    )}
+                  </TouchableOpacity>
+                );
+              }}
+              ListEmptyComponent={
+                <View style={styles.catEmptyState}>
+                  <Package size={32} color={COLORS.border} />
+                  <Text style={styles.catEmptyText}>
+                    No categories found matching "{categorySearchQuery}"
+                  </Text>
+                </View>
+              }
+            />
+
+            <View style={styles.catModalFooter}>
+              <TouchableOpacity
+                style={styles.catCancelBtn}
+                onPress={() => setShowCategoryModal(false)}
+              >
+                <Text style={styles.catCancelBtnText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Modal>
   );
 };
@@ -614,6 +946,27 @@ const styles = StyleSheet.create({
   formScroll: {
     padding: SPACING.md,
   },
+  masterNoticeBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FAF5FF',
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+    borderRadius: RADIUS.input,
+    padding: 10,
+    marginBottom: SPACING.md,
+  },
+  masterNoticeTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.purple,
+    marginBottom: 2,
+  },
+  masterNoticeText: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    lineHeight: 15,
+  },
   inputGroup: {
     marginBottom: SPACING.md,
   },
@@ -648,79 +1001,320 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 4,
   },
-  categoryRow: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-  },
-  categoryBtn: {
-    flex: 1,
-    paddingVertical: 9,
-    alignItems: 'center',
-    borderRadius: RADIUS.button,
-    backgroundColor: COLORS.cardBackground,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  categoryBtnActive: {
-    backgroundColor: COLORS.purple,
-    borderColor: COLORS.purple,
-  },
-  categoryBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.textMuted,
-  },
-  categoryBtnTextActive: {
-    color: COLORS.white,
-  },
 
-  // Image Upload Styles
-  imageUploadRow: {
-    marginTop: 2,
-  },
-  uploadBox: {
+  // 📸 Image Upload Styles
+  uploadCardContainer: {
+    backgroundColor: '#FAF5FF',
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    borderColor: COLORS.purple,
+    borderColor: '#D8B4FE',
     borderRadius: RADIUS.card,
-    padding: SPACING.md,
+    padding: 14,
+  },
+  uploadButtonsGrid: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  actionPickBtn: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FAF5FF',
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+    borderRadius: RADIUS.button,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    gap: 8,
   },
-  uploadText: {
-    fontSize: 13,
+  actionPickText: {
+    fontSize: 12,
     fontWeight: '700',
     color: COLORS.purple,
   },
-  uploadSubtext: {
-    fontSize: 11,
-    color: COLORS.textMuted,
-    marginTop: 2,
+  orDividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 10,
+    gap: 8,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E9D5FF',
+  },
+  orText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#9333EA',
+    letterSpacing: 0.5,
+  },
+  showUrlBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+  },
+  showUrlBtnText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: COLORS.purple,
+    textDecorationLine: 'underline',
+  },
+  urlInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  urlTextInput: {
+    flex: 1,
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+    borderRadius: RADIUS.input,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    fontSize: 12,
+    color: COLORS.textPrimary,
+  },
+  urlApplyBtn: {
+    backgroundColor: COLORS.purple,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: RADIUS.button,
+  },
+  urlApplyBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.white,
+  },
+  uploadLoadingBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 8,
+  },
+  uploadLoadingText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.purple,
   },
   previewContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     backgroundColor: COLORS.cardBackground,
-    padding: SPACING.sm,
+    padding: 10,
     borderRadius: RADIUS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   previewImage: {
-    width: 64,
-    height: 64,
+    width: 68,
+    height: 68,
+    borderRadius: RADIUS.sm,
+    backgroundColor: '#F3F4F6',
+  },
+  previewDetails: {
+    flex: 1,
+  },
+  previewTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  previewSubtitle: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+  previewActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 8,
+  },
+  changeActionBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    backgroundColor: '#FAF5FF',
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
     borderRadius: RADIUS.sm,
   },
-  changeImageBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.purple,
-  },
-  changeImageText: {
+  changeActionText: {
     fontSize: 11,
     fontWeight: '700',
-    color: COLORS.white,
+    color: COLORS.purple,
+  },
+  removeActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  removeActionText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.error,
+  },
+
+  // 🥬 Category Dropdown Styles
+  categoryDropdownTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.cardBackground,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.input,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 10,
+  },
+  categoryDropdownLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  categoryDropdownIcon: {
+    fontSize: 16,
+  },
+  categoryDropdownText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+
+  // Category Modal Styles
+  catModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.md,
+  },
+  catModalCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.card,
+    width: '100%',
+    maxWidth: 420,
+    padding: SPACING.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  catModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  catModalTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+  },
+  catModalSubtitle: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+  catModalCloseBtn: {
+    padding: 4,
+  },
+  catSearchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.cardBackground,
+    borderRadius: RADIUS.input,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 10,
+    height: 38,
+    marginBottom: 10,
+  },
+  catSearchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: COLORS.textPrimary,
+  },
+  catListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: RADIUS.sm,
+    marginBottom: 4,
+  },
+  catListItemSelected: {
+    backgroundColor: '#FAF5FF',
+  },
+  catListItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  catListEmoji: {
+    fontSize: 18,
+  },
+  catListName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  catListNameSelected: {
+    color: COLORS.purple,
+    fontWeight: '700',
+  },
+  catListItemCount: {
+    fontSize: 10.5,
+    color: COLORS.textMuted,
+  },
+  catSelectedCheck: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#F3E8FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  catUnselectedCheck: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+  },
+  catEmptyState: {
+    alignItems: 'center',
+    paddingVertical: 24,
+    gap: 8,
+  },
+  catEmptyText: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+  },
+  catModalFooter: {
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    paddingTop: 10,
+    marginTop: 8,
+    alignItems: 'flex-end',
+  },
+  catCancelBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    backgroundColor: COLORS.cardBackground,
+    borderRadius: RADIUS.sm,
+  },
+  catCancelBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textMuted,
   },
 
   // Variants Section
@@ -736,7 +1330,7 @@ const styles = StyleSheet.create({
   },
   variantsHeading: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '700',
     color: COLORS.textPrimary,
   },
   variantsSubheading: {
@@ -746,23 +1340,25 @@ const styles = StyleSheet.create({
   addVariantBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.purple,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: RADIUS.pill,
+    borderRadius: RADIUS.button,
+    backgroundColor: '#FAF5FF',
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
   },
-  addVariantText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: COLORS.white,
+  addVariantBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.purple,
   },
   variantCard: {
-    backgroundColor: '#FAFAFA',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    backgroundColor: COLORS.cardBackground,
     borderRadius: RADIUS.sm,
-    padding: SPACING.sm,
-    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 10,
+    marginBottom: SPACING.sm,
   },
   variantCardHeader: {
     flexDirection: 'row',
@@ -770,44 +1366,58 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
-  variantBadge: {
+  variantBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
   },
   variantBadgeText: {
     fontSize: 11,
     fontWeight: '800',
-    color: COLORS.purple,
+    color: COLORS.textPrimary,
   },
-  defaultPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: RADIUS.pill,
-    backgroundColor: '#E5E7EB',
+  defaultBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#FAF5FF',
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: RADIUS.pill,
   },
-  defaultPillActive: {
-    backgroundColor: COLORS.purple,
-  },
-  defaultPillText: {
+  defaultBadgeText: {
     fontSize: 10,
+    color: COLORS.purple,
     fontWeight: '700',
+  },
+  variantHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  setDefaultBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: RADIUS.sm,
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  setDefaultBtnText: {
+    fontSize: 10,
     color: COLORS.textMuted,
+    fontWeight: '600',
   },
-  defaultPillTextActive: {
-    color: COLORS.white,
-  },
-  removeVariantBtn: {
+  deleteVariantBtn: {
     padding: 4,
   },
-  variantGrid: {
+  variantInputsRow: {
     flexDirection: 'row',
     gap: 8,
-    alignItems: 'center',
   },
   variantFieldLabel: {
-    fontSize: 10,
+    fontSize: 10.5,
     fontWeight: '700',
     color: COLORS.textMuted,
     marginBottom: 4,
@@ -816,27 +1426,28 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderWidth: 1,
     borderColor: COLORS.border,
-    borderRadius: RADIUS.input,
+    borderRadius: RADIUS.sm,
     paddingHorizontal: 8,
     paddingVertical: 6,
     fontSize: 12,
     color: COLORS.textPrimary,
   },
 
-  // Footer
+  // Footer Actions
   footer: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: SPACING.md,
+    alignItems: 'center',
+    gap: 10,
     padding: SPACING.md,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
-    backgroundColor: COLORS.white,
   },
   cancelBtn: {
-    paddingVertical: 10,
-    paddingHorizontal: SPACING.lg,
+    paddingVertical: 9,
+    paddingHorizontal: SPACING.md,
     borderRadius: RADIUS.button,
+    backgroundColor: COLORS.cardBackground,
   },
   cancelBtnText: {
     fontSize: 13,
@@ -844,22 +1455,19 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
   },
   saveBtn: {
-    backgroundColor: COLORS.purple,
-    paddingVertical: 10,
-    paddingHorizontal: SPACING.xl,
+    paddingVertical: 9,
+    paddingHorizontal: SPACING.lg,
     borderRadius: RADIUS.button,
-    shadowColor: COLORS.purple,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: COLORS.purple,
+    minWidth: 160,
+    alignItems: 'center',
   },
   disabledBtn: {
     opacity: 0.6,
   },
   saveBtnText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '700',
     color: COLORS.white,
   },
 });

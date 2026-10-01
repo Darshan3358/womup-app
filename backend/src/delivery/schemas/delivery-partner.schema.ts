@@ -31,8 +31,14 @@ export class DeliveryPartner {
   @Prop()
   avatar?: string;
 
+  @Prop({ type: Types.ObjectId, ref: 'City' })
+  cityId?: Types.ObjectId;
+
   @Prop({ default: 'Ahmedabad' })
   city: string;
+
+  @Prop({ trim: true })
+  cityName?: string;
 
   @Prop({ type: Types.ObjectId, ref: 'Store' })
   hubId?: Types.ObjectId;

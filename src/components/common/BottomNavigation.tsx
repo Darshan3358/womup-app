@@ -1,3 +1,4 @@
+
 import React from 'react';
 import {
   View,
@@ -8,14 +9,12 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, GRADIENTS } from '../../theme/colors';
+import { COLORS } from '../../theme/colors';
 import { AppIcon, IconName } from './AppIcon';
-import { useApp } from '../../context/AppContext';
 
-export type BlinkitTabKey = 'Home' | 'Order Again' | 'Categories' | 'Print' | 'District';
+export type BlinkitTabKey = 'Home' | 'Order Again' | 'Categories' | 'Print' | 'Profile';
 // Backward compatibility alias
-export type TabKey = BlinkitTabKey | 'Cart' | 'Orders' | 'Account';
+export type TabKey = BlinkitTabKey | 'Cart' | 'Orders' | 'Account' | 'District';
 
 interface BottomNavigationProps {
   currentTab: BlinkitTabKey | TabKey;
@@ -28,7 +27,6 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { setDistrictModalVisible } = useApp();
 
   const isSmallDevice = width <= 360;
 
@@ -36,13 +34,12 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
     key: BlinkitTabKey;
     label: string;
     icon: IconName;
-    isDistrict?: boolean;
   }[] = [
     { key: 'Home', label: 'Home', icon: 'home' },
     { key: 'Order Again', label: 'Order Again', icon: 'shopping-basket' },
     { key: 'Categories', label: 'Categories', icon: 'grid' },
     { key: 'Print', label: 'Print', icon: 'printer' },
-    { key: 'District', label: 'district', icon: 'sparkles', isDistrict: true },
+    { key: 'Profile', label: 'Profile', icon: 'user' },
   ];
 
   const bottomPadding = Math.max(insets.bottom, 8);
@@ -52,27 +49,6 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
     <View style={[styles.wrapper, { paddingBottom: bottomPadding }]}>
       <View style={[styles.container, { height: barHeight }]}>
         {tabs.map((tab) => {
-          if (tab.isDistrict) {
-            return (
-              <TouchableOpacity
-                key={tab.key}
-                activeOpacity={0.85}
-                onPress={() => setDistrictModalVisible(true)}
-                style={styles.districtTabItem}
-                accessibilityLabel="District by Blinkit"
-              >
-                <LinearGradient
-                  colors={GRADIENTS.logo}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.districtPill}
-                >
-                  <Text style={styles.districtText}>district</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            );
-          }
-
           const isActive = currentTab === tab.key;
           const iconColor = isActive ? COLORS.hotPink : COLORS.textMuted;
           const labelColor = isActive ? COLORS.hotPink : COLORS.textMuted;
@@ -120,6 +96,11 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    width: '100%',
+    maxWidth: '100%',
+    overflow: 'hidden',
     ...Platform.select({
       web: {
         boxShadow: '0 -2px 4px rgba(0, 0, 0, 0.06)',
@@ -138,6 +119,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-around',
     width: '100%',
+    maxWidth: '100%',
     paddingHorizontal: 4,
   },
   tabItem: {
@@ -153,12 +135,13 @@ const styles = StyleSheet.create({
     height: 24,
   },
   tabLabel: {
-    fontSize: 11,
-    fontWeight: '500',
+    fontSize: 11.5,
+    fontWeight: '600',
     marginTop: 3,
+    letterSpacing: -0.2,
   },
   activeTabLabel: {
-    fontWeight: '700',
+    fontWeight: '800',
   },
   activeBar: {
     width: 20,
@@ -166,25 +149,5 @@ const styles = StyleSheet.create({
     borderRadius: 1.5,
     backgroundColor: COLORS.hotPink,
     marginTop: 3,
-  },
-  districtTabItem: {
-    flex: 1.1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  districtPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 64,
-  },
-  districtText: {
-    color: COLORS.white,
-    fontWeight: '900',
-    fontSize: 13,
-    letterSpacing: -0.3,
   },
 });

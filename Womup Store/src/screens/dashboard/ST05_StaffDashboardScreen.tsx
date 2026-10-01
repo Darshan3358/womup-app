@@ -8,6 +8,7 @@ import { COLORS } from '../../theme/colors';
 export const ST05_StaffDashboardScreen: React.FC = () => {
   const {
     staff,
+    store,
     performance,
     incomingOrders,
     pickingOrders,
@@ -21,6 +22,14 @@ export const ST05_StaffDashboardScreen: React.FC = () => {
     refreshReady,
     isLoading,
   } = useStore();
+
+  const areaName =
+    store?.areaName ||
+    (store?.name
+      ? store.name.replace(/^Wom\s*Up\s*/i, '').replace(/\s*(Dark\s*Store|Store)$/i, '').trim()
+      : 'Chandlodiya');
+
+  const cityName = store?.cityName || store?.city || 'Ahmedabad';
 
   const handleRefresh = async () => {
     await Promise.all([refreshIncoming(), refreshPicking(), refreshReady()]);
@@ -38,10 +47,10 @@ export const ST05_StaffDashboardScreen: React.FC = () => {
       <View style={styles.welcomeBanner}>
         <View style={styles.welcomeTextWrapper}>
           <Text style={styles.greetingText} numberOfLines={1} ellipsizeMode="tail">
-            Hello, {staff?.fullName || 'Dark Store Picker'} 👋
+            Hello, {staff?.fullName || `${store?.name || 'Dark Store'} Staff`} 👋
           </Text>
           <Text style={styles.shiftMetaText} numberOfLines={1} ellipsizeMode="tail">
-            Shift: {staff?.shift || 'MORNING'} • Terminal: #{staff?.employeeCode || '—'}
+            Shift: {staff?.shift || 'MORNING'} • Terminal: #{staff?.employeeCode ? staff.employeeCode.replace(/^STF-STORE-/, '').replace(/^STF-/, '') : (store?.code || '001')}
           </Text>
         </View>
 
@@ -55,6 +64,25 @@ export const ST05_StaffDashboardScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
+      {/* 📍 Serving Zone Banner (NEW) */}
+      <View style={styles.servingBanner}>
+        <View style={styles.servingBannerLeft}>
+          <View style={styles.servingIconBox}>
+            <Ionicons name="location" size={16} color={COLORS.primary} />
+          </View>
+          <View>
+            <Text style={styles.servingLabel}>YOU ARE SERVING</Text>
+            <Text style={styles.servingValue}>
+              {areaName} · {cityName}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.servingLockBadge}>
+          <Ionicons name="lock-closed" size={11} color={COLORS.accentCyan} />
+          <Text style={styles.servingLockText}>Area Locked</Text>
+        </View>
+      </View>
+
       {/* KPI Cards Grid */}
       <View style={styles.kpiGrid}>
         <View style={styles.kpiCard}>
@@ -63,22 +91,33 @@ export const ST05_StaffDashboardScreen: React.FC = () => {
           </View>
           <Text style={styles.kpiValue}>{performance?.todayPicked ?? 0}</Text>
           <Text style={styles.kpiLabel}>Orders Picked</Text>
+          <Text style={styles.kpiSubLabel}>
+            {(performance?.todayPicked ?? 0) === 0 ? 'Just started' : 'Picked today'}
+          </Text>
         </View>
 
         <View style={styles.kpiCard}>
           <View style={[styles.kpiIconBox, { backgroundColor: 'rgba(6, 182, 212, 0.15)' }]}>
             <Ionicons name="speedometer-outline" size={18} color={COLORS.accentCyan} />
           </View>
-          <Text style={styles.kpiValue}>{performance?.avgPickTime || '—'}</Text>
+          <Text style={styles.kpiValue} numberOfLines={1}>
+            {performance?.avgPickTime ? performance.avgPickTime : 'No orders'}
+          </Text>
           <Text style={styles.kpiLabel}>Avg Pick Speed</Text>
+          <Text style={styles.kpiSubLabel} numberOfLines={1}>
+            {performance?.avgPickTime ? 'Avg pick time' : 'Pick 1 order to see'}
+          </Text>
         </View>
 
         <View style={styles.kpiCard}>
           <View style={[styles.kpiIconBox, { backgroundColor: 'rgba(139, 92, 246, 0.15)' }]}>
             <Ionicons name="checkmark-circle-outline" size={18} color={COLORS.accentPurple} />
           </View>
-          <Text style={styles.kpiValue}>{performance?.accuracy ? `${performance.accuracy}%` : '—'}</Text>
+          <Text style={styles.kpiValue}>{performance?.accuracy ?? 100}%</Text>
           <Text style={styles.kpiLabel}>Scan Accuracy</Text>
+          <Text style={styles.kpiSubLabel}>
+            {(performance?.todayPicked ?? 0) === 0 ? 'Perfect so far' : 'High accuracy'}
+          </Text>
         </View>
       </View>
 
@@ -154,7 +193,10 @@ export const ST05_StaffDashboardScreen: React.FC = () => {
           <View style={styles.emptyCard}>
             <Ionicons name="checkmark-done-circle" size={42} color={COLORS.primary} />
             <Text style={styles.emptyTitle}>Queue Clear!</Text>
-            <Text style={styles.emptyDesc}>No orders currently waiting. Stay ready for incoming push.</Text>
+            <Text style={styles.emptyDesc}>No orders currently waiting.</Text>
+            <Text style={styles.emptyAreaNote}>
+              New orders from <Text style={{ color: COLORS.primary, fontWeight: '700' }}>{areaName}</Text> area will appear here.
+            </Text>
           </View>
         ) : (
           incomingOrders.slice(0, 3).map((order) => (
@@ -251,6 +293,12 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     fontSize: 10,
     marginTop: 2,
+    fontWeight: '700',
+  },
+  kpiSubLabel: {
+    color: COLORS.textSecondary,
+    fontSize: 9.5,
+    marginTop: 2,
   },
   quickShortcuts: {
     gap: 10,
@@ -340,5 +388,66 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 4,
     maxWidth: 240,
+  },
+  emptyAreaNote: {
+    color: COLORS.textSecondary,
+    fontSize: 11.5,
+    textAlign: 'center',
+    marginTop: 6,
+    maxWidth: 280,
+  },
+  servingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+  },
+  servingBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  servingIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: 'rgba(16, 185, 129, 0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  servingLabel: {
+    color: COLORS.textMuted,
+    fontSize: 9.5,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  servingValue: {
+    color: COLORS.textPrimary,
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 1,
+  },
+  servingLockBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(6, 182, 212, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(6, 182, 212, 0.25)',
+  },
+  servingLockText: {
+    color: COLORS.accentCyan,
+    fontSize: 10,
+    fontWeight: '800',
   },
 });

@@ -27,6 +27,15 @@
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
-    }
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Wom Up needs access to your photos to upload product images.",
+          "cameraPermission": "Wom Up needs access to your camera to take product photos."
+        }
+      ]
+    ]
   }
 }

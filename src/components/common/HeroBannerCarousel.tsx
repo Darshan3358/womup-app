@@ -5,50 +5,42 @@ import {
   Image,
   TouchableOpacity,
   StyleSheet,
-  Dimensions,
+  useWindowDimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
 
 export interface HeroBannerItem {
   id: string;
-  title: string;
-  image: any;
   type: 'deals' | 'category';
   categoryName?: string;
   categoryId?: string;
+  image: any;
+  bgColor?: string;
 }
 
-export const HERO_BANNERS: HeroBannerItem[] = [
+export const HERO_SLIDES: HeroBannerItem[] = [
   {
-    id: 'banner_maggi',
-    title: 'New Maggi Double Masala Noodles',
-    image: require('../../../assets/maggi_double_masala_banner.jpg'),
+    id: 'hero_1',
     type: 'deals',
+    image: require('../../../assets/home banner .png'),
+    bgColor: '#F9ECF8',
   },
   {
-    id: 'banner_amul',
-    title: 'Pure Amul Festive Cow Ghee',
-    image: require('../../../assets/amul_festive_ghee_banner.jpg'),
+    id: 'hero_2',
+    type: 'category',
+    categoryName: 'Vegetables & Fruits',
+    categoryId: 'c1',
+    image: require('../../../assets/FRESH AND HEALTHY .png'),
+    bgColor: '#EDE8FF',
+  },
+  {
+    id: 'hero_3',
     type: 'category',
     categoryName: 'Dairy, Bread & Eggs',
-    categoryId: 'c1',
-  },
-  {
-    id: 'banner_loreal',
-    title: "L'Oréal Paris Volume Rush Range",
-    image: require('../../../assets/loreal_volume_rush_banner.jpg'),
-    type: 'category',
-    categoryName: 'Bath & Body',
-    categoryId: 'c7',
-  },
-  {
-    id: 'banner_nivea',
-    title: 'Nivea Deep Impact Men Grooming',
-    image: require('../../../assets/nivea_grooming_banner.jpg'),
-    type: 'category',
-    categoryName: 'Bath & Body',
-    categoryId: 'c7',
+    categoryId: 'c3',
+    image: require('../../../assets/dairy special.png'),
+    bgColor: '#FCEAF5',
   },
 ];
 
@@ -57,7 +49,10 @@ interface HeroBannerCarouselProps {
 }
 
 export const HeroBannerCarousel: React.FC<HeroBannerCarouselProps> = ({ onBannerPress }) => {
-  const [containerWidth, setContainerWidth] = useState(Dimensions.get('window').width);
+  const { width } = useWindowDimensions();
+  // Ensure the banner container never exceeds viewport width minus 24px padding
+  const bannerWidth = Math.min(width - 24, 1400);
+
   const [activeIndex, setActiveIndex] = useState(0);
   const scrollRef = useRef<ScrollView | null>(null);
   const timerRef = useRef<any>(null);
@@ -68,15 +63,15 @@ export const HeroBannerCarousel: React.FC<HeroBannerCarouselProps> = ({ onBanner
     timerRef.current = setInterval(() => {
       if (isInteracting.current) return;
       setActiveIndex((prev) => {
-        const next = (prev + 1) % HERO_BANNERS.length;
+        const next = (prev + 1) % HERO_SLIDES.length;
         scrollRef.current?.scrollTo({
-          x: next * containerWidth,
+          x: next * bannerWidth,
           animated: true,
         });
         return next;
       });
-    }, 3500);
-  }, [containerWidth]);
+    }, 4500);
+  }, [bannerWidth]);
 
   useEffect(() => {
     startAutoScroll();
@@ -87,70 +82,70 @@ export const HeroBannerCarousel: React.FC<HeroBannerCarouselProps> = ({ onBanner
 
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetX = e.nativeEvent.contentOffset.x;
-    const index = Math.round(offsetX / (containerWidth || 1));
-    if (index >= 0 && index < HERO_BANNERS.length && index !== activeIndex) {
+    const index = Math.round(offsetX / (bannerWidth || 1));
+    if (index >= 0 && index < HERO_SLIDES.length && index !== activeIndex) {
       setActiveIndex(index);
     }
   };
 
-  const handleScrollBegin = () => {
-    isInteracting.current = true;
-  };
-
-  const handleScrollEnd = () => {
-    isInteracting.current = false;
-  };
+  // Dynamic 2:1 aspect ratio matching the 1024x512 banner dimensions so the image fills edge-to-edge with zero empty space
+  const bannerHeight = Math.min(Math.round(bannerWidth * 0.5), 360);
 
   return (
-    <View
-      style={styles.wrapper}
-      onLayout={(e) => {
-        const width = e.nativeEvent.layout.width;
-        if (width > 0 && Math.abs(width - containerWidth) > 1) {
-          setContainerWidth(width);
-        }
-      }}
-    >
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onScroll={handleScroll}
-        onScrollBeginDrag={handleScrollBegin}
-        onScrollEndDrag={handleScrollEnd}
-        onMomentumScrollEnd={(e) => {
-          handleScroll(e);
-          handleScrollEnd();
-        }}
-        scrollEventThrottle={16}
-        decelerationRate="fast"
-      >
-        {HERO_BANNERS.map((banner) => (
-          <TouchableOpacity
-            key={banner.id}
-            activeOpacity={0.94}
-            onPress={() => onBannerPress?.(banner)}
-            style={[styles.slide, { width: containerWidth }]}
-            accessibilityLabel={banner.title}
-          >
-            <Image
-              source={banner.image}
-              style={styles.image}
-              resizeMode="cover"
-            />
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+    <View style={styles.outerContainer}>
+      <View style={[styles.carouselContainer, { width: bannerWidth, height: bannerHeight }]}>
+        <ScrollView
+          ref={scrollRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+          onScrollBeginDrag={() => {
+            isInteracting.current = true;
+          }}
+          onScrollEndDrag={() => {
+            isInteracting.current = false;
+          }}
+          style={{ width: bannerWidth, height: bannerHeight, maxWidth: '100%', overflow: 'hidden' }}
+          contentContainerStyle={{ width: bannerWidth * HERO_SLIDES.length, height: bannerHeight }}
+        >
+          {HERO_SLIDES.map((slide) => (
+            <TouchableOpacity
+              key={slide.id}
+              activeOpacity={0.92}
+              onPress={() => onBannerPress && onBannerPress(slide)}
+              style={[
+                styles.bannerTouchable,
+                { width: bannerWidth, height: bannerHeight, backgroundColor: slide.bgColor || '#F9ECF8' },
+              ]}
+            >
+              <Image
+                source={slide.image}
+                style={styles.bannerImage}
+                resizeMode="cover"
+              />
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
 
-      {/* Pill Pagination Dots */}
-      <View style={styles.pagination} pointerEvents="none">
-        {HERO_BANNERS.map((_, i) => (
-          <View
-            key={`dot_${i}`}
+      {/* Carousel Dots */}
+      <View style={styles.dotsContainer}>
+        {HERO_SLIDES.map((_, idx) => (
+          <TouchableOpacity
+            key={idx}
+            activeOpacity={0.7}
+            onPress={() => {
+              scrollRef.current?.scrollTo({
+                x: idx * bannerWidth,
+                animated: true,
+              });
+              setActiveIndex(idx);
+            }}
             style={[
               styles.dot,
-              activeIndex === i ? styles.dotActive : styles.dotInactive,
+              idx === activeIndex ? styles.activeDot : styles.inactiveDot,
             ]}
           />
         ))}
@@ -160,45 +155,54 @@ export const HeroBannerCarousel: React.FC<HeroBannerCarouselProps> = ({ onBanner
 };
 
 const styles = StyleSheet.create({
-  wrapper: {
+  outerContainer: {
     width: '100%',
-    marginBottom: 16,
-    position: 'relative',
+    maxWidth: '100%',
     overflow: 'hidden',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    marginTop: 12,
+    marginBottom: 6,
   },
-  slide: {
-    aspectRatio: 16 / 9,
+  carouselContainer: {
+    maxWidth: '100%',
+    borderRadius: 16,
     overflow: 'hidden',
+    backgroundColor: '#F9ECF8',
+    shadowColor: '#EC4A9D',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 4,
   },
-  image: {
+  bannerTouchable: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    padding: 0,
+  },
+  bannerImage: {
     width: '100%',
     height: '100%',
   },
-  pagination: {
-    position: 'absolute',
-    bottom: 8,
-    left: 0,
-    right: 0,
+  dotsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 6,
+    paddingTop: 10,
+    paddingBottom: 4,
   },
   dot: {
-    height: 5,
+    height: 6,
     borderRadius: 3,
   },
-  dotActive: {
+  activeDot: {
     width: 20,
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.35,
-    shadowRadius: 2,
-    elevation: 3,
+    backgroundColor: '#EC4A9D',
   },
-  dotInactive: {
+  inactiveDot: {
     width: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    backgroundColor: 'rgba(16, 26, 77, 0.16)',
   },
 });

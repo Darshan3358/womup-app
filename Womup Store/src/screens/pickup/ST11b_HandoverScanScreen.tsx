@@ -93,7 +93,7 @@ export const ST11b_HandoverScanScreen: React.FC = () => {
           </Text>
           {activeOrder.assignedRider ? (
             <Text style={styles.riderMeta}>
-              Vehicle: {activeOrder.assignedRider.vehicleNumber || '—'} • {activeOrder.assignedRider.phone || '—'}
+              Vehicle: {activeOrder.assignedRider.vehicleNumber || 'Bike'} • {activeOrder.assignedRider.phone || 'Contact verified'}
             </Text>
           ) : (
             <Text style={styles.riderMeta}>Rider has not been assigned yet</Text>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   ViewStyle,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Product } from '../../types';
@@ -30,11 +31,39 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 }) => {
   const { cart, addToCart, updateQuantity, setSelectedProduct, setActiveScreen } = useApp();
 
+  const variants = product.variants || [];
+  const defaultVariant = variants.find((v) => v.isDefault) || variants[0];
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(defaultVariant?.id || null);
+
+  const activeVariant = variants.find((v) => v.id === selectedVariantId) || defaultVariant;
+  const currentSellingPrice = activeVariant ? activeVariant.price : product.sellingPrice;
+  const currentMrp = activeVariant ? activeVariant.mrp : product.mrp;
+  const currentLabel = activeVariant ? activeVariant.label : product.quantityLabel;
+  const currentDiscount = currentMrp > currentSellingPrice
+    ? Math.round(((currentMrp - currentSellingPrice) / currentMrp) * 100)
+    : product.discountPercent;
+
   const cartItem = cart.find((i) => i.product.id === product.id);
   const quantity = cartItem ? cartItem.quantity : 0;
 
+  const handleAddToCart = () => {
+    const enrichedProduct: Product = {
+      ...product,
+      sellingPrice: currentSellingPrice,
+      mrp: currentMrp,
+      quantityLabel: currentLabel,
+    };
+    addToCart(enrichedProduct);
+  };
+
   const handleCardPress = () => {
-    setSelectedProduct(product);
+    const enrichedProduct: Product = {
+      ...product,
+      sellingPrice: currentSellingPrice,
+      mrp: currentMrp,
+      quantityLabel: currentLabel,
+    };
+    setSelectedProduct(enrichedProduct);
     if (onPress) {
       onPress();
     } else {
@@ -62,24 +91,64 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               <Ionicons name="basket-outline" size={28} color={COLORS.purple} />
             </View>
           )}
-          {product.discountPercent > 0 && (
+          {currentDiscount > 0 && (
             <View style={styles.discountBadge}>
-              <Text style={styles.discountText}>{product.discountPercent}% OFF</Text>
+              <Text style={styles.discountText}>{currentDiscount}% OFF</Text>
             </View>
           )}
         </View>
 
         {/* Details */}
         <View style={styles.horizontalContent}>
-          <Text style={styles.brandText}>{product.brand}</Text>
+          {product.brand ? <Text style={styles.brandText}>{product.brand}</Text> : null}
           <Text style={styles.nameText} numberOfLines={1}>
             {product.name}
           </Text>
-          <Text style={styles.quantityLabel}>{product.quantityLabel}</Text>
+
+          {/* Variant Selector Pills */}
+          {variants.length > 1 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.variantScrollContent}
+              style={styles.variantScrollView}
+            >
+              {variants.map((v) => {
+                const isSelected = v.id === activeVariant?.id;
+                return (
+                  <TouchableOpacity
+                    key={v.id}
+                    activeOpacity={0.7}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      setSelectedVariantId(v.id);
+                    }}
+                    style={[
+                      styles.variantPill,
+                      isSelected && styles.variantPillActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.variantPillText,
+                        isSelected && styles.variantPillTextActive,
+                      ]}
+                    >
+                      {v.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          ) : (
+            <Text style={styles.quantityLabel}>{currentLabel}</Text>
+          )}
 
           <View style={styles.priceRow}>
-            <Text style={styles.sellingPrice}>₹{product.sellingPrice}</Text>
-            <Text style={styles.mrpText}>₹{product.mrp}</Text>
+            <Text style={styles.sellingPrice}>₹{currentSellingPrice}</Text>
+            {currentMrp > currentSellingPrice && (
+              <Text style={styles.mrpText}>₹{currentMrp}</Text>
+            )}
           </View>
 
           <CoinBadge coins={product.shoppingCoins} />
@@ -90,10 +159,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           {quantity === 0 ? (
             <TouchableOpacity
               activeOpacity={0.8}
-              onPress={() => addToCart(product)}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleAddToCart();
+              }}
               style={styles.addButton}
             >
-              <Text style={styles.addButtonText}>Add</Text>
+              <Text style={styles.addButtonText}>ADD</Text>
             </TouchableOpacity>
           ) : (
             <QuantityStepper
@@ -115,9 +187,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       style={[styles.gridCard, style]}
     >
       {/* Discount Badge */}
-      {product.discountPercent > 0 && (
+      {currentDiscount > 0 && (
         <View style={styles.discountBadge}>
-          <Text style={styles.discountText}>{product.discountPercent}% OFF</Text>
+          <Text style={styles.discountText}>{currentDiscount}% OFF</Text>
         </View>
       )}
 
@@ -138,14 +210,55 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
       {/* Info */}
       <View style={styles.gridContent}>
+        {product.brand ? <Text style={styles.brandText}>{product.brand}</Text> : null}
         <Text style={styles.nameText} numberOfLines={1}>
           {product.name}
         </Text>
-        <Text style={styles.quantityLabel}>{product.quantityLabel}</Text>
+
+        {/* Variant Selector Pills */}
+        {variants.length > 1 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.variantScrollContent}
+            style={styles.variantScrollView}
+          >
+            {variants.map((v) => {
+              const isSelected = v.id === activeVariant?.id;
+              return (
+                <TouchableOpacity
+                  key={v.id}
+                  activeOpacity={0.7}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    setSelectedVariantId(v.id);
+                  }}
+                  style={[
+                    styles.variantPill,
+                    isSelected && styles.variantPillActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.variantPillText,
+                      isSelected && styles.variantPillTextActive,
+                    ]}
+                  >
+                    {v.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        ) : (
+          <Text style={styles.quantityLabel}>{currentLabel}</Text>
+        )}
 
         <View style={styles.priceRow}>
-          <Text style={styles.sellingPrice}>₹{product.sellingPrice}</Text>
-          <Text style={styles.mrpText}>₹{product.mrp}</Text>
+          <Text style={styles.sellingPrice}>₹{currentSellingPrice}</Text>
+          {currentMrp > currentSellingPrice && (
+            <Text style={styles.mrpText}>₹{currentMrp}</Text>
+          )}
         </View>
 
         <View style={styles.coinBadgeContainer}>
@@ -157,10 +270,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           {quantity === 0 ? (
             <TouchableOpacity
               activeOpacity={0.8}
-              onPress={() => addToCart(product)}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleAddToCart();
+              }}
               style={styles.gridAddButton}
             >
-              <Text style={styles.gridAddButtonText}>Add</Text>
+              <Text style={styles.gridAddButtonText}>ADD</Text>
             </TouchableOpacity>
           ) : (
             <QuantityStepper
@@ -349,6 +465,37 @@ const styles = StyleSheet.create({
   addButtonText: {
     color: COLORS.hotPink,
     fontSize: 13,
+    fontWeight: '700',
+  },
+  variantScrollView: {
+    marginVertical: 4,
+    maxHeight: 28,
+  },
+  variantScrollContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  variantPill: {
+    backgroundColor: '#F1F3F8',
+    borderColor: '#E2E5EE',
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginRight: 4,
+  },
+  variantPillActive: {
+    backgroundColor: '#FCEAF5',
+    borderColor: '#EC4A9D',
+  },
+  variantPillText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#62677A',
+  },
+  variantPillTextActive: {
+    color: '#EC4A9D',
     fontWeight: '700',
   },
 });

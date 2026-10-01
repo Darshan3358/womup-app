@@ -21,6 +21,7 @@ export const BottomNav: React.FC = () => {
     { id: 'Picking', label: 'Picking', icon: 'barcode-outline', badge: pickingOrders.length },
     { id: 'Ready', label: 'Ready', icon: 'checkmark-done-circle-outline', badge: readyOrders.length },
     { id: 'Inventory', label: 'Stock', icon: 'file-tray-stacked-outline' },
+    { id: 'History', label: 'History', icon: 'time-outline' },
     { id: 'Profile', label: 'Profile', icon: 'person-outline' },
   ];
 

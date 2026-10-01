@@ -17,6 +17,12 @@ export class Store {
   @Prop({ required: true })
   city: string;
 
+  @Prop({ trim: true })
+  cityName?: string;
+
+  @Prop({ type: Object, ref: 'City' })
+  cityId?: any;
+
   @Prop({ required: true })
   pincode: string;
 
@@ -45,6 +51,9 @@ export class Store {
   @Prop({ default: true })
   isActive: boolean;
 
+  @Prop({ default: true })
+  isOnShift?: boolean;
+
   @Prop({ default: '07:00' })
   openingTime: string;
 
@@ -62,6 +71,18 @@ export class Store {
 
   @Prop({ trim: true })
   managerPhone?: string;
+
+  @Prop({ trim: true })
+  ownerName?: string;
+
+  @Prop({ trim: true, lowercase: true })
+  email?: string;
+
+  @Prop({ trim: true })
+  phone?: string;
+
+  @Prop({ trim: true, default: 'ACTIVE' })
+  status?: string;
 
   @Prop({ trim: true, lowercase: true, sparse: true })
   loginId?: string;
@@ -82,3 +103,4 @@ export class Store {
 export const StoreSchema = SchemaFactory.createForClass(Store);
 StoreSchema.index({ location: '2dsphere' });
 StoreSchema.index({ loginId: 1 }, { unique: true, sparse: true });
+StoreSchema.index({ areaId: 1, isActive: 1 }, { unique: true, partialFilterExpression: { isActive: true } });

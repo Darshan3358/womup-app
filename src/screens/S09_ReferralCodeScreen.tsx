@@ -33,6 +33,8 @@ export const S09_ReferralCodeScreen: React.FC = () => {
         tempRegistration.fullName || user.fullName || 'Customer',
         tempRegistration.phone || user.phoneNumber || undefined,
         refCode,
+        tempRegistration.preferredCityId || user.preferredCityId,
+        tempRegistration.preferredCityName || user.preferredCityName,
       );
       if (res.success) {
         if (res.user) {
@@ -41,6 +43,8 @@ export const S09_ReferralCodeScreen: React.FC = () => {
             fullName: res.user.name || user.fullName,
             email: res.user.email || user.email,
             phoneNumber: res.user.phone || user.phoneNumber,
+            preferredCityId: res.user.preferredCityId || tempRegistration.preferredCityId || user.preferredCityId,
+            preferredCityName: res.user.preferredCityName || tempRegistration.preferredCityName || user.preferredCityName,
             referralCode: res.user.referralCode || refCode,
             shoppingCoins: res.user.shoppingCoins || user.shoppingCoins + (refCode ? 100 : 50),
           };

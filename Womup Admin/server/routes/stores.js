@@ -40,7 +40,11 @@ router.get('/', async (req, res) => {
         name: store.name,
         loginId: store.loginId || `womup_${(store.code || '').toLowerCase().replace(/[^a-z0-9]/g, '')}`,
         address: store.address,
-        city: store.city,
+        city: store.cityName || store.city,
+        cityName: store.cityName || store.city,
+        cityId: store.cityId ? store.cityId.toString() : null,
+        areaId: store.areaId ? store.areaId.toString() : null,
+        areaName: store.areaName || null,
         pincode: store.pincode,
         location: store.location,
         coordinates: store.location?.coordinates || [72.5606, 23.0827],
@@ -69,6 +73,8 @@ router.post('/', async (req, res) => {
       code,
       address,
       city,
+      cityId,
+      areaId,
       pincode,
       coordinates,
       latitude,
@@ -79,8 +85,8 @@ router.post('/', async (req, res) => {
       password,
     } = req.body;
 
-    if (!name || !code || !address || !city) {
-      return res.status(400).json({ success: false, error: 'Name, code, address, and city are required' });
+    if (!name || !code || !address) {
+      return res.status(400).json({ success: false, error: 'Name, code, and address are required' });
     }
 
     const cleanCode = code.toUpperCase().replace(/\s+/g, '_');
@@ -99,24 +105,72 @@ router.post('/', async (req, res) => {
       return res.status(409).json({ success: false, error: 'Store code or Login ID already exists' });
     }
 
+    // Resolve Area & City with strict 1-store-per-area constraint
+    let resolvedArea = null;
+    let resolvedCity = null;
+
+    if (areaId) {
+      const areaQuery = ObjectId.isValid(areaId)
+        ? { _id: new ObjectId(areaId) }
+        : { code: areaId.toUpperCase() };
+      resolvedArea = await db.collection('areas').findOne(areaQuery);
+
+      if (!resolvedArea) {
+        return res.status(400).json({ success: false, error: 'Selected area does not exist' });
+      }
+
+      // STRICT VALIDATION: Check if this area already has an active store!
+      const activeStoreInArea = await db.collection('stores').findOne({
+        $or: [{ areaId: resolvedArea._id }, { areaId: resolvedArea._id.toString() }],
+        isActive: true,
+      });
+
+      if (activeStoreInArea) {
+        return res.status(409).json({
+          success: false,
+          error: `Area "${resolvedArea.name}" already has an active store assigned ("${activeStoreInArea.name}"). Each area can only have ONE store.`,
+        });
+      }
+
+      if (resolvedArea.cityId) {
+        resolvedCity = await db.collection('cities').findOne({
+          $or: [{ _id: resolvedArea.cityId }, { _id: new ObjectId(resolvedArea.cityId.toString()) }],
+        });
+      }
+    }
+
+    if (!resolvedCity && cityId) {
+      const cityQuery = ObjectId.isValid(cityId)
+        ? { _id: new ObjectId(cityId) }
+        : { code: cityId.toUpperCase() };
+      resolvedCity = await db.collection('cities').findOne(cityQuery);
+    }
+
+    const finalCityName = resolvedCity?.name || resolvedArea?.cityName || (typeof city === 'string' && city.trim()) || 'Ahmedabad';
+    const finalCityId = resolvedCity?._id || resolvedArea?.cityId || null;
+
     const passwordHash = await bcrypt.hash(cleanPassword, 10);
     const resolvedCoords = coordinates || [
-      Number(longitude) || 72.5606,
-      Number(latitude) || 23.0827,
+      Number(longitude) || resolvedArea?.centerLng || 72.5606,
+      Number(latitude) || resolvedArea?.centerLat || 23.0827,
     ];
 
     const newStore = {
       name: name.trim(),
       code: cleanCode,
       address: address.trim(),
-      city: city.trim(),
-      pincode: pincode || '380015',
+      city: finalCityName,
+      cityName: finalCityName,
+      cityId: finalCityId,
+      areaId: resolvedArea ? resolvedArea._id : null,
+      areaName: resolvedArea ? resolvedArea.name : null,
+      pincode: pincode || resolvedArea?.pincodes?.[0] || '380015',
       location: {
         type: 'Point',
         coordinates: resolvedCoords,
       },
-      serviceRadiusKm: Number(serviceRadiusKm) || 4.5,
-      estimatedDeliveryMinutes: Number(estimatedDeliveryMinutes) || 9,
+      serviceRadiusKm: Number(serviceRadiusKm) || resolvedArea?.radiusKm || 4.5,
+      estimatedDeliveryMinutes: Number(estimatedDeliveryMinutes) || resolvedArea?.defaultDeliveryMinutes || 9,
       openingTime: '07:00',
       closingTime: '23:00',
       loginId: cleanLoginId,
@@ -234,8 +288,128 @@ router.put('/:id', async (req, res) => {
     delete body._id;
     body.updatedAt = new Date();
 
-    await db.collection('stores').updateOne({ _id: new ObjectId(id) }, { $set: body });
-    res.json({ success: true, message: 'Store updated successfully' });
+    const storeId = ObjectId.isValid(id) ? new ObjectId(id) : id;
+
+    // If updating areaId, enforce 1-store-per-area rule!
+    if (body.areaId) {
+      const areaQuery = ObjectId.isValid(body.areaId)
+        ? { _id: new ObjectId(body.areaId) }
+        : { code: body.areaId.toUpperCase() };
+      const resolvedArea = await db.collection('areas').findOne(areaQuery);
+
+      if (!resolvedArea) {
+        return res.status(400).json({ success: false, error: 'Selected area does not exist' });
+      }
+
+      // Check if another store has this area
+      const existingOtherStore = await db.collection('stores').findOne({
+        _id: { $ne: storeId },
+        $or: [{ areaId: resolvedArea._id }, { areaId: resolvedArea._id.toString() }],
+        isActive: true,
+      });
+
+      if (existingOtherStore) {
+        return res.status(409).json({
+          success: false,
+          error: `Area "${resolvedArea.name}" already has an active store assigned ("${existingOtherStore.name}"). Each area can only have ONE store.`,
+        });
+      }
+
+      body.areaId = resolvedArea._id;
+      body.areaName = resolvedArea.name;
+      body.cityId = resolvedArea.cityId || body.cityId;
+      body.cityName = resolvedArea.cityName || resolvedArea.city || body.city;
+      body.city = resolvedArea.cityName || resolvedArea.city || body.city;
+    }
+
+    await db.collection('stores').updateOne({ _id: storeId }, { $set: body });
+    const updated = await db.collection('stores').findOne({ _id: storeId });
+    res.json({ success: true, message: 'Store updated successfully', data: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Dedicated endpoint to assign/reassign store to city & area
+router.post('/:id/assign-area', async (req, res) => {
+  try {
+    const db = getDB();
+    const { id } = req.params;
+    const { areaId, cityId } = req.body;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, error: 'Invalid store ID' });
+    }
+    const storeId = new ObjectId(id);
+
+    const store = await db.collection('stores').findOne({ _id: storeId });
+    if (!store) {
+      return res.status(404).json({ success: false, error: 'Store not found' });
+    }
+
+    if (!areaId) {
+      return res.status(400).json({ success: false, error: 'areaId is required' });
+    }
+
+    const areaQuery = ObjectId.isValid(areaId)
+      ? { _id: new ObjectId(areaId) }
+      : { code: areaId.toUpperCase() };
+    const targetArea = await db.collection('areas').findOne(areaQuery);
+
+    if (!targetArea) {
+      return res.status(404).json({ success: false, error: 'Area not found' });
+    }
+
+    // Verify 1 store per area: ensure no OTHER active store is in targetArea
+    const conflictingStore = await db.collection('stores').findOne({
+      _id: { $ne: storeId },
+      $or: [{ areaId: targetArea._id }, { areaId: targetArea._id.toString() }],
+      isActive: true,
+    });
+
+    if (conflictingStore) {
+      return res.status(409).json({
+        success: false,
+        error: `Area "${targetArea.name}" already has an active store assigned ("${conflictingStore.name}"). Cannot assign multiple stores to the same area.`,
+      });
+    }
+
+    // Resolve city
+    let targetCity = null;
+    if (targetArea.cityId) {
+      targetCity = await db.collection('cities').findOne({
+        $or: [{ _id: targetArea.cityId }, { _id: new ObjectId(targetArea.cityId.toString()) }],
+      });
+    }
+    if (!targetCity && cityId) {
+      targetCity = await db.collection('cities').findOne({
+        $or: [{ _id: new ObjectId(cityId) }, { code: cityId.toUpperCase() }],
+      });
+    }
+
+    const updates = {
+      areaId: targetArea._id,
+      areaName: targetArea.name,
+      cityId: targetCity ? targetCity._id : targetArea.cityId || null,
+      cityName: targetCity ? targetCity.name : targetArea.cityName || targetArea.city,
+      city: targetCity ? targetCity.name : targetArea.cityName || targetArea.city,
+      updatedAt: new Date(),
+    };
+
+    await db.collection('stores').updateOne({ _id: storeId }, { $set: updates });
+
+    res.json({
+      success: true,
+      message: `Store "${store.name}" successfully assigned to ${targetArea.name}, ${updates.cityName}`,
+      data: {
+        storeId: store._id.toString(),
+        storeName: store.name,
+        areaId: targetArea._id.toString(),
+        areaName: targetArea.name,
+        cityId: updates.cityId ? updates.cityId.toString() : null,
+        cityName: updates.cityName,
+      },
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -276,6 +450,7 @@ router.get('/inventory', async (req, res) => {
         reservedQty: inv.reservedQty || 0,
         soldQty: inv.soldQty || 0,
         lowStockThreshold: inv.lowStockThreshold || 5,
+        shelfLocation: inv.shelfLocation || prod.shelfLocation || 'Not set',
         isLowStock: (inv.availableQty || 0) <= (inv.lowStockThreshold || 5),
         createdAt: inv.createdAt,
         updatedAt: inv.updatedAt,
@@ -287,6 +462,39 @@ router.get('/inventory', async (req, res) => {
     }
 
     res.json({ success: true, count: items.length, data: items });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Update Shelf Location in Dark Store Inventory
+router.post('/inventory/shelf', async (req, res) => {
+  try {
+    const db = getDB();
+    const { inventoryId, storeId, productId, shelfLocation } = req.body;
+    const cleanShelf = (shelfLocation || '').trim().toUpperCase();
+
+    let filter = {};
+    if (inventoryId) {
+      filter = { _id: new ObjectId(inventoryId) };
+    } else if (storeId && productId) {
+      filter = { storeId: new ObjectId(storeId), productId: new ObjectId(productId) };
+    } else {
+      return res.status(400).json({ success: false, error: 'inventoryId or (storeId and productId) required' });
+    }
+
+    await db.collection('inventory').updateOne(filter, {
+      $set: { shelfLocation: cleanShelf, updatedAt: new Date() }
+    });
+
+    if (productId) {
+      await db.collection('products').updateOne(
+        { _id: new ObjectId(productId) },
+        { $set: { shelfLocation: cleanShelf } }
+      ).catch(() => {});
+    }
+
+    res.json({ success: true, shelfLocation: cleanShelf, message: `Shelf location assigned to ${cleanShelf}` });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

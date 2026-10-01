@@ -46,7 +46,7 @@ export const BlinkitCategoriesScreen: React.FC = () => {
           >
             <View style={[styles.iconBox, { backgroundColor: tile.bgColor || '#f0f7f0' }]}>
               <Image
-                source={{ uri: tile.imageUrl }}
+                source={tile.localImage || { uri: tile.imageUrl }}
                 style={styles.tileImage}
                 resizeMode="contain"
               />
@@ -125,23 +125,20 @@ const styles = StyleSheet.create({
   iconBox: {
     width: '100%',
     aspectRatio: 1,
-    borderRadius: 16,
+    borderRadius: 14,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 8,
-    backgroundColor: '#f0f7f0',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    padding: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
+    shadowOpacity: 0.03,
     shadowRadius: 3,
-    elevation: 2,
+    elevation: 1,
   },
   tileImage: {
-    width: '100%',
-    height: '100%',
+    width: '82%',
+    height: '82%',
     resizeMode: 'contain',
   },
   tileTitle: {

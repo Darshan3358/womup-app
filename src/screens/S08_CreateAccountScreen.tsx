@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +17,14 @@ import { COLORS } from '../theme/colors';
 import { SPACING, RADIUS } from '../theme/spacing';
 import { GradientButton } from '../components/common/GradientButton';
 import { useApp } from '../context/AppContext';
+import { AuthService } from '../services/authService';
+
+interface CityItem {
+  id: string;
+  name: string;
+  code: string;
+  state?: string;
+}
 
 export const S08_CreateAccountScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -22,16 +32,54 @@ export const S08_CreateAccountScreen: React.FC = () => {
   const [fullName, setFullName] = useState(user.fullName || '');
   const [email, setEmail] = useState(user.email || '');
   const [phone, setPhone] = useState(user.phoneNumber || '');
-  const [errors, setErrors] = useState<{ name?: string; email?: string; phone?: string }>({});
+
+  // Service City State
+  const [cities, setCities] = useState<CityItem[]>([]);
+  const [selectedCityId, setSelectedCityId] = useState<string | null>(user.preferredCityId || null);
+  const [selectedCityName, setSelectedCityName] = useState<string>(user.preferredCityName || 'Ahmedabad');
+  const [isCityModalVisible, setIsCityModalVisible] = useState(false);
+  const [citySearchQuery, setCitySearchQuery] = useState('');
+
+  const [errors, setErrors] = useState<{
+    name?: string;
+    email?: string;
+    phone?: string;
+    city?: string;
+  }>({});
+
+  useEffect(() => {
+    // Fetch active cities configured by Admin
+    AuthService.getCities().then((fetchedCities) => {
+      if (fetchedCities && fetchedCities.length > 0) {
+        setCities(fetchedCities);
+        // If not yet selected or preferred city matches
+        const existing = fetchedCities.find(
+          (c) => c.name.toLowerCase() === selectedCityName.toLowerCase() || c.id === selectedCityId
+        );
+        if (existing) {
+          setSelectedCityId(existing.id);
+          setSelectedCityName(existing.name);
+        } else {
+          // Default to first active city
+          setSelectedCityId(fetchedCities[0].id);
+          setSelectedCityName(fetchedCities[0].name);
+        }
+      }
+    });
+  }, []);
 
   const handleContinue = () => {
-    const newErrors: { name?: string; email?: string; phone?: string } = {};
+    const newErrors: { name?: string; email?: string; phone?: string; city?: string } = {};
     if (!fullName.trim()) newErrors.name = 'Please enter your full name';
     if (!email.trim() || !email.includes('@')) newErrors.email = 'Please enter a valid email address';
-    
+
     const cleanPhone = phone.replace(/\D/g, '');
     if (!cleanPhone || !/^[6-9]\d{9}$/.test(cleanPhone)) {
       newErrors.phone = 'Please enter a valid 10-digit mobile number';
+    }
+
+    if (!selectedCityName || !selectedCityId) {
+      newErrors.city = 'Please select your service city';
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -44,14 +92,26 @@ export const S08_CreateAccountScreen: React.FC = () => {
       fullName: fullName.trim(),
       email: email.trim(),
       phoneNumber: cleanPhone,
+      preferredCityId: selectedCityId || undefined,
+      preferredCityName: selectedCityName,
     });
+
     setTempRegistration({
       fullName: fullName.trim(),
       email: email.trim(),
       phone: cleanPhone,
+      preferredCityId: selectedCityId || undefined,
+      preferredCityName: selectedCityName,
     });
+
     setActiveScreen('C09_ReferralCode');
   };
+
+  const filteredCities = cities.filter(
+    (c) =>
+      c.name.toLowerCase().includes(citySearchQuery.toLowerCase()) ||
+      c.code.toLowerCase().includes(citySearchQuery.toLowerCase())
+  );
 
   return (
     <KeyboardAvoidingView
@@ -137,6 +197,39 @@ export const S08_CreateAccountScreen: React.FC = () => {
           </View>
           {errors.phone ? <Text style={styles.errorText}>{errors.phone}</Text> : null}
 
+          {/* ── YOUR SERVICE CITY * ── */}
+          <View style={styles.citySectionHeaderRow}>
+            <View style={styles.sectionLine} />
+            <Text style={styles.sectionHeaderText}>YOUR SERVICE CITY *</Text>
+            <View style={styles.sectionLine} />
+          </View>
+
+          <Text style={styles.label}>
+            Select City <Text style={styles.requiredAsterisk}>*</Text>
+          </Text>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => setIsCityModalVisible(true)}
+            style={[styles.inputContainer, styles.cityDropdownBtn, errors.city ? styles.inputError : null]}
+          >
+            <View style={styles.cityDropdownLeft}>
+              <Text style={styles.cityIcon}>🏙️</Text>
+              <Text style={[styles.cityText, !selectedCityName && styles.cityPlaceholder]}>
+                {selectedCityName || 'Select your city'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-down" size={18} color={COLORS.textMuted} />
+          </TouchableOpacity>
+          {errors.city ? <Text style={styles.errorText}>{errors.city}</Text> : null}
+
+          {/* Info Badge */}
+          <View style={styles.cityInfoRow}>
+            <Ionicons name="information-circle-outline" size={15} color={COLORS.hotPink} />
+            <Text style={styles.cityInfoText}>
+              You'll see products from stores serving this city
+            </Text>
+          </View>
+
           <Text style={styles.noticeText}>
             🔒 Each email and mobile number can only be registered once.
           </Text>
@@ -151,6 +244,103 @@ export const S08_CreateAccountScreen: React.FC = () => {
 
         <View />
       </ScrollView>
+
+      {/* City Selection Modal */}
+      <Modal
+        visible={isCityModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsCityModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalSheet, { paddingBottom: insets.bottom + 20 }]}>
+            {/* Sheet Handle */}
+            <View style={styles.sheetHandle} />
+
+            {/* Header */}
+            <View style={styles.sheetHeader}>
+              <View>
+                <Text style={styles.sheetTitle}>Select Your Service City</Text>
+                <Text style={styles.sheetSubtitle}>Choose where you want orders delivered</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setIsCityModalVisible(false)}
+                style={styles.sheetCloseBtn}
+              >
+                <Ionicons name="close" size={22} color={COLORS.textPrimary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Search Input */}
+            <View style={styles.searchBox}>
+              <Ionicons name="search-outline" size={18} color={COLORS.textMuted} style={{ marginRight: 8 }} />
+              <TextInput
+                style={styles.modalSearchInput}
+                placeholder="Search city..."
+                placeholderTextColor={COLORS.secondaryText}
+                value={citySearchQuery}
+                onChangeText={setCitySearchQuery}
+                autoCorrect={false}
+              />
+              {citySearchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setCitySearchQuery('')}>
+                  <Ionicons name="close-circle" size={16} color={COLORS.textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Cities List */}
+            <FlatList
+              data={filteredCities}
+              keyExtractor={(item) => item.id}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.cityListContent}
+              renderItem={({ item }) => {
+                const isSelected = selectedCityId === item.id || selectedCityName.toLowerCase() === item.name.toLowerCase();
+                return (
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      setSelectedCityId(item.id);
+                      setSelectedCityName(item.name);
+                      if (errors.city) setErrors({ ...errors, city: undefined });
+                      setIsCityModalVisible(false);
+                    }}
+                    style={[styles.cityRowItem, isSelected && styles.cityRowItemSelected]}
+                  >
+                    <View style={styles.cityRowLeft}>
+                      <View style={[styles.cityIconWrap, isSelected && styles.cityIconWrapSelected]}>
+                        <Text style={styles.cityEmoji}>🏙️</Text>
+                      </View>
+                      <View>
+                        <Text style={[styles.cityNameText, isSelected && styles.cityNameTextSelected]}>
+                          {item.name}
+                        </Text>
+                        <Text style={styles.cityStateText}>
+                          {item.state || 'Gujarat'} · Code: {item.code}
+                        </Text>
+                      </View>
+                    </View>
+                    {isSelected ? (
+                      <View style={styles.checkedCircle}>
+                        <Ionicons name="checkmark" size={16} color={COLORS.white} />
+                      </View>
+                    ) : (
+                      <View style={styles.uncheckedCircle} />
+                    )}
+                  </TouchableOpacity>
+                );
+              }}
+              ListEmptyComponent={
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="business-outline" size={40} color={COLORS.border} />
+                  <Text style={styles.emptyText}>No cities found matching "{citySearchQuery}"</Text>
+                </View>
+              }
+            />
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
@@ -171,7 +361,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   content: {
-    marginTop: 30,
+    marginTop: 20,
   },
   title: {
     fontSize: 24,
@@ -182,13 +372,17 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     color: COLORS.textMuted,
-    marginBottom: SPACING.xl,
+    marginBottom: SPACING.lg,
   },
   label: {
     fontSize: 13,
     fontWeight: '600',
     color: COLORS.textPrimary,
     marginBottom: 6,
+  },
+  requiredAsterisk: {
+    color: COLORS.hotPink,
+    fontWeight: '700',
   },
   inputContainer: {
     flexDirection: 'row',
@@ -250,6 +444,61 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.textPrimary,
   },
+  citySectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: SPACING.md,
+    marginBottom: SPACING.md,
+    gap: 10,
+  },
+  sectionLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E5E7EB',
+  },
+  sectionHeaderText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.hotPink,
+    letterSpacing: 0.8,
+  },
+  cityDropdownBtn: {
+    justifyContent: 'space-between',
+  },
+  cityDropdownLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  cityIcon: {
+    fontSize: 18,
+  },
+  cityText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  cityPlaceholder: {
+    color: COLORS.secondaryText,
+    fontWeight: '400',
+  },
+  cityInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FFF0F7',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: RADIUS.sm,
+    marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: '#FCE7F3',
+  },
+  cityInfoText: {
+    fontSize: 12,
+    color: COLORS.hotPink,
+    fontWeight: '500',
+  },
   noticeText: {
     fontSize: 12,
     color: COLORS.textMuted,
@@ -264,6 +513,145 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   button: {
-    marginTop: SPACING.lg,
+    marginTop: SPACING.md,
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: 12,
+    maxHeight: '80%',
+  },
+  sheetHandle: {
+    width: 44,
+    height: 5,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 3,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  sheetTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.navy,
+  },
+  sheetSubtitle: {
+    fontSize: 13,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+  sheetCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderRadius: RADIUS.input,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    height: 46,
+    paddingHorizontal: SPACING.md,
+    marginBottom: 14,
+  },
+  modalSearchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: COLORS.textPrimary,
+  },
+  cityListContent: {
+    paddingBottom: 20,
+  },
+  cityRowItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: RADIUS.card,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    backgroundColor: '#FAFAFA',
+  },
+  cityRowItemSelected: {
+    borderColor: COLORS.hotPink,
+    backgroundColor: '#FFF0F7',
+  },
+  cityRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  cityIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#EEF2F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cityIconWrapSelected: {
+    backgroundColor: '#FDE8F1',
+  },
+  cityEmoji: {
+    fontSize: 18,
+  },
+  cityNameText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  cityNameTextSelected: {
+    color: COLORS.hotPink,
+    fontWeight: '700',
+  },
+  cityStateText: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    marginTop: 1,
+  },
+  checkedCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: COLORS.hotPink,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  uncheckedCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: '#D1D5DB',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: COLORS.textMuted,
+    marginTop: 10,
   },
 });

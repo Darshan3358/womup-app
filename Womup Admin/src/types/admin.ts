@@ -36,6 +36,7 @@ export interface DeliveryPartnerItem {
   email?: string;
   avatar?: string;
   hubName: string;
+  hubId?: string;
   city: string;
   vehicleType: string;
   vehicleNumber: string;
@@ -51,15 +52,42 @@ export interface DeliveryPartnerItem {
   joinedDate: string;
 }
 
-export interface CategoryItem {
+export interface SubCategoryItem {
   id: string;
+  _id?: string;
+  categoryId?: string;
   name: string;
   slug: string;
   icon?: string;
-  bgColor?: string;
-  itemCount?: number;
+  imageUrl?: string;
+  defaultShelfAisle?: string;
   sortOrder?: number;
   isActive: boolean;
+  productCount?: number;
+  itemCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CategoryItem {
+  id: string;
+  _id?: string;
+  name: string;
+  code?: string;
+  slug: string;
+  icon?: string;
+  iconUrl?: string;
+  bgColor?: string;
+  description?: string;
+  itemCount?: number;
+  productCount?: number;
+  subCategoryCount?: number;
+  subCategories?: SubCategoryItem[];
+  sortOrder?: number;
+  displayOrder?: number;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export type PricingCategory = string;
@@ -122,20 +150,54 @@ export interface ProductItem {
   isActive?: boolean;
   variants?: ProductVariantItem[];
   priceHistory?: PriceHistoryEntry[];
+  shelfLocation?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CityItem {
+  id: string;
+  _id?: string;
+  name: string;
+  code: string;
+  state?: string;
+  status: 'Active' | 'Inactive';
+  sortOrder?: number;
+  areaCount?: number;
+  storeCount?: number;
+  activeStoreCount?: number;
   createdAt?: string;
   updatedAt?: string;
 }
 
 export interface Zone {
   id: string;
+  _id?: string;
   name: string;
   code?: string;
   darkStore: string;
   address?: string;
   city?: string;
+  cityName?: string;
+  cityId?: string | null;
   isActive?: boolean;
   activeOrders: number;
   gmvSharePercent: number;
+  hasActiveStore?: boolean;
+  assignedStore?: {
+    id: string;
+    _id?: string;
+    name: string;
+    code: string;
+    loginId?: string;
+    address?: string;
+  } | null;
+  centerLat?: number;
+  centerLng?: number;
+  radiusKm?: number;
+  defaultDeliveryMinutes?: number;
+  pincodes?: string[];
+  sortOrder?: number;
 }
 
 export type OrderStage =
@@ -176,6 +238,11 @@ export interface Order {
   address: string;
   zoneName: string;
   darkStore: string;
+  cityId?: string;
+  cityName?: string;
+  areaId?: string;
+  areaName?: string;
+  paymentMethod?: string;
   items: OrderItem[];
   subtotal: number;
   deliveryFee: number;
@@ -209,6 +276,7 @@ export interface InventoryItem {
   lowStockThreshold?: number;
   expiryDate?: string;
   status: 'Healthy' | 'Low Stock' | 'Expired';
+  shelfLocation?: string;
 }
 
 export interface DarkStoreItem {
@@ -218,9 +286,11 @@ export interface DarkStoreItem {
   loginId?: string;
   address?: string;
   city?: string;
+  cityName?: string;
+  cityId?: string | null;
   pincode?: string;
-  areaId?: string;
-  areaName?: string;
+  areaId?: string | null;
+  areaName?: string | null;
   isActive?: boolean;
   orderCount?: number;
   pendingOrders?: number;
@@ -250,6 +320,11 @@ export interface StaffMember {
   role: 'Picker' | 'Rider';
   zone: string;
   darkStore: string;
+  cityId?: string;
+  cityName?: string;
+  areaId?: string;
+  areaName?: string;
+  storeId?: string;
   status: 'On Duty' | 'Off Duty';
   activeOrdersCount: number;
   rating: number;
