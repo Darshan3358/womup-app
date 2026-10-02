@@ -9,6 +9,7 @@ interface TabItem {
   id: CurrentTab;
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
+  activeIcon: keyof typeof Ionicons.glyphMap;
   badge?: number;
 }
 
@@ -16,13 +17,33 @@ export const BottomNav: React.FC = () => {
   const { currentTab, setCurrentTab, setSubScreen, incomingOrders, pickingOrders, readyOrders } = useStore();
 
   const tabs: TabItem[] = [
-    { id: 'Dashboard', label: 'Home', icon: 'speedometer-outline' },
-    { id: 'Incoming', label: 'Incoming', icon: 'flash-outline', badge: incomingOrders.length },
-    { id: 'Picking', label: 'Picking', icon: 'barcode-outline', badge: pickingOrders.length },
-    { id: 'Ready', label: 'Ready', icon: 'checkmark-done-circle-outline', badge: readyOrders.length },
-    { id: 'Inventory', label: 'Stock', icon: 'file-tray-stacked-outline' },
-    { id: 'History', label: 'History', icon: 'time-outline' },
-    { id: 'Profile', label: 'Profile', icon: 'person-outline' },
+    {
+      id: 'Dashboard',
+      label: 'Home',
+      icon: 'home-outline',
+      activeIcon: 'home',
+    },
+    {
+      id: 'Incoming',
+      label: 'Incoming',
+      icon: 'flash-outline',
+      activeIcon: 'flash',
+      badge: incomingOrders.length,
+    },
+    {
+      id: 'Picking',
+      label: 'Picking',
+      icon: 'cube-outline',
+      activeIcon: 'cube',
+      badge: pickingOrders.length,
+    },
+    {
+      id: 'Ready',
+      label: 'Ready',
+      icon: 'checkmark-circle-outline',
+      activeIcon: 'checkmark-circle',
+      badge: readyOrders.length,
+    },
   ];
 
   const handleTabPress = (tabId: CurrentTab) => {
@@ -43,17 +64,27 @@ export const BottomNav: React.FC = () => {
           >
             <View style={styles.iconContainer}>
               <Ionicons
-                name={tab.icon}
-                size={22}
-                color={isActive ? COLORS.primary : COLORS.textMuted}
+                name={isActive ? tab.activeIcon : tab.icon}
+                size={24}
+                color={isActive ? '#EC4A9D' : '#9296A7'}
               />
               {Boolean(tab.badge && tab.badge > 0) && (
-                <View style={[styles.badge, tab.id === 'Incoming' ? styles.incomingBadge : styles.normalBadge]}>
-                  <Text style={styles.badgeText}>{tab.badge}</Text>
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {tab.badge! > 99 ? '99+' : tab.badge}
+                  </Text>
                 </View>
               )}
             </View>
-            <Text style={[styles.tabLabel, { color: isActive ? COLORS.primary : COLORS.textMuted }]}>
+            <Text
+              style={[
+                styles.tabLabel,
+                {
+                  color: isActive ? '#EC4A9D' : '#9296A7',
+                  fontWeight: isActive ? '700' : '500',
+                },
+              ]}
+            >
               {tab.label}
             </Text>
           </TouchableOpacity>
@@ -69,14 +100,16 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
-    paddingVertical: 8,
-    paddingBottom: 16,
+    height: 64,
+    alignItems: 'center',
     justifyContent: 'space-around',
+    paddingHorizontal: 8,
   },
   tabBtn: {
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
+    height: '100%',
   },
   iconContainer: {
     position: 'relative',
@@ -88,19 +121,16 @@ const styles = StyleSheet.create({
   badge: {
     position: 'absolute',
     top: -4,
-    right: -10,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
+    right: -8,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#EF4444',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 3,
-  },
-  incomingBadge: {
-    backgroundColor: COLORS.danger,
-  },
-  normalBadge: {
-    backgroundColor: COLORS.accentCyan,
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: COLORS.surface,
   },
   badgeText: {
     color: '#FFF',
@@ -109,7 +139,7 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     fontSize: 10,
-    marginTop: 3,
-    fontWeight: '600',
+    marginTop: 2,
+    letterSpacing: 0.2,
   },
 });

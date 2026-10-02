@@ -57,6 +57,10 @@ interface StoreContextType {
   pendingEmail: string | null;
   setPendingEmail: (email: string | null) => void;
 
+  isSidebarOpen: boolean;
+  setSidebarOpen: (open: boolean) => void;
+  toggleSidebar: () => void;
+
   // Actions
   loginWithStoreCredentials: (loginId: string, password: string) => Promise<boolean>;
   sendOtp: (email: string) => Promise<boolean>;
@@ -108,6 +112,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [shiftLoading, setShiftLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [isSidebarOpen, setSidebarOpen] = useState<boolean>(false);
+  const toggleSidebar = () => setSidebarOpen((prev) => !prev);
 
 const enrichStore = (rawStore: any): StoreHub | null => {
   if (!rawStore) return null;
@@ -530,6 +536,9 @@ const enrichStore = (rawStore: any): StoreHub | null => {
         error,
         pendingEmail,
         setPendingEmail,
+        isSidebarOpen,
+        setSidebarOpen,
+        toggleSidebar,
         loginWithStoreCredentials,
         sendOtp,
         verifyOtp,

@@ -12,7 +12,7 @@ import { useStore } from '../../context/StoreContext';
 import { COLORS } from '../../theme/colors';
 
 export const Header: React.FC = () => {
-  const { staff, store, subScreen, setSubScreen, toggleShift, shiftLoading } = useStore();
+  const { staff, store, subScreen, setSubScreen, toggleShift, shiftLoading, setSidebarOpen } = useStore();
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const isOnShift = staff?.isOnShift ?? false;
@@ -104,40 +104,52 @@ export const Header: React.FC = () => {
           </Text>
         </View>
 
-        {/* ON SHIFT Toggle Pill Button */}
-        <TouchableOpacity
-          style={[
-            styles.shiftPill,
-            isOnShift ? styles.shiftPillOn : styles.shiftPillOff,
-          ]}
-          onPress={handleToggleShift}
-          activeOpacity={0.8}
-          disabled={shiftLoading}
-        >
-          {shiftLoading ? (
-            <ActivityIndicator size="small" color={isOnShift ? COLORS.primary : COLORS.danger} />
-          ) : (
-            <>
-              <Animated.View
-                style={[
-                  styles.pulseDot,
-                  {
-                    backgroundColor: isOnShift ? COLORS.primary : COLORS.danger,
-                    transform: isOnShift ? [{ scale: pulseAnim }] : [],
-                  },
-                ]}
-              />
-              <Text
-                style={[
-                  styles.shiftPillText,
-                  { color: isOnShift ? COLORS.primary : COLORS.danger },
-                ]}
-              >
-                {isOnShift ? 'ON SHIFT' : 'OFF SHIFT'}
-              </Text>
-            </>
-          )}
-        </TouchableOpacity>
+        <View style={styles.rightRowOne}>
+          {/* ON SHIFT Toggle Pill Button */}
+          <TouchableOpacity
+            style={[
+              styles.shiftPill,
+              isOnShift ? styles.shiftPillOn : styles.shiftPillOff,
+            ]}
+            onPress={handleToggleShift}
+            activeOpacity={0.8}
+            disabled={shiftLoading}
+          >
+            {shiftLoading ? (
+              <ActivityIndicator size="small" color={isOnShift ? COLORS.primary : COLORS.danger} />
+            ) : (
+              <>
+                <Animated.View
+                  style={[
+                    styles.pulseDot,
+                    {
+                      backgroundColor: isOnShift ? COLORS.primary : COLORS.danger,
+                      transform: isOnShift ? [{ scale: pulseAnim }] : [],
+                    },
+                  ]}
+                />
+                <Text
+                  style={[
+                    styles.shiftPillText,
+                    { color: isOnShift ? COLORS.primary : COLORS.danger },
+                  ]}
+                >
+                  {isOnShift ? 'ON SHIFT' : 'OFF SHIFT'}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          {/* ☰ Hamburger Menu Button */}
+          <TouchableOpacity
+            style={styles.hamburgerBtn}
+            onPress={() => setSidebarOpen(true)}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="menu" size={22} color="#FFF" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Row 2: 📍 Area · City (Left) + Picker Code (Right) */}
@@ -216,6 +228,22 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     flex: 1,
     letterSpacing: 0.1,
+  },
+  rightRowOne: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexShrink: 0,
+  },
+  hamburgerBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   shiftPill: {
     flexDirection: 'row',

@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StoreProvider, useStore } from './src/context/StoreContext';
 import { Header } from './src/components/common/Header';
 import { BottomNav } from './src/components/common/BottomNav';
+import { SidebarDrawer } from './src/components/common/SidebarDrawer';
 import { ConfirmHandoverModal } from './src/components/modals/ConfirmHandoverModal';
 import { COLORS } from './src/theme/colors';
 
@@ -83,6 +84,9 @@ const MainStoreApp: React.FC = () => {
         <View style={styles.body}>{renderContent()}</View>
         <BottomNav />
       </View>
+
+      {/* Slide-out Sidebar Drawer (Hamburger Menu) */}
+      <SidebarDrawer />
 
       {/* Real-time Handover Alert Modal (triggers on rider arrival at counter) */}
       <ConfirmHandoverModal />
