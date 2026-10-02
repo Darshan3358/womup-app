@@ -17,7 +17,18 @@ export const S01_SplashScreen: React.FC = () => {
   const setActiveScreenRef = useRef(setActiveScreen);
   setActiveScreenRef.current = setActiveScreen;
 
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasNavigatedRef = useRef<boolean>(false);
+
   const navigateToHome = () => {
+    if (hasNavigatedRef.current) return;
+    hasNavigatedRef.current = true;
+
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+
     if (setActiveScreenRef.current) {
       setActiveScreenRef.current('Blinkit_Home');
     }
@@ -25,12 +36,15 @@ export const S01_SplashScreen: React.FC = () => {
 
   useEffect(() => {
     // Exactly 2-second splash screen display, guaranteed to complete without restart
-    const timer = setTimeout(() => {
+    timerRef.current = setTimeout(() => {
       navigateToHome();
     }, 2000);
 
     return () => {
-      clearTimeout(timer);
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
     };
   }, []); // Run ONCE on mount
 
