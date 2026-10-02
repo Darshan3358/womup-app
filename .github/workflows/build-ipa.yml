@@ -69,7 +69,9 @@ jobs:
           xcodebuild -version
 
       - name: Install Project Dependencies
-        run: npm ci || npm install --legacy-peer-deps
+        run: |
+          npm ci || npm install --legacy-peer-deps
+          node scripts/patch-expo-swift.js
 
       # -----------------------------------------------------------------
       # Optional: EAS Cloud Build path (if selected and EXPO_TOKEN exists)
@@ -114,10 +116,12 @@ jobs:
         if: inputs.build_mode == 'standalone_macos'
         run: |
           npx expo prebuild --platform ios --clean
+          node scripts/patch-expo-swift.js
 
       - name: Install CocoaPods
         if: inputs.build_mode == 'standalone_macos'
         run: |
+          node scripts/patch-expo-swift.js
           cd ios
           pod install --repo-update
 
@@ -194,11 +198,13 @@ jobs:
         run: |
           cd "Womup Admin"
           npm ci || npm install --legacy-peer-deps
+          node ../scripts/patch-expo-swift.js .
 
       - name: Generate Admin iOS Native Project
         run: |
           cd "Womup Admin"
           npx expo prebuild --platform ios --clean
+          node ../scripts/patch-expo-swift.js .
           cd ios
           pod install --repo-update
 
@@ -265,11 +271,13 @@ jobs:
         run: |
           cd "Womup Rider"
           npm ci || npm install --legacy-peer-deps
+          node ../scripts/patch-expo-swift.js .
 
       - name: Generate Rider iOS Native Project
         run: |
           cd "Womup Rider"
           npx expo prebuild --platform ios --clean
+          node ../scripts/patch-expo-swift.js .
           cd ios
           pod install --repo-update
 
@@ -336,11 +344,13 @@ jobs:
         run: |
           cd "Womup Store"
           npm ci || npm install --legacy-peer-deps
+          node ../scripts/patch-expo-swift.js .
 
       - name: Generate Store iOS Native Project
         run: |
           cd "Womup Store"
           npx expo prebuild --platform ios --clean
+          node ../scripts/patch-expo-swift.js .
           cd ios
           pod install --repo-update
 
