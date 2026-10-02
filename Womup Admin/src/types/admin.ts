@@ -292,6 +292,10 @@ export interface DarkStoreItem {
   areaId?: string | null;
   areaName?: string | null;
   isActive?: boolean;
+  isOnShift?: boolean;
+  isOnline?: boolean;
+  staffOnShift?: number;
+  staffTotal?: number;
   orderCount?: number;
   pendingOrders?: number;
   riderCount?: number;
@@ -396,5 +400,35 @@ export interface PrintOrder {
   isDocumentPurged?: boolean;
   createdAt: string;
   timestamp?: string;
+}
+
+export type PayoutScope = 'GLOBAL' | 'CITY' | 'AREA';
+
+export interface PayoutRateItem {
+  id: string;
+  _id?: string;
+  scope: PayoutScope;
+  cityId?: string | null;
+  cityName?: string | null;
+  areaId?: string | null;
+  areaName?: string | null;
+  ratePerKm: number;
+  minimumPayout: number;
+  maximumPayout: number;
+  isActive: boolean;
+  effectiveFrom?: string;
+  effectiveUntil?: string | null;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PayoutStats {
+  totalRates: number;
+  activeOverridesCount: number;
+  globalRatePerKm: number;
+  rateRangeText: string;
+  minRate: number;
+  maxRate: number;
 }
 

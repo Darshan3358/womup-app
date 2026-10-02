@@ -23,6 +23,7 @@ import {
   DeliveryLocation,
   DeliveryLocationSchema,
 } from './schemas/delivery-partner.schema';
+import { RiderPayoutRate, RiderPayoutRateSchema } from './schemas/rider-payout-rate.schema';
 
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { Order, OrderSchema } from '../orders/schemas/order.schema';
@@ -65,6 +66,7 @@ import { SupportService } from './support/support.service';
       { name: Order.name, schema: OrderSchema },
       { name: Store.name, schema: StoreSchema },
       { name: OtpVerification.name, schema: OtpVerificationSchema },
+      { name: RiderPayoutRate.name, schema: RiderPayoutRateSchema },
     ]),
     JwtModule.registerAsync({
       imports: [ConfigModule],

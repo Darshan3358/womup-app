@@ -30,6 +30,8 @@ import {
 import { Role } from '../../common/enums/role.enum';
 import { MailService } from '../../common/services/mail.service';
 import { RegisterStoreDto } from './dto/store-auth.dto';
+import { TrackingGateway } from '../../tracking/tracking.gateway';
+import { Optional } from '@nestjs/common';
 
 @Injectable()
 export class StoreAuthService {
@@ -49,6 +51,7 @@ export class StoreAuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     private mailService: MailService,
+    @Optional() private readonly trackingGateway?: TrackingGateway,
   ) {}
 
   async registerStore(dto: RegisterStoreDto) {
@@ -627,6 +630,10 @@ export class StoreAuthService {
   }
 
   async updateShift(userId: string, isOnShift: boolean) {
+    let storeId: any = null;
+    let staffId: any = null;
+    let returnData: any = null;
+
     if (Types.ObjectId.isValid(userId)) {
       const store = await this.storeModel.findById(userId);
       if (store) {
@@ -641,7 +648,8 @@ export class StoreAuthService {
 
         this.logger.log(`[Shift Update] Store ${store.code} shifted to ${store.isOnShift ? 'ON SHIFT' : 'OFF SHIFT'}`);
 
-        return {
+        storeId = store._id;
+        returnData = {
           success: true,
           isOnShift: store.isOnShift,
           shiftStartedAt: store.isOnShift ? new Date() : null,
@@ -650,22 +658,57 @@ export class StoreAuthService {
       }
     }
 
-    const staff = await this.staffModel.findOne({ userId: new Types.ObjectId(userId) });
-    if (!staff) {
-      throw new BadRequestException('Staff profile not found');
+    if (!returnData) {
+      const staff = await this.staffModel.findOne({ userId: new Types.ObjectId(userId) });
+      if (!staff) {
+        throw new BadRequestException('Staff profile not found');
+      }
+
+      staff.isOnShift = Boolean(isOnShift);
+      await staff.save();
+
+      this.logger.log(`[Shift Update] Staff ${staff.employeeCode} shifted to ${staff.isOnShift ? 'ON SHIFT' : 'OFF SHIFT'}`);
+
+      storeId = staff.storeId;
+      staffId = staff._id;
+      returnData = {
+        success: true,
+        isOnShift: staff.isOnShift,
+        shiftStartedAt: staff.isOnShift ? new Date() : null,
+        message: staff.isOnShift ? 'Shift started. You can now receive orders.' : 'Shift ended.',
+      };
     }
 
-    staff.isOnShift = Boolean(isOnShift);
-    await staff.save();
+    // Broadcast shift update in real time to Admin Console and connected clients
+    if (storeId) {
+      try {
+        const staffOnShiftCount = await this.staffModel.countDocuments({
+          storeId,
+          isOnShift: true,
+          status: 'ACTIVE',
+        });
+        const staffTotal = await this.staffModel.countDocuments({
+          storeId,
+          status: 'ACTIVE',
+        });
+        const storeDoc = await this.storeModel.findById(storeId).select('isActive isOnShift');
+        const effectiveCount = staffOnShiftCount > 0 ? staffOnShiftCount : (storeDoc?.isOnShift ? 1 : 0);
+        const isOnline = (storeDoc?.isActive !== false) && effectiveCount > 0;
 
-    this.logger.log(`[Shift Update] Staff ${staff.employeeCode} shifted to ${staff.isOnShift ? 'ON SHIFT' : 'OFF SHIFT'}`);
+        this.trackingGateway?.broadcastStaffShiftChange({
+          storeId: storeId.toString(),
+          staffId: staffId ? staffId.toString() : undefined,
+          isOnShift: Boolean(isOnShift),
+          staffOnShiftCount: effectiveCount,
+          staffTotal: Math.max(staffTotal, effectiveCount),
+          isOnline,
+        });
+      } catch (err: any) {
+        this.logger.warn(`Failed to broadcast staff shift change: ${err?.message}`);
+      }
+    }
 
-    return {
-      success: true,
-      isOnShift: staff.isOnShift,
-      shiftStartedAt: staff.isOnShift ? new Date() : null,
-      message: staff.isOnShift ? 'Shift started. You can now receive orders.' : 'Shift ended.',
-    };
+    return returnData;
   }
 
   async getPerformance(userId: string) {

@@ -102,6 +102,9 @@ export interface DeliveryRequest {
   }>;
   isFromOwnHub?: boolean;
   distanceToStoreKm?: number;
+  ratePerKm?: number;
+  rateSource?: 'AREA' | 'CITY' | 'GLOBAL' | string;
+  basePayout?: number;
 }
 
 export interface RiderProfile {

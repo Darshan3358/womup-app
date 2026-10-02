@@ -66,7 +66,7 @@ export const S16_ProductDetailsScreen: React.FC = () => {
             <Image
               source={product.image || { uri: product.imageUrl }}
               style={styles.showcaseProductImage}
-              resizeMode="contain"
+              resizeMode="cover"
             />
           ) : (
             <View style={styles.iconCircleLarge}>
@@ -186,18 +186,20 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   imageShowcase: {
-    height: 250,
-    backgroundColor: '#FFFFFF',
+    width: '100%',
+    aspectRatio: 1,
+    backgroundColor: '#F8FAFC',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
-    padding: SPACING.md,
+    overflow: 'hidden',
   },
   showcaseProductImage: {
     width: '100%',
     height: '100%',
+    resizeMode: 'cover',
   },
   iconCircleLarge: {
     width: 120,

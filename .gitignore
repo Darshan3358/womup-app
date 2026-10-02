@@ -57,4 +57,5 @@ backend/.env
 **/node_modules/
 **/dist/
 **/.next/
+.gemini/
 

@@ -269,7 +269,7 @@ export class StoreOrdersService {
 
   async getOrderDetail(userId: string, orderId: string) {
     const staff = await this.getStaff(userId);
-    const order = await this.orderModel.findById(orderId);
+    const order = await this.orderModel.findById(orderId).populate('userId', 'name phone').exec();
     if (!order) {
       throw new NotFoundException('Order not found');
     }
@@ -333,6 +333,10 @@ export class StoreOrdersService {
       totalAmount: order.totalAmount,
       deliverySlot: order.deliverySlot,
       createdAt: (order as any).createdAt,
+      deliveredAt: (order as any).deliveredAt || (order as any).updatedAt,
+      customerName: (order.userId as any)?.name || (order as any).customerName || 'Customer',
+      customerPhone: (order.userId as any)?.phone || null,
+      deliveryAddress: (order as any).deliveryAddress,
     };
   }
 

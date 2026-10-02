@@ -43,6 +43,29 @@ export const mapProductToBlinkit = (p: Product): BlinkitProduct => ({
   variants: p.variants || [],
 });
 
+export const mapBlinkitToProduct = (bp: BlinkitProduct): Product => ({
+  id: bp.id,
+  name: bp.name,
+  brand: bp.brand,
+  categoryId: bp.category,
+  quantityLabel: bp.packSize || '1 unit',
+  sellingPrice: bp.sellingPrice,
+  mrp: bp.mrp,
+  discountPercent:
+    bp.mrp > bp.sellingPrice
+      ? Math.round(((bp.mrp - bp.sellingPrice) / bp.mrp) * 100)
+      : 0,
+  shoppingCoins: 10,
+  rating: bp.rating || 4.8,
+  reviewCount: bp.reviewCount || 100,
+  stock: bp.stock || 100,
+  deliveryMinutes: bp.deliveryMinutes || 9,
+  description: bp.description || `${bp.name} - Fresh everyday essential`,
+  imageUrl: bp.imageUrl || (bp.galleryImages && bp.galleryImages[0]) || '',
+  variants: bp.variants || [],
+  specifications: bp.specifications || {},
+});
+
 const DEFAULT_FALLBACK_PRODUCT: Product = {
   id: 'prod_default',
   name: 'Loading Products...',
@@ -519,24 +542,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.warn('Session restoration error:', e);
       }
 
-      // 2. Saved Cart & Blinkit Cart
+      // 2. Saved Cart & Blinkit Cart with Bidirectional Hydration
       try {
-        const savedCart = await StorageService.getItem<CartItem[] | null>(
-          StorageService.KEYS.CART,
-          null
-        );
-        if (savedCart && savedCart.length > 0) setCart(savedCart);
-      } catch (e) {}
+        const [savedCart, savedBlinkitCart] = await Promise.all([
+          StorageService.getItem<CartItem[] | null>(StorageService.KEYS.CART, null),
+          StorageService.getItem<Record<string, BlinkitCartEntry> | null>(
+            StorageService.KEYS.BLINKIT_CART,
+            null
+          ),
+        ]);
 
-      try {
-        const savedBlinkitCart = await StorageService.getItem<Record<string, BlinkitCartEntry> | null>(
-          StorageService.KEYS.BLINKIT_CART,
-          null
-        );
-        if (savedBlinkitCart && Object.keys(savedBlinkitCart).length > 0) {
+        if (savedCart && savedCart.length > 0 && (!savedBlinkitCart || Object.keys(savedBlinkitCart).length === 0)) {
+          // Hydrate blinkitCart from legacy cart
+          const hydratedBlinkit: Record<string, BlinkitCartEntry> = {};
+          savedCart.forEach((item) => {
+            hydratedBlinkit[item.product.id] = {
+              product: mapProductToBlinkit(item.product),
+              quantity: item.quantity,
+            };
+          });
+          setCart(savedCart);
+          setBlinkitCart(hydratedBlinkit);
+        } else if (savedBlinkitCart && Object.keys(savedBlinkitCart).length > 0 && (!savedCart || savedCart.length === 0)) {
+          // Hydrate legacy cart from blinkitCart
+          const hydratedCart: CartItem[] = Object.values(savedBlinkitCart).map((entry) => ({
+            product: mapBlinkitToProduct(entry.product),
+            quantity: entry.quantity,
+          }));
           setBlinkitCart(savedBlinkitCart);
+          setCart(hydratedCart);
+        } else {
+          if (savedCart) setCart(savedCart);
+          if (savedBlinkitCart) setBlinkitCart(savedBlinkitCart);
         }
-      } catch (e) {}
+      } catch (e) {
+        console.warn('Cart restoration error:', e);
+      }
 
       // Saved Wishlist
       try {
@@ -762,19 +803,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const cartSummary = CartService.calculateSummary(cart, appliedCoins, 40);
 
   const addToCart = (product: Product) => {
+    // 1. Update legacy cart
     setCart((prev) => {
       const existing = prev.find((item) => item.product.id === product.id);
-      if (existing) {
-        return prev.map((item) =>
-          item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
-        );
-      }
-      return [...prev, { product, quantity: 1 }];
+      const next = existing
+        ? prev.map((item) =>
+            item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+          )
+        : [...prev, { product, quantity: 1 }];
+      return next;
     });
+
+    // 2. Also synchronize to blinkitCart immediately
+    const bp = mapProductToBlinkit(product);
+    setBlinkitCart((prev) => {
+      const current = prev[product.id]?.quantity || 0;
+      return {
+        ...prev,
+        [product.id]: {
+          product: bp,
+          quantity: current + 1,
+        },
+      };
+    });
+
+    // 3. Fire-and-forget sync to backend API
+    CartService.addItemToServer(product.id, 1).catch(() => {});
   };
 
   const updateQuantity = (productId: string, delta: number) => {
+    let affectedProduct: Product | undefined;
+
     setCart((prev) => {
+      const target = prev.find((item) => item.product.id === productId);
+      if (target) affectedProduct = target.product;
+
       return prev
         .map((item) => {
           if (item.product.id === productId) {
@@ -785,14 +848,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         })
         .filter((item): item is CartItem => item !== null);
     });
+
+    setBlinkitCart((prev) => {
+      const currentEntry = prev[productId];
+      const currentQty = currentEntry?.quantity || 0;
+      const nextQty = Math.max(0, currentQty + delta);
+
+      const copy = { ...prev };
+      if (nextQty <= 0) {
+        delete copy[productId];
+      } else if (currentEntry) {
+        copy[productId] = {
+          ...currentEntry,
+          quantity: nextQty,
+        };
+      } else if (affectedProduct) {
+        copy[productId] = {
+          product: mapProductToBlinkit(affectedProduct),
+          quantity: nextQty,
+        };
+      }
+      return copy;
+    });
+
+    CartService.updateQuantityOnServer(productId, delta).catch(() => {});
   };
 
   const removeFromCart = (productId: string) => {
     setCart((prev) => prev.filter((item) => item.product.id !== productId));
+    setBlinkitCart((prev) => {
+      const copy = { ...prev };
+      delete copy[productId];
+      return copy;
+    });
+    CartService.removeItemFromServer(productId).catch(() => {});
   };
 
   const clearCart = () => {
     setCart([]);
+    setBlinkitCart({});
+    CartService.clearServerCart().catch(() => {});
   };
 
   const addAddress = (address: Address) => {
@@ -945,10 +1040,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   );
 
   const getBlinkitQty = (productId: string): number => {
-    return blinkitCart[productId]?.quantity || 0;
+    if (blinkitCart[productId]?.quantity) {
+      return blinkitCart[productId].quantity;
+    }
+    const legacyItem = cart.find((i) => i.product.id === productId);
+    return legacyItem?.quantity || 0;
   };
 
   const updateBlinkitQty = (product: BlinkitProduct, delta: number) => {
+    // 1. Update blinkitCart
     setBlinkitCart((prev) => {
       const current = prev[product.id]?.quantity || 0;
       const nextQty = Math.max(0, current + delta);
@@ -969,10 +1069,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         },
       };
     });
+
+    // 2. Synchronize to legacy cart immediately
+    setCart((prev) => {
+      const existing = prev.find((item) => item.product.id === product.id);
+      let next: CartItem[];
+      if (delta > 0) {
+        if (existing) {
+          next = prev.map((item) =>
+            item.product.id === product.id ? { ...item, quantity: item.quantity + delta } : item
+          );
+        } else {
+          next = [...prev, { product: mapBlinkitToProduct(product), quantity: delta }];
+        }
+      } else {
+        next = prev
+          .map((item) => {
+            if (item.product.id === product.id) {
+              const newQty = item.quantity + delta;
+              return newQty > 0 ? { ...item, quantity: newQty } : null;
+            }
+            return item;
+          })
+          .filter((item): item is CartItem => item !== null);
+      }
+      return next;
+    });
+
+    // 3. Fire-and-forget sync to backend API
+    CartService.updateQuantityOnServer(product.id, delta).catch(() => {});
   };
 
   const clearBlinkitCart = () => {
     setBlinkitCart({});
+    setCart([]);
+    CartService.clearServerCart().catch(() => {});
   };
 
   const addWalletBalance = (amount: number) => {

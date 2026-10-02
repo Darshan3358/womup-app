@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../context/StoreContext';
@@ -18,10 +18,34 @@ export const ST08_PickingScreen: React.FC = () => {
     setCurrentTab,
     store,
     updateShelfLocation,
+    clearActivePicking,
   } = useStore();
   const [showOOSModal, setShowOOSModal] = useState(false);
   const [showEditShelfModal, setShowEditShelfModal] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
+
+  // Auto-clear active order if it is in completed/packed/delivered terminal states
+  useEffect(() => {
+    if (activeOrder) {
+      const isPastPicking = [
+        'PACKED',
+        'READY_FOR_PICKUP',
+        'HANDED_OVER',
+        'GOING_TO_STORE',
+        'ARRIVED_AT_STORE',
+        'OUT_FOR_DELIVERY',
+        'DELIVERED',
+        'CANCELLED',
+      ].includes(activeOrder.status);
+
+      if (isPastPicking) {
+        console.log(
+          `[ST08_PickingScreen] Auto-clearing activeOrder (${activeOrder.orderNumber || ''}) with terminal status '${activeOrder.status}'`
+        );
+        clearActivePicking();
+      }
+    }
+  }, [activeOrder?.status, activeOrder?.id, (activeOrder as any)?._id]);
 
   const areaName =
     store?.areaName ||
@@ -30,7 +54,20 @@ export const ST08_PickingScreen: React.FC = () => {
       : 'Chandlodiya');
   const cityName = store?.cityName || store?.city || 'Ahmedabad';
 
-  if (!activeOrder) {
+  const isPastPicking =
+    activeOrder &&
+    [
+      'PACKED',
+      'READY_FOR_PICKUP',
+      'HANDED_OVER',
+      'GOING_TO_STORE',
+      'ARRIVED_AT_STORE',
+      'OUT_FOR_DELIVERY',
+      'DELIVERED',
+      'CANCELLED',
+    ].includes(activeOrder.status);
+
+  if (!activeOrder || isPastPicking) {
     return (
       <View style={styles.emptyContainer}>
         <Ionicons name="cart-outline" size={54} color={COLORS.textMuted} />

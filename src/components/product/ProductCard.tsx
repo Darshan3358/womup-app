@@ -29,7 +29,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onPress,
   style,
 }) => {
-  const { cart, addToCart, updateQuantity, setSelectedProduct, setActiveScreen } = useApp();
+  const { cart, addToCart, updateQuantity, setSelectedProduct, setActiveScreen, getBlinkitQty } = useApp();
 
   const variants = product.variants || [];
   const defaultVariant = variants.find((v) => v.isDefault) || variants[0];
@@ -44,7 +44,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     : product.discountPercent;
 
   const cartItem = cart.find((i) => i.product.id === product.id);
-  const quantity = cartItem ? cartItem.quantity : 0;
+  const quantity = cartItem ? cartItem.quantity : (getBlinkitQty ? getBlinkitQty(product.id) : 0);
 
   const handleAddToCart = () => {
     const enrichedProduct: Product = {
@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     left: 8,
-    backgroundColor: COLORS.success,
+    backgroundColor: COLORS.hotPink,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,

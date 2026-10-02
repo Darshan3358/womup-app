@@ -71,6 +71,13 @@ export const NewDeliveryModal: React.FC = () => {
               </View>
               <View style={styles.dividerVertical} />
               <View style={styles.highlightItem}>
+                <Text style={styles.highlightLabel}>RATE</Text>
+                <Text style={[styles.highlightValue, { color: '#F562AF' }]}>
+                  {offer.ratePerKm != null ? `₹${offer.ratePerKm}/km` : 'Standard'}
+                </Text>
+              </View>
+              <View style={styles.dividerVertical} />
+              <View style={styles.highlightItem}>
                 <Text style={styles.highlightLabel}>EST. TIME</Text>
                 <Text style={styles.highlightValue}>{offer.etaMinutes} min</Text>
               </View>

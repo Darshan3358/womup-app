@@ -13,7 +13,7 @@ import { useStore } from '../../context/StoreContext';
 import { COLORS } from '../../theme/colors';
 
 export const ST17_OrderHistoryScreen: React.FC = () => {
-  const { completedOrders, refreshCompletedOrders, isLoading, store } = useStore();
+  const { completedOrders, refreshCompletedOrders, isLoading, store, selectOrderForDetail } = useStore();
   const [filterTab, setFilterTab] = useState<'ALL' | 'TODAY' | 'EARLIER'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
@@ -149,7 +149,7 @@ export const ST17_OrderHistoryScreen: React.FC = () => {
           return (
             <TouchableOpacity
               style={styles.orderCard}
-              onPress={() => toggleExpand(item.orderId)}
+              onPress={() => selectOrderForDetail(item.orderId)}
               activeOpacity={0.85}
             >
               {/* Card Top: Order Number & DELIVERED Badge */}
@@ -189,37 +189,44 @@ export const ST17_OrderHistoryScreen: React.FC = () => {
                   <Text style={styles.totalAmountText}>₹{item.totalAmount}</Text>
                 </View>
 
-                {/* Items list preview (collapsed: 2 items, expanded: all) */}
-                {(item.items || [])
-                  .slice(0, isExpanded ? item.items.length : 2)
-                  .map((prod: any, idx: number) => (
-                    <View key={idx} style={styles.itemRow}>
-                      <Text style={styles.itemBullet}>•</Text>
-                      <Text style={styles.itemName} numberOfLines={1}>
-                        {prod.name}
-                      </Text>
-                      <Text style={styles.itemQty}>
-                        {prod.quantity}x {prod.quantityLabel || ''}
-                      </Text>
-                    </View>
-                  ))}
+                {/* Items list preview */}
+                {(item.items || []).slice(0, 3).map((prod: any, idx: number) => (
+                  <View key={idx} style={styles.itemRow}>
+                    <Text style={styles.itemBullet}>•</Text>
+                    <Text style={styles.itemName} numberOfLines={1}>
+                      {prod.name}
+                    </Text>
+                    <Text style={styles.itemQty}>
+                      {prod.quantity}x {prod.quantityLabel || ''}
+                    </Text>
+                  </View>
+                ))}
 
-                {(item.items || []).length > 2 && !isExpanded && (
+                {(item.items || []).length > 3 && (
                   <Text style={styles.moreItemsText}>
-                    +{item.items.length - 2} more items (tap to view)
+                    +{item.items.length - 3} more items
                   </Text>
                 )}
               </View>
 
-              {/* Card Footer: Rider Handover info */}
-              {Boolean(item.deliveryPartner) && (
-                <View style={styles.riderRow}>
-                  <Ionicons name="bicycle-outline" size={13} color={COLORS.accentCyan} />
-                  <Text style={styles.riderText}>
-                    Rider: {item.deliveryPartner.name} • {item.deliveryPartner.vehicle || 'Bike'}
-                  </Text>
+              {/* Card Footer: Rider info & View Detail CTA */}
+              <View style={styles.cardFooterRow}>
+                {Boolean(item.deliveryPartner) ? (
+                  <View style={styles.riderRow}>
+                    <Ionicons name="bicycle-outline" size={13} color={COLORS.accentCyan} />
+                    <Text style={styles.riderText} numberOfLines={1}>
+                      {item.deliveryPartner.name} • {item.deliveryPartner.vehicle || 'Bike'}
+                    </Text>
+                  </View>
+                ) : (
+                  <View />
+                )}
+
+                <View style={styles.viewDetailBadge}>
+                  <Text style={styles.viewDetailText}>View Details</Text>
+                  <Ionicons name="chevron-forward" size={13} color={COLORS.primary} />
                 </View>
-              )}
+              </View>
             </TouchableOpacity>
           );
         }}
@@ -460,17 +467,41 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: 6,
   },
+  cardFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 8,
+    marginTop: 2,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.05)',
+  },
   riderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingTop: 6,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.05)',
+    flex: 1,
+    marginRight: 8,
   },
   riderText: {
     color: COLORS.textMuted,
     fontSize: 10.5,
+  },
+  viewDetailBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(236, 74, 157, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(236, 74, 157, 0.25)',
+  },
+  viewDetailText: {
+    color: COLORS.primary,
+    fontSize: 10.5,
+    fontWeight: '700',
   },
   emptyState: {
     alignItems: 'center',

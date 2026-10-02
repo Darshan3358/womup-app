@@ -78,6 +78,8 @@ export interface PickList {
 
 export interface StoreOrder {
   orderId: string;
+  id?: string;
+  _id?: string;
   orderNumber: string;
   status: string;
   itemCount: number;
@@ -105,6 +107,10 @@ export interface StoreOrder {
     vehicleNumber: string;
   } | null;
   deliverySlot?: string;
+  customerName?: string;
+  customerPhone?: string;
+  deliveryAddress?: any;
+  deliveredAt?: string;
   progress?: {
     pickedCount: number;
     totalCount: number;

@@ -325,5 +325,38 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
       this.logger.log(`[WebSocket] Broadcasted chat_receive for order ${cleanId}: from ${payload.senderRole} (${payload.senderName || payload.senderId})`);
     }
   }
+
+  // Broadcast Staff/Store Shift status change to Admin Console & Store Hub
+  broadcastStaffShiftChange(payload: {
+    storeId: string;
+    staffId?: string;
+    isOnShift: boolean;
+    staffOnShiftCount?: number;
+    staffTotal?: number;
+    isOnline?: boolean;
+  }) {
+    if (this.server) {
+      const data = {
+        ...payload,
+        timestamp: new Date().toISOString(),
+      };
+
+      // 1. Global event for Admin Console
+      this.server.emit('staff_shift_changed', data);
+      this.server.emit('store_shift_update', data);
+
+      // 2. Targeted store room
+      if (payload.storeId) {
+        this.server.to(`store_${payload.storeId}`).emit('staff_shift_changed', data);
+        this.server.to(`store_${payload.storeId}`).emit('store_shift_update', data);
+      }
+
+      this.logger.log(
+        `[WebSocket] Dispatched staff_shift_changed for store ${payload.storeId}: ${
+          payload.isOnShift ? 'ON SHIFT' : 'OFF SHIFT'
+        } (Active pickers: ${payload.staffOnShiftCount ?? 'N/A'})`
+      );
+    }
+  }
 }
 

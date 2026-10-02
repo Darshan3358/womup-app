@@ -33,6 +33,23 @@ router.get('/', async (req, res) => {
         hubId: sId,
       });
 
+      // Live staff on-shift calculation
+      const staffTotal = await db.collection('store_staff').countDocuments({
+        $or: [{ storeId: sId }, { storeId: sId.toString() }],
+        status: { $ne: 'INACTIVE' },
+      });
+
+      const staffOnShift = await db.collection('store_staff').countDocuments({
+        $or: [{ storeId: sId }, { storeId: sId.toString() }],
+        isOnShift: true,
+      });
+
+      const effectiveStaffOnShift = staffOnShift > 0
+        ? staffOnShift
+        : (store.isOnShift === true ? 1 : 0);
+      const effectiveStaffTotal = Math.max(staffTotal, effectiveStaffOnShift, 1);
+      const isOnline = (store.isActive !== false) && (effectiveStaffOnShift > 0);
+
       return {
         id: store._id.toString(),
         _id: store._id,
@@ -51,6 +68,10 @@ router.get('/', async (req, res) => {
         serviceRadiusKm: store.serviceRadiusKm || 4.5,
         estimatedDeliveryMinutes: store.estimatedDeliveryMinutes || 9,
         isActive: store.isActive !== false,
+        isOnShift: effectiveStaffOnShift > 0,
+        isOnline,
+        staffOnShift: effectiveStaffOnShift,
+        staffTotal: effectiveStaffTotal,
         lastLoginAt: store.lastLoginAt || null,
         orderCount,
         pendingOrders,

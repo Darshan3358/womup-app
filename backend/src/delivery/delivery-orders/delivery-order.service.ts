@@ -421,19 +421,24 @@ export class DeliveryOrderService implements OnModuleInit {
         const deliveryDistanceKm = 2.0;
         const totalDistanceKm = parseFloat((pickupDistanceKm + deliveryDistanceKm).toFixed(2));
 
-        // Distance-weighted payout: base ₹25 + ₹8/km with a minimum of ₹35
-        const payoutAmount = Math.max(35, Math.round(25 + totalDistanceKm * 8));
+        // Dynamic Per-KM Payout based on Area -> City -> Global hierarchy
+        const payoutConfig = await this.resolvePayoutForOrder(realOrder, totalDistanceKm);
+        const payoutAmount = payoutConfig.payoutAmount;
 
         const assignment = await this.assignmentModel.create({
           orderId: realOrder._id,
           partnerId: partner._id,
           status: RiderAssignmentStatus.OFFERED,
           payoutAmount,
+          ratePerKm: payoutConfig.ratePerKm,
+          rateSource: payoutConfig.rateSource,
           distanceKm: totalDistanceKm,
           etaMinutes: Math.max(8, Math.round(totalDistanceKm * 4 + 3)),
           assignedAt: new Date(),
         });
         const payload = await this.formatOrderDeliveryPayload(assignment, realOrder, partner, hubInfo);
+        (payload as any).ratePerKm = payoutConfig.ratePerKm;
+        (payload as any).rateSource = payoutConfig.rateSource;
         results.push(payload);
       } catch (err: any) {
         this.logger.warn(`Failed offering fresh order ${realOrder._id}: ${err?.message}`);
@@ -542,6 +547,85 @@ export class DeliveryOrderService implements OnModuleInit {
     }
 
     return { success: true, message: 'Delivery offer rejected' };
+  }
+
+  async resolvePayoutForOrder(order: any, totalDistanceKm: number = 3.5): Promise<{
+    payoutAmount: number;
+    ratePerKm: number;
+    rateSource: 'AREA' | 'CITY' | 'GLOBAL';
+    minimumPayout: number;
+    maximumPayout: number;
+  }> {
+    try {
+      const db = this.orderModel.db;
+      const ratesColl = db.collection('rider_payout_rates');
+      const storeId = order.storeId?._id || order.storeId;
+      const store = storeId
+        ? await db.collection('stores').findOne({ $or: [{ _id: storeId }, { _id: storeId.toString() }] })
+        : null;
+
+      const cityName = order.deliveryAddress?.city || store?.cityName || store?.city || 'Ahmedabad';
+      const areaName = order.deliveryAddress?.area || store?.areaName || 'Prahlad Nagar';
+      const cityId = store?.cityId;
+      const areaId = store?.areaId;
+
+      // 1. Area Level
+      let rateDoc: any = null;
+      let rateSource: 'AREA' | 'CITY' | 'GLOBAL' = 'GLOBAL';
+
+      if (areaId || areaName) {
+        const query: any = { scope: 'AREA', isActive: { $ne: false } };
+        if (areaId) {
+          query.$or = [{ areaId }, { areaId: areaId.toString() }];
+        } else {
+          query.areaName = new RegExp(`^${areaName.trim()}$`, 'i');
+        }
+        rateDoc = await ratesColl.findOne(query);
+        if (rateDoc) rateSource = 'AREA';
+      }
+
+      // 2. City Level
+      if (!rateDoc && (cityId || cityName)) {
+        const query: any = { scope: 'CITY', isActive: { $ne: false } };
+        if (cityId) {
+          query.$or = [{ cityId }, { cityId: cityId.toString() }];
+        } else {
+          query.cityName = new RegExp(`^${cityName.trim()}$`, 'i');
+        }
+        rateDoc = await ratesColl.findOne(query);
+        if (rateDoc) rateSource = 'CITY';
+      }
+
+      // 3. Global Level
+      if (!rateDoc) {
+        rateDoc = await ratesColl.findOne({ scope: 'GLOBAL', isActive: { $ne: false } });
+        if (rateDoc) rateSource = 'GLOBAL';
+      }
+
+      const ratePerKm = Number(rateDoc?.ratePerKm) || 10;
+      const minPayout = Number(rateDoc?.minimumPayout) || 30;
+      const maxPayout = Number(rateDoc?.maximumPayout) || 150;
+
+      const dist = Math.max(1, Number(totalDistanceKm) || 3.5);
+      const rawPayout = Math.round(dist * ratePerKm);
+      const finalPayout = Math.min(maxPayout, Math.max(minPayout, rawPayout));
+
+      return {
+        payoutAmount: finalPayout,
+        ratePerKm,
+        rateSource,
+        minimumPayout: minPayout,
+        maximumPayout: maxPayout,
+      };
+    } catch {
+      return {
+        payoutAmount: Math.max(35, Math.round(25 + (totalDistanceKm || 3.5) * 8)),
+        ratePerKm: 10,
+        rateSource: 'GLOBAL',
+        minimumPayout: 30,
+        maximumPayout: 150,
+      };
+    }
   }
 
   async arrivedAtStore(userId: string, assignmentOrOrderId: string) {

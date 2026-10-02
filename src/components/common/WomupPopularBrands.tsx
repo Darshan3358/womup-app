@@ -7,6 +7,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { BrandLogo } from './BrandLogos';
+import { Award, ChevronRight } from 'lucide-react-native';
 
 interface WomupPopularBrandsProps {
   onSelectBrand?: (brand: string) => void;
@@ -71,14 +72,20 @@ export const WomupPopularBrands: React.FC<WomupPopularBrandsProps> = ({
 
   return (
     <View style={styles.sectionContainer}>
-      {/* Header with Pink Brand Accent */}
+      {/* Header with Pink Brand Accent & Professional Award Badge */}
       <View style={styles.headerRow}>
-        <View style={styles.titleWrap}>
-          <Text style={styles.sectionTitle}>Popular </Text>
-          <Text style={styles.sectionTitlePink}>Brands</Text>
+        <View style={styles.headerLeftGroup}>
+          <View style={styles.iconBadge}>
+            <Award size={19} color="#EC4899" strokeWidth={2.4} />
+          </View>
+          <View style={styles.titleWrap}>
+            <Text style={styles.sectionTitle}>Popular </Text>
+            <Text style={styles.sectionTitlePink}>Brands</Text>
+          </View>
         </View>
         <TouchableOpacity activeOpacity={0.8} onPress={onViewAll} style={styles.viewAllRow}>
-          <Text style={styles.viewAllText}>View All →</Text>
+          <Text style={styles.viewAllText}>View All</Text>
+          <ChevronRight size={15} color="#EC4A9D" strokeWidth={2.4} />
         </TouchableOpacity>
       </View>
 
@@ -136,6 +143,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 14,
+  },
+  headerLeftGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  iconBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(236, 72, 153, 0.12)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   titleWrap: {
     flexDirection: 'row',

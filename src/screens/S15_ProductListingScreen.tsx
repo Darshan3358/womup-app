@@ -13,6 +13,7 @@ import { COLORS } from '../theme/colors';
 import { SPACING, RADIUS } from '../theme/spacing';
 import { Header } from '../components/common/Header';
 import { ProductCard } from '../components/product/ProductCard';
+import { FloatingCartPill } from '../components/common/FloatingCartPill';
 import { useApp } from '../context/AppContext';
 import { ProductService } from '../services/productService';
 import { Product } from '../types';
@@ -150,9 +151,12 @@ export const S15_ProductListingScreen: React.FC = () => {
           {filteredProducts.map((prod) => (
             <ProductCard key={prod.id} product={prod} variant="horizontal" />
           ))}
-          <View style={{ height: 40 }} />
+          <View style={{ height: 90 }} />
         </ScrollView>
       )}
+
+      {/* Floating View Cart Pill */}
+      <FloatingCartPill bottomOffset={20} />
     </View>
   );
 };

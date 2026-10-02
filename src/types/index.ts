@@ -212,6 +212,7 @@ export interface BlinkitProduct {
   brand: string;
   category: string;
   packSize: string;
+  description?: string;
   sellingPrice: number;
   mrp: number;
   discountBadge?: string;

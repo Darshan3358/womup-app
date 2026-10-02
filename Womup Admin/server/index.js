@@ -15,6 +15,7 @@ const financeRouter = require('./routes/finance');
 const securityRouter = require('./routes/security');
 const citiesRouter = require('./routes/cities');
 const categoriesRouter = require('./routes/categories');
+const payoutRatesRouter = require('./routes/payoutRates');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -64,7 +65,30 @@ app.get('/api/realtime-data', async (req, res) => {
     const products = await db.collection('products').find({}).toArray();
     const categories = await db.collection('categories').find({}).toArray();
     const areas = await db.collection('areas').find({}).toArray();
-    const stores = await db.collection('stores').find({}).toArray();
+    const rawStores = await db.collection('stores').find({}).toArray();
+    const storeStaffList = await db.collection('store_staff').find({}).toArray();
+
+    const stores = rawStores.map((store) => {
+      const sId = store._id.toString();
+      const staffAtStore = storeStaffList.filter(
+        st => st.storeId && (st.storeId.toString() === sId)
+      );
+      const staffOnShift = staffAtStore.filter(st => st.isOnShift === true).length;
+      const effectiveStaffOnShift = staffOnShift > 0
+        ? staffOnShift
+        : (store.isOnShift === true ? 1 : 0);
+      const effectiveStaffTotal = Math.max(staffAtStore.length, effectiveStaffOnShift, 1);
+      const isOnline = (store.isActive !== false) && (effectiveStaffOnShift > 0);
+
+      return {
+        ...store,
+        staffOnShift: effectiveStaffOnShift,
+        staffTotal: effectiveStaffTotal,
+        isOnShift: effectiveStaffOnShift > 0,
+        isOnline,
+      };
+    });
+
     const inventory = await db.collection('inventory').find({}).toArray();
     const coinTransactions = await db.collection('coin_transactions').find({}).toArray();
     const coupons = await db.collection('coupons').find({}).toArray();
@@ -247,6 +271,7 @@ app.use('/api/admin/print-orders', printOrdersRouter);
 app.use('/api/admin/marketing', marketingRouter);
 app.use('/api/admin/finance', financeRouter);
 app.use('/api/admin/security', securityRouter);
+app.use('/api/admin/payout-rates', payoutRatesRouter);
 
 // 404 handler
 app.use((req, res) => {

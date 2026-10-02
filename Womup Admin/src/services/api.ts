@@ -18,6 +18,8 @@ import {
   SubCategoryItem,
   DarkStoreItem,
   CityItem,
+  PayoutRateItem,
+  PayoutStats,
 } from '../types/admin';
 
 const getApiBaseUrl = () => {
@@ -453,6 +455,10 @@ export const ApiService = {
               areaId: s.areaId?.toString ? s.areaId.toString() : (s.areaId || null),
               areaName: s.areaName || null,
               isActive: s.isActive !== false,
+              isOnShift: s.isOnShift === true,
+              isOnline: s.isOnline ?? (s.isActive !== false && (Number(s.staffOnShift) > 0 || s.isOnShift === true)),
+              staffOnShift: Number(s.staffOnShift || 0),
+              staffTotal: Number(s.staffTotal || 0),
               orderCount: s.orderCount,
               pendingOrders: s.pendingOrders,
               riderCount: s.riderCount,
@@ -1274,7 +1280,128 @@ export const ApiService = {
       const json = await res.json();
       return json;
     } catch (err: any) {
-      return { success: false, error: err.message || 'Network error deleting subcategory' };
+      return { success: false, error: err.message };
+    }
+  },
+
+  // 30. PAYOUT RATES - FETCH ALL
+  async fetchPayoutRates(): Promise<{
+    success: boolean;
+    data: PayoutRateItem[];
+    globalRate: PayoutRateItem;
+    stats: PayoutStats;
+    error?: string;
+  }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/payout-rates`);
+      const json = await res.json();
+      return json;
+    } catch (err: any) {
+      return {
+        success: false,
+        data: [],
+        globalRate: {
+          id: 'fallback_global',
+          scope: 'GLOBAL',
+          ratePerKm: 10,
+          minimumPayout: 30,
+          maximumPayout: 150,
+          isActive: true,
+          description: 'Global Default Rate',
+        },
+        stats: {
+          totalRates: 1,
+          activeOverridesCount: 0,
+          globalRatePerKm: 10,
+          rateRangeText: '₹10 - ₹10',
+          minRate: 10,
+          maxRate: 10,
+        },
+        error: err.message,
+      };
+    }
+  },
+
+  // 31. PAYOUT RATES - CREATE
+  async createPayoutRate(payload: Partial<PayoutRateItem>): Promise<{
+    success: boolean;
+    id?: string;
+    message?: string;
+    error?: string;
+  }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/payout-rates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed creating payout rate' };
+    }
+  },
+
+  // 32. PAYOUT RATES - UPDATE
+  async updatePayoutRate(
+    id: string,
+    updates: Partial<PayoutRateItem>
+  ): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/payout-rates/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed updating payout rate' };
+    }
+  },
+
+  // 33. PAYOUT RATES - TOGGLE ACTIVE
+  async togglePayoutRate(id: string): Promise<{ success: boolean; isActive?: boolean; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/payout-rates/${id}/toggle`, {
+        method: 'PATCH',
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed toggling payout rate' };
+    }
+  },
+
+  // 34. PAYOUT RATES - DELETE
+  async deletePayoutRate(id: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/payout-rates/${id}`, {
+        method: 'DELETE',
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed deleting payout rate' };
+    }
+  },
+
+  // 35. PAYOUT RATES - RESOLVE / SIMULATE
+  async resolvePayoutRatePreview(params: {
+    cityId?: string;
+    cityName?: string;
+    areaId?: string;
+    areaName?: string;
+    distanceKm?: number;
+  }): Promise<any> {
+    try {
+      const q = new URLSearchParams();
+      if (params.cityId) q.append('cityId', params.cityId);
+      if (params.cityName) q.append('cityName', params.cityName);
+      if (params.areaId) q.append('areaId', params.areaId);
+      if (params.areaName) q.append('areaName', params.areaName);
+      if (params.distanceKm) q.append('distanceKm', params.distanceKm.toString());
+
+      const res = await fetch(`${API_BASE_URL}/api/admin/payout-rates/resolve?${q.toString()}`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message };
     }
   },
 };

@@ -33,6 +33,8 @@ import {
   Building2,
   Navigation,
   Sliders,
+  Users,
+  AlertTriangle,
 } from 'lucide-react-native';
 import { COLORS, GRADIENTS, RADIUS, SPACING } from '../theme';
 import { ApiService } from '../services/api';
@@ -40,13 +42,20 @@ import { DarkStoreItem, CityItem, Zone } from '../types/admin';
 import { useAdminState } from '../context/AdminStateContext';
 
 export const StoresManagementScreen: React.FC = () => {
-  const { refreshFromDb, cities, zones } = useAdminState();
+  const { refreshFromDb, cities, zones, darkStores } = useAdminState();
 
   const [stores, setStores] = useState<DarkStoreItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'All' | 'Active' | 'Logged In'>('All');
+  const [filterStatus, setFilterStatus] = useState<'All' | 'Active' | 'On Shift' | 'Logged In'>('All');
+
+  // Sync stores from real-time admin context (WebSocket & DB)
+  useEffect(() => {
+    if (darkStores && darkStores.length > 0) {
+      setStores(darkStores);
+    }
+  }, [darkStores]);
 
   // Cascading City & Area Filters
   const [selectedCityFilter, setSelectedCityFilter] = useState<string>('ALL');
@@ -347,6 +356,7 @@ export const StoresManagementScreen: React.FC = () => {
     if (!matchesQuery) return false;
 
     if (filterStatus === 'Active' && s.isActive === false) return false;
+    if (filterStatus === 'On Shift' && !(Number(s.staffOnShift || 0) > 0 || s.isOnShift)) return false;
     if (filterStatus === 'Logged In' && !s.lastLoginAt) return false;
 
     // Filter by City
@@ -588,7 +598,7 @@ export const StoresManagementScreen: React.FC = () => {
 
         {/* Row 3: Status Filter Chips */}
         <View style={styles.filterChipsRow}>
-          {(['All', 'Active', 'Logged In'] as const).map((filter) => (
+          {(['All', 'Active', 'On Shift', 'Logged In'] as const).map((filter) => (
             <TouchableOpacity
               key={filter}
               style={[styles.filterChip, filterStatus === filter && styles.filterChipActive]}
@@ -665,6 +675,10 @@ export const StoresManagementScreen: React.FC = () => {
                   {cityStores.map((store) => {
                     const hasLogin = !!store.loginId;
                     const hasLoggedIn = !!store.lastLoginAt;
+                    const isStoreActive = store.isActive !== false;
+                    const staffOnShift = Number(store.staffOnShift ?? (store.isOnShift ? 1 : 0));
+                    const staffTotal = Number(store.staffTotal ?? (staffOnShift > 0 ? staffOnShift : 1));
+                    const hasPickers = staffOnShift > 0;
 
                     return (
                       <View key={store.id} style={styles.storeCard}>
@@ -673,18 +687,49 @@ export const StoresManagementScreen: React.FC = () => {
                           <View style={styles.storeMainInfo}>
                             <View style={styles.storeTitleRow}>
                               <Text style={styles.storeName}>{store.name}</Text>
-                              {store.isActive ? (
-                                <View style={styles.activeTag}>
-                                  <View style={styles.activeDot} />
-                                  <Text style={styles.activeTagText}>ONLINE</Text>
+                              {!isStoreActive ? (
+                                <View style={[styles.activeTag, styles.statusInactiveTag]}>
+                                  <View style={[styles.activeDot, { backgroundColor: COLORS.error }]} />
+                                  <Text style={[styles.activeTagText, { color: COLORS.error }]}>STORE INACTIVE</Text>
+                                </View>
+                              ) : hasPickers ? (
+                                <View style={[styles.activeTag, styles.statusOnlineTag]}>
+                                  <View style={[styles.activeDot, { backgroundColor: COLORS.success }]} />
+                                  <Text style={[styles.activeTagText, { color: COLORS.success }]}>
+                                    STORE ACTIVE · {staffOnShift}/{staffTotal} ON SHIFT
+                                  </Text>
                                 </View>
                               ) : (
-                                <View style={[styles.activeTag, { backgroundColor: '#FDE8E8' }]}>
-                                  <Text style={[styles.activeTagText, { color: COLORS.error }]}>INACTIVE</Text>
+                                <View style={[styles.activeTag, styles.statusWarningTag]}>
+                                  <View style={[styles.activeDot, { backgroundColor: '#F59E0B' }]} />
+                                  <Text style={[styles.activeTagText, { color: '#B45309' }]}>
+                                    STORE ACTIVE · NO PICKERS
+                                  </Text>
                                 </View>
                               )}
                             </View>
-                            <Text style={styles.storeCode}>CODE: {store.code}</Text>
+
+                            <View style={styles.storeMetaRow}>
+                              <Text style={styles.storeCode}>CODE: {store.code}</Text>
+                              {isStoreActive && (
+                                <View style={[styles.pickerLiveIndicator, !hasPickers && styles.pickerLiveIndicatorWarning]}>
+                                  <Users size={12} color={hasPickers ? COLORS.success : '#B45309'} style={{ marginRight: 5 }} />
+                                  <Text style={[styles.pickerLiveText, { color: hasPickers ? COLORS.success : '#B45309' }]}>
+                                    {hasPickers ? `${staffOnShift} of ${staffTotal} pickers on shift` : '0 pickers on shift'}
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
+
+                            {/* Warning Banner if Store is Active but 0 pickers on shift */}
+                            {isStoreActive && !hasPickers && (
+                              <View style={styles.unattendedWarningBox}>
+                                <AlertTriangle size={13} color="#D97706" style={{ marginRight: 6 }} />
+                                <Text style={styles.unattendedWarningText}>
+                                  ⚠️ Orders may not be picked — no pickers currently on shift
+                                </Text>
+                              </View>
+                            )}
                           </View>
                         </View>
 
@@ -1875,6 +1920,61 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     color: COLORS.success,
+  },
+  statusOnlineTag: {
+    backgroundColor: '#E6F9F0',
+    borderWidth: 1,
+    borderColor: '#B7F0D0',
+  },
+  statusWarningTag: {
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  statusInactiveTag: {
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  storeMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 3,
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  pickerLiveIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E6F9F0',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: RADIUS.pill,
+  },
+  pickerLiveIndicatorWarning: {
+    backgroundColor: '#FEF3C7',
+  },
+  pickerLiveText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  unattendedWarningBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginTop: 8,
+  },
+  unattendedWarningText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#B45309',
+    flex: 1,
   },
   storeCode: {
     fontSize: 11,

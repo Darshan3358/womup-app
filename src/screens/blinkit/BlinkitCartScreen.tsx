@@ -133,7 +133,7 @@ export const BlinkitCartScreen: React.FC = () => {
                   <Image
                     source={{ uri: entry.product.imageUrl }}
                     style={styles.itemRealImage}
-                    resizeMode="contain"
+                    resizeMode="cover"
                   />
                 </View>
 
@@ -391,11 +391,11 @@ const styles = StyleSheet.create({
     borderBottomColor: COLORS.border,
   },
   itemEmojiContainer: {
-    width: 52,
-    height: 52,
+    width: 60,
+    height: 60,
     borderRadius: 8,
-    backgroundColor: '#f0f7f0',
-    padding: 4,
+    backgroundColor: '#F8FAFC',
+    padding: 0,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -404,7 +404,7 @@ const styles = StyleSheet.create({
   itemRealImage: {
     width: '100%',
     height: '100%',
-    resizeMode: 'contain',
+    resizeMode: 'cover',
   },
   itemDetails: {
     flex: 1,

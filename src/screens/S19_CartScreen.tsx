@@ -65,7 +65,7 @@ export const S19_CartScreen: React.FC = () => {
                   <Image
                     source={item.product.image || { uri: item.product.imageUrl }}
                     style={styles.itemImage}
-                    resizeMode="contain"
+                    resizeMode="cover"
                   />
                 ) : (
                   <View style={styles.itemIconCircle}>

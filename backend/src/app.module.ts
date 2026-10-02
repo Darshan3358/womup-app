@@ -20,6 +20,7 @@ import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { AreasModule } from './areas/areas.module';
 import { DeliveryModule } from './delivery/delivery.module';
 import { StoreModule } from './store/store.module';
+import { HomeModule } from './home/home.module';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { StoreModule } from './store/store.module';
     AreasModule,
     DeliveryModule,
     StoreModule,
+    HomeModule,
   ],
   controllers: [AppController],
 })

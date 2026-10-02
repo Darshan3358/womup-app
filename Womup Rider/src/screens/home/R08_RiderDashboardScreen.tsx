@@ -276,6 +276,14 @@ export const RiderDashboardScreen: React.FC = () => {
             <Text style={styles.metaItem}>Drop: {incomingJobOffer.distanceKm} km</Text>
             <Text style={styles.metaItem}>•</Text>
             <Text style={styles.metaPayout}>Earning: ₹{incomingJobOffer.payoutAmount}</Text>
+            {incomingJobOffer.ratePerKm != null && (
+              <>
+                <Text style={styles.metaItem}>•</Text>
+                <Text style={[styles.metaItem, { color: '#059669', fontWeight: '700' }]}>
+                  ₹{incomingJobOffer.ratePerKm}/km
+                </Text>
+              </>
+            )}
           </View>
 
           <View style={styles.offerActionsRow}>

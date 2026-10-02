@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../theme/colors';
 import { SPACING, RADIUS } from '../theme/spacing';
 import { ProductCard } from '../components/product/ProductCard';
+import { FloatingCartPill } from '../components/common/FloatingCartPill';
 import { useApp } from '../context/AppContext';
 import { ProductService } from '../services/productService';
 import { Product } from '../types';
@@ -240,6 +241,9 @@ export const S17_SearchScreen: React.FC = () => {
         onResult={handleVoiceResult}
         initialQuery={query}
       />
+
+      {/* Floating View Cart Pill */}
+      <FloatingCartPill bottomOffset={20} />
     </View>
   );
 };

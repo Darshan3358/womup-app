@@ -5,8 +5,92 @@ import { api } from './api';
 let cachedProducts: Product[] = [];
 let cachedCategories: Category[] = [];
 
+export function mapRawItemToProduct(item: any): Product {
+  const variants: ProductVariantPriced[] = Array.isArray(item.variants)
+    ? item.variants.map((v: any) => ({
+        id: v.id || v._id || `${item._id}_v`,
+        label: v.label || `${v.quantity || ''} ${v.unit || ''}`.trim() || '1 unit',
+        price: Number(v.price ?? v.sellingPrice ?? item.sellingPrice ?? 0),
+        mrp: Number(v.mrp ?? item.mrp ?? 0),
+        discountPercent: Number(v.discountPercent ?? item.discountPercent ?? 0),
+        stock: Number(v.stock ?? 100),
+        isAvailable: v.isAvailable !== false,
+        isDefault: !!v.isDefault,
+      }))
+    : [];
+
+  const defaultVariant = variants.find((v) => v.isDefault) || variants[0];
+  const effectiveSellingPrice = defaultVariant ? defaultVariant.price : (item.sellingPrice ?? 0);
+  const effectiveMrp = defaultVariant ? defaultVariant.mrp : (item.mrp ?? effectiveSellingPrice);
+  const effectiveDiscount = defaultVariant ? defaultVariant.discountPercent : (item.discountPercent ?? 0);
+  const effectiveLabel = defaultVariant ? defaultVariant.label : (item.quantityLabel || '1 unit');
+
+  const catObj = item.categoryId;
+  const catIdStr = catObj?._id ? catObj._id.toString() : (catObj ? catObj.toString() : 'cooking');
+  const catSlug = catObj?.slug || '';
+  const catName = catObj?.name || '';
+
+  return {
+    id: item._id || item.id,
+    name: item.name,
+    brand: item.brand,
+    categoryId: catIdStr,
+    categorySlug: catSlug,
+    categoryName: catName,
+    subCategoryId: item.subCategoryId,
+    imageUrl: item.imageUrl,
+    quantityLabel: effectiveLabel,
+    mrp: effectiveMrp,
+    sellingPrice: effectiveSellingPrice,
+    discountPercent: effectiveDiscount,
+    shoppingCoins: item.shoppingCoins || 10,
+    rating: Number(Number(item.rating || 4.8).toFixed(1)),
+    reviewCount: item.reviewCount || 0,
+    stock: defaultVariant ? defaultVariant.stock : (item.stock || 100),
+    isPopular: item.isPopular || false,
+    isDeal: item.isDeal || false,
+    deliveryMinutes: item.deliveryMinutes || 9,
+    description: item.description || '',
+    specifications: item.specifications || {},
+    variants,
+  };
+}
+
 export const ProductService = {
   // --- Live API Methods (Fetching directly from MongoDB Atlas) ---
+  async fetchHomeSections(params: { storeId?: string; areaId?: string } = {}): Promise<{
+    hero: any[];
+    categories: any[];
+    sections: {
+      id: string;
+      title: string;
+      subtitle: string;
+      icon: string;
+      viewAllFilter?: string;
+      viewAllLink?: string;
+      categoryName?: string;
+      products: Product[];
+    }[];
+  } | null> {
+    const queryParts: string[] = [];
+    if (params.storeId) queryParts.push(`storeId=${encodeURIComponent(params.storeId)}`);
+    if (params.areaId) queryParts.push(`areaId=${encodeURIComponent(params.areaId)}`);
+    const qs = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+
+    const res = await api.get<any>(`/home/sections${qs}`);
+    if (res.success && res.data?.sections) {
+      return {
+        hero: res.data.hero || [],
+        categories: res.data.categories || [],
+        sections: res.data.sections.map((sec: any) => ({
+          ...sec,
+          products: (sec.products || []).map(mapRawItemToProduct),
+        })),
+      };
+    }
+    return null;
+  },
+
   async fetchProducts(params: {
     areaId?: string;
     storeId?: string;
@@ -39,57 +123,7 @@ export const ProductService = {
     const res = await api.get<{ items: any[] }>(`/products${queryString}`);
 
     if (res.success && res.data?.items) {
-      const mapped: Product[] = res.data.items.map((item: any) => {
-        const variants: ProductVariantPriced[] = Array.isArray(item.variants)
-          ? item.variants.map((v: any) => ({
-              id: v.id || v._id || `${item._id}_v`,
-              label: v.label || `${v.quantity || ''} ${v.unit || ''}`.trim() || '1 unit',
-              price: Number(v.price ?? v.sellingPrice ?? item.sellingPrice ?? 0),
-              mrp: Number(v.mrp ?? item.mrp ?? 0),
-              discountPercent: Number(v.discountPercent ?? item.discountPercent ?? 0),
-              stock: Number(v.stock ?? 100),
-              isAvailable: v.isAvailable !== false,
-              isDefault: !!v.isDefault,
-            }))
-          : [];
-
-        // Pick default variant or first variant for card price/label if variants exist
-        const defaultVariant = variants.find((v) => v.isDefault) || variants[0];
-        const effectiveSellingPrice = defaultVariant ? defaultVariant.price : (item.sellingPrice ?? 0);
-        const effectiveMrp = defaultVariant ? defaultVariant.mrp : (item.mrp ?? effectiveSellingPrice);
-        const effectiveDiscount = defaultVariant ? defaultVariant.discountPercent : (item.discountPercent ?? 0);
-        const effectiveLabel = defaultVariant ? defaultVariant.label : (item.quantityLabel || '1 unit');
-
-        const catObj = item.categoryId;
-        const catIdStr = catObj?._id ? catObj._id.toString() : (catObj ? catObj.toString() : 'cooking');
-        const catSlug = catObj?.slug || '';
-        const catName = catObj?.name || '';
-
-        return {
-          id: item._id || item.id,
-          name: item.name,
-          brand: item.brand,
-          categoryId: catIdStr,
-          categorySlug: catSlug,
-          categoryName: catName,
-          subCategoryId: item.subCategoryId,
-          imageUrl: item.imageUrl,
-          quantityLabel: effectiveLabel,
-          mrp: effectiveMrp,
-          sellingPrice: effectiveSellingPrice,
-          discountPercent: effectiveDiscount,
-          shoppingCoins: item.shoppingCoins || 10,
-          rating: Number(Number(item.rating || 4.8).toFixed(1)),
-          reviewCount: item.reviewCount || 0,
-          stock: defaultVariant ? defaultVariant.stock : (item.stock || 100),
-          isPopular: item.isPopular || false,
-          isDeal: item.isDeal || false,
-          deliveryMinutes: item.deliveryMinutes || 9,
-          description: item.description || '',
-          specifications: item.specifications || {},
-          variants,
-        };
-      });
+      const mapped: Product[] = res.data.items.map(mapRawItemToProduct);
 
       // If fetching general catalog, update cachedProducts
       if (!params.categoryId && (!params.categoryIds || params.categoryIds.length === 0) && !params.search) {

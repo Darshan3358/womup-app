@@ -33,6 +33,7 @@ export type ActiveTab =
   | 'Stores'
   | 'Locations'
   | 'Categories'
+  | 'PayoutRates'
   | 'More';
 
 export type ActiveSubView =
@@ -473,6 +474,57 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
               };
             }
             return item;
+          })
+        );
+      }
+      refreshFromDb();
+    });
+
+    // Real-time Store Staff Shift Sync (Picker On/Off Shift)
+    socket.on('staff_shift_changed', (data: any) => {
+      if (data && data.storeId) {
+        const sId = data.storeId.toString();
+        setDarkStores((prev) =>
+          prev.map((store) => {
+            const isMatch = store.id === sId || (store as any)._id === sId || store.code === data.storeCode;
+            if (isMatch) {
+              const staffOnShift = Number(data.staffOnShiftCount ?? (data.isOnShift ? 1 : 0));
+              const staffTotal = Number(data.staffTotal ?? store.staffTotal ?? (staffOnShift > 0 ? staffOnShift : 1));
+              const isOnline = data.isOnline !== undefined ? Boolean(data.isOnline) : (store.isActive !== false && staffOnShift > 0);
+              return {
+                ...store,
+                isOnShift: Boolean(data.isOnShift),
+                staffOnShift,
+                staffTotal: Math.max(staffTotal, staffOnShift),
+                isOnline,
+              };
+            }
+            return store;
+          })
+        );
+      }
+      refreshFromDb();
+    });
+
+    socket.on('store_shift_update', (data: any) => {
+      if (data && data.storeId) {
+        const sId = data.storeId.toString();
+        setDarkStores((prev) =>
+          prev.map((store) => {
+            const isMatch = store.id === sId || (store as any)._id === sId || store.code === data.storeCode;
+            if (isMatch) {
+              const staffOnShift = Number(data.staffOnShiftCount ?? (data.isOnShift ? 1 : 0));
+              const staffTotal = Number(data.staffTotal ?? store.staffTotal ?? (staffOnShift > 0 ? staffOnShift : 1));
+              const isOnline = data.isOnline !== undefined ? Boolean(data.isOnline) : (store.isActive !== false && staffOnShift > 0);
+              return {
+                ...store,
+                isOnShift: Boolean(data.isOnShift),
+                staffOnShift,
+                staffTotal: Math.max(staffTotal, staffOnShift),
+                isOnline,
+              };
+            }
+            return store;
           })
         );
       }

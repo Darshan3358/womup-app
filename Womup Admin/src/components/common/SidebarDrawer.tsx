@@ -293,6 +293,23 @@ export const SidebarDrawer: React.FC = () => {
               <ChevronRight size={16} color={COLORS.secondaryText} />
             </TouchableOpacity>
 
+            {/* 11. Rider Per-KM Payout Rates */}
+            <TouchableOpacity
+              style={[
+                styles.menuItem,
+                activeTab === 'PayoutRates' && subView === 'none' && styles.menuItemActive,
+              ]}
+              onPress={() => handleNavigateTab('PayoutRates')}
+            >
+              <View style={[styles.iconContainer, activeTab === 'PayoutRates' && subView === 'none' && styles.iconActive]}>
+                <Coins size={18} color={activeTab === 'PayoutRates' && subView === 'none' ? COLORS.white : '#10B981'} />
+              </View>
+              <Text style={[styles.menuLabel, activeTab === 'PayoutRates' && subView === 'none' && styles.menuLabelActive]}>
+                Rider Payout Rates (Per-KM)
+              </Text>
+              <ChevronRight size={16} color={COLORS.secondaryText} />
+            </TouchableOpacity>
+
             <Text style={[styles.menuSectionTitle, { marginTop: SPACING.md }]}>
               EXTENDED SYSTEMS
             </Text>

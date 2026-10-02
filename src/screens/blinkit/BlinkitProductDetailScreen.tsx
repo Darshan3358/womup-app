@@ -183,7 +183,7 @@ export const BlinkitProductDetailScreen: React.FC = () => {
             <Image
               source={{ uri: product.galleryImages?.[activeImageIndex] || product.imageUrl }}
               style={styles.carouselImage}
-              resizeMode="contain"
+              resizeMode="cover"
             />
           </View>
 
@@ -541,17 +541,17 @@ const styles = StyleSheet.create({
     borderBottomColor: COLORS.border,
   },
   carouselImageContainer: {
-    height: 260,
     width: '100%',
+    aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 8,
+    backgroundColor: '#F8FAFC',
+    overflow: 'hidden',
   },
   carouselImage: {
     width: '100%',
     height: '100%',
-    resizeMode: 'contain',
-    borderRadius: 12,
+    resizeMode: 'cover',
   },
   dotsRow: {
     flexDirection: 'row',

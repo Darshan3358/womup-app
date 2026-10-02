@@ -84,6 +84,9 @@ interface StoreContextType {
   adjustStock: (productId: string, delta: number, reason: string, changeType?: string) => Promise<void>;
   updateShelfLocation: (productId: string, shelfLocation: string) => Promise<void>;
   addNewProduct: (productData: any) => Promise<boolean>;
+  setActiveOrder: React.Dispatch<React.SetStateAction<StoreOrder | null>>;
+  setActivePickList: React.Dispatch<React.SetStateAction<PickList | null>>;
+  clearActivePicking: () => void;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -205,11 +208,49 @@ const enrichStore = (rawStore: any): StoreHub | null => {
       }
     });
 
+    // 5. Order status updates (PACKED, OUT_FOR_DELIVERY, DELIVERED, CANCELLED)
+    storeSocket.on('order_status', (payload: any) => {
+      console.log('[StoreContext] 📦 WS order_status update:', payload);
+      const updatedOrderId = (payload?.orderId || '').toString();
+      const updatedOrderNum = payload?.orderNumber?.toString();
+      const updatedStatus = payload?.status;
+
+      // If active picking order is completed, packed, handed over, or delivered, clear picking state!
+      if (
+        ['PACKED', 'HANDED_OVER', 'GOING_TO_STORE', 'ARRIVED_AT_STORE', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'].includes(
+          updatedStatus
+        )
+      ) {
+        setActiveOrder((prev) => {
+          if (!prev) return null;
+          const currentId = (prev.id || prev._id || (prev as any).orderId || '').toString();
+          const currentNum = prev.orderNumber?.toString();
+          if (
+            (updatedOrderId && currentId === updatedOrderId) ||
+            (updatedOrderNum && currentNum === updatedOrderNum)
+          ) {
+            console.log(`[StoreContext] Clearing activeOrder ${currentNum || currentId} (new status: ${updatedStatus})`);
+            setActivePickList(null);
+            setSubScreen(null);
+            return null;
+          }
+          return prev;
+        });
+      }
+
+      // Refresh queues to guarantee real-time parity
+      refreshIncoming();
+      refreshPicking();
+      refreshReady();
+      refreshCompletedOrders();
+    });
+
     return () => {
       storeSocket.off('new_order');
       storeSocket.off('rider_at_store');
       storeSocket.off('inventory_update');
       storeSocket.off('store_shift_update');
+      storeSocket.off('order_status');
     };
   }, [authStep, store?.id]);
 
@@ -463,13 +504,30 @@ const enrichStore = (rawStore: any): StoreHub | null => {
     await StoreApiService.readyForPickup(orderId, shelfSlot);
     refreshReady();
     setSubScreen(null);
+    setActiveOrder((prev) => {
+      const curId = (prev?.id || prev?._id || (prev as any)?.orderId || '').toString();
+      return curId === orderId.toString() ? null : prev;
+    });
+    setActivePickList(null);
   };
 
   const completeHandover = async (orderId: string, bagBarcode: string) => {
     await StoreApiService.handover(orderId, bagBarcode);
     refreshReady();
+    refreshCompletedOrders();
     setSubScreen(null);
+    setActiveOrder((prev) => {
+      const curId = (prev?.id || prev?._id || (prev as any)?.orderId || '').toString();
+      return curId === orderId.toString() ? null : prev;
+    });
+    setActivePickList(null);
     dismissRiderAlert();
+  };
+
+  const clearActivePicking = () => {
+    setActiveOrder(null);
+    setActivePickList(null);
+    setSubScreen(null);
   };
 
   const adjustStock = async (productId: string, delta: number, reason: string, changeType?: string) => {
@@ -480,12 +538,22 @@ const enrichStore = (rawStore: any): StoreHub | null => {
   const updateShelfLocation = async (productId: string, shelfLocation: string) => {
     const clean = shelfLocation.trim().toUpperCase();
     await StoreApiService.updateShelfLocation(productId, clean);
-    // Optimistic update
+    // Optimistic update in inventory
     setInventory((prev) =>
       prev.map((item) =>
         item.productId === productId ? { ...item, shelfLocation: clean } : item
       )
     );
+    // Optimistic update in activePickList if currently picking this product
+    setActivePickList((prev) => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        items: prev.items.map((it) =>
+          it.productId?.toString() === productId ? { ...it, shelfLocation: clean } : it
+        ),
+      };
+    });
     await refreshInventory();
   };
 
@@ -559,6 +627,9 @@ const enrichStore = (rawStore: any): StoreHub | null => {
         adjustStock,
         updateShelfLocation,
         addNewProduct,
+        setActiveOrder,
+        setActivePickList,
+        clearActivePicking,
       }}
     >
       {children}

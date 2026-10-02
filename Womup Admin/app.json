@@ -14,6 +14,10 @@
     "web": {
       "bundler": "metro"
     },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.web3apk.womupadmin"
+    },
     "android": {
       "package": "com.web3apk.womupadmin",
       "adaptiveIcon": {
