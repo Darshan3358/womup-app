@@ -101,6 +101,14 @@ const MainRiderApp: React.FC = () => {
 };
 
 export default function App() {
+  React.useEffect(() => {
+    if (typeof window !== 'undefined' && window.history) {
+      try {
+        window.history.replaceState(null, '', '/');
+      } catch (e) {}
+    }
+  }, []);
+
   return (
     <SafeAreaProvider>
       <RiderProvider>

@@ -328,6 +328,19 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, []);
 
   useEffect(() => {
+    // Always reset navigation to Dashboard on boot/reload
+    setActiveTab('Dashboard');
+    setSubView('none');
+    setPreviousSubView('none');
+    setActiveModal('none');
+    setIsSidebarOpen(false);
+
+    if (typeof window !== 'undefined' && window.history) {
+      try {
+        window.history.replaceState(null, '', '/');
+      } catch (e) {}
+    }
+
     refreshFromDb();
 
     // Connect to NestJS authoritative WebSocket Tracking Gateway

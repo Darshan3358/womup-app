@@ -29,6 +29,14 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 }
 
 export default function App() {
+  React.useEffect(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      try {
+        window.history.replaceState(null, '', '/');
+      } catch (e) {}
+    }
+  }, []);
+
   return (
     <SafeAreaProvider>
       <AppProvider>

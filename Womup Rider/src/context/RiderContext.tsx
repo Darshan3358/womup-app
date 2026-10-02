@@ -266,6 +266,22 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const checkSession = useCallback(async () => {
+    // Always reset navigation to Home tab and close any modals on app boot/reload
+    setCurrentTab('Home');
+    setSubScreen('None');
+    setShowNewRequestModal(false);
+    setShowRejectModal(false);
+    setShowOtpModal(false);
+    setShowEmergencyModal(false);
+    setShowPickupModal(false);
+    setShowUnavailableModal(false);
+
+    if (typeof window !== 'undefined' && window.history) {
+      try {
+        window.history.replaceState(null, '', '/');
+      } catch (e) {}
+    }
+
     try {
       const hasToken = await RiderApiService.hasValidToken();
       if (!hasToken) {

@@ -134,6 +134,20 @@ const enrichStore = (rawStore: any): StoreHub | null => {
 // Initialize Session
   useEffect(() => {
     const initSession = async () => {
+      // Always reset navigation state to default Dashboard on app boot/reload
+      setCurrentTab('Dashboard');
+      setSubScreen(null);
+      setSidebarOpen(false);
+      setActiveOrder(null);
+      setActivePickList(null);
+      setRiderArrivalAlert(null);
+
+      if (typeof window !== 'undefined' && window.history) {
+        try {
+          window.history.replaceState(null, '', '/');
+        } catch (e) {}
+      }
+
       try {
         const token = await AsyncStorage.getItem(TOKEN_STORAGE_KEY);
         if (!token) {

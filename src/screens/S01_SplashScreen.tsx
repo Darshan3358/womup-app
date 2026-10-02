@@ -31,32 +31,18 @@ export const S01_SplashScreen: React.FC = () => {
           StorageService.KEYS.USER,
           null
         );
-        const savedScreen = await StorageService.getItem<string | null>(
-          StorageService.KEYS.ACTIVE_SCREEN,
-          null
-        );
+
+        // Always clear any persisted active screen to ensure reloads open Home
+        await StorageService.removeItem(StorageService.KEYS.ACTIVE_SCREEN);
 
         if (token) {
           api.setToken(token);
           if (savedUser && isMounted) {
             setUser(savedUser);
           }
-
-          const validTarget =
-            savedScreen &&
-            savedScreen !== 'C01_Splash' &&
-            savedScreen !== 'C02_Onboarding1' &&
-            savedScreen !== 'C03_Onboarding2' &&
-            savedScreen !== 'C04_Onboarding3' &&
-            savedScreen !== 'C05_Onboarding4' &&
-            savedScreen !== 'C06_MobileNumber' &&
-            savedScreen !== 'C07_OtpVerification'
-              ? (savedScreen as any)
-              : 'Blinkit_Home';
-          targetScreenRef.current = validTarget;
-        } else {
-          targetScreenRef.current = 'Blinkit_Home';
         }
+        // Always reset to Home on reload / launch
+        targetScreenRef.current = 'Blinkit_Home';
       } catch (e) {
         console.warn('Session check error:', e);
         targetScreenRef.current = 'Blinkit_Home';

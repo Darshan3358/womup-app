@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { Platform } from 'react-native';
 import {
   Product,
   CartItem,
@@ -340,7 +341,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Automatically redirect legacy C12_Home to modern Blinkit_Home
     const targetScreen = screen === 'C12_Home' ? 'Blinkit_Home' : screen;
     setActiveScreenState(targetScreen);
-    StorageService.saveItem(StorageService.KEYS.ACTIVE_SCREEN, targetScreen);
+    // Never persist navigation route to storage so reloads always reset to Home
     setHistory((prev) => {
       if (TAB_SCREENS.includes(targetScreen)) {
         return [targetScreen];
@@ -524,20 +525,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
         }
 
-        // Restore Active Screen on refresh
-        const savedScreen = await StorageService.getItem<ScreenId | null>(
-          StorageService.KEYS.ACTIVE_SCREEN,
-          null
-        );
-        const validTarget =
-          savedScreen &&
-          savedScreen !== 'C01_Splash' &&
-          savedScreen !== 'C02_Onboarding1' &&
-          savedScreen !== 'C06_MobileNumber' &&
-          savedScreen !== 'C07_OtpVerification'
-            ? savedScreen
-            : 'Blinkit_Home';
-        setActiveScreenState(validTarget);
+        // Clear any persisted active screen to ensure reloads always open Home
+        await StorageService.removeItem(StorageService.KEYS.ACTIVE_SCREEN);
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          try {
+            window.history.replaceState(null, '', '/');
+          } catch (e) {}
+        }
       } catch (e) {
         console.warn('Session restoration error:', e);
       }
