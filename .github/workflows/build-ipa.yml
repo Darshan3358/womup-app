@@ -128,11 +128,16 @@ jobs:
       - name: Build & Archive iOS Project
         if: inputs.build_mode == 'standalone_macos'
         run: |
-          WORKSPACE=$(ls -d ios/*.xcworkspace | head -n 1)
-          SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list 2>/dev/null | awk '/Schemes:/{flag=1;next}/^[A-Z]/{flag=0}flag' | tr -d ' ' | head -n 1)
+          WORKSPACE=$(ls -d ios/*.xcworkspace 2>/dev/null | head -n 1)
+          APP_PROJECT=$(ls -d ios/*.xcodeproj 2>/dev/null | head -n 1)
+          SCHEME=""
+          if [ -n "$APP_PROJECT" ]; then
+            SCHEME=$(basename "$APP_PROJECT" .xcodeproj)
+          fi
           if [ -z "$SCHEME" ]; then
             SCHEME="WormUp"
           fi
+          echo "Selected Workspace: $WORKSPACE"
           echo "Selected Scheme: $SCHEME"
           mkdir -p build
 
@@ -211,8 +216,17 @@ jobs:
       - name: Build & Archive Admin iOS
         run: |
           cd "Womup Admin"
-          WORKSPACE=$(ls -d ios/*.xcworkspace | head -n 1)
-          SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list 2>/dev/null | awk '/Schemes:/{flag=1;next}/^[A-Z]/{flag=0}flag' | tr -d ' ' | head -n 1)
+          WORKSPACE=$(ls -d ios/*.xcworkspace 2>/dev/null | head -n 1)
+          APP_PROJECT=$(ls -d ios/*.xcodeproj 2>/dev/null | head -n 1)
+          SCHEME=""
+          if [ -n "$APP_PROJECT" ]; then
+            SCHEME=$(basename "$APP_PROJECT" .xcodeproj)
+          fi
+          if [ -z "$SCHEME" ]; then
+            SCHEME="WomupAdminConsole"
+          fi
+          echo "Selected Workspace: $WORKSPACE"
+          echo "Selected Scheme: $SCHEME"
           mkdir -p build
           xcodebuild -workspace "$WORKSPACE" \
             -scheme "$SCHEME" \
@@ -284,8 +298,17 @@ jobs:
       - name: Build & Archive Rider iOS
         run: |
           cd "Womup Rider"
-          WORKSPACE=$(ls -d ios/*.xcworkspace | head -n 1)
-          SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list 2>/dev/null | awk '/Schemes:/{flag=1;next}/^[A-Z]/{flag=0}flag' | tr -d ' ' | head -n 1)
+          WORKSPACE=$(ls -d ios/*.xcworkspace 2>/dev/null | head -n 1)
+          APP_PROJECT=$(ls -d ios/*.xcodeproj 2>/dev/null | head -n 1)
+          SCHEME=""
+          if [ -n "$APP_PROJECT" ]; then
+            SCHEME=$(basename "$APP_PROJECT" .xcodeproj)
+          fi
+          if [ -z "$SCHEME" ]; then
+            SCHEME="WomupRider"
+          fi
+          echo "Selected Workspace: $WORKSPACE"
+          echo "Selected Scheme: $SCHEME"
           mkdir -p build
           xcodebuild -workspace "$WORKSPACE" \
             -scheme "$SCHEME" \
@@ -357,8 +380,17 @@ jobs:
       - name: Build & Archive Store iOS
         run: |
           cd "Womup Store"
-          WORKSPACE=$(ls -d ios/*.xcworkspace | head -n 1)
-          SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list 2>/dev/null | awk '/Schemes:/{flag=1;next}/^[A-Z]/{flag=0}flag' | tr -d ' ' | head -n 1)
+          WORKSPACE=$(ls -d ios/*.xcworkspace 2>/dev/null | head -n 1)
+          APP_PROJECT=$(ls -d ios/*.xcodeproj 2>/dev/null | head -n 1)
+          SCHEME=""
+          if [ -n "$APP_PROJECT" ]; then
+            SCHEME=$(basename "$APP_PROJECT" .xcodeproj)
+          fi
+          if [ -z "$SCHEME" ]; then
+            SCHEME="WomupStore"
+          fi
+          echo "Selected Workspace: $WORKSPACE"
+          echo "Selected Scheme: $SCHEME"
           mkdir -p build
           xcodebuild -workspace "$WORKSPACE" \
             -scheme "$SCHEME" \

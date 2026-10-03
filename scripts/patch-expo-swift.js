@@ -10,10 +10,36 @@ const path = require('path');
 function patchFile(filePath) {
   try {
     let content = fs.readFileSync(filePath, 'utf8');
-    if (content.includes('swift-tools-version: 6.2')) {
-      content = content.replace(/swift-tools-version:\s*6\.2/g, 'swift-tools-version: 6.0');
+    let modified = false;
+
+    // 1. Downgrade swift-tools-version: 6.2+ to 6.0 (Xcode 16.2 only supports up to 6.0)
+    if (/swift-tools-version:\s*6\.[1-9]/.test(content)) {
+      content = content.replace(/swift-tools-version:\s*6\.[1-9](\.\d+)?/g, 'swift-tools-version: 6.0');
+      modified = true;
+    }
+
+    // 2. Fix trailing commas before closing parenthesis ')'
+    // Swift 6.0 (Xcode 16.2) does NOT support trailing commas in function argument lists (added in Swift 6.2).
+    if (/,\s*\)/.test(content)) {
+      content = content.replace(/,\s*\)/g, (match) => match.replace(',', ''));
+      modified = true;
+    }
+
+    // 3. Remove/comment upcoming features introduced in Swift 6.2
+    if (content.includes('NonisolatedNonsendingByDefault') || content.includes('InferIsolatedConformances')) {
+      const updated = content.replace(
+        /^[ \t]*\.enableUpcomingFeature\("(NonisolatedNonsendingByDefault|InferIsolatedConformances)"\),?/gm,
+        '        // .enableUpcomingFeature("$1"),'
+      );
+      if (updated !== content) {
+        content = updated;
+        modified = true;
+      }
+    }
+
+    if (modified) {
       fs.writeFileSync(filePath, content, 'utf8');
-      console.log(`[patch-expo-swift] Successfully patched: ${filePath} -> swift-tools-version: 6.0`);
+      console.log(`[patch-expo-swift] Successfully patched: ${filePath}`);
     }
   } catch (err) {
     console.warn(`[patch-expo-swift] Error reading/writing ${filePath}:`, err.message);
