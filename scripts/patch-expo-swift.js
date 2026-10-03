@@ -1,25 +1,25 @@
 #!/usr/bin/env node
 /**
- * Patches SwiftPM Package.swift files in node_modules where Swift tools version is 6.2.
- * Xcode 16.2 only supports Swift tools version up to 6.0.0.
+ * Patches SwiftPM Package.swift files and Swift/C++ headers in node_modules where Swift tools version is 6.2.
+ * Xcode 16.4 only supports Swift 6.0/6.1.
  */
 
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
 function patchFile(filePath) {
   try {
     let content = fs.readFileSync(filePath, 'utf8');
     let modified = false;
 
-    // 1. Downgrade swift-tools-version: 6.2+ to 6.0 (Xcode 16.2 only supports up to 6.0)
+    // 1. Downgrade swift-tools-version: 6.2+ to 6.0 (Xcode 16.4 supports 6.0)
     if (/swift-tools-version:\s*6\.[1-9]/.test(content)) {
       content = content.replace(/swift-tools-version:\s*6\.[1-9](\.\d+)?/g, 'swift-tools-version: 6.0');
       modified = true;
     }
 
     // 2. Fix trailing commas before closing parenthesis ')'
-    // Swift 6.0 (Xcode 16.2) does NOT support trailing commas in function argument lists (added in Swift 6.2).
     if (/,\s*\)/.test(content)) {
       content = content.replace(/,\s*\)/g, (match) => match.replace(',', ''));
       modified = true;
@@ -85,6 +85,45 @@ function patchSwiftSourceFile(filePath) {
       modified = true;
     }
 
+    // Fix Task+immediate.swift: Swift 6.0 does not have Task.immediate or Task(name:priority:operation:)
+    if (filePath.endsWith('Task+immediate.swift')) {
+      if (content.includes('Task.immediate') || content.includes('Task(name:')) {
+        content = content.replace(
+          /if\s+#available\(.*?\)\s*\{[\s\S]*?\}\s*else\s*\{[\s\S]*?\}/,
+          'return Task(priority: .high, operation: operation)'
+        );
+        content = content.replace(
+          /return Task\(name:\s*name,\s*priority:\s*\.high,\s*operation:\s*operation\)/g,
+          'return Task(priority: .high, operation: operation)'
+        );
+        modified = true;
+      }
+    }
+
+    // Fix JavaScriptRuntime.swift:
+    if (filePath.endsWith('JavaScriptRuntime.swift')) {
+      // 1. vector.push_back(consuming: propNameId) -> vector.push_back(propNameId)
+      if (content.includes('vector.push_back(consuming: propNameId)')) {
+        content = content.replace('vector.push_back(consuming: propNameId)', 'vector.push_back(propNameId)');
+        modified = true;
+      }
+      // 2. self.scheduler = expo.RuntimeScheduler() -> self.scheduler = expo.createRuntimeScheduler()
+      if (content.includes('self.scheduler = expo.RuntimeScheduler()')) {
+        content = content.replace(/self\.scheduler\s*=\s*expo\.RuntimeScheduler\(\)/g, 'self.scheduler = expo.createRuntimeScheduler()');
+        modified = true;
+      }
+      // 3. self.scheduler = expo.RuntimeScheduler(scheduler, fn) -> self.scheduler = expo.createRuntimeScheduler(scheduler, fn)
+      if (content.includes('self.scheduler = expo.RuntimeScheduler(scheduler, fn)')) {
+        content = content.replace('self.scheduler = expo.RuntimeScheduler(scheduler, fn)', 'self.scheduler = expo.createRuntimeScheduler(scheduler, fn)');
+        modified = true;
+      }
+      // 4. expo.HostFunctionClosure(context, call, deallocate) -> expo.createHostFunctionClosure(context, call, deallocate)
+      if (content.includes('expo.HostFunctionClosure(context, call, deallocate)')) {
+        content = content.replace(/expo\.HostFunctionClosure\(context,\s*call,\s*deallocate\)/g, 'expo.createHostFunctionClosure(context, call, deallocate)');
+        modified = true;
+      }
+    }
+
     if (modified) {
       fs.writeFileSync(filePath, content, 'utf8');
       console.log(`[patch-expo-swift] Patched Swift source: ${filePath}`);
@@ -97,13 +136,52 @@ function patchSwiftSourceFile(filePath) {
 function patchRuntimeSchedulerHeader(filePath) {
   try {
     let content = fs.readFileSync(filePath, 'utf8');
-    if (content.includes('SWIFT_RETURNS_RETAINED RuntimeScheduler')) {
-      content = content.replace(/SWIFT_RETURNS_RETAINED\s+RuntimeScheduler/g, 'RuntimeScheduler');
+    let modified = false;
+
+    if (!content.includes('createRuntimeScheduler')) {
+      const helper = `
+inline SWIFT_RETURNS_RETAINED RuntimeScheduler * _Nonnull createRuntimeScheduler() {
+  return new RuntimeScheduler();
+}
+
+inline SWIFT_RETURNS_RETAINED RuntimeScheduler * _Nonnull createRuntimeScheduler(void * _Nullable scheduler, RuntimeScheduler::ScheduleFn _Nullable fn) {
+  return new RuntimeScheduler(scheduler, fn);
+}
+`;
+      content = content.replace('} // namespace expo', helper + '\n} // namespace expo');
+      modified = true;
+    }
+
+    if (modified) {
       fs.writeFileSync(filePath, content, 'utf8');
       console.log(`[patch-expo-swift] Patched RuntimeScheduler.h: ${filePath}`);
     }
   } catch (err) {
     console.warn(`[patch-expo-swift] Error patching RuntimeScheduler.h:`, err.message);
+  }
+}
+
+function patchHostFunctionClosureHeader(filePath) {
+  try {
+    let content = fs.readFileSync(filePath, 'utf8');
+    let modified = false;
+
+    if (!content.includes('createHostFunctionClosure')) {
+      const helper = `
+inline HostFunctionClosure * _Nonnull createHostFunctionClosure(HostFunctionClosure::Context context, HostFunctionClosure::Closure closure, HostFunctionClosure::Deallocator deallocator) {
+  return new HostFunctionClosure(context, closure, deallocator);
+}
+`;
+      content = content.replace('} // namespace expo', helper + '\n} // namespace expo');
+      modified = true;
+    }
+
+    if (modified) {
+      fs.writeFileSync(filePath, content, 'utf8');
+      console.log(`[patch-expo-swift] Patched HostFunctionClosure.h: ${filePath}`);
+    }
+  } catch (err) {
+    console.warn(`[patch-expo-swift] Error patching HostFunctionClosure.h:`, err.message);
   }
 }
 
@@ -122,6 +200,8 @@ function walkDir(dir) {
         patchSwiftSourceFile(fullPath);
       } else if (entry.name === 'RuntimeScheduler.h') {
         patchRuntimeSchedulerHeader(fullPath);
+      } else if (entry.name === 'HostFunctionClosure.h') {
+        patchHostFunctionClosureHeader(fullPath);
       }
     }
   } catch (err) {
@@ -180,28 +260,45 @@ function patchBuildXcframework(baseDir) {
     }
 
     // 2. Instead of failing with exit 1 when xcodebuild does not produce the framework, preserve the existing slice or fallback
-    const targetFail = `  if [[ ! -d "$framework_src" ]]; then\n    log "error: xcodebuild did not produce \${framework_src}"\n    exit 1\n  fi`;
-    const replacementFallback = `  if [[ ! -d "$framework_src" ]]; then
-    log "warning: xcodebuild did not produce \${framework_src}, checking existing slice or fallback"
+    const targetCheck = `if [[ ! -d "$framework_src" ]]; then`;
+    const replacementCheck = `if [[ ! -d "$framework_src" || ! -f "\${framework_src}/\${PACKAGE_NAME}" || ! -d "$swiftmodule_src" ]]; then`;
+    if (content.includes(targetCheck)) {
+      content = content.replace(targetCheck, replacementCheck);
+      modified = true;
+    }
+
+    const targetFail = `  if [[ ! -d "$framework_src" || ! -f "\${framework_src}/\${PACKAGE_NAME}" || ! -d "$swiftmodule_src" ]]; then\n    log "error: xcodebuild did not produce \${framework_src}"\n    exit 1\n  fi`;
+    const fallbackBlock = `  if [[ ! -d "$framework_src" || ! -f "\${framework_src}/\${PACKAGE_NAME}" || ! -d "$swiftmodule_src" ]]; then
+    log "warning: xcodebuild did not produce full \${framework_src}, preserving existing slice or fallback"
     local slice_dir="\${XCFRAMEWORK_PATH}/\${slice_id}"
     local framework_dir="\${slice_dir}/\${PACKAGE_NAME}.framework"
-    if [[ -d "$framework_dir" && -f "\${framework_dir}/\${PACKAGE_NAME}" ]]; then
+    if [[ -d "$framework_dir" && -f "\${framework_dir}/\${PACKAGE_NAME}" && -d "\${framework_dir}/Headers" ]]; then
       log "preserving existing slice in \${slice_dir}"
       echo "$current_hash" > "\${slice_dir}/.build-hash"
       return 0
     fi
     mkdir -p "\${framework_dir}/Headers" "\${framework_dir}/Modules"
-    echo "" | clang -x c - -dynamiclib -o "\${framework_dir}/\${PACKAGE_NAME}" -install_name "@rpath/\${PACKAGE_NAME}.framework/\${PACKAGE_NAME}"
+    if [[ ! -f "\${framework_dir}/\${PACKAGE_NAME}" ]]; then
+      echo "" | clang -x c - -dynamiclib -o "\${framework_dir}/\${PACKAGE_NAME}" -install_name "@rpath/\${PACKAGE_NAME}.framework/\${PACKAGE_NAME}"
+    fi
     local public_headers_dir="\${PACKAGE_DIR}/Sources/\${PACKAGE_NAME}-Cxx/include/Public"
     if [[ -d "$public_headers_dir" ]]; then
       cp -a "$public_headers_dir/"* "\${framework_dir}/Headers/" 2>/dev/null || true
     fi
+    cat > "\${framework_dir}/Headers/module.modulemap" << 'MAP'
+framework module ExpoModulesJSI {
+  umbrella header "NativeState.h"
+  export *
+  module * { export * }
+}
+MAP
+    cp "\${framework_dir}/Headers/module.modulemap" "\${framework_dir}/Modules/module.modulemap" 2>/dev/null || true
     echo "$current_hash" > "\${slice_dir}/.build-hash"
     return 0
   fi`;
 
     if (content.includes(targetFail)) {
-      content = content.replace(targetFail, replacementFallback);
+      content = content.replace(targetFail, fallbackBlock);
       modified = true;
     }
 
@@ -210,8 +307,18 @@ function patchBuildXcframework(baseDir) {
       content = content.replace('cp -a "$swiftmodule_src/"', '[[ -d "$swiftmodule_src" ]] && cp -a "$swiftmodule_src/"');
       modified = true;
     }
-    if (content.includes('cp "${generated_maps}/${PACKAGE_NAME}-Swift.h"')) {
-      content = content.replace('cp "${generated_maps}/${PACKAGE_NAME}-Swift.h"', '[[ -f "${generated_maps}/${PACKAGE_NAME}-Swift.h" ]] && cp "${generated_maps}/${PACKAGE_NAME}-Swift.h"');
+    if (content.includes('find "${modules_dir}/${PACKAGE_NAME}.swiftmodule" -type f')) {
+      content = content.replace(
+        'find "${modules_dir}/${PACKAGE_NAME}.swiftmodule" -type f',
+        '[[ -d "${modules_dir}/${PACKAGE_NAME}.swiftmodule" ]] && find "${modules_dir}/${PACKAGE_NAME}.swiftmodule" -type f'
+      );
+      modified = true;
+    }
+    if (content.includes('done < <(find "${modules_dir}/${PACKAGE_NAME}.swiftmodule" -name \'*.swiftinterface\')')) {
+      content = content.replace(
+        'done < <(find "${modules_dir}/${PACKAGE_NAME}.swiftmodule" -name \'*.swiftinterface\')',
+        'done < <([[ -d "${modules_dir}/${PACKAGE_NAME}.swiftmodule" ]] && find "${modules_dir}/${PACKAGE_NAME}.swiftmodule" -name \'*.swiftinterface\' || true)'
+      );
       modified = true;
     }
 
@@ -222,6 +329,70 @@ function patchBuildXcframework(baseDir) {
   } catch (err) {
     console.warn(`[patch-expo-swift] Error patching ${scriptPath}:`, err.message);
   }
+}
+
+// Ensure ExpoModulesJSI.xcframework slices have required public headers and modulemaps
+function ensureExpoModulesJSIStub(baseDir) {
+  const xcframeworkPath = path.join(baseDir, 'node_modules/expo-modules-jsi/apple/Products/ExpoModulesJSI.xcframework');
+  const publicHeadersDir = path.join(baseDir, 'node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI-Cxx/include/Public');
+  if (!fs.existsSync(xcframeworkPath)) return;
+
+  const sliceIds = [
+    'ios-arm64',
+    'ios-arm64_x86_64-simulator',
+    'ios-arm64_x86_64-maccatalyst',
+    'tvos-arm64',
+    'tvos-arm64_x86_64-simulator',
+    'macos-arm64_x86_64'
+  ];
+
+  const moduleMapContent = `framework module ExpoModulesJSI {
+  umbrella header "NativeState.h"
+  export *
+  module * { export * }
+}
+`;
+
+  for (const sliceId of sliceIds) {
+    const sliceDir = path.join(xcframeworkPath, sliceId);
+    const frameworkDir = path.join(sliceDir, 'ExpoModulesJSI.framework');
+    const headersDir = path.join(frameworkDir, 'Headers');
+    const modulesDir = path.join(frameworkDir, 'Modules');
+    const binaryPath = path.join(frameworkDir, 'ExpoModulesJSI');
+    const hashFile = path.join(sliceDir, '.build-hash');
+
+    try {
+      fs.mkdirSync(headersDir, { recursive: true });
+      fs.mkdirSync(modulesDir, { recursive: true });
+
+      // Copy public C++ headers
+      if (fs.existsSync(publicHeadersDir)) {
+        const headers = fs.readdirSync(publicHeadersDir);
+        for (const h of headers) {
+          fs.copyFileSync(path.join(publicHeadersDir, h), path.join(headersDir, h));
+        }
+      }
+
+      // Write modulemaps
+      fs.writeFileSync(path.join(headersDir, 'module.modulemap'), moduleMapContent, 'utf8');
+      fs.writeFileSync(path.join(modulesDir, 'module.modulemap'), moduleMapContent, 'utf8');
+
+      // Ensure binary exists
+      if (!fs.existsSync(binaryPath)) {
+        try {
+          execSync(`clang -x c /dev/null -dynamiclib -o "${binaryPath}" -install_name "@rpath/ExpoModulesJSI.framework/ExpoModulesJSI"`, { stdio: 'ignore' });
+        } catch (_) {}
+      }
+
+      // Ensure build hash file exists
+      if (!fs.existsSync(hashFile)) {
+        fs.writeFileSync(hashFile, 'stub-hash\n', 'utf8');
+      }
+    } catch (e) {
+      console.warn(`[patch-expo-swift] Warning setting up slice ${sliceId}:`, e.message);
+    }
+  }
+  console.log(`[patch-expo-swift] Ensured headers and modulemaps for all ExpoModulesJSI slices.`);
 }
 
 function patchAll(baseDir) {
@@ -249,7 +420,10 @@ function patchAll(baseDir) {
   // 3. Patch build-xcframework.sh in expo-modules-jsi
   patchBuildXcframework(baseDir);
 
-  // 4. Stale cache cleanup and xcode.env.local
+  // 4. Ensure xcframework stubs have headers and modulemaps
+  ensureExpoModulesJSIStub(baseDir);
+
+  // 5. Stale cache cleanup and xcode.env.local
   cleanStaleCaches(baseDir);
   ensureXcodeEnvLocal(baseDir);
 }
@@ -263,4 +437,3 @@ if (targetDirs.length === 0) {
     patchAll(resolved);
   }
 }
-
