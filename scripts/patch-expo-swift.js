@@ -52,8 +52,30 @@ function patchSwiftSourceFile(filePath) {
     let modified = false;
 
     // Fix Swift 6.2 'weak let' which is rejected in Swift 6.0/6.1 ('weak' must be a mutable variable)
+    // Add nonisolated(unsafe) so Sendable-conforming types allow mutable stored property
     if (/\bweak\s+let\b/.test(content)) {
-      content = content.replace(/\bweak\s+let\b/g, 'weak var');
+      content = content.replace(/\b(private|internal|public)?\s*weak\s+let\b/g, (match, vis) => {
+        return `nonisolated(unsafe) ${vis ? vis + ' ' : ''}weak var`;
+      });
+      modified = true;
+    } else if (/\bweak\s+var\b/.test(content) && !content.includes('nonisolated(unsafe)')) {
+      content = content.replace(/\b(private|internal|public)?\s*weak\s+var\b/g, (match, vis) => {
+        return `nonisolated(unsafe) ${vis ? vis + ' ' : ''}weak var`;
+      });
+      modified = true;
+    }
+
+    // Add @unchecked Sendable to JavaScriptPropNameID, JavaScriptError, JavaScriptValue
+    if (filePath.endsWith('JavaScriptPropNameID.swift') && content.includes(': JavaScriptType') && !content.includes('@unchecked Sendable')) {
+      content = content.replace(': JavaScriptType', ': JavaScriptType, @unchecked Sendable');
+      modified = true;
+    }
+    if (filePath.endsWith('JavaScriptError.swift') && content.includes('Error, Sendable')) {
+      content = content.replace('Error, Sendable', 'Error, @unchecked Sendable');
+      modified = true;
+    }
+    if (filePath.endsWith('JavaScriptValue.swift') && content.includes(': JavaScriptType, Equatable, Escapable') && !content.includes('@unchecked Sendable')) {
+      content = content.replace(': JavaScriptType, Equatable, Escapable', ': JavaScriptType, Equatable, Escapable, @unchecked Sendable');
       modified = true;
     }
 
