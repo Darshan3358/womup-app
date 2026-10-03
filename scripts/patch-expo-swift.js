@@ -81,15 +81,33 @@ function cleanStaleCaches(baseDir) {
   }
 }
 
+// Ensure ios/.xcode.env.local defines NODE_BINARY for Xcode build phases (Hermes, bundle, Expo)
+function ensureXcodeEnvLocal(baseDir) {
+  const iosDir = path.join(baseDir, 'ios');
+  if (fs.existsSync(iosDir)) {
+    try {
+      const envLocalPath = path.join(iosDir, '.xcode.env.local');
+      const nodeBinary = process.execPath;
+      const content = `export NODE_BINARY="${nodeBinary}"\n`;
+      fs.writeFileSync(envLocalPath, content, 'utf8');
+      console.log(`[patch-expo-swift] Created ${envLocalPath} -> NODE_BINARY=${nodeBinary}`);
+    } catch (err) {
+      console.warn(`[patch-expo-swift] Error creating .xcode.env.local in ${iosDir}:`, err.message);
+    }
+  }
+}
+
 const targetDirs = process.argv.slice(2);
 if (targetDirs.length === 0) {
   const rootNodeModules = path.resolve(process.cwd(), 'node_modules');
   walkDir(rootNodeModules);
   cleanStaleCaches(process.cwd());
+  ensureXcodeEnvLocal(process.cwd());
 } else {
   for (const dir of targetDirs) {
     const resolved = path.resolve(process.cwd(), dir);
     walkDir(resolved);
     cleanStaleCaches(resolved);
+    ensureXcodeEnvLocal(resolved);
   }
 }
