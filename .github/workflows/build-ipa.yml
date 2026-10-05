@@ -150,8 +150,8 @@ jobs:
             -destination "generic/platform=iOS" \
             -archivePath "build/${SCHEME}.xcarchive" \
             CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES \
             archive
 
       - name: Package IPA
@@ -237,8 +237,8 @@ jobs:
             -destination "generic/platform=iOS" \
             -archivePath "build/Admin.xcarchive" \
             CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES \
             archive
 
       - name: Package Admin IPA
@@ -320,8 +320,8 @@ jobs:
             -destination "generic/platform=iOS" \
             -archivePath "build/Rider.xcarchive" \
             CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES \
             archive
 
       - name: Package Rider IPA
@@ -403,8 +403,8 @@ jobs:
             -destination "generic/platform=iOS" \
             -archivePath "build/Store.xcarchive" \
             CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES \
             archive
 
       - name: Package Store IPA

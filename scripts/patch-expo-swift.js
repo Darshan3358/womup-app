@@ -477,6 +477,39 @@ function patchAll(baseDir) {
   // 5. Stale cache cleanup and xcode.env.local
   cleanStaleCaches(baseDir);
   ensureXcodeEnvLocal(baseDir);
+
+  // 6. Ensure Pods targets do not attempt code signing during archive
+  patchPodfile(baseDir);
+}
+
+// Injects CODE_SIGNING_ALLOWED=NO into Podfile post_install so CocoaPods Pods targets are unsigned
+function patchPodfile(baseDir) {
+  const podfilePath = path.join(baseDir, 'ios', 'Podfile');
+  if (!fs.existsSync(podfilePath)) return;
+  try {
+    let content = fs.readFileSync(podfilePath, 'utf8');
+    const signingSnippet = `
+    # Force Pod targets to disable code signing to avoid conflicts with unsigned archive
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+        config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
+        config.build_settings['CODE_SIGN_IDENTITY'] = ''
+      end
+    end
+`;
+    if (!content.includes("config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'")) {
+      if (content.includes('post_install do |installer|')) {
+        content = content.replace('post_install do |installer|', `post_install do |installer|\n${signingSnippet}`);
+      } else {
+        content += `\npost_install do |installer|\n${signingSnippet}\nend\n`;
+      }
+      fs.writeFileSync(podfilePath, content, 'utf8');
+      console.log(`[patch-expo-swift] Patched ${podfilePath} with CODE_SIGNING_ALLOWED=NO`);
+    }
+  } catch (err) {
+    console.warn(`[patch-expo-swift] Error patching Podfile in ${baseDir}:`, err.message);
+  }
 }
 
 const targetDirs = process.argv.slice(2);
