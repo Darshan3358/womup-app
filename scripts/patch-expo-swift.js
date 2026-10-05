@@ -185,6 +185,26 @@ inline HostFunctionClosure * _Nonnull createHostFunctionClosure(HostFunctionClos
   }
 }
 
+function patchNativeStateHeader(filePath) {
+  try {
+    let content = fs.readFileSync(filePath, 'utf8');
+    let modified = false;
+
+    if (!content.includes('#ifdef __cplusplus')) {
+      const stripped = content.replace(/#pragma once\s*/g, '');
+      content = `#pragma once\n\n#ifdef __cplusplus\n${stripped}\n#endif // __cplusplus\n`;
+      modified = true;
+    }
+
+    if (modified) {
+      fs.writeFileSync(filePath, content, 'utf8');
+      console.log(`[patch-expo-swift] Patched NativeState.h with __cplusplus guard: ${filePath}`);
+    }
+  } catch (err) {
+    console.warn(`[patch-expo-swift] Error patching NativeState.h:`, err.message);
+  }
+}
+
 function walkDir(dir) {
   if (!fs.existsSync(dir)) return;
   try {
@@ -202,6 +222,8 @@ function walkDir(dir) {
         patchRuntimeSchedulerHeader(fullPath);
       } else if (entry.name === 'HostFunctionClosure.h') {
         patchHostFunctionClosureHeader(fullPath);
+      } else if (entry.name === 'NativeState.h') {
+        patchNativeStateHeader(fullPath);
       }
     }
   } catch (err) {
@@ -285,9 +307,19 @@ function patchBuildXcframework(baseDir) {
     if [[ -d "$public_headers_dir" ]]; then
       cp -a "$public_headers_dir/"* "\${framework_dir}/Headers/" 2>/dev/null || true
     fi
+    cat > "\${framework_dir}/Headers/ExpoModulesJSI.h" << 'HDR'
+#import <Foundation/Foundation.h>
+#ifdef __cplusplus
+#if __has_include(<ExpoModulesJSI/NativeState.h>)
+#import <ExpoModulesJSI/NativeState.h>
+#elif __has_include("NativeState.h")
+#import "NativeState.h"
+#endif
+#endif
+HDR
     cat > "\${framework_dir}/Headers/module.modulemap" << 'MAP'
 framework module ExpoModulesJSI {
-  umbrella header "NativeState.h"
+  umbrella header "ExpoModulesJSI.h"
   export *
   module * { export * }
 }
@@ -346,8 +378,26 @@ function ensureExpoModulesJSIStub(baseDir) {
     'macos-arm64_x86_64'
   ];
 
+  const umbrellaHeaderContent = `// ExpoModulesJSI Umbrella Header
+#import <Foundation/Foundation.h>
+
+#if __has_include(<ExpoModulesJSI/ExpoModulesJSI-Swift.h>)
+#import <ExpoModulesJSI/ExpoModulesJSI-Swift.h>
+#elif __has_include("ExpoModulesJSI-Swift.h")
+#import "ExpoModulesJSI-Swift.h"
+#endif
+
+#ifdef __cplusplus
+#if __has_include(<ExpoModulesJSI/NativeState.h>)
+#import <ExpoModulesJSI/NativeState.h>
+#elif __has_include("NativeState.h")
+#import "NativeState.h"
+#endif
+#endif
+`;
+
   const moduleMapContent = `framework module ExpoModulesJSI {
-  umbrella header "NativeState.h"
+  umbrella header "ExpoModulesJSI.h"
   export *
   module * { export * }
 }
@@ -373,7 +423,8 @@ function ensureExpoModulesJSIStub(baseDir) {
         }
       }
 
-      // Write modulemaps
+      // Write umbrella header and modulemaps
+      fs.writeFileSync(path.join(headersDir, 'ExpoModulesJSI.h'), umbrellaHeaderContent, 'utf8');
       fs.writeFileSync(path.join(headersDir, 'module.modulemap'), moduleMapContent, 'utf8');
       fs.writeFileSync(path.join(modulesDir, 'module.modulemap'), moduleMapContent, 'utf8');
 
