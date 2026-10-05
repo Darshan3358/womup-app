@@ -529,25 +529,6 @@ function patchAll(baseDir) {
 
   // 6. Ensure Pods targets do not attempt code signing during archive and disable precompiled modules
   patchPodfile(baseDir);
-
-  // 7. Disable precompiled modules in expo-modules-autolinking to prevent Swift version mismatches
-  patchPrecompiledModules(baseDir);
-}
-
-function patchPrecompiledModules(baseDir) {
-  const nm = path.join(baseDir, 'node_modules');
-  const precompiledRb = path.join(nm, 'expo-modules-autolinking/scripts/ios/precompiled_modules.rb');
-  if (!fs.existsSync(precompiledRb)) return;
-  try {
-    let content = fs.readFileSync(precompiledRb, 'utf8');
-    if (content.includes('def enabled?')) {
-      content = content.replace(/def enabled\?[\s\S]*?end\n/m, "def enabled?\n        false\n      end\n");
-      fs.writeFileSync(precompiledRb, content, 'utf8');
-      console.log(`[patch-expo-swift] Patched precompiled_modules.rb: ${precompiledRb}`);
-    }
-  } catch (err) {
-    console.warn(`[patch-expo-swift] Error patching precompiled_modules.rb:`, err.message);
-  }
 }
 
 // Injects CODE_SIGNING_ALLOWED=NO into Podfile post_install so CocoaPods Pods targets are unsigned
