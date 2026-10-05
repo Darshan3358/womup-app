@@ -38,6 +38,8 @@ concurrency:
 
 env:
   NODE_ENV: production
+  EXPO_USE_PRECOMPILED_MODULES: 0
+  RCT_USE_PREBUILT_RNCORE: 0
 
 jobs:
   # =========================================================================

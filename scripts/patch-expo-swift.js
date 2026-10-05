@@ -102,9 +102,12 @@ function patchSwiftSourceFile(filePath) {
 
     // Fix JavaScriptRuntime.swift:
     if (filePath.endsWith('JavaScriptRuntime.swift')) {
-      // 1. vector.push_back(consuming: propNameId) -> vector.push_back(propNameId)
-      if (content.includes('vector.push_back(consuming: propNameId)')) {
-        content = content.replace('vector.push_back(consuming: propNameId)', 'vector.push_back(propNameId)');
+      // 1. In getPropertyNames, use appendPropNameIdUtf8 helper to avoid calling copy constructor on move-only PropNameID
+      if (content.includes('vector.push_back(') || content.includes('vector.push_back(consuming: propNameId)') || content.includes('for propertyName in propertyNames')) {
+        content = content.replace(
+          /for\s+propertyName\s+in\s+propertyNames\s*\{[\s\S]*?vector\.push_back[\s\S]*?\}/,
+          `for propertyName in propertyNames {\n        expo.appendPropNameIdUtf8(&vector, iRuntime, propertyName)\n      }`
+        );
         modified = true;
       }
       // 2. self.scheduler = expo.RuntimeScheduler() -> self.scheduler = expo.createRuntimeScheduler()
@@ -225,6 +228,30 @@ function patchNativeStateHeader(filePath) {
   }
 }
 
+function patchHostObjectCallbacksHeader(filePath) {
+  try {
+    let content = fs.readFileSync(filePath, 'utf8');
+    let modified = false;
+
+    if (!content.includes('appendPropNameIdUtf8')) {
+      const helper = `
+inline void appendPropNameIdUtf8(HostObjectCallbacks::PropNameIds &vector, facebook::jsi::IRuntime &runtime, const char *utf8) {
+  vector.push_back(facebook::jsi::PropNameID::forUtf8(runtime, utf8));
+}
+`;
+      content = content.replace('} // namespace expo', helper + '\n} // namespace expo');
+      modified = true;
+    }
+
+    if (modified) {
+      fs.writeFileSync(filePath, content, 'utf8');
+      console.log(`[patch-expo-swift] Patched HostObjectCallbacks.h: ${filePath}`);
+    }
+  } catch (err) {
+    console.warn(`[patch-expo-swift] Error patching HostObjectCallbacks.h:`, err.message);
+  }
+}
+
 function walkDir(dir) {
   if (!fs.existsSync(dir)) return;
   try {
@@ -242,6 +269,8 @@ function walkDir(dir) {
         patchRuntimeSchedulerHeader(fullPath);
       } else if (entry.name === 'HostFunctionClosure.h') {
         patchHostFunctionClosureHeader(fullPath);
+      } else if (entry.name === 'HostObjectCallbacks.h') {
+        patchHostObjectCallbacksHeader(fullPath);
       } else if (entry.name === 'NativeState.h') {
         patchNativeStateHeader(fullPath);
       }
@@ -498,8 +527,27 @@ function patchAll(baseDir) {
   cleanStaleCaches(baseDir);
   ensureXcodeEnvLocal(baseDir);
 
-  // 6. Ensure Pods targets do not attempt code signing during archive
+  // 6. Ensure Pods targets do not attempt code signing during archive and disable precompiled modules
   patchPodfile(baseDir);
+
+  // 7. Disable precompiled modules in expo-modules-autolinking to prevent Swift version mismatches
+  patchPrecompiledModules(baseDir);
+}
+
+function patchPrecompiledModules(baseDir) {
+  const nm = path.join(baseDir, 'node_modules');
+  const precompiledRb = path.join(nm, 'expo-modules-autolinking/scripts/ios/precompiled_modules.rb');
+  if (!fs.existsSync(precompiledRb)) return;
+  try {
+    let content = fs.readFileSync(precompiledRb, 'utf8');
+    if (content.includes('def enabled?')) {
+      content = content.replace(/def enabled\?[\s\S]*?end\n/m, "def enabled?\n        false\n      end\n");
+      fs.writeFileSync(precompiledRb, content, 'utf8');
+      console.log(`[patch-expo-swift] Patched precompiled_modules.rb: ${precompiledRb}`);
+    }
+  } catch (err) {
+    console.warn(`[patch-expo-swift] Error patching precompiled_modules.rb:`, err.message);
+  }
 }
 
 // Injects CODE_SIGNING_ALLOWED=NO into Podfile post_install so CocoaPods Pods targets are unsigned
@@ -508,6 +556,14 @@ function patchPodfile(baseDir) {
   if (!fs.existsSync(podfilePath)) return;
   try {
     let content = fs.readFileSync(podfilePath, 'utf8');
+    let modified = false;
+
+    // Force precompiled modules off so all Expo modules build from source with the current compiler
+    if (!content.includes("ENV['EXPO_USE_PRECOMPILED_MODULES'] = '0'")) {
+      content = "ENV['EXPO_USE_PRECOMPILED_MODULES'] = '0'\nENV['RCT_USE_PREBUILT_RNCORE'] = '0'\n" + content;
+      modified = true;
+    }
+
     const signingSnippet = `
     # Force Pod targets to disable code signing to avoid conflicts with unsigned archive
     installer.pods_project.targets.each do |target|
@@ -524,8 +580,12 @@ function patchPodfile(baseDir) {
       } else {
         content += `\npost_install do |installer|\n${signingSnippet}\nend\n`;
       }
+      modified = true;
+    }
+
+    if (modified) {
       fs.writeFileSync(podfilePath, content, 'utf8');
-      console.log(`[patch-expo-swift] Patched ${podfilePath} with CODE_SIGNING_ALLOWED=NO`);
+      console.log(`[patch-expo-swift] Patched ${podfilePath} with CODE_SIGNING_ALLOWED=NO and source-build flags`);
     }
   } catch (err) {
     console.warn(`[patch-expo-swift] Error patching Podfile in ${baseDir}:`, err.message);
