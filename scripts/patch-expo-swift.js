@@ -138,6 +138,26 @@ function patchRuntimeSchedulerHeader(filePath) {
     let content = fs.readFileSync(filePath, 'utf8');
     let modified = false;
 
+    // 1. Remove SWIFT_RETURNS_RETAINED on constructors (invalid in Swift 6.0)
+    if (content.includes('SWIFT_RETURNS_RETAINED RuntimeScheduler(') || content.includes('SWIFT_RETURNS_RETAINED RuntimeScheduler()')) {
+      content = content.replace(/SWIFT_RETURNS_RETAINED\s+RuntimeScheduler\(/g, 'RuntimeScheduler(');
+      content = content.replace(/SWIFT_RETURNS_RETAINED\s+RuntimeScheduler\(\)/g, 'RuntimeScheduler()');
+      modified = true;
+    }
+
+    // 2. Forward-declare retain/release functions before class definition so SWIFT_SHARED_REFERENCE resolves
+    if (!content.includes('forward declare for SWIFT_SHARED_REFERENCE')) {
+      const fwd = `
+// forward declare for SWIFT_SHARED_REFERENCE
+namespace expo { class RuntimeScheduler; }
+void retainRuntimeScheduler(expo::RuntimeScheduler *scheduler);
+void releaseRuntimeScheduler(expo::RuntimeScheduler *scheduler);
+`;
+      content = content.replace('namespace expo {', fwd + '\nnamespace expo {');
+      modified = true;
+    }
+
+    // 3. Provide createRuntimeScheduler helper
     if (!content.includes('createRuntimeScheduler')) {
       const helper = `
 inline SWIFT_RETURNS_RETAINED RuntimeScheduler * _Nonnull createRuntimeScheduler() {
