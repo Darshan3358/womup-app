@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from '../../context/StoreContext';
 import { CurrentTab } from '../../types/store.types';
 import { COLORS } from '../../theme/colors';
@@ -15,6 +16,8 @@ interface TabItem {
 
 export const BottomNav: React.FC = () => {
   const { currentTab, setCurrentTab, setSubScreen, incomingOrders, pickingOrders, readyOrders } = useStore();
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Math.max(insets.bottom, 6);
 
   const tabs: TabItem[] = [
     {
@@ -52,7 +55,7 @@ export const BottomNav: React.FC = () => {
   };
 
   return (
-    <View style={styles.navContainer}>
+    <View style={[styles.navContainer, { height: 60 + bottomPadding, paddingBottom: bottomPadding }]}>
       {tabs.map((tab) => {
         const isActive = currentTab === tab.id;
         return (

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, SafeAreaView, StatusBar } from 'react-native';
+import { StyleSheet, View, StatusBar } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { AdminStateProvider, useAdminState } from './src/context/AdminStateContext';
 import { Header } from './src/components/common/Header';
 import { BottomNav } from './src/components/common/BottomNav';
@@ -86,7 +87,7 @@ const MainApp: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.navy} />
       <View style={styles.container}>
         <Header />
@@ -128,9 +129,11 @@ export default function App() {
   }, []);
 
   return (
-    <AdminStateProvider>
-      <MainApp />
-    </AdminStateProvider>
+    <SafeAreaProvider>
+      <AdminStateProvider>
+        <MainApp />
+      </AdminStateProvider>
+    </SafeAreaProvider>
   );
 }
 

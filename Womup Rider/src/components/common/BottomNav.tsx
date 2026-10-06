@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRider } from '../../context/RiderContext';
 import { RiderTabKey } from '../../types/rider.types';
 import { COLORS } from '../../theme/colors';
@@ -22,6 +23,8 @@ const TABS: TabItem[] = [
 
 export const BottomNav: React.FC = () => {
   const { currentTab, setCurrentTab, setSubScreen, activeDelivery } = useRider();
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Math.max(insets.bottom, 6);
 
   const handleTabPress = (tabKey: RiderTabKey) => {
     setSubScreen('None');
@@ -29,7 +32,7 @@ export const BottomNav: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { height: 60 + bottomPadding, paddingBottom: bottomPadding }]}>
       {TABS.map((tab) => {
         const isActive = currentTab === tab.key;
         return (

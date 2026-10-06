@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   LayoutDashboard,
   Users,
@@ -25,6 +26,8 @@ const TABS: TabItem[] = [
 
 export const BottomNav: React.FC = () => {
   const { activeTab, setActiveTab, setSubView } = useAdminState();
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Math.max(insets.bottom, 6);
 
   const handleTabPress = (key: ActiveTab) => {
     setSubView('none');
@@ -32,7 +35,7 @@ export const BottomNav: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { height: 60 + bottomPadding, paddingBottom: bottomPadding }]}>
       {TABS.map((tab) => {
         const Icon = tab.icon;
         const isActive = activeTab === tab.key;
