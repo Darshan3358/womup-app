@@ -138,6 +138,22 @@ function patchSwiftSourceFile(filePath) {
         content = content.replace(/expo\.HostFunctionClosure\(context,\s*call,\s*deallocate\)/g, 'expo.createHostFunctionClosure(context, call, deallocate)');
         modified = true;
       }
+      // 5. Replace regex literal with try! Regex to support both Swift 5 and Swift 6 modes
+      if (content.includes('/^[a-zA-Z_$][a-zA-Z0-9_$]*$/')) {
+        content = content.replace('/^[a-zA-Z_$][a-zA-Z0-9_$]*$/', 'try! Regex("^[a-zA-Z_$][a-zA-Z0-9_$]*$")');
+        modified = true;
+      }
+    }
+
+    // Fix JavaScriptPromise.swift:
+    if (filePath.endsWith('JavaScriptPromise.swift')) {
+      if (content.includes('private let longLivedState = LongLivedState()')) {
+        content = content.replace(
+          'private let longLivedState = LongLivedState()',
+          'private let longLivedState = JavaScriptActor.assumeIsolated { LongLivedState() }'
+        );
+        modified = true;
+      }
     }
 
     if (modified) {
