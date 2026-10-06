@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Worm Up",
-    "slug": "worm-up-app",
+    "slug": "womup-customer",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -53,7 +53,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "1d64c304-0e2d-4716-8301-de5ebd1d6900"
+        "projectId": "d05b7fce-0f74-4d20-8b8b-59b06b5cda95"
       }
     },
     "owner": "darshanthanki007"
