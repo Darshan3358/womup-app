@@ -37,6 +37,19 @@ function patchFile(filePath) {
       }
     }
 
+    // 4. Set swiftLanguageModes to [.v5] and add -strict-concurrency=minimal
+    if (content.includes('swiftLanguageModes: [.v6]')) {
+      content = content.replace('swiftLanguageModes: [.v6]', 'swiftLanguageModes: [.v5]');
+      modified = true;
+    }
+    if (content.includes('.unsafeFlags(swiftIncludeFlags)') && !content.includes('-strict-concurrency=minimal')) {
+      content = content.replace(
+        '.unsafeFlags(swiftIncludeFlags)',
+        '.unsafeFlags(swiftIncludeFlags),\n        .unsafeFlags(["-strict-concurrency=minimal"])'
+      );
+      modified = true;
+    }
+
     if (modified) {
       fs.writeFileSync(filePath, content, 'utf8');
       console.log(`[patch-expo-swift] Successfully patched: ${filePath}`);
@@ -529,6 +542,33 @@ function patchAll(baseDir) {
 
   // 6. Ensure Pods targets do not attempt code signing during archive and disable precompiled modules
   patchPodfile(baseDir);
+
+  // 7. Fix Hermes tar extract command for directories containing spaces (e.g. "Womup Admin", "Womup Store")
+  patchReplaceHermesVersion(baseDir);
+}
+
+function patchReplaceHermesVersion(baseDir) {
+  const searchDirs = [
+    baseDir,
+    path.join(baseDir, 'Womup Admin'),
+    path.join(baseDir, 'Womup Store'),
+    path.join(baseDir, 'Womup Rider')
+  ];
+  for (const dir of searchDirs) {
+    const file = path.join(dir, 'node_modules/react-native/sdks/hermes-engine/utils/replace_hermes_version.js');
+    if (fs.existsSync(file)) {
+      try {
+        let content = fs.readFileSync(file, 'utf8');
+        if (content.includes('tar -xf ${tarballURLPath}')) {
+          content = content.replace('tar -xf ${tarballURLPath} -C ${finalLocation}', 'tar -xf "${tarballURLPath}" -C "${finalLocation}"');
+          fs.writeFileSync(file, content, 'utf8');
+          console.log(`[patch-expo-swift] Patched hermes script with quoted paths: ${file}`);
+        }
+      } catch (e) {
+        console.warn(`[patch-expo-swift] Error patching hermes script in ${dir}:`, e.message);
+      }
+    }
+  }
 }
 
 // Injects CODE_SIGNING_ALLOWED=NO into Podfile post_install so CocoaPods Pods targets are unsigned
