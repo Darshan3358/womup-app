@@ -355,6 +355,17 @@ export const BlinkitHomeScreen: React.FC = () => {
           viewAllText="View All"
         />
 
+        {/* Section 6: Bestsellers (8 products) */}
+        <ProductSection
+          id="bestsellers"
+          title="Bestsellers"
+          subtitle="Loved by 1000+ customers"
+          products={bestsellersList}
+          onOpenProduct={handleOpenProductDetail}
+          onViewAll={() => setActiveScreen('C15_ProductListing')}
+          viewAllText="View All"
+        />
+
         {/* --- BANNER 2: Dairy & Breakfast --- */}
         <TouchableOpacity
           activeOpacity={0.9}
@@ -368,7 +379,7 @@ export const BlinkitHomeScreen: React.FC = () => {
           />
         </TouchableOpacity>
 
-        {/* Section 6: Dairy, Bread & Eggs (8 products) */}
+        {/* Section 7: Dairy, Bread & Eggs (8 products) */}
         <ProductSection
           id="dairy_bread"
           title="Dairy, Bread & Eggs"
@@ -376,17 +387,6 @@ export const BlinkitHomeScreen: React.FC = () => {
           products={dairyBreadEggsList}
           onOpenProduct={handleOpenProductDetail}
           onViewAll={() => handleSelectCategory('Dairy, Bread & Eggs', 'c3')}
-          viewAllText="View All"
-        />
-
-        {/* Section 7: Bestsellers (8 products) */}
-        <ProductSection
-          id="bestsellers"
-          title="Bestsellers"
-          subtitle="Loved by 1000+ customers"
-          products={bestsellersList}
-          onOpenProduct={handleOpenProductDetail}
-          onViewAll={() => setActiveScreen('C15_ProductListing')}
           viewAllText="View All"
         />
 
@@ -409,18 +409,6 @@ export const BlinkitHomeScreen: React.FC = () => {
           viewAllText="View All"
         />
 
-        {/* --- BANNER 4: Personal Care --- */}
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={() => handleSelectCategory('Personal Care', 'c10')}
-          style={styles.bannerContainer}
-        >
-          <Image
-            source={require('../../../assets/banners/personal_care.jpg')}
-            style={styles.bannerImage}
-            resizeMode="cover"
-          />
-        </TouchableOpacity>
 
         {/* Section 10: Under ₹50 (8 products) */}
         <ProductSection
