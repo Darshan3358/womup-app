@@ -27,6 +27,14 @@ export const HERO_SLIDES: HeroBannerItem[] = [
     bgColor: '#F9ECF8',
   },
   {
+    id: 'hero_snacks',
+    type: 'category',
+    categoryName: 'Chips & Namkeen',
+    categoryId: 'c4',
+    image: require('../../../assets/banners/snacks_beverages.jpg'),
+    bgColor: '#0D47A1',
+  },
+  {
     id: 'hero_2',
     type: 'category',
     categoryName: 'Vegetables & Fruits',

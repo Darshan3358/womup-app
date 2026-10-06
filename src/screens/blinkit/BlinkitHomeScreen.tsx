@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   useWindowDimensions,
+  Image,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { COLORS } from '../../theme/colors';
@@ -330,6 +331,19 @@ export const BlinkitHomeScreen: React.FC = () => {
           viewAllText="View All"
         />
 
+        {/* --- BANNER 1: Fresh Groceries (Delivered in 9 Minutes) --- */}
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => handleSelectCategory('Vegetables & Fruits', 'c1')}
+          style={styles.groceriesBannerContainer}
+        >
+          <Image
+            source={require('../../../assets/banners/9minbanner.png')}
+            style={styles.groceriesBannerImage}
+            resizeMode="contain"
+          />
+        </TouchableOpacity>
+
         {/* Section 5: Fresh Vegetables & Fruits (8 products) */}
         <ProductSection
           id="fresh_veggies"
@@ -340,6 +354,19 @@ export const BlinkitHomeScreen: React.FC = () => {
           onViewAll={() => handleSelectCategory('Vegetables & Fruits', 'c1')}
           viewAllText="View All"
         />
+
+        {/* --- BANNER 2: Dairy & Breakfast --- */}
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => handleSelectCategory('Dairy, Bread & Eggs', 'c3')}
+          style={styles.bannerContainer}
+        >
+          <Image
+            source={require('../../../assets/banners/dairy_breakfast.jpg')}
+            style={styles.bannerImage}
+            resizeMode="cover"
+          />
+        </TouchableOpacity>
 
         {/* Section 6: Dairy, Bread & Eggs (8 products) */}
         <ProductSection
@@ -363,7 +390,15 @@ export const BlinkitHomeScreen: React.FC = () => {
           viewAllText="View All"
         />
 
-        {/* Section 8: New Arrivals (6-8 products) */}
+        {/* Section 8: Popular Brands (Moved right above New Arrivals) */}
+        <WomupPopularBrands
+          onSelectBrand={(brand) => {
+            navigateToProductListing(brand, []);
+          }}
+          onViewAll={() => setActiveScreen('C15_ProductListing')}
+        />
+
+        {/* Section 9: New Arrivals (6-8 products) */}
         <ProductSection
           id="new_arrivals"
           title="New Arrivals"
@@ -374,7 +409,20 @@ export const BlinkitHomeScreen: React.FC = () => {
           viewAllText="View All"
         />
 
-        {/* Section 9: Under ₹50 (8 products) */}
+        {/* --- BANNER 4: Personal Care --- */}
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => handleSelectCategory('Personal Care', 'c10')}
+          style={styles.bannerContainer}
+        >
+          <Image
+            source={require('../../../assets/banners/personal_care.jpg')}
+            style={styles.bannerImage}
+            resizeMode="cover"
+          />
+        </TouchableOpacity>
+
+        {/* Section 10: Under ₹50 (8 products) */}
         <ProductSection
           id="under_50"
           title="Under ₹50"
@@ -383,14 +431,6 @@ export const BlinkitHomeScreen: React.FC = () => {
           onOpenProduct={handleOpenProductDetail}
           onViewAll={() => setActiveScreen('C15_ProductListing')}
           viewAllText="View All"
-        />
-
-        {/* Section 10: Popular Brands */}
-        <WomupPopularBrands
-          onSelectBrand={(brand) => {
-            navigateToProductListing(brand, []);
-          }}
-          onViewAll={() => setActiveScreen('C15_ProductListing')}
         />
 
         {/* Section 11: 📢 Monthly Benefits Banner */}
@@ -445,5 +485,39 @@ const styles = StyleSheet.create({
     color: '#B45309',
     marginTop: 2,
     lineHeight: 15,
+  },
+  groceriesBannerContainer: {
+    marginHorizontal: 12,
+    marginVertical: 14,
+    borderRadius: 16,
+    overflow: 'hidden',
+    aspectRatio: 1024 / 318,
+    backgroundColor: '#FAF0FA',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  groceriesBannerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  bannerContainer: {
+    marginHorizontal: 12,
+    marginVertical: 14,
+    borderRadius: 16,
+    overflow: 'hidden',
+    height: 150,
+    backgroundColor: '#F3E8FF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  bannerImage: {
+    width: '100%',
+    height: '100%',
   },
 });
