@@ -676,51 +676,55 @@ export const AddProductModal: React.FC = () => {
                   </View>
                 </View>
 
-                <View style={styles.variantInputsRow}>
-                  <View style={{ flex: 1.4 }}>
-                    <Text style={styles.variantFieldLabel}>Pack Size *</Text>
-                    <TextInput
-                      style={styles.variantInput}
-                      placeholder="e.g. 500 g"
-                      placeholderTextColor={COLORS.textMuted}
-                      value={v.weightOrVolume}
-                      onChangeText={(val) => handleUpdateVariant(v.id, 'weightOrVolume', val)}
-                    />
+                <View style={styles.variantFieldsContainer}>
+                  <View style={styles.variantRow}>
+                    <View style={styles.variantFieldHalf}>
+                      <Text style={styles.variantFieldLabel}>Pack Size *</Text>
+                      <TextInput
+                        style={styles.variantInput}
+                        placeholder="e.g. 500 g"
+                        placeholderTextColor={COLORS.textMuted}
+                        value={v.weightOrVolume}
+                        onChangeText={(val) => handleUpdateVariant(v.id, 'weightOrVolume', val)}
+                      />
+                    </View>
+
+                    <View style={styles.variantFieldHalf}>
+                      <Text style={styles.variantFieldLabel}>SKU Code</Text>
+                      <TextInput
+                        style={styles.variantInput}
+                        placeholder="Auto if empty"
+                        placeholderTextColor={COLORS.textMuted}
+                        value={v.sku}
+                        onChangeText={(val) => handleUpdateVariant(v.id, 'sku', val)}
+                      />
+                    </View>
                   </View>
 
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.variantFieldLabel}>Selling (₹) *</Text>
-                    <TextInput
-                      style={styles.variantInput}
-                      placeholder="e.g. 12"
-                      placeholderTextColor={COLORS.textMuted}
-                      keyboardType="numeric"
-                      value={v.sellingPrice}
-                      onChangeText={(val) => handleUpdateVariant(v.id, 'sellingPrice', val)}
-                    />
-                  </View>
+                  <View style={styles.variantRow}>
+                    <View style={styles.variantFieldHalf}>
+                      <Text style={styles.variantFieldLabel}>Selling (₹) *</Text>
+                      <TextInput
+                        style={styles.variantInput}
+                        placeholder="e.g. 12"
+                        placeholderTextColor={COLORS.textMuted}
+                        keyboardType="numeric"
+                        value={v.sellingPrice}
+                        onChangeText={(val) => handleUpdateVariant(v.id, 'sellingPrice', val)}
+                      />
+                    </View>
 
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.variantFieldLabel}>MRP (₹) *</Text>
-                    <TextInput
-                      style={styles.variantInput}
-                      placeholder="e.g. 15"
-                      placeholderTextColor={COLORS.textMuted}
-                      keyboardType="numeric"
-                      value={v.mrp}
-                      onChangeText={(val) => handleUpdateVariant(v.id, 'mrp', val)}
-                    />
-                  </View>
-
-                  <View style={{ flex: 1.2 }}>
-                    <Text style={styles.variantFieldLabel}>SKU Code</Text>
-                    <TextInput
-                      style={styles.variantInput}
-                      placeholder="Auto if empty"
-                      placeholderTextColor={COLORS.textMuted}
-                      value={v.sku}
-                      onChangeText={(val) => handleUpdateVariant(v.id, 'sku', val)}
-                    />
+                    <View style={styles.variantFieldHalf}>
+                      <Text style={styles.variantFieldLabel}>MRP (₹) *</Text>
+                      <TextInput
+                        style={styles.variantInput}
+                        placeholder="e.g. 15"
+                        placeholderTextColor={COLORS.textMuted}
+                        keyboardType="numeric"
+                        value={v.mrp}
+                        onChangeText={(val) => handleUpdateVariant(v.id, 'mrp', val)}
+                      />
+                    </View>
                   </View>
                 </View>
               </View>
@@ -882,37 +886,43 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: SPACING.md,
+    paddingHorizontal: 10,
+    paddingVertical: 16,
   },
   card: {
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.card,
     width: '100%',
-    maxWidth: 620,
-    maxHeight: '90%',
+    maxWidth: 580,
+    maxHeight: '92%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.25,
     shadowRadius: 20,
     elevation: 10,
     overflow: 'hidden',
+    alignSelf: 'center',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
   },
   title: {
     fontSize: 16,
     fontWeight: '800',
     color: COLORS.textPrimary,
+    flexShrink: 1,
   },
   closeBtn: {
     padding: 6,
@@ -1412,12 +1422,18 @@ const styles = StyleSheet.create({
   deleteVariantBtn: {
     padding: 4,
   },
-  variantInputsRow: {
+  variantFieldsContainer: {
+    gap: 8,
+  },
+  variantRow: {
     flexDirection: 'row',
     gap: 8,
   },
+  variantFieldHalf: {
+    flex: 1,
+  },
   variantFieldLabel: {
-    fontSize: 10.5,
+    fontSize: 10,
     fontWeight: '700',
     color: COLORS.textMuted,
     marginBottom: 4,
@@ -1426,7 +1442,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderWidth: 1,
     borderColor: COLORS.border,
-    borderRadius: RADIUS.sm,
+    borderRadius: RADIUS.input,
     paddingHorizontal: 8,
     paddingVertical: 6,
     fontSize: 12,
@@ -1438,35 +1454,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
-    gap: 10,
-    padding: SPACING.md,
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
+    backgroundColor: COLORS.white,
+    flexWrap: 'wrap',
   },
   cancelBtn: {
-    paddingVertical: 9,
-    paddingHorizontal: SPACING.md,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     borderRadius: RADIUS.button,
     backgroundColor: COLORS.cardBackground,
   },
   cancelBtnText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: COLORS.textMuted,
   },
   saveBtn: {
-    paddingVertical: 9,
-    paddingHorizontal: SPACING.lg,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
     borderRadius: RADIUS.button,
     backgroundColor: COLORS.purple,
-    minWidth: 160,
     alignItems: 'center',
   },
   disabledBtn: {
     opacity: 0.6,
   },
   saveBtnText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: COLORS.white,
   },

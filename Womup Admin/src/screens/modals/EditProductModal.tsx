@@ -478,52 +478,56 @@ export const EditProductModal: React.FC = () => {
                   </View>
                 </View>
 
-                {/* Variant fields */}
-                <View style={styles.variantGrid}>
-                  <View style={{ flex: 1.2 }}>
-                    <Text style={styles.variantFieldLabel}>Pack Size *</Text>
-                    <TextInput
-                      style={styles.variantInput}
-                      placeholder="e.g. 250 g, 1 kg"
-                      placeholderTextColor={COLORS.textMuted}
-                      value={v.weightOrVolume}
-                      onChangeText={(val) => handleUpdateVariant(v.id, 'weightOrVolume', val)}
-                    />
+                {/* Variant fields - 2x2 responsive grid */}
+                <View style={styles.variantFieldsContainer}>
+                  <View style={styles.variantRow}>
+                    <View style={styles.variantFieldHalf}>
+                      <Text style={styles.variantFieldLabel}>Pack Size *</Text>
+                      <TextInput
+                        style={styles.variantInput}
+                        placeholder="e.g. 250 g, 1 kg"
+                        placeholderTextColor={COLORS.textMuted}
+                        value={v.weightOrVolume}
+                        onChangeText={(val) => handleUpdateVariant(v.id, 'weightOrVolume', val)}
+                      />
+                    </View>
+
+                    <View style={styles.variantFieldHalf}>
+                      <Text style={styles.variantFieldLabel}>SKU Code</Text>
+                      <TextInput
+                        style={styles.variantInput}
+                        placeholder="Auto if empty"
+                        placeholderTextColor={COLORS.textMuted}
+                        value={v.sku}
+                        onChangeText={(val) => handleUpdateVariant(v.id, 'sku', val)}
+                      />
+                    </View>
                   </View>
 
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.variantFieldLabel}>Default Price (₹) *</Text>
-                    <TextInput
-                      style={[styles.variantInput, { borderColor: COLORS.purple, borderWidth: 1.5 }]}
-                      placeholder="e.g. 12"
-                      placeholderTextColor={COLORS.textMuted}
-                      keyboardType="numeric"
-                      value={v.sellingPrice}
-                      onChangeText={(val) => handleUpdateVariant(v.id, 'sellingPrice', val)}
-                    />
-                  </View>
+                  <View style={styles.variantRow}>
+                    <View style={styles.variantFieldHalf}>
+                      <Text style={styles.variantFieldLabel}>Default Price (₹) *</Text>
+                      <TextInput
+                        style={[styles.variantInput, { borderColor: COLORS.purple, borderWidth: 1.5 }]}
+                        placeholder="e.g. 12"
+                        placeholderTextColor={COLORS.textMuted}
+                        keyboardType="numeric"
+                        value={v.sellingPrice}
+                        onChangeText={(val) => handleUpdateVariant(v.id, 'sellingPrice', val)}
+                      />
+                    </View>
 
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.variantFieldLabel}>MRP (₹) *</Text>
-                    <TextInput
-                      style={styles.variantInput}
-                      placeholder="e.g. 15"
-                      placeholderTextColor={COLORS.textMuted}
-                      keyboardType="numeric"
-                      value={v.mrp}
-                      onChangeText={(val) => handleUpdateVariant(v.id, 'mrp', val)}
-                    />
-                  </View>
-
-                  <View style={{ flex: 1.2 }}>
-                    <Text style={styles.variantFieldLabel}>SKU Code</Text>
-                    <TextInput
-                      style={styles.variantInput}
-                      placeholder="Auto if empty"
-                      placeholderTextColor={COLORS.textMuted}
-                      value={v.sku}
-                      onChangeText={(val) => handleUpdateVariant(v.id, 'sku', val)}
-                    />
+                    <View style={styles.variantFieldHalf}>
+                      <Text style={styles.variantFieldLabel}>MRP (₹) *</Text>
+                      <TextInput
+                        style={styles.variantInput}
+                        placeholder="e.g. 15"
+                        placeholderTextColor={COLORS.textMuted}
+                        keyboardType="numeric"
+                        value={v.mrp}
+                        onChangeText={(val) => handleUpdateVariant(v.id, 'mrp', val)}
+                      />
+                    </View>
                   </View>
                 </View>
               </View>
@@ -541,11 +545,11 @@ export const EditProductModal: React.FC = () => {
           {/* Footer Actions */}
           <View style={styles.footer}>
             <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete} disabled={saving}>
-              <Trash2 size={15} color={COLORS.error} style={{ marginRight: 4 }} />
-              <Text style={styles.deleteBtnText}>Delete Item</Text>
+              <Trash2 size={14} color={COLORS.error} style={{ marginRight: 4 }} />
+              <Text style={styles.deleteBtnText}>Delete</Text>
             </TouchableOpacity>
 
-            <View style={{ flexDirection: 'row', gap: SPACING.md }}>
+            <View style={styles.footerRightButtons}>
               <TouchableOpacity style={styles.cancelBtn} onPress={handleClose} disabled={saving}>
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
@@ -558,7 +562,7 @@ export const EditProductModal: React.FC = () => {
                 {saving ? (
                   <ActivityIndicator size="small" color={COLORS.white} />
                 ) : (
-                  <Text style={styles.saveBtnText}>Save Product & Variants</Text>
+                  <Text style={styles.saveBtnText} numberOfLines={1}>Save Product</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -575,37 +579,43 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: SPACING.md,
+    paddingHorizontal: 10,
+    paddingVertical: 16,
   },
   card: {
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.card,
     width: '100%',
-    maxWidth: 620,
-    maxHeight: '90%',
+    maxWidth: 580,
+    maxHeight: '92%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.25,
     shadowRadius: 20,
     elevation: 10,
     overflow: 'hidden',
+    alignSelf: 'center',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
   },
   title: {
     fontSize: 16,
     fontWeight: '800',
     color: COLORS.textPrimary,
+    flexShrink: 1,
   },
   closeBtn: {
     padding: 6,
@@ -820,10 +830,15 @@ const styles = StyleSheet.create({
   removeVariantBtn: {
     padding: 4,
   },
-  variantGrid: {
+  variantFieldsContainer: {
+    gap: 8,
+  },
+  variantRow: {
     flexDirection: 'row',
     gap: 8,
-    alignItems: 'center',
+  },
+  variantFieldHalf: {
+    flex: 1,
   },
   variantFieldLabel: {
     fontSize: 10,
@@ -847,37 +862,45 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: SPACING.md,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
     backgroundColor: COLORS.white,
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  footerRightButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   deleteBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
     borderRadius: RADIUS.button,
   },
   deleteBtnText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: COLORS.error,
   },
   cancelBtn: {
-    paddingVertical: 10,
-    paddingHorizontal: SPACING.md,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     borderRadius: RADIUS.button,
   },
   cancelBtnText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: COLORS.textMuted,
   },
   saveBtn: {
     backgroundColor: COLORS.purple,
-    paddingVertical: 10,
-    paddingHorizontal: SPACING.xl,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
     borderRadius: RADIUS.button,
     shadowColor: COLORS.purple,
     shadowOffset: { width: 0, height: 2 },
@@ -889,7 +912,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   saveBtnText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
     color: COLORS.white,
   },

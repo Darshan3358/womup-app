@@ -20,6 +20,7 @@ import { BlinkitProduct, Order, Address } from '../../types';
 import { AppIcon } from '../../components/common/AppIcon';
 import { DEALS_OF_THE_DAY_PRODUCTS, ORDER_AGAIN_PRODUCTS } from '../../data/blinkitData';
 import { PrintingService, PrintOrderItem } from '../../services/printingService';
+import { OrderCard } from '../../components/OrderCard';
 
 const defaultAddress: Address = {
   id: 'addr_default',
@@ -319,100 +320,27 @@ export const BlinkitOrderAgainScreen: React.FC = () => {
                     })
                   : 'Recent';
 
-                return (
-                  <View key={pOrd._id || pOrd.printOrderNumber} style={styles.pastOrderCard}>
-                    <View style={styles.cardMainRow}>
-                      {/* Left Thumbnail */}
-                      <View style={styles.orderThumbBox}>
-                        {pOrd.thumbnailUrl || pOrd.fileUrl ? (
-                          <Image
-                            source={{ uri: pOrd.thumbnailUrl || pOrd.fileUrl }}
-                            style={styles.orderThumbImage}
-                            resizeMode="cover"
-                          />
-                        ) : (
-                          <Ionicons name="document-text" size={32} color="#F23D9B" />
-                        )}
-                      </View>
-
-                      {/* Right Details Column */}
-                      <View style={styles.orderContentColumn}>
-                        {/* Order Number & Status */}
-                        <View style={styles.cardHeaderRow}>
-                          <Text style={styles.orderNumberText} numberOfLines={1}>
-                            #{pOrd.printOrderNumber}
-                          </Text>
-                          <View style={styles.headerRightBadges}>
-                            <View
-                              style={[
-                                styles.statusBadge,
-                                isDelivered ? styles.statusBadgeDelivered : styles.statusBadgePending,
-                              ]}
-                            >
-                              <Text
-                                style={[
-                                  styles.statusBadgeText,
-                                  isDelivered ? styles.statusTextDelivered : styles.statusTextPending,
-                                ]}
-                              >
-                                {isDelivered ? 'DELIVERED' : 'PRINTING'}
-                              </Text>
-                            </View>
-                            <TouchableOpacity
-                              onPress={() => handleOpenPrintDetail(pOrd)}
-                              style={styles.chevronCircle}
-                            >
-                              <Ionicons name="chevron-forward" size={13} color="#697293" />
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-
-                        {/* Date */}
-                        <View style={styles.dateRow}>
-                          <Ionicons name="calendar-outline" size={12} color="#697293" style={{ marginRight: 4 }} />
-                          <Text style={styles.orderDateText}>{dateStr}</Text>
-                        </View>
-
-                        {/* Print Spec Item */}
-                        <View style={styles.orderItemLine}>
-                          <Text style={styles.pinkBullet}>•</Text>
-                          <Text style={styles.itemNameText} numberOfLines={1}>
-                            {pOrd.originalFileName}
-                          </Text>
-                          <Text style={styles.itemPriceText}>₹{pOrd.totalAmount}</Text>
-                        </View>
-                      </View>
-                    </View>
-
-                    {/* Footer: Total & Actions */}
-                    <View style={styles.cardFooterRow}>
-                      <View style={styles.totalWrap}>
-                        <Text style={styles.totalLabel}>Total: </Text>
-                        <Text style={styles.totalValue}>₹{pOrd.totalAmount}</Text>
-                      </View>
-
-                      <View style={styles.actionsWrap}>
-                        <TouchableOpacity
-                          activeOpacity={0.8}
-                          onPress={() => handleOpenPrintDetail(pOrd)}
-                          style={styles.detailsBtn}
-                        >
-                          <Text style={styles.detailsBtnText}>Details →</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          activeOpacity={0.85}
-                          onPress={() => setActiveScreen('Blinkit_Print')}
-                          style={styles.repeatOrderBtn}
-                        >
-                          <Feather name="printer" size={13} color="#FFFFFF" />
-                          <Text style={styles.repeatOrderBtnText}>Repeat Print</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  </View>
-                );
-              })}
+              return (
+                <OrderCard
+                  key={pOrd._id || pOrd.printOrderNumber}
+                  orderNumber={`#${pOrd.printOrderNumber}`}
+                  date={dateStr}
+                  status={pOrd.status || 'PRINTING'}
+                  totalPaid={pOrd.totalAmount}
+                  items={[
+                    {
+                      name: pOrd.originalFileName || 'Print Document',
+                      quantity: pOrd.numberOfCopies || 1,
+                      price: pOrd.totalAmount,
+                      variant: `${pOrd.pageCount || 1} pages · ${pOrd.isColor ? 'Color' : 'B&W'}`,
+                      imageUrl: pOrd.thumbnailUrl || pOrd.fileUrl,
+                    },
+                  ]}
+                  onPressDetails={() => handleOpenPrintDetail(pOrd)}
+                  onPressReorder={() => setActiveScreen('Blinkit_Print')}
+                />
+              );
+            })}
             </View>
           ) : (
             <View style={styles.onboardingBannerContainer}>
@@ -454,135 +382,14 @@ export const BlinkitOrderAgainScreen: React.FC = () => {
               />
             </View>
 
-            {/* Past Order Cards (SRS Section 14–25) */}
-            {displayOrders.map((ord, idx) => {
-              const isDelivered = ord.status === 'DELIVERED';
-              const isCancelled = ord.status === 'CANCELLED';
-
-              const firstItem = ord.items?.[0];
-              const thumbSource = getProductImageSource(firstItem, idx, isCancelled);
-
-              return (
-                <TouchableOpacity
-                  key={ord.id || ord.orderNumber || idx}
-                  activeOpacity={0.92}
-                  onPress={() => handleOpenOrderDetail(ord)}
-                  style={styles.pastOrderCard}
-                  accessibilityLabel={`Order ${ord.orderNumber}`}
-                >
-                  <View style={styles.cardMainRow}>
-                    {/* Left: Product Thumbnail Container with Authentic Product Photo */}
-                    <View style={styles.orderThumbBox}>
-                      <Image
-                        source={thumbSource}
-                        style={styles.orderThumbImage}
-                        resizeMode="cover"
-                      />
-                    </View>
-
-                    {/* Right: Order Details Column */}
-                    <View style={styles.orderContentColumn}>
-                      {/* Row 1: Order Number & Status Badge */}
-                      <View style={styles.cardHeaderRow}>
-                        <Text style={styles.orderNumberText} numberOfLines={1}>
-                          {ord.orderNumber}
-                        </Text>
-                        <View style={styles.headerRightBadges}>
-                          <View
-                            style={[
-                              styles.statusBadge,
-                              isDelivered
-                                ? styles.statusBadgeDelivered
-                                : isCancelled
-                                ? styles.statusBadgeCancelled
-                                : styles.statusBadgePending,
-                            ]}
-                          >
-                            <Text
-                              style={[
-                                styles.statusBadgeText,
-                                isDelivered
-                                  ? styles.statusTextDelivered
-                                  : isCancelled
-                                  ? styles.statusTextCancelled
-                                  : styles.statusTextPending,
-                              ]}
-                            >
-                              {ord.status}
-                            </Text>
-                          </View>
-
-                          <View style={styles.chevronCircle}>
-                            <Ionicons name="chevron-forward" size={13} color="#697293" />
-                          </View>
-                        </View>
-                      </View>
-
-                      {/* Row 2: Date */}
-                      <View style={styles.dateRow}>
-                        <Ionicons
-                          name="calendar-outline"
-                          size={12}
-                          color="#697293"
-                          style={{ marginRight: 4 }}
-                        />
-                        <Text style={styles.orderDateText}>{ord.date || '19 Sept 2026, 11:19 am'}</Text>
-                      </View>
-
-                      {/* Row 3: Items */}
-                      {ord.items && ord.items.length > 0 ? (
-                        ord.items.slice(0, 2).map((item, itemIdx) => (
-                          <View key={itemIdx} style={styles.orderItemLine}>
-                            <Text style={styles.pinkBullet}>•</Text>
-                            <Text style={styles.itemNameText} numberOfLines={1}>
-                              {item.name} × {item.quantity}
-                            </Text>
-                            <Text style={styles.itemPriceText}>
-                              ₹{item.price * item.quantity}
-                            </Text>
-                          </View>
-                        ))
-                      ) : (
-                        <View style={styles.orderItemLine}>
-                          <Text style={styles.pinkBullet}>•</Text>
-                          <Text style={styles.itemNameText} numberOfLines={1}>
-                            Fresh Grocery Items × 1
-                          </Text>
-                          <Text style={styles.itemPriceText}>₹{ord.totalAmount}</Text>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-
-                  {/* Row 4: Total & Action Buttons (Full Width, Proper Button Design) */}
-                  <View style={styles.cardFooterRow}>
-                    <View style={styles.totalWrap}>
-                      <Text style={styles.totalLabel}>Total: </Text>
-                      <Text style={styles.totalValue}>₹{ord.totalAmount}</Text>
-                    </View>
-
-                    <View style={styles.actionsWrap}>
-                      <TouchableOpacity
-                        activeOpacity={0.8}
-                        onPress={() => handleOpenOrderDetail(ord)}
-                        style={styles.detailsBtn}
-                      >
-                        <Text style={styles.detailsBtnText}>Details →</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        activeOpacity={0.85}
-                        onPress={() => handleRepeatOrder(ord)}
-                        style={styles.repeatOrderBtn}
-                      >
-                        <Feather name="shopping-bag" size={14} color="#FFFFFF" />
-                        <Text style={styles.repeatOrderBtnText}>Repeat Order</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
+            {displayOrders.map((ord, idx) => (
+              <OrderCard
+                key={ord.id || ord.orderNumber || idx}
+                order={ord}
+                onPressDetails={() => handleOpenOrderDetail(ord)}
+                onPressReorder={() => handleRepeatOrder(ord)}
+              />
+            ))}
           </View>
         ) : (
           <View style={styles.onboardingBannerContainer}>
@@ -839,13 +646,15 @@ const styles = StyleSheet.create({
   },
   cardMainRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
   orderThumbBox: {
-    width: 88,
-    height: 88,
-    borderRadius: 16,
-    backgroundColor: '#F2F4FF',
+    width: 72,
+    height: 72,
+    borderRadius: 14,
+    backgroundColor: '#F8F9FE',
+    borderWidth: 1,
+    borderColor: '#EDEFF8',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -855,12 +664,12 @@ const styles = StyleSheet.create({
   orderThumbImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 16,
+    borderRadius: 13,
   },
   orderContentColumn: {
     flex: 1,
-    justifyContent: 'space-between',
-    minHeight: 88,
+    justifyContent: 'center',
+    minWidth: 0,
   },
 
   // Card Header Row (Order number + status + chevron)
@@ -868,21 +677,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 2,
+  },
+  orderHeaderLeft: {
+    flex: 1,
+    minWidth: 0,
+    marginRight: 8,
   },
   orderNumberText: {
-    fontSize: 15,
+    fontSize: 14.5,
     fontWeight: '800',
     color: '#10205D',
-    flex: 1,
-    marginRight: 4,
   },
   headerRightBadges: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    flexShrink: 0,
   },
   statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4.5,
     paddingHorizontal: 8,
     paddingVertical: 3.5,
     borderRadius: 6,
@@ -910,6 +725,20 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.3,
   },
+  statusDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+  },
+  statusDotDelivered: {
+    backgroundColor: '#18A66A',
+  },
+  statusDotCancelled: {
+    backgroundColor: '#E54B4B',
+  },
+  statusDotPending: {
+    backgroundColor: '#7C3AED',
+  },
   chevronCircle: {
     width: 22,
     height: 22,
@@ -923,25 +752,32 @@ const styles = StyleSheet.create({
   dateRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
+    marginTop: 2,
   },
   orderDateText: {
-    fontSize: 11.5,
-    color: '#697293',
+    fontSize: 11,
+    color: '#7E87A4',
     fontWeight: '500',
+  },
+
+  // Divider
+  cardDivider: {
+    height: 1,
+    backgroundColor: '#F1F3F8',
+    marginVertical: 10,
   },
 
   // Order Item Line
   orderItemLine: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 5,
   },
   pinkBullet: {
     color: '#F23D9B',
-    fontSize: 14,
+    fontSize: 13,
     marginRight: 5,
-    lineHeight: 14,
+    lineHeight: 13,
   },
   itemNameText: {
     flex: 1,
@@ -949,68 +785,83 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#10205D',
   },
+  itemQtyBadge: {
+    fontSize: 11.5,
+    fontWeight: '500',
+    color: '#7E87A4',
+  },
   itemPriceText: {
     fontSize: 13,
     fontWeight: '700',
     color: '#10205D',
     marginLeft: 6,
   },
+  moreItemsText: {
+    fontSize: 11,
+    color: '#7C3AED',
+    fontWeight: '700',
+    marginTop: 2,
+  },
 
-  // Footer: Total & Actions (SRS Section 20, 22, 23)
-  cardFooterRow: {
+  // Bill Row
+  billRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 11,
-    marginTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#F0F2F8',
+    marginBottom: 10,
   },
   totalWrap: {
     flexDirection: 'row',
     alignItems: 'baseline',
   },
   totalLabel: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#10205D',
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#697293',
   },
   totalValue: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '800',
-    color: '#F23D9B',
-    marginLeft: 3,
+    color: '#10205D',
+    marginLeft: 2,
   },
+  totalCountText: {
+    fontSize: 11.5,
+    color: '#7E87A4',
+    fontWeight: '500',
+  },
+
+  // Actions Row: View Details & Repeat Order
   actionsWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
   },
   detailsBtn: {
-    backgroundColor: '#F5F2FF',
-    borderWidth: 1.2,
-    borderColor: '#DED4FF',
-    height: 38,
-    paddingHorizontal: 16,
-    borderRadius: 22,
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#F5F2FF',
+    borderWidth: 1.2,
+    borderColor: '#E0D8FF',
+    height: 40,
+    borderRadius: 20,
   },
   detailsBtnText: {
     color: '#493BCE',
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '700',
-    letterSpacing: 0.1,
   },
   repeatOrderBtn: {
+    flex: 1.4,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
     backgroundColor: '#F23D9B',
-    height: 38,
-    paddingHorizontal: 18,
-    borderRadius: 22,
+    height: 40,
+    borderRadius: 20,
     shadowColor: '#F23D9B',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.28,

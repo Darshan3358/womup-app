@@ -110,13 +110,13 @@ export const EditZonePriceModal: React.FC = () => {
         <View style={styles.modalContainer}>
           {/* Header */}
           <View style={styles.modalHeader}>
-            <View style={styles.headerTitleRow}>
+            <View style={[styles.headerTitleRow, { flex: 1, minWidth: 0, marginRight: 8 }]}>
               <View style={styles.iconCircle}>
                 <DollarSign size={20} color={COLORS.primary} />
               </View>
-              <View>
-                <Text style={styles.modalTitle}>Edit Zone Price</Text>
-                <Text style={styles.modalSubtitle}>Single Source of Truth: area_pricing</Text>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.modalTitle} numberOfLines={1}>Edit Zone Price</Text>
+                <Text style={styles.modalSubtitle} numberOfLines={1}>Single Source of Truth: area_pricing</Text>
               </View>
             </View>
             <TouchableOpacity style={styles.closeBtn} onPress={handleClose} disabled={saving}>

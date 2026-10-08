@@ -11,12 +11,15 @@ import {
   Animated,
   Easing,
   Image,
+  Switch,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../theme/colors';
 import { TYPOGRAPHY } from '../../theme/typography';
 import { AppIcon } from '../../components/common/AppIcon';
+import { ShieldCheck, CheckCircle2 } from 'lucide-react-native';
 import { useApp } from '../../context/AppContext';
+import { CartService } from '../../services/cartService';
 
 // Resolve full-screen order celebration video asset
 const orderVideoAsset = require('../../../assets/gemini_generated_video_2981966f.mp4');
@@ -35,18 +38,26 @@ const getVideoSource = () => {
 export const BlinkitCheckoutScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const {
+    blinkitCartList,
     blinkitCartTotal,
     couponDiscount,
     walletBalance,
     deliveryLocation,
+    currentCityName,
+    currentAreaName,
+    selectedAddress,
     placeOrder,
     currentOrder,
+    user,
+    appliedCoins,
+    setAppliedCoins,
     setActiveScreen,
     goBack,
   } = useApp();
 
-  const [selectedPayment, setSelectedPayment] = useState<'blinkit_money' | 'upi' | 'card' | 'cod'>('upi');
-  const [useWalletBalance, setUseWalletBalance] = useState(walletBalance > 0);
+  const [selectedPayment, setSelectedPayment] = useState<'upi' | 'card' | 'cod'>('upi');
+  const [useWalletBalance, setUseWalletBalance] = useState<boolean>(false);
+  const [useCoins, setUseCoins] = useState<boolean>(appliedCoins > 0);
   const [deliveryInstruction, setDeliveryInstruction] = useState('Ring bell & leave at door');
   const [tipAmount, setTipAmount] = useState<number>(0);
   const [isOrderConfirmed, setOrderConfirmed] = useState(false);
@@ -62,11 +73,61 @@ export const BlinkitCheckoutScreen: React.FC = () => {
 
   const TIP_OPTIONS = [0, 10, 20, 30, 50];
 
-  const deliveryFee = blinkitCartTotal > 199 ? 0 : 15;
+  const [dynamicDeliveryFee, setDynamicDeliveryFee] = useState<number>(40);
+  const [feeBreakdown, setFeeBreakdown] = useState<any>({
+    distanceKm: 3.26,
+    rateUsed: 11,
+    floorApplied: true,
+    areaName: 'Prahlad Nagar',
+    minimumPayout: 40,
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchFee = async () => {
+      const res = await CartService.calculateDynamicDeliveryFee({
+        items: blinkitCartList.map((item) => ({
+          name: item.product.name,
+          price: item.product.sellingPrice,
+          mrp: item.product.mrp,
+          quantity: item.quantity,
+        })),
+        cityName: currentCityName || selectedAddress?.city || 'Ahmedabad',
+        areaName: currentAreaName || selectedAddress?.areaLandmark || 'Prahlad Nagar',
+        distanceKm: 3.26,
+      });
+      if (isMounted && res) {
+        setDynamicDeliveryFee(res.deliveryFee);
+        if (res.breakdown) {
+          setFeeBreakdown({
+            ...res.breakdown,
+            distanceKm: res.distanceKm,
+            rateUsed: res.rateUsed,
+            areaName: res.areaName || 'Prahlad Nagar',
+          });
+        }
+      }
+    };
+    fetchFee();
+    return () => {
+      isMounted = false;
+    };
+  }, [blinkitCartList, currentCityName, currentAreaName, selectedAddress]);
+
+  const deliveryFee = dynamicDeliveryFee;
   const handlingFee = 5;
-  const baseTotal = Math.max(0, blinkitCartTotal + deliveryFee + handlingFee + tipAmount - couponDiscount);
-  const walletDeduction = useWalletBalance ? Math.min(walletBalance, baseTotal) : 0;
-  const finalPayable = Math.max(0, baseTotal - walletDeduction);
+  const orderSubtotal = Math.max(0, blinkitCartTotal + deliveryFee + handlingFee - couponDiscount);
+  const totalWithTip = orderSubtotal + tipAmount;
+
+  // Shopping coins (2,000 SC or user balance, max 20% order subtotal)
+  const availableCoins = user?.shoppingCoins ?? 2000;
+  const maxCoinsUsable = Math.min(availableCoins, Math.max(10, Math.floor(orderSubtotal * 0.2)));
+  const coinsDeduction = useCoins ? maxCoinsUsable : 0;
+
+  // WOMUP Money wallet deduction on remaining amount
+  const remainingAfterCoins = Math.max(0, totalWithTip - coinsDeduction);
+  const walletDeduction = useWalletBalance ? Math.min(walletBalance, remainingAfterCoins) : 0;
+  const finalPayable = Math.max(0, remainingAfterCoins - walletDeduction);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -134,10 +195,18 @@ export const BlinkitCheckoutScreen: React.FC = () => {
 
   const handlePlaceOrder = async () => {
     if (isSubmitting) return;
-    const paymentMethod = useWalletBalance && finalPayable === 0 ? 'WALLET' : selectedPayment.toUpperCase();
+    const paymentMethod = useWalletBalance && finalPayable === 0 ? 'WOMUP_WALLET' : selectedPayment.toUpperCase();
     setIsSubmitting(true);
     try {
-      await placeOrder(paymentMethod, { tip: tipAmount, deliveryInstructions: deliveryInstruction });
+      if (useCoins) {
+        setAppliedCoins(coinsDeduction);
+      }
+      await placeOrder(paymentMethod, {
+        tip: tipAmount,
+        deliveryFee: deliveryFee,
+        deliveryInstructions: deliveryInstruction,
+        walletDeduction: useWalletBalance ? walletDeduction : 0,
+      });
       // Play full screen video for 5 seconds on order place
       startCelebrationVideo();
     } catch (error) {
@@ -263,137 +332,231 @@ export const BlinkitCheckoutScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* 4. Payment Method Selection */}
+        {/* 4. Discounts & Wallet Section */}
+        <View style={styles.cardSection}>
+          <Text style={[TYPOGRAPHY.bodyMdMedium, styles.subSectionTitle]}>
+            Discounts & Wallet
+          </Text>
+
+          {/* Shopping Coins (2,000 SC) Toggle */}
+          <View style={styles.walletToggleRow}>
+            <View style={styles.walletToggleLeft}>
+              <View style={[styles.paymentIconBox, { backgroundColor: '#FEF3C7' }]}>
+                <AppIcon name="star" size={20} color="#D97706" />
+              </View>
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <Text style={[TYPOGRAPHY.bodyMdMedium, styles.paymentTitle]}>
+                  Use Shopping Coins
+                </Text>
+                <Text style={styles.walletBalText}>
+                  Available: {availableCoins.toLocaleString()} Coins • Save ₹{maxCoinsUsable}
+                </Text>
+              </View>
+            </View>
+            <Switch
+              trackColor={{ false: '#D1D5DB', true: COLORS.primary }}
+              thumbColor={useCoins ? COLORS.white : '#f4f3f4'}
+              onValueChange={(val) => {
+                if (availableCoins > 0) {
+                  setUseCoins(val);
+                }
+              }}
+              value={useCoins && availableCoins > 0}
+              disabled={availableCoins <= 0}
+            />
+          </View>
+          {useCoins && coinsDeduction > 0 && (
+            <View style={[styles.walletAppliedBadge, { backgroundColor: '#FEF3C7', marginBottom: 12 }]}>
+              <Text style={[styles.walletAppliedText, { color: '#B45309' }]}>
+                🪙 {coinsDeduction} Shopping Coins applied (-₹{coinsDeduction})
+              </Text>
+            </View>
+          )}
+
+          <View style={[styles.divider, { marginVertical: 10 }]} />
+
+          {/* WOMUP Money (Wallet) Toggle */}
+          <View style={styles.walletToggleRow}>
+            <View style={styles.walletToggleLeft}>
+              <View style={[styles.paymentIconBox, { backgroundColor: COLORS.lightPink }]}>
+                <AppIcon name="wallet" size={20} color={COLORS.primary} />
+              </View>
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <Text style={[TYPOGRAPHY.bodyMdMedium, styles.paymentTitle]}>
+                  WOMUP Money
+                </Text>
+                <Text style={styles.walletBalText}>Available: ₹{walletBalance}</Text>
+              </View>
+            </View>
+            <Switch
+              trackColor={{ false: '#D1D5DB', true: COLORS.primary }}
+              thumbColor={useWalletBalance ? COLORS.white : '#f4f3f4'}
+              onValueChange={(val) => {
+                if (walletBalance > 0) {
+                  setUseWalletBalance(val);
+                }
+              }}
+              value={useWalletBalance && walletBalance > 0}
+              disabled={walletBalance <= 0}
+            />
+          </View>
+          {useWalletBalance && walletDeduction > 0 && (
+            <View style={styles.walletAppliedBadge}>
+              <Text style={styles.walletAppliedText}>
+                ✓ ₹{walletDeduction} applied from WOMUP Money
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* 5. Payment Method Selection */}
         <View style={styles.cardSection}>
           <Text style={[TYPOGRAPHY.headingMd, styles.subSectionTitle]}>
             Select Payment Method
           </Text>
 
-          {/* Blinkit Money Option */}
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => {
-              setSelectedPayment('blinkit_money');
-              setUseWalletBalance(true);
-            }}
-            style={styles.paymentOptionRow}
-          >
-            <View style={styles.paymentOptionLeft}>
-              <View style={[styles.paymentIconBox, { backgroundColor: COLORS.lightPink }]}>
-                <AppIcon name="wallet" size={20} color={COLORS.primary} />
-              </View>
-              <View>
-                <Text style={[TYPOGRAPHY.bodyMdMedium, styles.paymentTitle]}>
-                  Blinkit Money
-                </Text>
-                <Text style={styles.walletBalText}>Available: ₹{walletBalance}</Text>
-              </View>
+          {finalPayable === 0 ? (
+            <View style={styles.fullyPaidBanner}>
+              <AppIcon name="check-circle" size={18} color={COLORS.success} />
+              <Text style={styles.fullyPaidText}>
+                Full amount covered by WOMUP Benefits! No extra payment required.
+              </Text>
             </View>
-            <View
-              style={[
-                styles.radioOuter,
-                selectedPayment === 'blinkit_money' && styles.radioOuterActive,
-              ]}
-            >
-              {selectedPayment === 'blinkit_money' && <View style={styles.radioInner} />}
-            </View>
-          </TouchableOpacity>
+          ) : (
+            <>
+              {/* UPI Option */}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setSelectedPayment('upi')}
+                style={styles.paymentOptionRow}
+              >
+                <View style={styles.paymentOptionLeft}>
+                  <View style={[styles.paymentIconBox, { backgroundColor: COLORS.lightBlueLavender }]}>
+                    <AppIcon name="zap" size={20} color={COLORS.secondary} />
+                  </View>
+                  <View>
+                    <Text style={[TYPOGRAPHY.bodyMdMedium, styles.paymentTitle]}>
+                      UPI (Google Pay, PhonePe, Paytm)
+                    </Text>
+                    <Text style={styles.walletBalText}>Fast & secure 1-tap checkout</Text>
+                  </View>
+                </View>
+                <View
+                  style={[
+                    styles.radioOuter,
+                    selectedPayment === 'upi' && styles.radioOuterActive,
+                  ]}
+                >
+                  {selectedPayment === 'upi' && <View style={styles.radioInner} />}
+                </View>
+              </TouchableOpacity>
 
-          <View style={styles.divider} />
+              <View style={styles.divider} />
 
-          {/* UPI Option */}
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setSelectedPayment('upi')}
-            style={styles.paymentOptionRow}
-          >
-            <View style={styles.paymentOptionLeft}>
-              <View style={[styles.paymentIconBox, { backgroundColor: COLORS.lightBlueLavender }]}>
-                <AppIcon name="zap" size={20} color={COLORS.secondary} />
-              </View>
-              <View>
-                <Text style={[TYPOGRAPHY.bodyMdMedium, styles.paymentTitle]}>
-                  UPI (Google Pay, PhonePe, Paytm)
-                </Text>
-                <Text style={styles.walletBalText}>Fast & secure 1-tap checkout</Text>
-              </View>
-            </View>
-            <View
-              style={[
-                styles.radioOuter,
-                selectedPayment === 'upi' && styles.radioOuterActive,
-              ]}
-            >
-              {selectedPayment === 'upi' && <View style={styles.radioInner} />}
-            </View>
-          </TouchableOpacity>
+              {/* Credit / Debit Cards */}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setSelectedPayment('card')}
+                style={styles.paymentOptionRow}
+              >
+                <View style={styles.paymentOptionLeft}>
+                  <View style={[styles.paymentIconBox, { backgroundColor: COLORS.cardBackground }]}>
+                    <AppIcon name="credit-card" size={20} color={COLORS.textPrimary} />
+                  </View>
+                  <View>
+                    <Text style={[TYPOGRAPHY.bodyMdMedium, styles.paymentTitle]}>
+                      Credit / Debit Card
+                    </Text>
+                    <Text style={styles.walletBalText}>Visa, MasterCard, RuPay</Text>
+                  </View>
+                </View>
+                <View
+                  style={[
+                    styles.radioOuter,
+                    selectedPayment === 'card' && styles.radioOuterActive,
+                  ]}
+                >
+                  {selectedPayment === 'card' && <View style={styles.radioInner} />}
+                </View>
+              </TouchableOpacity>
 
-          <View style={styles.divider} />
+              <View style={styles.divider} />
 
-          {/* Credit / Debit Cards */}
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setSelectedPayment('card')}
-            style={styles.paymentOptionRow}
-          >
-            <View style={styles.paymentOptionLeft}>
-              <View style={[styles.paymentIconBox, { backgroundColor: COLORS.cardBackground }]}>
-                <AppIcon name="credit-card" size={20} color={COLORS.textPrimary} />
-              </View>
-              <View>
-                <Text style={[TYPOGRAPHY.bodyMdMedium, styles.paymentTitle]}>
-                  Credit / Debit Card
-                </Text>
-                <Text style={styles.walletBalText}>Visa, MasterCard, RuPay</Text>
-              </View>
-            </View>
-            <View
-              style={[
-                styles.radioOuter,
-                selectedPayment === 'card' && styles.radioOuterActive,
-              ]}
-            >
-              {selectedPayment === 'card' && <View style={styles.radioInner} />}
-            </View>
-          </TouchableOpacity>
-
-          <View style={styles.divider} />
-
-          {/* Cash on Delivery */}
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setSelectedPayment('cod')}
-            style={styles.paymentOptionRow}
-          >
-            <View style={styles.paymentOptionLeft}>
-              <View style={[styles.paymentIconBox, { backgroundColor: COLORS.cardBackground }]}>
-                <AppIcon name="tag" size={20} color={COLORS.textPrimary} />
-              </View>
-              <View>
-                <Text style={[TYPOGRAPHY.bodyMdMedium, styles.paymentTitle]}>
-                  Cash on Delivery
-                </Text>
-                <Text style={styles.walletBalText}>Pay cash or UPI at delivery doorstep</Text>
-              </View>
-            </View>
-            <View
-              style={[
-                styles.radioOuter,
-                selectedPayment === 'cod' && styles.radioOuterActive,
-              ]}
-            >
-              {selectedPayment === 'cod' && <View style={styles.radioInner} />}
-            </View>
-          </TouchableOpacity>
+              {/* Cash on Delivery */}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setSelectedPayment('cod')}
+                style={styles.paymentOptionRow}
+              >
+                <View style={styles.paymentOptionLeft}>
+                  <View style={[styles.paymentIconBox, { backgroundColor: COLORS.cardBackground }]}>
+                    <AppIcon name="tag" size={20} color={COLORS.textPrimary} />
+                  </View>
+                  <View>
+                    <Text style={[TYPOGRAPHY.bodyMdMedium, styles.paymentTitle]}>
+                      Cash on Delivery
+                    </Text>
+                    <Text style={styles.walletBalText}>Pay cash or UPI at delivery doorstep</Text>
+                  </View>
+                </View>
+                <View
+                  style={[
+                    styles.radioOuter,
+                    selectedPayment === 'cod' && styles.radioOuterActive,
+                  ]}
+                >
+                  {selectedPayment === 'cod' && <View style={styles.radioInner} />}
+                </View>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
 
-        {/* 4. Payment Summary Preview */}
+        {/* 6. Payment Summary Preview */}
         <View style={styles.cardSection}>
           <Text style={[TYPOGRAPHY.headingMd, styles.subSectionTitle]}>Summary</Text>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Order Total</Text>
-            <Text style={styles.summaryValue}>₹{baseTotal}</Text>
+            <Text style={styles.summaryLabel}>Items Subtotal</Text>
+            <Text style={styles.summaryValue}>₹{blinkitCartTotal}</Text>
           </View>
+          <View style={[styles.summaryRow, { alignItems: 'flex-start', paddingVertical: 8 }]}>
+            <View style={{ flex: 1, paddingRight: 8 }}>
+              <Text style={styles.summaryLabel}>Delivery Partner Fee</Text>
+              <Text style={{ fontSize: 11, color: '#62677A', marginTop: 1 }}>
+                {feeBreakdown?.distanceKm || 3.26} km · ₹{feeBreakdown?.rateUsed || 11}/km
+                {feeBreakdown?.floorApplied ? ` (Base: ₹${feeBreakdown?.baseFee || 35.86})` : ''}
+              </Text>
+              {feeBreakdown?.floorApplied && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                  <ShieldCheck size={12} color="#4338CA" />
+                  <Text style={{ fontSize: 10, color: '#4338CA', fontWeight: '600' }}>
+                    +₹{(Number(feeBreakdown?.minimumPayout || 40) - Number(feeBreakdown?.baseFee || 35.86)).toFixed(2)} Floor Guarantee (Min ₹{feeBreakdown?.minimumPayout || 40})
+                  </Text>
+                </View>
+              )}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                <CheckCircle2 size={10} color="#059669" />
+                <Text style={{ fontSize: 10, color: '#059669', fontWeight: '600' }}>
+                  100% passed to delivery partner
+                </Text>
+              </View>
+            </View>
+            <Text style={[styles.summaryValue, { fontWeight: '700' }]}>
+              ₹{deliveryFee}
+            </Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Handling & Convenience</Text>
+            <Text style={styles.summaryValue}>₹{handlingFee}</Text>
+          </View>
+          {couponDiscount > 0 && (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Coupon Discount</Text>
+              <Text style={[styles.summaryValue, { color: COLORS.success, fontWeight: '700' }]}>
+                - ₹{couponDiscount}
+              </Text>
+            </View>
+          )}
           {tipAmount > 0 && (
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Delivery Partner Tip</Text>
@@ -402,10 +565,18 @@ export const BlinkitCheckoutScreen: React.FC = () => {
               </Text>
             </View>
           )}
-          {walletDeduction > 0 && (
+          {useCoins && coinsDeduction > 0 && (
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Blinkit Money Deducted</Text>
-              <Text style={[styles.summaryValue, { color: COLORS.success }]}>
+              <Text style={styles.summaryLabel}>Shopping Coins Applied ({coinsDeduction} SC)</Text>
+              <Text style={[styles.summaryValue, { color: COLORS.success, fontWeight: '700' }]}>
+                - ₹{coinsDeduction}
+              </Text>
+            </View>
+          )}
+          {useWalletBalance && walletDeduction > 0 && (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>WOMUP Money Deducted</Text>
+              <Text style={[styles.summaryValue, { color: COLORS.success, fontWeight: '700' }]}>
                 - ₹{walletDeduction}
               </Text>
             </View>
@@ -720,6 +891,43 @@ const styles = StyleSheet.create({
   tipPillTextActive: {
     color: COLORS.primary,
     fontWeight: '800',
+  },
+  walletToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  walletToggleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  walletAppliedBadge: {
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#E8F5E9',
+  },
+  walletAppliedText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#2E7D32',
+  },
+  fullyPaidBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    backgroundColor: '#E8F5E9',
+    borderRadius: 10,
+    marginTop: 4,
+  },
+  fullyPaidText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#2E7D32',
+    fontWeight: '600',
   },
   paymentOptionRow: {
     flexDirection: 'row',

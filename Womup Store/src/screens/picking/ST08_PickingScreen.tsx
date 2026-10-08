@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../context/StoreContext';
 import { BarcodeScanner } from '../../components/common/BarcodeScanner';
@@ -93,7 +93,8 @@ export const ST08_PickingScreen: React.FC = () => {
   const items = activePickList?.items || [];
   const pendingItems = items.filter((i) => i.status === 'PENDING');
   const pickedCount = items.filter((i) => i.status === 'PICKED').length;
-  const currentItem = pendingItems[0] || items[items.length - 1];
+  // If no pending items remain, currentItem is null so completion card renders
+  const currentItem = pendingItems[0] || null;
 
   const isShelfAssigned =
     Boolean(currentItem?.shelfLocation) &&
@@ -134,13 +135,17 @@ export const ST08_PickingScreen: React.FC = () => {
       setSuccessToast(`Scanned: ${currentItem.name}`);
       setTimeout(() => setSuccessToast(null), 1500);
 
-      if (res.isCompleted) {
+      if (res?.isCompleted || (res as any)?.progress?.isCompleted || pendingItems.length <= 1) {
         setTimeout(() => {
           setSubScreen('Packing');
-        }, 600);
+        }, 500);
       }
     } catch (err: any) {
       console.log('Pick scan error:', err);
+      Alert.alert(
+        'Barcode Mismatch',
+        err?.message || `The scanned barcode "${scannedBarcode}" does not match the product SKU.`
+      );
     }
   };
 
@@ -246,7 +251,7 @@ export const ST08_PickingScreen: React.FC = () => {
               style={styles.proceedPackingBtn}
               onPress={() => setSubScreen('Packing')}
             >
-              <Text style={styles.proceedPackingText}>PROCEED TO PACKING</Text>
+              <Text style={styles.proceedPackingText}>COMPLETE PACKING & GENERATE BAG BARCODE</Text>
               <Ionicons name="arrow-forward" size={18} color="#FFF" />
             </TouchableOpacity>
           </View>

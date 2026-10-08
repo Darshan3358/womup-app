@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRider } from '../../context/RiderContext';
 import { COLORS } from '../../theme/colors';
@@ -7,11 +7,31 @@ import { COLORS } from '../../theme/colors';
 export const PickupVerificationModal: React.FC = () => {
   const { showPickupModal, setShowPickupModal, pickupOrder, activeDelivery } = useRider();
   const [bagBarcode, setBagBarcode] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const handleConfirmPickup = async () => {
-    // Verifies package & advances to OUT_FOR_DELIVERY
-    await pickupOrder(bagBarcode.trim() || undefined);
-    setShowPickupModal(false);
+    const code = bagBarcode.trim();
+    if (!code) {
+      Alert.alert(
+        'Bag Barcode Required',
+        'Please scan or enter the Bag Barcode (e.g., BAG-WORM-...) printed on the sealed grocery tote bag before confirming pickup.'
+      );
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await pickupOrder(code);
+      setShowPickupModal(false);
+      setBagBarcode('');
+    } catch (err: any) {
+      Alert.alert(
+        'Pickup Verification Failed',
+        err?.message || 'The store has not finished packing this order, or the barcode does not match.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -48,12 +68,16 @@ export const PickupVerificationModal: React.FC = () => {
             </View>
           </View>
 
+          <Text style={{ alignSelf: 'flex-start', fontSize: 11, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 6, marginTop: 4 }}>
+            SEALED BAG BARCODE <Text style={{ color: '#EF4444' }}>*</Text>
+          </Text>
           <TextInput
             style={styles.input}
-            placeholder="Scan / Enter Bag Barcode ID (Optional)"
+            placeholder="Scan / Enter Bag Barcode (BAG-...)"
             placeholderTextColor={COLORS.secondaryText}
             value={bagBarcode}
             onChangeText={setBagBarcode}
+            autoCapitalize="characters"
           />
 
           <View style={styles.actionButtons}>
@@ -61,16 +85,22 @@ export const PickupVerificationModal: React.FC = () => {
               style={styles.cancelBtn}
               onPress={() => setShowPickupModal(false)}
               activeOpacity={0.7}
+              disabled={isSubmitting}
             >
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.confirmBtn}
+              style={[styles.confirmBtn, isSubmitting && { opacity: 0.7 }]}
               onPress={handleConfirmPickup}
               activeOpacity={0.85}
+              disabled={isSubmitting}
             >
-              <Text style={styles.confirmBtnText}>CONFIRM PICKUP</Text>
+              {isSubmitting ? (
+                <ActivityIndicator color="#FFF" size="small" />
+              ) : (
+                <Text style={styles.confirmBtnText}>CONFIRM PICKUP</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>

@@ -140,16 +140,17 @@ router.post('/', async (req, res) => {
         return res.status(400).json({ success: false, error: 'Selected area does not exist' });
       }
 
-      // STRICT VALIDATION: Check if this area already has an active store!
-      const activeStoreInArea = await db.collection('stores').findOne({
+      // MULTI-STORE CAPACITY VALIDATION:
+      const activeStoresInArea = await db.collection('stores').countDocuments({
         $or: [{ areaId: resolvedArea._id }, { areaId: resolvedArea._id.toString() }],
         isActive: true,
       });
+      const maxStores = Number(resolvedArea.maxStores) || 1;
 
-      if (activeStoreInArea) {
+      if (activeStoresInArea >= maxStores) {
         return res.status(409).json({
           success: false,
-          error: `Area "${resolvedArea.name}" already has an active store assigned ("${activeStoreInArea.name}"). Each area can only have ONE store.`,
+          error: `Area "${resolvedArea.name}" has reached maximum capacity (${activeStoresInArea}/${maxStores} stores). Increase the area limit in Location Management or choose another area.`,
         });
       }
 
@@ -322,17 +323,18 @@ router.put('/:id', async (req, res) => {
         return res.status(400).json({ success: false, error: 'Selected area does not exist' });
       }
 
-      // Check if another store has this area
-      const existingOtherStore = await db.collection('stores').findOne({
+      // MULTI-STORE CAPACITY VALIDATION: Check if another store has this area and if area is full
+      const existingOtherStoresCount = await db.collection('stores').countDocuments({
         _id: { $ne: storeId },
         $or: [{ areaId: resolvedArea._id }, { areaId: resolvedArea._id.toString() }],
         isActive: true,
       });
+      const maxStores = Number(resolvedArea.maxStores) || 1;
 
-      if (existingOtherStore) {
+      if (existingOtherStoresCount >= maxStores) {
         return res.status(409).json({
           success: false,
-          error: `Area "${resolvedArea.name}" already has an active store assigned ("${existingOtherStore.name}"). Each area can only have ONE store.`,
+          error: `Area "${resolvedArea.name}" has reached maximum capacity (${existingOtherStoresCount}/${maxStores} stores). Increase the area limit in Location Management or choose another area.`,
         });
       }
 

@@ -267,7 +267,9 @@ export const DynamicLiveMap: React.FC<DynamicLiveMapProps> = ({
           {/* Floating Rider Badge */}
           <View style={styles.riderFloatingBadge}>
             <Text style={styles.riderFloatingName} numberOfLines={1}>
-              {partnerName && partnerName !== 'Delivery Partner' ? partnerName.split(' ')[0] : 'Rider'}
+              {partnerName && partnerName !== 'Delivery Partner'
+                ? partnerName
+                : 'DARSHAN THANKI'}
             </Text>
           </View>
         </View>

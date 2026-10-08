@@ -103,4 +103,4 @@ export class Store {
 export const StoreSchema = SchemaFactory.createForClass(Store);
 StoreSchema.index({ location: '2dsphere' });
 StoreSchema.index({ loginId: 1 }, { unique: true, sparse: true });
-StoreSchema.index({ areaId: 1, isActive: 1 }, { unique: true, partialFilterExpression: { isActive: true } });
+StoreSchema.index({ areaId: 1, isActive: 1 });

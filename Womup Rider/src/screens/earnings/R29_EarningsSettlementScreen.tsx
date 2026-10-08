@@ -120,6 +120,13 @@ export const EarningsSettlementScreen: React.FC = () => {
           </View>
         </View>
 
+        <View style={{ backgroundColor: '#ECFDF5', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'stretch' }}>
+          <Ionicons name="shield-checkmark" size={14} color="#059669" />
+          <Text style={{ fontSize: 11, color: '#047857', fontWeight: '600' }}>
+            100% Tips Passed Directly: Wom Up takes ₹0 commission on customer tips.
+          </Text>
+        </View>
+
         {(settlementSummary?.pendingTransfer || 0) > 0 && (
           <TouchableOpacity
             style={styles.payoutBtn}

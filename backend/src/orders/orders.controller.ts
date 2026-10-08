@@ -23,24 +23,24 @@ export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(OptionalJwtAuthGuard)
   @UseInterceptors(IdempotencyInterceptor)
   @ApiOperation({ summary: 'Place a new order (Authoritative server pricing, protected with Idempotency-Key)' })
   @ApiHeader({ name: 'idempotency-key', required: false, description: 'Unique UUID to prevent duplicate submissions' })
   @ApiResponse({ status: 201, description: 'Order created with live 9-min tracking' })
   async createOrder(@CurrentUser() user: any, @Body() dto: CreateOrderDto) {
-    return this.ordersService.createOrder(user.id, dto);
+    return this.ordersService.createOrder(user?.id, dto);
   }
 
   @Get()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Get customer order history with pagination' })
   async getOrderHistory(
     @CurrentUser() user: any,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
   ) {
-    return this.ordersService.getOrderHistory(user.id, page, limit);
+    return this.ordersService.getOrderHistory(user?.id, page, limit);
   }
 
   @Get(':id')

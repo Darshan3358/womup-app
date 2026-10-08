@@ -323,6 +323,11 @@ export class StoreOrdersService {
       } catch (err) {}
     }
 
+    const itemSubtotal = Math.max(0, Number((order as any)?.itemSubtotal) || (order as any)?.items?.reduce((s: number, i: any) => s + (Number(i.unitPrice || i.price || 0) * (i.quantity || 1)), 0) || 60);
+    const platformCommissionRate = 0.10;
+    const storeCommission = Math.round(itemSubtotal * platformCommissionRate);
+    const storeEarnings = Math.max(0, itemSubtotal - storeCommission);
+
     return {
       orderId: order._id.toString(),
       orderNumber: order.orderNumber,
@@ -330,6 +335,9 @@ export class StoreOrdersService {
       items: pickList ? pickList.items : order.items,
       pickList: pickList || null,
       assignedRider,
+      storeEarnings,
+      storeCommission,
+      itemSubtotal,
       totalAmount: order.totalAmount,
       deliverySlot: order.deliverySlot,
       createdAt: (order as any).createdAt,
@@ -460,21 +468,35 @@ export class StoreOrdersService {
       pickList = await this.createPickListForOrder(order, staff);
     }
 
-    // Find the item by either index or productId/barcode
+    // 1. Locate the targeted item by itemId or name
     let item = pickList.items.find(
       (i) =>
         i.productId?.toString() === itemId ||
-        i.barcode === scannedBarcode ||
+        (i as any)._id?.toString() === itemId ||
         i.name.toLowerCase().includes(itemId.toLowerCase()),
     );
 
-    if (!item && pickList.items.length > 0) {
-      // If direct match failed, select first pending item
-      item = pickList.items.find((i) => i.status === PickItemStatus.PENDING) || pickList.items[0];
+    // If itemId wasn't provided or didn't match, attempt match by scanned barcode
+    if (!item && scannedBarcode) {
+      item = pickList.items.find((i) => i.barcode === scannedBarcode);
     }
 
     if (!item) {
-      throw new NotFoundException('Item not found in pick list');
+      throw new NotFoundException(`Item '${itemId}' not found in pick list`);
+    }
+
+    // 2. STRICT BARCODE VALIDATION:
+    // Verify that scannedBarcode matches this product's SKU / barcode
+    if (scannedBarcode) {
+      const cleanScanned = scannedBarcode.trim().toUpperCase();
+      const cleanExpected = (item.barcode || '').trim().toUpperCase();
+      const cleanProductId = (item.productId?.toString() || '').toUpperCase();
+
+      if (cleanExpected && cleanScanned !== cleanExpected && cleanScanned !== cleanProductId) {
+        throw new BadRequestException(
+          `Scanned barcode "${scannedBarcode}" does not match the product barcode (${item.barcode}) for "${item.name}". Please scan the correct item.`,
+        );
+      }
     }
 
     item.status = PickItemStatus.PICKED;

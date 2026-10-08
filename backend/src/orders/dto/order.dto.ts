@@ -7,6 +7,16 @@ export class CreateOrderDto {
   @IsOptional()
   addressId?: string;
 
+  @ApiProperty({ description: 'Optional specific Dark Store ID', required: false })
+  @IsString()
+  @IsOptional()
+  storeId?: string;
+
+  @ApiProperty({ description: 'Optional Area ID', required: false })
+  @IsString()
+  @IsOptional()
+  areaId?: string;
+
   @ApiProperty({ required: false, description: 'Optional delivery address payload if addressId is not in DB' })
   @IsOptional()
   address?: {
@@ -41,6 +51,10 @@ export class CreateOrderDto {
   @ApiProperty({ example: 20, required: false, description: 'Tip amount for delivery partner' })
   @IsOptional()
   tip?: number;
+
+  @ApiProperty({ example: 40, required: false, description: 'Calculated dynamic delivery fee' })
+  @IsOptional()
+  deliveryFee?: number;
 
   @ApiProperty({ required: false, description: 'Client cart items to sync before checkout' })
   @IsOptional()

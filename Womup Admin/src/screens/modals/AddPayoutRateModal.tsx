@@ -1,15 +1,17 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Pressable,
   TextInput,
   Modal,
   Alert,
   ActivityIndicator,
   FlatList,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -24,6 +26,7 @@ import {
   X,
   ShieldCheck,
   AlertCircle,
+  Info,
 } from 'lucide-react-native';
 import { COLORS, GRADIENTS, RADIUS, SPACING } from '../../theme';
 import { useAdminState } from '../../context/AdminStateContext';
@@ -57,6 +60,12 @@ export const AddPayoutRateModal: React.FC<AddPayoutRateModalProps> = ({
   const [description, setDescription] = useState<string>('');
   const [isActive, setIsActive] = useState<boolean>(true);
   const [submitting, setSubmitting] = useState<boolean>(false);
+
+  // Field refs & focus tracking for seamless input interaction
+  const rateInputRef = useRef<TextInput>(null);
+  const minInputRef = useRef<TextInput>(null);
+  const maxInputRef = useRef<TextInput>(null);
+  const [focusedRateField, setFocusedRateField] = useState<'rate' | 'min' | 'max' | null>(null);
 
   // Sub-Picker Modals
   const [showCityPicker, setShowCityPicker] = useState<boolean>(false);
@@ -283,20 +292,20 @@ export const AddPayoutRateModal: React.FC<AddPayoutRateModalProps> = ({
         <View style={styles.modalContent}>
           {/* Header */}
           <View style={styles.modalHeader}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View style={styles.headerLeftContainer}>
               <View style={styles.headerIcon}>
                 <DollarSign size={20} color={COLORS.hotPink} />
               </View>
-              <View>
-                <Text style={styles.modalTitle}>
+              <View style={styles.headerTextContainer}>
+                <Text style={styles.modalTitle} numberOfLines={1}>
                   {editingItem ? 'Edit Payout Rate' : 'Add New Payout Rate'}
                 </Text>
-                <Text style={styles.modalSubtitle}>
+                <Text style={styles.modalSubtitle} numberOfLines={2}>
                   Configure distance-based rider compensation rules
                 </Text>
               </View>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <X size={20} color={COLORS.textMuted} />
             </TouchableOpacity>
           </View>
@@ -459,49 +468,140 @@ export const AddPayoutRateModal: React.FC<AddPayoutRateModalProps> = ({
             {/* 4. Rates & Bounds Configuration */}
             <View style={styles.threeCols}>
               {/* Rate / km */}
-              <View style={[styles.colItem, { marginRight: 10 }]}>
-                <Text style={styles.fieldLabel}>Rate / km (₹) *</Text>
-                <View style={styles.inputWrapper}>
-                  <Text style={styles.inputCurrency}>₹</Text>
+              <View style={styles.colItem}>
+                <Text style={styles.fieldLabel} numberOfLines={1}>
+                  Rate / km (₹) <Text style={{ color: COLORS.hotPink }}>*</Text>
+                </Text>
+                <Pressable
+                  style={[
+                    styles.rateFieldBox,
+                    focusedRateField === 'rate' && styles.rateFieldBoxFocused,
+                  ]}
+                  onPress={() => rateInputRef.current?.focus()}
+                >
+                  <Text
+                    style={[
+                      styles.rateCurrencyPrefix,
+                      focusedRateField === 'rate' && styles.rateCurrencyPrefixFocused,
+                    ]}
+                    selectable={false}
+                  >
+                    ₹
+                  </Text>
                   <TextInput
-                    style={styles.inputControl}
+                    ref={rateInputRef}
+                    style={[
+                      styles.rateTextInput,
+                      Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
+                    ]}
                     value={ratePerKm}
-                    onChangeText={setRatePerKm}
-                    keyboardType="numeric"
+                    onChangeText={(val) => setRatePerKm(val.replace(/[^0-9.]/g, ''))}
+                    onFocus={() => setFocusedRateField('rate')}
+                    onBlur={() => setFocusedRateField(null)}
+                    keyboardType="decimal-pad"
                     placeholder="15"
+                    placeholderTextColor="#94A3B8"
+                    selectTextOnFocus
                   />
-                  <Text style={styles.inputUnit}>/km</Text>
-                </View>
+                  <View style={styles.rateUnitBadge}>
+                    <Text style={styles.rateUnitBadgeText} selectable={false}>
+                      /km
+                    </Text>
+                  </View>
+                </Pressable>
               </View>
 
               {/* Minimum Payout Floor */}
-              <View style={[styles.colItem, { marginRight: 10 }]}>
-                <Text style={styles.fieldLabel}>Min Floor (₹)</Text>
-                <View style={styles.inputWrapper}>
-                  <Text style={styles.inputCurrencyMuted}>₹</Text>
+              <View style={styles.colItem}>
+                <Text style={styles.fieldLabel} numberOfLines={1}>
+                  Min Floor (₹)
+                </Text>
+                <Pressable
+                  style={[
+                    styles.rateFieldBox,
+                    focusedRateField === 'min' && styles.rateFieldBoxFocused,
+                  ]}
+                  onPress={() => minInputRef.current?.focus()}
+                >
+                  <Text
+                    style={[
+                      styles.rateCurrencyPrefix,
+                      focusedRateField === 'min' && styles.rateCurrencyPrefixFocused,
+                    ]}
+                    selectable={false}
+                  >
+                    ₹
+                  </Text>
                   <TextInput
-                    style={styles.inputControl}
+                    ref={minInputRef}
+                    style={[
+                      styles.rateTextInput,
+                      Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
+                    ]}
                     value={minPayout}
-                    onChangeText={setMinPayout}
+                    onChangeText={(val) => setMinPayout(val.replace(/[^0-9]/g, ''))}
+                    onFocus={() => setFocusedRateField('min')}
+                    onBlur={() => setFocusedRateField(null)}
                     keyboardType="numeric"
                     placeholder="35"
+                    placeholderTextColor="#94A3B8"
+                    selectTextOnFocus
                   />
-                </View>
+                </Pressable>
               </View>
 
               {/* Maximum Payout Cap */}
               <View style={styles.colItem}>
-                <Text style={styles.fieldLabel}>Max Cap (₹)</Text>
-                <View style={styles.inputWrapper}>
-                  <Text style={styles.inputCurrencyMuted}>₹</Text>
+                <Text style={styles.fieldLabel} numberOfLines={1}>
+                  Max Cap (₹)
+                </Text>
+                <Pressable
+                  style={[
+                    styles.rateFieldBox,
+                    focusedRateField === 'max' && styles.rateFieldBoxFocused,
+                  ]}
+                  onPress={() => maxInputRef.current?.focus()}
+                >
+                  <Text
+                    style={[
+                      styles.rateCurrencyPrefix,
+                      focusedRateField === 'max' && styles.rateCurrencyPrefixFocused,
+                    ]}
+                    selectable={false}
+                  >
+                    ₹
+                  </Text>
                   <TextInput
-                    style={styles.inputControl}
+                    ref={maxInputRef}
+                    style={[
+                      styles.rateTextInput,
+                      Platform.OS === 'web' && ({ outlineStyle: 'none' } as any),
+                    ]}
                     value={maxPayout}
-                    onChangeText={setMaxPayout}
+                    onChangeText={(val) => setMaxPayout(val.replace(/[^0-9]/g, ''))}
+                    onFocus={() => setFocusedRateField('max')}
+                    onBlur={() => setFocusedRateField(null)}
                     keyboardType="numeric"
                     placeholder="180"
+                    placeholderTextColor="#94A3B8"
+                    selectTextOnFocus
                   />
-                </View>
+                </Pressable>
+              </View>
+            </View>
+
+            {/* Live Pricing Math & Floor Explanation Helper */}
+            <View style={styles.floorHelperBanner}>
+              <Info size={14} color="#6366F1" style={{ marginTop: 2 }} />
+              <View style={{ flex: 1, marginLeft: 8 }}>
+                <Text style={styles.floorHelperTitle}>
+                  Dynamic Cart & Rider Pricing Formula:
+                </Text>
+                <Text style={styles.floorHelperText}>
+                  • Customer Cart Fee: max(Distance × ₹{ratePerKm || '11'}, ₹{minPayout || '40'}) min floor guaranteed.
+                  {'\n'}• Example (3.26 km trip): 3.26 × ₹{ratePerKm || '11'} = ₹{(3.26 * (Number(ratePerKm) || 11)).toFixed(2)} → { (3.26 * (Number(ratePerKm) || 11)) < (Number(minPayout) || 40) ? `Floor applied: Customer pays ₹${minPayout || 40}` : `Customer pays ₹${Math.round(3.26 * (Number(ratePerKm) || 11))}` }.
+                  {'\n'}• 100% of this delivery fee is paid directly to your rider.
+                </Text>
               </View>
             </View>
 
@@ -769,14 +869,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(5, 6, 42, 0.65)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    padding: 12,
   },
   modalContent: {
     backgroundColor: '#FFF',
     borderRadius: RADIUS.card,
     width: '100%',
-    maxWidth: 580,
-    maxHeight: '90%',
+    maxWidth: 500,
+    maxHeight: '92%',
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
@@ -788,55 +888,72 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F1FA',
   },
+  headerLeftContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+    minWidth: 0,
+    marginRight: 8,
+  },
+  headerTextContainer: {
+    flex: 1,
+    minWidth: 0,
+  },
   headerIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: COLORS.lightPink,
     justifyContent: 'center',
     alignItems: 'center',
+    flexShrink: 0,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '800',
     color: COLORS.navy,
   },
   modalSubtitle: {
-    fontSize: 12,
+    fontSize: 11.5,
     color: COLORS.textMuted,
     marginTop: 2,
+    lineHeight: 15,
   },
   closeBtn: {
     padding: 6,
     borderRadius: RADIUS.pill,
     backgroundColor: '#F5F6FA',
+    flexShrink: 0,
   },
   modalBody: {
-    padding: 24,
+    padding: 16,
   },
   fieldLabel: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '600',
     color: COLORS.textPrimary,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   scopeSelector: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
     marginBottom: 16,
   },
   scopeOption: {
     flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
+    gap: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
     borderRadius: RADIUS.button,
     backgroundColor: '#F8F9FE',
     borderWidth: 1,
@@ -847,9 +964,10 @@ const styles = StyleSheet.create({
     borderColor: COLORS.navy,
   },
   scopeOptionText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: COLORS.textPrimary,
+    textAlign: 'center',
   },
   scopeOptionTextActive: {
     color: '#FFF',
@@ -910,10 +1028,68 @@ const styles = StyleSheet.create({
   },
   threeCols: {
     flexDirection: 'row',
+    gap: 10,
     marginBottom: 16,
   },
   colItem: {
     flex: 1,
+    minWidth: 0,
+  },
+  rateFieldBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: RADIUS.input,
+    paddingHorizontal: 10,
+    height: 48,
+    cursor: 'text' as any,
+  },
+  rateFieldBoxFocused: {
+    borderColor: COLORS.purple,
+    backgroundColor: '#FFFFFF',
+    shadowColor: COLORS.purple,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  rateCurrencyPrefix: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#64748B',
+    marginRight: 6,
+    userSelect: 'none' as any,
+    pointerEvents: 'none' as any,
+  },
+  rateCurrencyPrefixFocused: {
+    color: COLORS.purple,
+  },
+  rateTextInput: {
+    flex: 1,
+    minWidth: 0,
+    height: '100%',
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.navy,
+    paddingVertical: 0,
+    paddingHorizontal: 2,
+    margin: 0,
+  },
+  rateUnitBadge: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginLeft: 4,
+    pointerEvents: 'none' as any,
+  },
+  rateUnitBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+    userSelect: 'none' as any,
   },
   inputWrapper: {
     flexDirection: 'row',
@@ -922,32 +1098,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ECEEF8',
     borderRadius: RADIUS.input,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  inputCurrency: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.hotPink,
-    marginRight: 4,
-  },
-  inputCurrencyMuted: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.textMuted,
-    marginRight: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
   inputControl: {
     flex: 1,
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.navy,
-  },
-  inputUnit: {
-    fontSize: 12,
+    minWidth: 0,
+    fontSize: 13.5,
     fontWeight: '600',
-    color: COLORS.textMuted,
-    marginLeft: 2,
+    color: COLORS.navy,
   },
   toggleRow: {
     flexDirection: 'row',
@@ -994,11 +1153,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderTopWidth: 1,
     borderTopColor: '#F0F1FA',
-    gap: 12,
+    gap: 10,
   },
   cancelBtn: {
     paddingVertical: 10,
@@ -1117,5 +1276,26 @@ const styles = StyleSheet.create({
   pickerEmptyText: {
     fontSize: 13,
     color: COLORS.textMuted,
+  },
+  floorHelperBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    borderRadius: RADIUS.input,
+    padding: 12,
+    marginBottom: 16,
+  },
+  floorHelperTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#3730A3',
+    marginBottom: 4,
+  },
+  floorHelperText: {
+    fontSize: 11,
+    color: '#4338CA',
+    lineHeight: 16,
   },
 });

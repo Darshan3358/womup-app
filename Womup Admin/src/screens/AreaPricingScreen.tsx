@@ -488,14 +488,14 @@ export const AreaPricingScreen: React.FC = () => {
                       <>
                         <View style={styles.variantTableHeader}>
                           <Text style={[styles.variantColHeader, { flex: 2 }]}>PACK / SKU</Text>
-                          <Text style={[styles.variantColHeader, { flex: 1.2, textAlign: 'center' }]}>
-                            DEFAULT PRICE
+                          <Text style={[styles.variantColHeader, { flex: 1.1, textAlign: 'center' }]}>
+                            DEFAULT
                           </Text>
-                          <Text style={[styles.variantColHeader, { flex: 1.8, textAlign: 'center' }]}>
+                          <Text style={[styles.variantColHeader, { flex: 1.6, textAlign: 'center' }]}>
                             AREA PRICE
                           </Text>
-                          <Text style={[styles.variantColHeader, { flex: 1, textAlign: 'center' }]}>MRP</Text>
-                          <Text style={[styles.variantColHeader, { flex: 1, textAlign: 'center' }]}>ACTION</Text>
+                          <Text style={[styles.variantColHeader, { flex: 0.9, textAlign: 'center' }]}>MRP</Text>
+                          <Text style={[styles.variantColHeader, { flex: 1.1, textAlign: 'center' }]}>ACTION</Text>
                         </View>
 
                         {variants.map((v) => {
@@ -513,13 +513,13 @@ export const AreaPricingScreen: React.FC = () => {
                               </View>
 
                               {/* Base/Default Price */}
-                              <View style={{ flex: 1.2, alignItems: 'center' }}>
+                              <View style={{ flex: 1.1, alignItems: 'center' }}>
                                 <Text style={styles.defaultPriceValue}>₹{v.sellingPrice}</Text>
                                 <Text style={styles.defaultPriceSub}>Catalog Base</Text>
                               </View>
 
                               {/* Final Area Selling Price */}
-                              <View style={{ flex: 1.8, alignItems: 'center' }}>
+                              <View style={{ flex: 1.6, alignItems: 'center' }}>
                                 <TouchableOpacity
                                   style={[
                                     styles.zonePriceBadge,
@@ -550,18 +550,18 @@ export const AreaPricingScreen: React.FC = () => {
                               </View>
 
                               {/* MRP */}
-                              <View style={{ flex: 1, alignItems: 'center' }}>
+                              <View style={{ flex: 0.9, alignItems: 'center' }}>
                                 <Text style={styles.mrpValue}>₹{v.mrp}</Text>
                               </View>
 
                               {/* Edit Action Button */}
-                              <View style={{ flex: 1, alignItems: 'center' }}>
+                              <View style={{ flex: 1.1, alignItems: 'center' }}>
                                 <TouchableOpacity
                                   style={styles.editVariantBtn}
                                   onPress={() => handleEditVariantPrice(p, v)}
                                   activeOpacity={0.7}
                                 >
-                                  <Edit2 size={13} color={COLORS.white} style={{ marginRight: 4 }} />
+                                  <Edit2 size={11} color={COLORS.white} style={{ marginRight: 2 }} />
                                   <Text style={styles.editVariantBtnText}>Edit</Text>
                                 </TouchableOpacity>
                               </View>
@@ -785,7 +785,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   topSection: {
-    padding: SPACING.md,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
     backgroundColor: COLORS.white,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
@@ -997,7 +998,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   tableContent: {
-    paddingHorizontal: SPACING.md,
+    paddingHorizontal: 12,
     paddingTop: 10,
     paddingBottom: 24,
   },
@@ -1152,13 +1153,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 6,
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     backgroundColor: '#F3F4F6',
     borderRadius: RADIUS.sm,
     marginBottom: 6,
   },
   variantColHeader: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: '800',
     color: COLORS.textMuted,
     textTransform: 'uppercase',
@@ -1167,7 +1168,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 8,
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
     backgroundColor: COLORS.white,
@@ -1180,12 +1181,12 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
   },
   defaultLabel: {
-    fontSize: 10,
+    fontSize: 9.5,
     color: COLORS.purple,
     fontWeight: '800',
   },
   variantSkuText: {
-    fontSize: 10,
+    fontSize: 9.5,
     color: COLORS.textMuted,
     marginTop: 1,
   },
@@ -1195,12 +1196,12 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
   },
   defaultPriceSub: {
-    fontSize: 9,
+    fontSize: 8,
     color: COLORS.textMuted,
   },
   zonePriceBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: RADIUS.pill,
     alignItems: 'center',
   },
@@ -1225,7 +1226,7 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
   },
   overrideLabel: {
-    fontSize: 9,
+    fontSize: 8,
     marginTop: 2,
   },
   overrideLabelActive: {
@@ -1243,10 +1244,12 @@ const styles = StyleSheet.create({
   editVariantBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: COLORS.purple,
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     paddingVertical: 4,
     borderRadius: RADIUS.pill,
+    minWidth: 38,
   },
   editVariantBtnText: {
     fontSize: 10,
@@ -1261,15 +1264,17 @@ const styles = StyleSheet.create({
   },
   subActionRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'center',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
   },
   subActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    gap: 5,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
     backgroundColor: '#FAF5FF',
     borderRadius: RADIUS.pill,
     borderWidth: 1,

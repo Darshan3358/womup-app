@@ -171,28 +171,85 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
   // Server notifies order room and admin of status change
   notifyOrderStatus(orderId: string, status: string, additionalData: any = {}) {
     if (this.server) {
+      const rawPartnerName =
+        additionalData.partnerName ||
+        additionalData.riderName ||
+        additionalData.fullName ||
+        '';
+      const formattedName =
+        rawPartnerName.toLowerCase() === 'darshanthanki'
+          ? 'DARSHAN THANKI'
+          : rawPartnerName;
+
+      const partnerPhone =
+        additionalData.partnerPhone ||
+        additionalData.phoneNumber ||
+        additionalData.phone ||
+        '';
+      const vehicleNumber = additionalData.vehicleNumber || 'GJ AE 2020';
+      const partnerId = additionalData.partnerId || additionalData.riderId || '';
+
+      const riderObj = {
+        id: partnerId,
+        _id: partnerId,
+        name: formattedName,
+        fullName: formattedName,
+        phone: partnerPhone,
+        phoneNumber: partnerPhone,
+        vehicleNumber,
+        rating: additionalData.rating || 5,
+        location: additionalData.currentLocation || additionalData.location,
+      };
+
       const payload = {
         orderId,
         status,
         ...additionalData,
+        partnerName: formattedName,
+        riderName: formattedName,
+        rider: riderObj,
+        partner: riderObj,
+        deliveryPartner: riderObj,
+        riderId: riderObj,
         timestamp: new Date().toISOString(),
       };
 
       // 1. Emit to customer's specific order room
       this.server.to(`order_${orderId}`).emit('order_status', payload);
       this.server.to(`order_${orderId}`).emit('order.status.updated', payload);
+      this.server.to(`order_${orderId}`).emit('orderStatusUpdated', payload);
+      this.server.to(`order_${orderId}`).emit('orderUpdate', payload);
+      this.server.to(`order_${orderId}`).emit(`orderStatusUpdate_${orderId}`, payload);
 
       if (additionalData?.orderNumber) {
         const num = additionalData.orderNumber.toString();
         const clean = num.replace(/^#/, '');
         this.server.to(`order_${num}`).emit('order_status', payload);
+        this.server.to(`order_${num}`).emit('order.status.updated', payload);
+        this.server.to(`order_${num}`).emit('orderStatusUpdated', payload);
+        this.server.to(`order_${num}`).emit('orderUpdate', payload);
+        this.server.to(`order_${num}`).emit(`orderStatusUpdate_${num}`, payload);
+        this.server.to(`order_${num}`).emit(`orderStatusUpdate_${clean}`, payload);
+
         this.server.to(`order_${clean}`).emit('order_status', payload);
+        this.server.to(`order_${clean}`).emit('order.status.updated', payload);
+        this.server.to(`order_${clean}`).emit('orderStatusUpdated', payload);
+        this.server.to(`order_${clean}`).emit('orderUpdate', payload);
+        this.server.to(`order_${clean}`).emit(`orderStatusUpdate_${clean}`, payload);
       }
 
-      // 2. Emit globally to Admin Console Kanban and Rider Radar
+      // 2. Emit globally to Admin Console Kanban, Rider Radar, and Customer App listeners
       this.server.emit('order_status', payload);
+      this.server.emit('order.status.updated', payload);
+      this.server.emit('orderStatusUpdated', payload);
+      this.server.emit('orderUpdate', payload);
+      this.server.emit(`orderStatusUpdate_${orderId}`, payload);
+      if (additionalData?.orderNumber) {
+        const clean = additionalData.orderNumber.toString().replace(/^#/, '');
+        this.server.emit(`orderStatusUpdate_${clean}`, payload);
+      }
 
-      this.logger.log(`[WebSocket] Emitted order_status (${status}) for order: ${orderId} (${additionalData?.orderNumber || ''})`);
+      this.logger.log(`[WebSocket] Emitted order_status (${status}) for order: ${orderId} (${additionalData?.orderNumber || ''}) with rider: ${formattedName}`);
     }
   }
 

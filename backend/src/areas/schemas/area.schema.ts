@@ -56,6 +56,15 @@ export class Area {
     coordinates: number[][][];
   };
 
+  @Prop({ default: 1 })
+  maxStores: number;
+
+  @Prop({ default: 0 })
+  currentStoreCount: number;
+
+  @Prop({ default: 'NEAREST', enum: ['NEAREST', 'LOAD_BALANCED', 'STOCK_FIRST', 'ROUND_ROBIN', 'PRIORITY'] })
+  storeRoutingStrategy: string;
+
   @Prop({ type: Object, ref: 'Store' })
   hubStoreId?: any;
 }

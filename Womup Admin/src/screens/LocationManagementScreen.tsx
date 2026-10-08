@@ -82,14 +82,19 @@ export const LocationManagementScreen: React.FC = () => {
   const [areaLat, setAreaLat] = useState('23.0225');
   const [areaLng, setAreaLng] = useState('72.5714');
   const [areaPincodes, setAreaPincodes] = useState('380015');
+  const [areaMaxStores, setAreaMaxStores] = useState('1');
+  const [areaRoutingStrategy, setAreaRoutingStrategy] = useState('NEAREST');
   const [areaSubmitting, setAreaSubmitting] = useState(false);
 
-  // Calculate Metrics
+  // Calculate Metrics (Multi-Store Capacity Aware)
   const totalCities = cities.length;
   const activeCitiesCount = cities.filter((c) => c.status === 'Active' || !c.status).length;
   const totalAreas = zones.length;
+  const totalStoreCapacity = zones.reduce((sum, z) => sum + (Number(z.maxStores) || 1), 0);
+  const totalActiveStores = zones.reduce((sum, z) => sum + (z.assignedStores?.length || (z.hasActiveStore ? 1 : 0)), 0);
+  const totalAvailableSlots = Math.max(0, totalStoreCapacity - totalActiveStores);
   const assignedAreasCount = zones.filter((z) => {
-    if (z.hasActiveStore) return true;
+    if (z.hasActiveStore || (z.assignedStores && z.assignedStores.length > 0)) return true;
     const zIdStr = z.id || z._id;
     return darkStores.some((s) => {
       if (s.areaId && zIdStr && String(s.areaId) === String(zIdStr)) return true;
@@ -248,6 +253,8 @@ export const LocationManagementScreen: React.FC = () => {
     setAreaLat('23.0225');
     setAreaLng('72.5714');
     setAreaPincodes('380015');
+    setAreaMaxStores('1');
+    setAreaRoutingStrategy('NEAREST');
     setShowAreaModal(true);
   };
 
@@ -262,6 +269,8 @@ export const LocationManagementScreen: React.FC = () => {
     setAreaLat(String(area.centerLat || 23.0225));
     setAreaLng(String(area.centerLng || 72.5714));
     setAreaPincodes((area.pincodes || ['380015']).join(', '));
+    setAreaMaxStores(String(area.maxStores || 1));
+    setAreaRoutingStrategy(area.storeRoutingStrategy || 'NEAREST');
     setShowAreaModal(true);
   };
 
@@ -281,8 +290,10 @@ export const LocationManagementScreen: React.FC = () => {
 
     setAreaSubmitting(true);
     try {
+      const parsedMaxStores = Math.max(1, Number(areaMaxStores) || 1);
       if (editingArea) {
-        const res = await ApiService.updateArea(editingArea.id, {
+        const targetId = String(editingArea.id || editingArea._id);
+        const res = await ApiService.updateArea(targetId, {
           name: areaName.trim(),
           code: cleanCode,
           cityId: selectedCityObj ? (selectedCityObj.id || selectedCityObj._id) : null,
@@ -292,12 +303,14 @@ export const LocationManagementScreen: React.FC = () => {
           radiusKm: Number(areaRadius) || 3.5,
           centerLat: Number(areaLat) || 23.0225,
           centerLng: Number(areaLng) || 72.5714,
+          maxStores: parsedMaxStores,
+          storeRoutingStrategy: areaRoutingStrategy,
           pincodes: pins.length > 0 ? pins : ['380015'],
         });
         if (res.success) {
           await refreshFromDb();
           setShowAreaModal(false);
-          Alert.alert('Success', `Area "${areaName}" updated successfully`);
+          Alert.alert('Success', `Area "${areaName}" updated with ${parsedMaxStores} max store capacity`);
         } else {
           Alert.alert('Error', res.error || 'Failed to update area');
         }
@@ -313,12 +326,14 @@ export const LocationManagementScreen: React.FC = () => {
           radiusKm: Number(areaRadius) || 3.5,
           centerLat: Number(areaLat) || 23.0225,
           centerLng: Number(areaLng) || 72.5714,
+          maxStores: parsedMaxStores,
+          storeRoutingStrategy: areaRoutingStrategy,
           isActive: true,
         });
         if (res.success) {
           await refreshFromDb();
           setShowAreaModal(false);
-          Alert.alert('Success', `Area "${areaName}" created successfully`);
+          Alert.alert('Success', `Area "${areaName}" created with ${parsedMaxStores} store capacity`);
         } else {
           Alert.alert('Error', res.error || 'Failed to add area');
         }
@@ -385,13 +400,13 @@ export const LocationManagementScreen: React.FC = () => {
               </View>
               <View style={styles.ruleBadge}>
                 <ShieldCheck size={11} color={COLORS.success} />
-                <Text style={styles.ruleBadgeText}>1 Store per Area Enforced</Text>
+                <Text style={styles.ruleBadgeText}>Multi-Store Capacity Architecture</Text>
               </View>
             </View>
 
             <Text style={styles.headerTitle}>Location Management</Text>
             <Text style={styles.headerSubtitle}>
-              City (Admin) → Area (Admin) → Store (1:1 Allocation) Hierarchy
+              City (Admin) → Area (Multi-Store Capacity) → Dark Stores Pool
             </Text>
           </View>
 
@@ -416,12 +431,14 @@ export const LocationManagementScreen: React.FC = () => {
             <Text style={styles.kpiLabel}>Total Areas</Text>
           </View>
           <View style={[styles.kpiCard, styles.kpiCardPurple]}>
-            <Text style={[styles.kpiValue, { color: COLORS.purple }]}>{assignedAreasCount}</Text>
-            <Text style={styles.kpiLabel}>Stores Assigned</Text>
+            <Text style={[styles.kpiValue, { color: COLORS.purple }]}>
+              {totalActiveStores}/{totalStoreCapacity}
+            </Text>
+            <Text style={styles.kpiLabel}>Stores Active</Text>
           </View>
           <View style={[styles.kpiCard, styles.kpiCardEmerald]}>
-            <Text style={[styles.kpiValue, { color: COLORS.success }]}>{availableAreasCount}</Text>
-            <Text style={styles.kpiLabel}>Available Areas</Text>
+            <Text style={[styles.kpiValue, { color: COLORS.success }]}>{totalAvailableSlots}</Text>
+            <Text style={styles.kpiLabel}>Slots Available</Text>
           </View>
         </View>
       </LinearGradient>
@@ -748,13 +765,25 @@ export const LocationManagementScreen: React.FC = () => {
               <View style={styles.cardsGrid}>
                 {filteredAreas.map((area) => {
                   const zIdStr = area.id || area._id;
-                  const assignedStore = darkStores.find((s) => {
+                  const matchingStores = darkStores.filter((s) => {
                     if (s.areaId && zIdStr && String(s.areaId) === String(zIdStr)) return true;
                     if (s.areaName && area.name && s.areaName.toLowerCase() === area.name.toLowerCase()) return true;
                     return false;
-                  }) || (area.assignedStore ? { name: area.assignedStore.name, loginId: area.assignedStore.code } as any : null);
+                  });
 
-                  const isAssigned = !!assignedStore;
+                  const allStores = area.assignedStores && area.assignedStores.length > 0
+                    ? area.assignedStores
+                    : matchingStores.length > 0
+                    ? matchingStores
+                    : area.assignedStore
+                    ? [area.assignedStore]
+                    : [];
+
+                  const maxStores = Number(area.maxStores) || 1;
+                  const currentCount = allStores.length;
+                  const availableSlots = Math.max(0, maxStores - currentCount);
+                  const isFull = currentCount >= maxStores;
+                  const percent = Math.min(100, Math.round((currentCount / maxStores) * 100));
 
                   return (
                     <View key={area.id || area._id || area.name} style={styles.areaCard}>
@@ -764,12 +793,12 @@ export const LocationManagementScreen: React.FC = () => {
                           <View
                             style={[
                               styles.areaIconWrap,
-                              isAssigned ? styles.areaIconAssigned : styles.areaIconAvailable,
+                              isFull ? styles.areaIconAssigned : currentCount > 0 ? styles.areaIconPartial : styles.areaIconAvailable,
                             ]}
                           >
                             <MapPin
                               size={18}
-                              color={isAssigned ? COLORS.purple : COLORS.success}
+                              color={isFull ? '#DC2626' : currentCount > 0 ? '#D97706' : COLORS.success}
                             />
                           </View>
                           <View style={{ flex: 1 }}>
@@ -784,46 +813,100 @@ export const LocationManagementScreen: React.FC = () => {
                           </View>
                         </View>
 
-                        {/* Store Status Pill */}
-                        {isAssigned ? (
-                          <View style={styles.assignedPill}>
-                            <Lock size={11} color={COLORS.purple} />
-                            <Text style={styles.assignedPillText}>STORE ASSIGNED</Text>
+                        {/* Multi-Store Capacity Pill */}
+                        {isFull ? (
+                          <View style={styles.fullPill}>
+                            <Lock size={11} color="#DC2626" />
+                            <Text style={styles.fullPillText}>{currentCount}/{maxStores} FULL</Text>
+                          </View>
+                        ) : currentCount > 0 ? (
+                          <View style={styles.partialPill}>
+                            <Store size={11} color="#D97706" />
+                            <Text style={styles.partialPillText}>
+                              {currentCount}/{maxStores} STORES ({availableSlots} SLOT{availableSlots > 1 ? 'S' : ''})
+                            </Text>
                           </View>
                         ) : (
                           <View style={styles.availablePill}>
                             <CheckCircle2 size={11} color={COLORS.success} />
-                            <Text style={styles.availablePillText}>AVAILABLE</Text>
+                            <Text style={styles.availablePillText}>0/{maxStores} AVAILABLE</Text>
                           </View>
                         )}
                       </View>
 
-                      {/* Store Box: Displays assigned store info or prompt to register */}
+                      {/* Capacity Progress Bar */}
+                      <View style={styles.capacityProgressSection}>
+                        <View style={styles.capacityLabelRow}>
+                          <Text style={styles.capacityLabelText}>
+                            Capacity: {currentCount} of {maxStores} stores
+                          </Text>
+                          <Text style={[styles.capacitySlotsText, isFull ? { color: '#DC2626' } : { color: COLORS.success }]}>
+                            {isFull ? 'No slots left' : `${availableSlots} slot${availableSlots > 1 ? 's' : ''} available`}
+                          </Text>
+                        </View>
+                        <View style={styles.capacityBarTrack}>
+                          <View
+                            style={[
+                              styles.capacityBarFill,
+                              { width: `${Math.max(percent, currentCount > 0 ? 12 : 0)}%` },
+                              isFull
+                                ? { backgroundColor: '#DC2626' }
+                                : currentCount > 0
+                                ? { backgroundColor: '#F59E0B' }
+                                : { backgroundColor: '#10B981' },
+                            ]}
+                          />
+                        </View>
+                      </View>
+
+                      {/* Stores Pool Box */}
                       <View
                         style={[
                           styles.storeInfoBox,
-                          isAssigned ? styles.storeInfoBoxAssigned : styles.storeInfoBoxAvailable,
+                          currentCount > 0 ? styles.storeInfoBoxAssigned : styles.storeInfoBoxAvailable,
                         ]}
                       >
-                        {isAssigned && assignedStore ? (
+                        {allStores.length > 0 ? (
                           <View>
-                            <View style={styles.assignedStoreHeader}>
-                              <Store size={14} color={COLORS.purple} />
-                              <Text style={styles.assignedStoreName} numberOfLines={1}>
-                                {assignedStore.name}
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                              <Text style={{ fontSize: 10, fontWeight: '800', color: COLORS.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                Stores in Area ({allStores.length})
+                              </Text>
+                              <Text style={{ fontSize: 9.5, color: COLORS.purple, fontWeight: '700' }}>
+                                Routing: {area.storeRoutingStrategy || 'NEAREST'}
                               </Text>
                             </View>
-                            <View style={styles.assignedStoreMeta}>
-                              <Text style={styles.assignedStoreMetaText}>
-                                ID: {assignedStore.loginId || assignedStore.code} · 1:1 Area Locked
-                              </Text>
-                            </View>
+                            {allStores.map((st: any, idx: number) => (
+                              <View key={st.id || st._id || idx} style={styles.assignedStoreItemRow}>
+                                <Store size={13} color={COLORS.purple} />
+                                <View style={{ flex: 1, marginLeft: 6 }}>
+                                  <Text style={styles.assignedStoreName} numberOfLines={1}>
+                                    {st.name}
+                                  </Text>
+                                  <Text style={styles.assignedStoreMetaText}>
+                                    Code: {st.code || st.loginId}
+                                  </Text>
+                                </View>
+                              </View>
+                            ))}
+                            {!isFull && (
+                              <TouchableOpacity
+                                style={styles.addStoreSlotBtn}
+                                onPress={() => setActiveTab('Stores')}
+                                activeOpacity={0.7}
+                              >
+                                <Plus size={11} color="#2563EB" />
+                                <Text style={styles.addStoreSlotText}>
+                                  + Add Store ({availableSlots} slot{availableSlots > 1 ? 's' : ''} left)
+                                </Text>
+                              </TouchableOpacity>
+                            )}
                           </View>
                         ) : (
                           <View style={styles.availableStorePrompt}>
                             <AlertCircle size={14} color={COLORS.success} />
                             <Text style={styles.availableStoreText}>
-                              Ready for store registration. Next store selecting this area gets locked to it.
+                              Ready for store allocation. Up to {maxStores} store{maxStores > 1 ? 's' : ''} can operate in this area.
                             </Text>
                           </View>
                         )}
@@ -863,14 +946,14 @@ export const LocationManagementScreen: React.FC = () => {
                         <TouchableOpacity
                           style={[
                             styles.deleteAreaBtn,
-                            isAssigned && styles.deleteAreaBtnDisabled,
+                            currentCount > 0 && styles.deleteAreaBtnDisabled,
                           ]}
                           onPress={() => handleDeleteArea(area)}
                           activeOpacity={0.7}
                         >
                           <Trash2
                             size={14}
-                            color={isAssigned ? COLORS.secondaryText : COLORS.error}
+                            color={currentCount > 0 ? COLORS.secondaryText : COLORS.error}
                           />
                         </TouchableOpacity>
                       </View>
@@ -1024,7 +1107,7 @@ export const LocationManagementScreen: React.FC = () => {
                   <Text style={styles.modalTitle}>
                     {editingArea ? `Edit Area: ${editingArea.name}` : 'Add New Operational Area'}
                   </Text>
-                  <Text style={styles.modalSubtitle}>1 Area = 1 Dark Store Architecture</Text>
+                  <Text style={styles.modalSubtitle}>Configurable Multi-Store Capacity Architecture</Text>
                 </View>
               </View>
               <TouchableOpacity onPress={() => setShowAreaModal(false)}>
@@ -1091,6 +1174,27 @@ export const LocationManagementScreen: React.FC = () => {
                 value={areaCode}
                 onChangeText={(text) => setAreaCode(text.toUpperCase())}
               />
+            </View>
+
+            {/* Max Stores in Area (Multi-Store Capacity) */}
+            <View style={styles.formGroup}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={styles.formLabel}>Max Stores in Area *</Text>
+                <Text style={{ fontSize: 11, color: COLORS.hotPink, fontWeight: '700' }}>
+                  Multi-Store Capacity
+                </Text>
+              </View>
+              <TextInput
+                style={styles.formInput}
+                placeholder="e.g. 1, 3, 5"
+                placeholderTextColor={COLORS.textMuted}
+                keyboardType="numeric"
+                value={areaMaxStores}
+                onChangeText={setAreaMaxStores}
+              />
+              <Text style={{ fontSize: 11, color: COLORS.textMuted, marginTop: 4 }}>
+                ⓘ Allow up to {areaMaxStores || '1'} dark stores to operate in this area. Customer orders are intelligently routed to the best store.
+              </Text>
             </View>
 
             <View style={styles.formRow}>
@@ -1626,7 +1730,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   areaIconAssigned: {
-    backgroundColor: '#F3F0FA',
+    backgroundColor: '#FEE2E2',
+  },
+  areaIconPartial: {
+    backgroundColor: '#FEF3C7',
   },
   areaIconAvailable: {
     backgroundColor: '#E6F9F0',
@@ -1650,6 +1757,97 @@ const styles = StyleSheet.create({
   areaCodeText: {
     fontSize: 10,
     color: COLORS.textMuted,
+  },
+  fullPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: RADIUS.pill,
+  },
+  fullPillText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#DC2626',
+    letterSpacing: 0.3,
+  },
+  partialPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: RADIUS.pill,
+  },
+  partialPillText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#D97706',
+    letterSpacing: 0.3,
+  },
+  capacityProgressSection: {
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  capacityLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  capacityLabelText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  capacitySlotsText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+  },
+  capacityBarTrack: {
+    height: 5,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 999,
+    overflow: 'hidden',
+  },
+  capacityBarFill: {
+    height: '100%',
+    borderRadius: 999,
+  },
+  assignedStoreItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 7,
+    borderRadius: 6,
+    marginVertical: 3,
+  },
+  addStoreSlotBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    marginTop: 6,
+    alignSelf: 'flex-start',
+  },
+  addStoreSlotText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#2563EB',
   },
   assignedPill: {
     flexDirection: 'row',

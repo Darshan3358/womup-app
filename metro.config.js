@@ -17,6 +17,7 @@ config.resolver.blockList = [
   ...defaultBlockList,
   new RegExp('^' + path.resolve(__dirname, 'Womup Admin') + '/.*'),
   new RegExp('^' + path.resolve(__dirname, 'Womup Rider') + '/.*'),
+  new RegExp('^' + path.resolve(__dirname, 'Womup Store') + '/.*'),
   new RegExp('^' + path.resolve(__dirname, 'backend') + '/.*'),
   new RegExp('^' + path.resolve(__dirname, 'Womup Admin.zip') + '.*'),
 ];

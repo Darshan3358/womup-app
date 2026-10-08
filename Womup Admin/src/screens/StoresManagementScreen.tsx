@@ -8,6 +8,7 @@ import {
   TextInput,
   Modal,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -429,18 +430,16 @@ export const StoresManagementScreen: React.FC = () => {
     <View style={styles.container}>
       {/* Header Banner */}
       <LinearGradient colors={GRADIENTS.navyHeader} style={styles.topHeader}>
+        {/* Row 1: Icon + Title + Actions */}
         <View style={styles.topHeaderRow}>
-          <View style={styles.headerTitleCol}>
-            <View style={styles.titleIconRow}>
-              <View style={styles.iconBadge}>
-                <Store size={22} color={COLORS.white} />
-              </View>
-              <View>
-                <Text style={styles.screenTitle}>Dark Stores & Hubs</Text>
-                <Text style={styles.screenSubtitle}>
-                  City → Area → Store (1:1 Architecture) & fulfillment metrics
-                </Text>
-              </View>
+          <View style={styles.titleIconRow}>
+            <View style={styles.iconBadge}>
+              <Store size={20} color={COLORS.white} />
+            </View>
+            <View style={styles.titleTextWrapper}>
+              <Text style={styles.screenTitle} numberOfLines={1}>
+                Dark Stores & Hubs
+              </Text>
             </View>
           </View>
 
@@ -449,18 +448,20 @@ export const StoresManagementScreen: React.FC = () => {
               style={styles.refreshBtn}
               onPress={handleRefresh}
               disabled={refreshing}
+              accessibilityLabel="Refresh stores"
             >
               <RefreshCw
-                size={16}
+                size={14}
                 color={COLORS.white}
                 style={refreshing ? styles.rotating : undefined}
               />
             </TouchableOpacity>
 
-            <TouchableOpacity
+            {/* <TouchableOpacity
               style={styles.createStoreBtn}
               onPress={openCreateModal}
               activeOpacity={0.85}
+              accessibilityLabel="New Dark Store"
             >
               <LinearGradient
                 colors={GRADIENTS.primary}
@@ -468,55 +469,86 @@ export const StoresManagementScreen: React.FC = () => {
                 end={{ x: 1, y: 0 }}
                 style={styles.createBtnGradient}
               >
-                <Plus size={16} color={COLORS.white} />
+                <Plus size={14} color={COLORS.white} />
                 <Text style={styles.createBtnText}>NEW STORE</Text>
               </LinearGradient>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
           </View>
         </View>
 
-        {/* Operational Telemetry Summary */}
-        <View style={styles.metricsRow}>
-          <View style={styles.metricCard}>
-            <Text style={styles.metricValue}>{totalStores}</Text>
-            <Text style={styles.metricLabel}>Total Dark Stores</Text>
+        {/* Row 2: Subtitle Architecture Badge */}
+        <View style={styles.subtitleRow}>
+          <View style={styles.subtitleBadge}>
+            <Text style={styles.subtitleBadgeText} numberOfLines={1}>
+              City → Area → Store (1:1 Architecture) & Fulfillment
+            </Text>
           </View>
-          <View style={styles.metricCard}>
-            <Text style={[styles.metricValue, { color: COLORS.hotPink }]}>
+        </View>
+
+        {/* 2x2 Telemetry Summary KPI Grid (Clean & Fully Legible) */}
+        <View style={styles.kpiGrid}>
+          <View style={styles.kpiCard}>
+            <Text style={styles.kpiValue}>{totalStores}</Text>
+            <Text style={styles.kpiLabel}>Total Dark Stores</Text>
+          </View>
+
+          <View style={[styles.kpiCard, styles.kpiCardPink]}>
+            <Text style={[styles.kpiValue, { color: COLORS.hotPink }]}>
               {stores.filter((s) => s.loginId).length} / {totalStores}
             </Text>
-            <Text style={styles.metricLabel}>Store IDs Active</Text>
+            <Text style={styles.kpiLabel}>Store IDs Active</Text>
           </View>
-          <View style={styles.metricCard}>
-            <Text style={[styles.metricValue, { color: COLORS.purple }]}>{totalOrders}</Text>
-            <Text style={styles.metricLabel}>
+
+          <View style={[styles.kpiCard, styles.kpiCardPurple]}>
+            <Text style={[styles.kpiValue, { color: COLORS.purple }]}>{totalOrders}</Text>
+            <Text style={styles.kpiLabel}>
               Orders Handled {totalPending > 0 ? `(${totalPending} Active)` : ''}
             </Text>
           </View>
-          <View style={styles.metricCard}>
-            <Text style={[styles.metricValue, { color: COLORS.blue }]}>{totalRiders}</Text>
-            <Text style={styles.metricLabel}>Assigned Riders</Text>
+
+          <View style={[styles.kpiCard, styles.kpiCardBlue]}>
+            <Text style={[styles.kpiValue, { color: COLORS.blue }]}>{totalRiders}</Text>
+            <Text style={styles.kpiLabel}>Assigned Riders</Text>
           </View>
         </View>
       </LinearGradient>
 
       {/* ================= CASCADING FILTER CONTROLS & SEARCH BAR ================= */}
       <View style={styles.filterSection}>
-        {/* Row 1: Search Box */}
-        <View style={styles.searchBox}>
-          <Search size={18} color={COLORS.textMuted} style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search by Store Name, Area, Code, or Store ID..."
-            placeholderTextColor={COLORS.textMuted}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery ? (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <X size={16} color={COLORS.textMuted} />
-            </TouchableOpacity>
-          ) : null}
+        {/* Row 1: Search Box & New Store Button */}
+        <View style={styles.searchRowContainer}>
+          <View style={styles.searchBox}>
+            <Search size={18} color={COLORS.textMuted} style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search by Store Name, Area, Code, or..."
+              placeholderTextColor={COLORS.textMuted}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery ? (
+              <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <X size={16} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
+          <TouchableOpacity
+            style={styles.createStoreBtn}
+            onPress={openCreateModal}
+            activeOpacity={0.85}
+            accessibilityLabel="New Dark Store"
+          >
+            <LinearGradient
+              colors={GRADIENTS.primary}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.createBtnGradient}
+            >
+              <Plus size={15} color={COLORS.white} />
+              <Text style={styles.createBtnText}>NEW STORE</Text>
+            </LinearGradient>
+          </TouchableOpacity>
         </View>
 
         {/* Row 2: Cascading City & Area Filter Buttons */}
@@ -686,7 +718,9 @@ export const StoresManagementScreen: React.FC = () => {
                         <View style={styles.cardHeader}>
                           <View style={styles.storeMainInfo}>
                             <View style={styles.storeTitleRow}>
-                              <Text style={styles.storeName}>{store.name}</Text>
+                              <View style={styles.storeNameContainer}>
+                                <Text style={styles.storeName}>{store.name}</Text>
+                              </View>
                               {!isStoreActive ? (
                                 <View style={[styles.activeTag, styles.statusInactiveTag]}>
                                   <View style={[styles.activeDot, { backgroundColor: COLORS.error }]} />
@@ -753,10 +787,10 @@ export const StoresManagementScreen: React.FC = () => {
                         {/* Authentication Credentials Highlight Box */}
                         <View style={styles.credentialsBox}>
                           <View style={styles.credLeft}>
-                            <KeyRound size={16} color={COLORS.purple} style={{ marginRight: 8 }} />
-                            <View>
+                            <KeyRound size={16} color={COLORS.purple} style={{ marginRight: 8, flexShrink: 0 }} />
+                            <View style={{ flex: 1, minWidth: 140 }}>
                               <Text style={styles.credLabel}>STORE LOGIN ID</Text>
-                              <Text style={styles.credValue}>
+                              <Text style={styles.credValue} numberOfLines={1} ellipsizeMode="middle">
                                 {hasLogin ? store.loginId : 'No Login ID Assigned'}
                               </Text>
                             </View>
@@ -1123,9 +1157,9 @@ export const StoresManagementScreen: React.FC = () => {
             ) : (
               <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
                 {/* Section 1: City & Area Cascading Selectors */}
-                <Text style={styles.inputSectionTitle}>1. City & Area Assignment (1:1 Lock)</Text>
+                <Text style={styles.inputSectionTitle}>1. City & Area Assignment</Text>
                 <Text style={styles.helperText}>
-                  Each dark store must belong to a verified City and strictly lock to ONE Area.
+                  Assign the dark store to an operational Area with available store capacity slots.
                 </Text>
 
                 {/* City Picker in Modal */}
@@ -1142,7 +1176,7 @@ export const StoresManagementScreen: React.FC = () => {
                 </TouchableOpacity>
 
                 {/* Area Picker in Modal */}
-                <Text style={styles.inputLabel}>Select Area (Locks 1:1) *</Text>
+                <Text style={styles.inputLabel}>Select Area *</Text>
                 <TouchableOpacity
                   style={[
                     styles.modalSelectorBtn,
@@ -1280,7 +1314,7 @@ export const StoresManagementScreen: React.FC = () => {
                     ) : (
                       <>
                         <Plus size={16} color={COLORS.white} style={{ marginRight: 6 }} />
-                        <Text style={styles.submitBtnText}>Create & Link 1:1 Area Store</Text>
+                        <Text style={styles.submitBtnText}>Create Dark Store</Text>
                       </>
                     )}
                   </LinearGradient>
@@ -1345,7 +1379,7 @@ export const StoresManagementScreen: React.FC = () => {
                 <MapPin size={18} color={COLORS.purple} />
                 <View>
                   <Text style={styles.modalTitle}>Choose Area for Store</Text>
-                  <Text style={styles.modalSubtitle}>1 Area = 1 Dark Store Rule</Text>
+                  <Text style={styles.modalSubtitle}>Capacity & Slot Availability</Text>
                 </View>
               </View>
               <TouchableOpacity onPress={() => setShowCreateAreaPicker(false)}>
@@ -1363,11 +1397,15 @@ export const StoresManagementScreen: React.FC = () => {
                 })
                 .map((a) => {
                   const areaIdStr = a.id || a._id || '';
-                  const assignedStore = stores.find(
+                  const matchingStores = stores.filter(
                     (s) =>
                       (s.areaId && areaIdStr && String(s.areaId) === String(areaIdStr)) ||
                       (s.areaName && s.areaName.toLowerCase() === a.name.toLowerCase())
                   );
+                  const maxStores = Number(a.maxStores) || 1;
+                  const currentCount = a.assignedStores?.length || matchingStores.length;
+                  const availableSlots = Math.max(0, maxStores - currentCount);
+                  const isFull = currentCount >= maxStores;
 
                   return (
                     <TouchableOpacity
@@ -1375,22 +1413,47 @@ export const StoresManagementScreen: React.FC = () => {
                       style={[
                         styles.filterOptionItem,
                         newAreaName === a.name && styles.filterOptionItemActive,
+                        isFull && { opacity: 0.7, backgroundColor: '#FEF2F2' },
                       ]}
-                      onPress={() => handleSelectCreateArea(a)}
+                      onPress={() => {
+                        if (isFull) {
+                          Alert.alert(
+                            'Area at Full Capacity',
+                            `"${a.name}" already has ${currentCount}/${maxStores} active stores. Please increase the area limit in Location Management or choose another area.`
+                          );
+                          return;
+                        }
+                        handleSelectCreateArea(a);
+                      }}
                     >
                       <View style={styles.filterOptionLeft}>
-                        <Lock size={14} color={assignedStore ? COLORS.error : COLORS.success} />
-                        <View>
-                          <Text style={styles.filterOptionText}>{a.name}</Text>
+                        {isFull ? (
+                          <Lock size={14} color="#DC2626" />
+                        ) : currentCount > 0 ? (
+                          <Store size={14} color="#D97706" />
+                        ) : (
+                          <CheckCircle2 size={14} color={COLORS.success} />
+                        )}
+                        <View style={{ flex: 1, marginLeft: 6 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Text style={[styles.filterOptionText, isFull && { color: '#991B1B' }]}>
+                              {a.name}
+                            </Text>
+                            <Text style={{ fontSize: 10, fontWeight: '800', color: isFull ? '#DC2626' : currentCount > 0 ? '#D97706' : COLORS.success }}>
+                              {isFull ? 'FULL' : `${availableSlots} slot${availableSlots > 1 ? 's' : ''}`}
+                            </Text>
+                          </View>
                           <Text
                             style={[
                               styles.filterOptionSubtext,
-                              assignedStore && { color: COLORS.error },
+                              isFull && { color: '#DC2626' },
                             ]}
                           >
-                            {assignedStore
-                              ? `⚠️ Already has store: ${assignedStore.name}`
-                              : '🟢 Available for new Dark Store'}
+                            {isFull
+                              ? `⚠️ Capacity full: ${currentCount}/${maxStores} stores assigned`
+                              : currentCount > 0
+                              ? `🟡 ${currentCount}/${maxStores} stores active · ${availableSlots} slot left`
+                              : `🟢 0/${maxStores} stores · Ready for allocation`}
                           </Text>
                         </View>
                       </View>
@@ -1555,9 +1618,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.cardBackground,
   },
   topHeader: {
-    paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.md,
-    paddingBottom: SPACING.md,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 14,
     borderBottomLeftRadius: RADIUS.card,
     borderBottomRightRadius: RADIUS.card,
   },
@@ -1565,43 +1628,41 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: SPACING.md,
-  },
-  headerTitleCol: {
-    flex: 1,
+    marginBottom: 8,
   },
   titleIconRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    marginRight: 6,
   },
   iconBadge: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 8,
+  },
+  titleTextWrapper: {
+    flex: 1,
   },
   screenTitle: {
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: '800',
     color: COLORS.white,
-  },
-  screenSubtitle: {
-    fontSize: 12,
-    color: COLORS.secondaryText,
-    marginTop: 2,
+    letterSpacing: -0.3,
   },
   headerActionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   refreshBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1610,40 +1671,71 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '45deg' }],
   },
   createStoreBtn: {
-    borderRadius: RADIUS.pill,
+    borderRadius: RADIUS.input,
     overflow: 'hidden',
+    flexShrink: 0,
+    height: 42,
+    justifyContent: 'center',
   },
   createBtnGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    gap: 6,
+    paddingHorizontal: 12,
+    height: 42,
+    gap: 4,
   },
   createBtnText: {
     color: COLORS.white,
-    fontWeight: '700',
-    fontSize: 12,
+    fontWeight: '800',
+    fontSize: 11,
     letterSpacing: 0.5,
   },
-  metricsRow: {
-    flexDirection: 'row',
-    gap: 8,
+  subtitleRow: {
+    marginBottom: 10,
   },
-  metricCard: {
-    flex: 1,
+  subtitleBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  subtitleBadgeText: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: '#E2E8F0',
+  },
+  kpiGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 8,
+  },
+  kpiCard: {
+    width: '48.5%',
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: 10,
-    paddingVertical: 10,
+    paddingVertical: 8,
     paddingHorizontal: 8,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
-  metricValue: {
-    fontSize: 18,
+  kpiCardPink: {
+    borderColor: 'rgba(255, 0, 122, 0.25)',
+  },
+  kpiCardPurple: {
+    borderColor: 'rgba(147, 51, 234, 0.25)',
+  },
+  kpiCardBlue: {
+    borderColor: 'rgba(59, 130, 246, 0.25)',
+  },
+  kpiValue: {
+    fontSize: 16,
     fontWeight: '800',
     color: COLORS.white,
   },
-  metricLabel: {
+  kpiLabel: {
     fontSize: 10,
     color: COLORS.secondaryText,
     marginTop: 2,
@@ -1654,16 +1746,22 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     backgroundColor: COLORS.cardBackground,
   },
+  searchRowContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
   searchBox: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.input,
     paddingHorizontal: 12,
-    height: 40,
+    height: 42,
     borderWidth: 1,
     borderColor: COLORS.border,
-    marginBottom: 8,
   },
   searchIcon: {
     marginRight: 8,
@@ -1890,25 +1988,34 @@ const styles = StyleSheet.create({
   },
   storeTitleRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: 6,
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  storeNameContainer: {
+    flex: 1,
+    minWidth: '55%',
+    marginRight: 6,
   },
   storeName: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '800',
     color: COLORS.textPrimary,
-    flex: 1,
-    marginRight: 8,
+    lineHeight: 23,
+    flexWrap: 'wrap',
   },
   activeTag: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#E6F9F0',
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: RADIUS.pill,
     gap: 4,
+    flexShrink: 0,
+    alignSelf: 'flex-start',
   },
   activeDot: {
     width: 6,
@@ -2035,11 +2142,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E7E4F9',
     marginBottom: 12,
+    flexWrap: 'wrap',
+    gap: 8,
   },
   credLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    minWidth: 160,
   },
   credLabel: {
     fontSize: 9,
@@ -2056,7 +2166,9 @@ const styles = StyleSheet.create({
   },
   credActions: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
+    flexShrink: 0,
   },
   copyBtn: {
     flexDirection: 'row',

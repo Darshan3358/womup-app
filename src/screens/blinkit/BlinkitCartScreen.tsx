@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,11 +9,13 @@ import {
   StyleSheet,
   Alert,
 } from 'react-native';
+import { Info, ShieldCheck, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../theme/colors';
 import { TYPOGRAPHY } from '../../theme/typography';
 import { AppIcon } from '../../components/common/AppIcon';
 import { useApp } from '../../context/AppContext';
+import { CartService } from '../../services/cartService';
 
 export const BlinkitCartScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -28,13 +30,57 @@ export const BlinkitCartScreen: React.FC = () => {
     applyCoupon,
     removeCoupon,
     deliveryLocation,
+    currentCityName,
+    currentAreaName,
+    selectedAddress,
     setActiveScreen,
     goBack,
   } = useApp();
 
   const [couponInput, setCouponInput] = useState('');
+  const [showFeeDetails, setShowFeeDetails] = useState(false);
+  const [dynamicDeliveryFee, setDynamicDeliveryFee] = useState<number>(40);
+  const [feeBreakdown, setFeeBreakdown] = useState<any>({
+    distanceKm: 3.26,
+    rateUsed: 11,
+    floorApplied: true,
+    areaName: 'Prahlad Nagar',
+    minimumPayout: 40,
+  });
 
-  const deliveryFee = blinkitCartTotal > 199 ? 0 : 15;
+  useEffect(() => {
+    let isMounted = true;
+    const fetchFee = async () => {
+      const res = await CartService.calculateDynamicDeliveryFee({
+        items: blinkitCartList.map((item) => ({
+          name: item.product.name,
+          price: item.product.sellingPrice,
+          mrp: item.product.mrp,
+          quantity: item.quantity,
+        })),
+        cityName: currentCityName || selectedAddress?.city || 'Ahmedabad',
+        areaName: currentAreaName || selectedAddress?.areaLandmark || 'Prahlad Nagar',
+        distanceKm: 3.26,
+      });
+      if (isMounted && res) {
+        setDynamicDeliveryFee(res.deliveryFee);
+        if (res.breakdown) {
+          setFeeBreakdown({
+            ...res.breakdown,
+            distanceKm: res.distanceKm,
+            rateUsed: res.rateUsed,
+            areaName: res.areaName || 'Prahlad Nagar',
+          });
+        }
+      }
+    };
+    fetchFee();
+    return () => {
+      isMounted = false;
+    };
+  }, [blinkitCartList, deliveryLocation]);
+
+  const deliveryFee = dynamicDeliveryFee;
   const handlingFee = 5;
   const grandTotal = Math.max(0, blinkitCartTotal + deliveryFee + handlingFee - couponDiscount);
   const totalSavings = (blinkitMrpTotal - blinkitCartTotal) + couponDiscount;
@@ -203,6 +249,8 @@ export const BlinkitCartScreen: React.FC = () => {
           ) : (
             <View style={styles.couponInputRow}>
               <TextInput
+                nativeID="coupon-code-input"
+                accessibilityLabel="Enter coupon code"
                 style={styles.couponTextInput}
                 placeholder="Enter coupon code (e.g. AUCC30)"
                 placeholderTextColor={COLORS.textMuted}
@@ -246,15 +294,92 @@ export const BlinkitCartScreen: React.FC = () => {
             </View>
           )}
 
-          <View style={styles.billRow}>
-            <Text style={styles.billLabel}>Delivery Partner Fee</Text>
-            <Text style={styles.billValue}>
-              {deliveryFee === 0 ? (
-                <Text style={{ color: COLORS.success, fontWeight: '700' }}>FREE</Text>
-              ) : (
-                `₹${deliveryFee}`
-              )}
-            </Text>
+          {/* Transparent Dynamic Delivery Partner Fee */}
+          <View style={styles.deliveryFeeSection}>
+            <View style={styles.billRow}>
+              <View style={{ flex: 1, paddingRight: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <Text style={styles.billLabel}>Delivery Partner Fee</Text>
+                  <TouchableOpacity
+                    onPress={() => setShowFeeDetails(!showFeeDetails)}
+                    activeOpacity={0.7}
+                    style={styles.infoTouchBtn}
+                  >
+                    <Info size={12} color="#4F46E5" />
+                    <Text style={styles.infoTouchText}>
+                      {showFeeDetails ? 'Hide math' : 'Why this fee?'}
+                    </Text>
+                    {showFeeDetails ? (
+                      <ChevronUp size={11} color="#4F46E5" />
+                    ) : (
+                      <ChevronDown size={11} color="#4F46E5" />
+                    )}
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.feeSubText}>
+                  {feeBreakdown?.distanceKm || 3.26} km · ₹{feeBreakdown?.rateUsed || 11}/km
+                  {feeBreakdown?.floorApplied ? ` (Base: ₹${feeBreakdown?.baseFee || 35.86})` : ''}
+                </Text>
+              </View>
+              <Text style={[styles.billValue, { fontWeight: '700', fontSize: 14 }]}>
+                ₹{deliveryFee}
+              </Text>
+            </View>
+
+            {/* Rider Minimum Guarantee Callout */}
+            {feeBreakdown?.floorApplied && (
+              <View style={styles.floorNoticeBox}>
+                <ShieldCheck size={14} color="#4338CA" style={{ marginTop: 1 }} />
+                <View style={{ flex: 1, marginLeft: 6 }}>
+                  <Text style={styles.floorNoticeTitle}>
+                    Fair Rider Floor Guarantee Applied
+                  </Text>
+                  <Text style={styles.floorNoticeDesc}>
+                    Base distance fee is ₹{feeBreakdown?.baseFee || 35.86}. A +₹{(Number(feeBreakdown?.minimumPayout || 40) - Number(feeBreakdown?.baseFee || 35.86)).toFixed(2)} top-up is included to guarantee a minimum ₹{feeBreakdown?.minimumPayout || 40} payout for your delivery partner.
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* Expandable Explanation Details */}
+            {showFeeDetails && (
+              <View style={styles.feeDetailsDrawer}>
+                <Text style={styles.drawerTitle}>Fee Calculation Breakdown</Text>
+                <View style={styles.drawerItem}>
+                  <Text style={styles.drawerDot}>•</Text>
+                  <Text style={styles.drawerText}>
+                    <Text style={{ fontWeight: '700' }}>Route Distance:</Text> {feeBreakdown?.distanceKm || 3.26} km from {feeBreakdown?.areaName || 'Prahlad Nagar'} store to your address.
+                  </Text>
+                </View>
+                <View style={styles.drawerItem}>
+                  <Text style={styles.drawerDot}>•</Text>
+                  <Text style={styles.drawerText}>
+                    <Text style={{ fontWeight: '700' }}>Base Math:</Text> {feeBreakdown?.distanceKm || 3.26} km × ₹{feeBreakdown?.rateUsed || 11}/km = ₹{feeBreakdown?.baseFee || 35.86}.
+                  </Text>
+                </View>
+                <View style={styles.drawerItem}>
+                  <Text style={styles.drawerDot}>•</Text>
+                  <Text style={styles.drawerText}>
+                    <Text style={{ fontWeight: '700' }}>Floor Policy (Min ₹{feeBreakdown?.minimumPayout || 40}):</Text> Guaranteed base pay so riders don't lose money on fuel and wait times.
+                  </Text>
+                </View>
+                <View style={styles.directPassPill}>
+                  <CheckCircle2 size={12} color="#059669" />
+                  <Text style={styles.directPassText}>
+                    100% of this fee goes directly to your delivery partner.
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {!showFeeDetails && (
+              <View style={styles.directPassRow}>
+                <CheckCircle2 size={11} color="#059669" />
+                <Text style={styles.directPassText}>
+                  100% of delivery fee is paid to your delivery partner
+                </Text>
+              </View>
+            )}
           </View>
 
           <View style={styles.billRow}>
@@ -671,5 +796,101 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 14,
     fontWeight: '700',
+  },
+  deliveryFeeSection: {
+    paddingVertical: 4,
+  },
+  infoTouchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  infoTouchText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#4F46E5',
+  },
+  feeSubText: {
+    fontSize: 11,
+    color: '#62677A',
+    marginTop: 2,
+  },
+  floorNoticeBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#F5F3FF',
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+    borderRadius: 8,
+    padding: 8,
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  floorNoticeTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#4338CA',
+  },
+  floorNoticeDesc: {
+    fontSize: 10,
+    color: '#5B21B6',
+    marginTop: 2,
+    lineHeight: 14,
+  },
+  feeDetailsDrawer: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  drawerTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 4,
+  },
+  drawerItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 3,
+  },
+  drawerDot: {
+    fontSize: 11,
+    color: '#64748B',
+    marginRight: 4,
+  },
+  drawerText: {
+    fontSize: 10,
+    color: '#475569',
+    flex: 1,
+    lineHeight: 14,
+  },
+  directPassPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginTop: 6,
+  },
+  directPassRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 3,
+  },
+  directPassText: {
+    fontSize: 10,
+    color: '#059669',
+    fontWeight: '600',
   },
 });

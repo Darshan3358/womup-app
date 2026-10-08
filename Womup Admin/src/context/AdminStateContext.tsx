@@ -34,6 +34,7 @@ export type ActiveTab =
   | 'Locations'
   | 'Categories'
   | 'PayoutRates'
+  | 'Wallets'
   | 'More';
 
 export type ActiveSubView =

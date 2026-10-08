@@ -98,14 +98,16 @@ export class StoreAuthService {
       throw new BadRequestException(`Selected area "${area.name}" does not belong to city "${city.name}"`);
     }
 
-    // 3. Strict 1-store-per-area rule check
-    const existingStore = await this.storeModel.findOne({
+    // 3. Multi-Store Area Capacity Validation
+    const storeCountInArea = await this.storeModel.countDocuments({
       $or: [{ areaId: area._id }, { areaId: area._id.toString() }],
       isActive: true,
     }).exec();
-    if (existingStore) {
+
+    const maxAllowed = (area as any).maxStores || 1;
+    if (storeCountInArea >= maxAllowed) {
       throw new ConflictException(
-        `Area "${area.name}" is already assigned to active dark store "${existingStore.name}". Each delivery zone can only have 1 active store.`
+        `Area "${area.name}" is at full capacity (${storeCountInArea}/${maxAllowed} stores). Please select another area or ask Admin to increase capacity.`
       );
     }
 

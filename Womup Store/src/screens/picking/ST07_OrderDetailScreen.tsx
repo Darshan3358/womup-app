@@ -88,8 +88,10 @@ export const ST07_OrderDetailScreen: React.FC = () => {
               <Text style={styles.summaryVal}>{items.length}</Text>
             </View>
             <View style={styles.summaryCol}>
-              <Text style={styles.summaryLabel}>Order Total</Text>
-              <Text style={styles.summaryVal}>₹{activeOrder.totalAmount}</Text>
+              <Text style={styles.summaryLabel}>Your Payout</Text>
+              <Text style={[styles.summaryVal, { color: '#10B981' }]}>
+                ₹{(activeOrder as any).storeEarnings ?? Math.round((activeOrder.totalAmount || 60) * 0.9)}
+              </Text>
             </View>
             <View style={styles.summaryCol}>
               <Text style={styles.summaryLabel}>Priority</Text>

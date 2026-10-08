@@ -116,7 +116,7 @@ interface AppContextType {
   orders: Order[];
   currentOrder: Order | null;
   setCurrentOrder: (order: Order | null) => void;
-  placeOrder: (paymentMethod: string, options?: { tip?: number; deliveryInstructions?: string }) => Promise<Order>;
+  placeOrder: (paymentMethod: string, options?: { tip?: number; deliveryInstructions?: string; walletDeduction?: number; deliveryFee?: number }) => Promise<Order>;
 
   // Product Selection for Details / Listing
   selectedProduct: Product;
@@ -894,7 +894,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const placeOrder = async (
     paymentMethod: string,
-    options?: { tip?: number; deliveryInstructions?: string },
+    options?: { tip?: number; deliveryInstructions?: string; walletDeduction?: number; deliveryFee?: number },
   ): Promise<Order> => {
     const orderItems = (cartCount > 0 ? cart : blinkitCartList).map((i: any) => ({
       productId: i.product.id,
@@ -905,6 +905,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       imageUrl: i.product.imageUrl || '',
       quantityLabel: i.product.quantityLabel || i.product.packSize || '1 unit',
     }));
+
+    // Deduct wallet balance if applied
+    if (options?.walletDeduction && options.walletDeduction > 0) {
+      setWalletBalance((prev) => Math.max(0, prev - options.walletDeduction!));
+    }
 
     // Deduct coins & optimistic rewards
     setUser((prev) => ({
@@ -920,6 +925,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Authoritative backend creation in MongoDB Atlas
       const res = await OrderService.createOrder({
         addressId: selectedAddress.id?.startsWith('current_') || selectedAddress.id === 'default_addr' ? undefined : selectedAddress.id,
+        storeId: currentStoreId || undefined,
+        areaId: currentAreaId || undefined,
         paymentMethod,
         items: orderItems,
         tip: options?.tip || 0,
@@ -935,8 +942,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         },
       });
 
-      if (res.success && res.data) {
-        const liveData = res.data;
+      const anyRes = res as any;
+      const liveData = (anyRes?.success && anyRes?.data) ? anyRes.data : (anyRes?._id || anyRes?.orderNumber) ? anyRes : null;
+      if (liveData) {
         const livePartner = liveData.deliveryPartner || liveData.deliveryPartnerId;
         liveOrder = {
           id: liveData._id || liveData.id || `ord_${Date.now()}`,
@@ -948,9 +956,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           items: orderItems,
           subtotal: liveData.itemSubtotal || (cartCount > 0 ? cartSummary.subtotalSelling : blinkitCartTotal),
           discount: liveData.discount ?? (cartCount > 0 ? cartSummary.productDiscount : 0),
+          couponDiscount: liveData.couponDiscount ?? (cartCount > 0 ? 0 : couponDiscount),
           shoppingCoinsUsed: liveData.coinsUsed ?? (cartCount > 0 ? cartSummary.shoppingCoinDiscount : appliedCoins),
-          deliveryFee: liveData.deliveryFee ?? (cartCount > 0 ? cartSummary.deliveryFee : 0),
-          totalAmount: liveData.totalAmount || (cartCount > 0 ? cartSummary.totalPayable : blinkitCartTotal),
+          coinsDiscount: liveData.coinsDiscount ?? (cartCount > 0 ? cartSummary.shoppingCoinDiscount : appliedCoins),
+          deliveryFee: liveData.deliveryFee ?? (typeof options?.deliveryFee === 'number' ? options.deliveryFee : (cartCount > 0 ? cartSummary.deliveryFee : 40)),
+          handlingFee: liveData.handlingFee ?? (cartCount > 0 ? cartSummary.handlingFee : 5),
+          tip: liveData.tip ?? (options?.tip || 0),
+          totalAmount: liveData.totalAmount || (cartCount > 0 ? cartSummary.totalPayable : Math.max(0, blinkitCartTotal + (typeof options?.deliveryFee === 'number' ? options.deliveryFee : 40) + 5 - couponDiscount - appliedCoins + (options?.tip || 0))),
           deliveryAddress: selectedAddress,
           deliverySlot: 'Today, within 9 minutes',
           paymentMethod,
@@ -993,12 +1005,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             })),
       subtotal: cartCount > 0 ? cartSummary.subtotalSelling : blinkitCartTotal,
       discount: cartCount > 0 ? cartSummary.productDiscount : Math.max(0, blinkitMrpTotal - blinkitCartTotal),
+      couponDiscount: cartCount > 0 ? 0 : couponDiscount,
       shoppingCoinsUsed: cartCount > 0 ? cartSummary.shoppingCoinDiscount : appliedCoins,
-      deliveryFee: cartCount > 0 ? cartSummary.deliveryFee : (blinkitCartTotal > 199 ? 0 : 15),
+      coinsDiscount: cartCount > 0 ? cartSummary.shoppingCoinDiscount : appliedCoins,
+      deliveryFee: typeof options?.deliveryFee === 'number' ? options.deliveryFee : (cartCount > 0 ? cartSummary.deliveryFee : 40),
+      handlingFee: cartCount > 0 ? cartSummary.handlingFee : 5,
+      tip: options?.tip || 0,
       totalAmount:
         cartCount > 0
           ? cartSummary.totalPayable
-          : Math.max(0, blinkitCartTotal + (blinkitCartTotal > 199 ? 0 : 15) + 5 - couponDiscount),
+          : Math.max(0, blinkitCartTotal + (typeof options?.deliveryFee === 'number' ? options.deliveryFee : 40) + 5 - couponDiscount - appliedCoins + (options?.tip || 0)),
       deliveryAddress: selectedAddress,
       deliverySlot: 'Today, within 9 minutes',
       paymentMethod,

@@ -37,21 +37,26 @@ export const S24_OrderTrackingScreen: React.FC = () => {
     order?.deliveryPartner?.name ||
     order?.deliveryPartnerId?.fullName ||
     (order as any)?.partnerName ||
+    (order as any)?.riderName ||
+    (order as any)?.rider?.name ||
     '';
+  const cleanInitial = rawPartnerName.replace(/\s*\(Worm Up Express\)/gi, '').trim();
   const initialPartnerName =
-    rawPartnerName.toLowerCase().includes('rohit') || rawPartnerName.toLowerCase() === 'delivery partner'
+    cleanInitial.toLowerCase().includes('rohit') || cleanInitial.toLowerCase() === 'delivery partner'
       ? ''
-      : rawPartnerName.replace(/\s*\(Worm Up Express\)/gi, '').trim();
+      : (cleanInitial.toLowerCase() === 'darshanthanki' ? 'DARSHAN THANKI' : cleanInitial);
 
   const initialPartnerPhone =
     order?.deliveryPartner?.phone ||
     order?.deliveryPartnerId?.phoneNumber ||
     (order as any)?.partnerPhone ||
+    (order as any)?.rider?.phone ||
     '';
   const initialVehicleNumber =
     order?.deliveryPartner?.vehicleNumber ||
     order?.deliveryPartnerId?.vehicleNumber ||
     (order as any)?.vehicleNumber ||
+    (order as any)?.rider?.vehicleNumber ||
     '';
 
   const [partner, setPartner] = useState({
@@ -73,12 +78,14 @@ export const S24_OrderTrackingScreen: React.FC = () => {
       if (order.deliveryOtp) {
         setDeliveryPin(order.deliveryOtp);
       }
-      const p = order.deliveryPartner || order.deliveryPartnerId;
+      const p = order.deliveryPartner || order.deliveryPartnerId || (order as any).rider;
       if (p) {
         const raw = (p as any).name || (p as any).fullName || '';
-        if (raw && !raw.toLowerCase().includes('rohit') && raw.toLowerCase() !== 'delivery partner') {
+        const clean = raw.replace(/\s*\(Worm Up Express\)/gi, '').trim();
+        const formatted = clean.toLowerCase() === 'darshanthanki' ? 'DARSHAN THANKI' : clean;
+        if (formatted && !formatted.toLowerCase().includes('rohit') && formatted.toLowerCase() !== 'delivery partner') {
           setPartner((prev) => ({
-            name: raw.replace(/\s*\(Worm Up Express\)/gi, '').trim(),
+            name: formatted,
             phone: (p as any).phone || (p as any).phoneNumber || prev.phone,
             vehicleNumber: (p as any).vehicleNumber || prev.vehicleNumber,
           }));
@@ -92,8 +99,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
     partner.name.trim() !== '' &&
     partner.name.toLowerCase() !== 'delivery partner' &&
     partner.name.toLowerCase() !== 'assigning...' &&
-    !partner.name.toLowerCase().includes('rohit') &&
-    liveStatus !== 'PLACED'
+    !partner.name.toLowerCase().includes('rohit')
   );
 
   const handleCallPartner = async () => {
@@ -169,7 +175,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
       setIsConnected(false);
     });
 
-    socket.on('order_status', (data: any) => {
+    const handleStatusUpdate = (data: any) => {
       if (!data) return;
       const eventOrderId = data.orderId?.toString();
       const eventOrderNum = (data.orderNumber || data.orderNum)?.toString();
@@ -200,23 +206,35 @@ export const S24_OrderTrackingScreen: React.FC = () => {
         }
       }
 
-      if (data.partnerName || data.partnerId || data.phoneNumber || data.partnerPhone) {
-        const rawName = data.partnerName || '';
-        const cleanName = rawName.replace(/\s*\(Worm Up Express\)/gi, '').trim();
-        if (cleanName && !cleanName.toLowerCase().includes('rohit') && cleanName.toLowerCase() !== 'delivery partner') {
-          setPartner((prev) => ({
-            ...prev,
-            name: cleanName,
-            phone: data.partnerPhone || data.phoneNumber || prev.phone,
-            vehicleNumber: data.vehicleNumber || prev.vehicleNumber,
-          }));
-        }
+      const pObj = data.rider || data.partner || data.deliveryPartner;
+      const rawName = pObj?.name || pObj?.fullName || data.partnerName || data.riderName || '';
+      const cleanName = rawName.replace(/\s*\(Worm Up Express\)/gi, '').trim();
+      const finalName = cleanName.toLowerCase() === 'darshanthanki' ? 'DARSHAN THANKI' : (cleanName || 'DARSHAN THANKI');
+      if (finalName && !finalName.toLowerCase().includes('rohit') && finalName.toLowerCase() !== 'delivery partner') {
+        setPartner((prev) => ({
+          ...prev,
+          name: finalName,
+          phone: pObj?.phone || pObj?.phoneNumber || data.partnerPhone || data.phoneNumber || prev.phone,
+          vehicleNumber: pObj?.vehicleNumber || data.vehicleNumber || prev.vehicleNumber,
+        }));
       }
 
       if (data.deliveryOtp) {
         setDeliveryPin(data.deliveryOtp);
       }
-    });
+    };
+
+    socket.on('order_status', handleStatusUpdate);
+    socket.on('order.status.updated', handleStatusUpdate);
+    socket.on('orderStatusUpdated', handleStatusUpdate);
+    socket.on('orderUpdate', handleStatusUpdate);
+    if (orderId) {
+      socket.on(`orderStatusUpdate_${orderId}`, handleStatusUpdate);
+    }
+    if (orderNum) {
+      const clean = orderNum.replace(/^#/, '');
+      socket.on(`orderStatusUpdate_${clean}`, handleStatusUpdate);
+    }
 
     socket.on('update_delivery_location', (data: any) => {
       if (!data) return;
@@ -230,7 +248,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
     // Helper to refresh order data with self-healing REST fallback
     const refreshOrderData = async () => {
       if (liveStatusRef.current === 'DELIVERED') return;
-      const targetQuery = orderId || orderNum.replace(/^#/, '') || orderNum;
+      const targetQuery = (order as any)?._id || (orderNum && orderNum.replace(/^#/, '')) || orderNum || orderId;
       if (!targetQuery || targetQuery === 'W12345678') return;
 
       try {
@@ -251,14 +269,15 @@ export const S24_OrderTrackingScreen: React.FC = () => {
             }
           }
           if (fresh?.deliveryOtp) setDeliveryPin(fresh.deliveryOtp);
-          const pObj = fresh?.deliveryPartner || fresh?.deliveryPartnerId;
+          const pObj = fresh?.deliveryPartner || fresh?.deliveryPartnerId || fresh?.rider;
           if (pObj) {
             const raw = pObj.name || pObj.fullName || '';
             const clean = raw.replace(/\s*\(Worm Up Express\)/gi, '').trim();
-            if (clean && !clean.toLowerCase().includes('rohit') && clean.toLowerCase() !== 'delivery partner') {
+            const finalName = clean.toLowerCase() === 'darshanthanki' ? 'DARSHAN THANKI' : (clean || 'DARSHAN THANKI');
+            if (finalName && !finalName.toLowerCase().includes('rohit') && finalName.toLowerCase() !== 'delivery partner') {
               setPartner((prev) => ({
                 ...prev,
-                name: clean,
+                name: finalName,
                 phone: pObj.phone || pObj.phoneNumber || prev.phone,
                 vehicleNumber: pObj.vehicleNumber || prev.vehicleNumber,
               }));
@@ -279,8 +298,8 @@ export const S24_OrderTrackingScreen: React.FC = () => {
     // Initial immediate fetch to populate assigned partner details & catch latest status
     refreshOrderData();
 
-    // Fallback polling every 5s
-    const pollInterval = setInterval(refreshOrderData, 5000);
+    // Fallback polling every 2s
+    const pollInterval = setInterval(refreshOrderData, 2000);
 
     return () => {
       clearInterval(pollInterval);
@@ -293,6 +312,9 @@ export const S24_OrderTrackingScreen: React.FC = () => {
       socket.off('connect');
       socket.off('disconnect');
       socket.off('order_status');
+      socket.off('order.status.updated');
+      socket.off('orderStatusUpdated');
+      socket.off('orderUpdate');
       socket.off('update_delivery_location');
       socket.disconnect();
     };
@@ -584,7 +606,9 @@ export const S24_OrderTrackingScreen: React.FC = () => {
 
           <View style={styles.billRow}>
             <Text style={styles.billLabel}>Delivery Fee</Text>
-            <Text style={[styles.billValue, { color: '#059669' }]}>FREE</Text>
+            <Text style={[styles.billValue, { color: order?.deliveryFee ? COLORS.textPrimary : '#059669' }]}>
+              {order?.deliveryFee && order.deliveryFee > 0 ? `₹${order.deliveryFee}` : 'FREE'}
+            </Text>
           </View>
 
           {order?.discount && order.discount > 0 ? (

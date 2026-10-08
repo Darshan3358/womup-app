@@ -20,6 +20,7 @@ import { StoresManagementScreen } from './src/screens/StoresManagementScreen';
 import { LocationManagementScreen } from './src/screens/LocationManagementScreen';
 import { CategoryManagementScreen } from './src/screens/CategoryManagementScreen';
 import { PayoutRatesScreen } from './src/screens/PayoutRatesScreen';
+import { WalletsRevenueScreen } from './src/screens/WalletsRevenueScreen';
 
 // Sub Views
 import { CustomerProfileScreen } from './src/screens/sub/CustomerProfileScreen';
@@ -81,6 +82,8 @@ const MainApp: React.FC = () => {
         return <CategoryManagementScreen />;
       case 'PayoutRates':
         return <PayoutRatesScreen />;
+      case 'Wallets':
+        return <WalletsRevenueScreen />;
       default:
         return <DashboardScreen />;
     }

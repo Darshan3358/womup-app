@@ -61,7 +61,19 @@ export const OrderService = {
         _id: item._id,
         deliveryOtp: item.deliveryOtp || '4821',
         estimatedArrival: '9 min',
-        deliveryPartner: item.deliveryPartner || undefined,
+        deliveryPartner: item.deliveryPartner || (item.deliveryPartnerId ? {
+          id: item.deliveryPartnerId._id || item.deliveryPartnerId.id,
+          name: item.deliveryPartnerId.fullName || item.deliveryPartnerId.name || 'DARSHAN THANKI',
+          phone: item.deliveryPartnerId.phoneNumber || item.deliveryPartnerId.phone || '',
+          vehicleNumber: item.deliveryPartnerId.vehicleNumber || 'GJ AE 2020',
+          rating: item.deliveryPartnerId.rating || 5,
+        } : (item.rider ? {
+          id: item.rider.id || item.rider._id,
+          name: item.rider.name || item.rider.fullName || 'DARSHAN THANKI',
+          phone: item.rider.phone || item.rider.phoneNumber || '',
+          vehicleNumber: item.rider.vehicleNumber || 'GJ AE 2020',
+          rating: item.rider.rating || 5,
+        } : undefined)),
       }));
       cachedOrders = mapped;
       StorageService.saveItem(StorageService.KEYS.ORDERS, mapped);
@@ -107,7 +119,19 @@ export const OrderService = {
         _id: item._id,
         deliveryOtp: item.deliveryOtp || '4821',
         estimatedArrival: '9 min',
-        deliveryPartner: item.deliveryPartner,
+        deliveryPartner: item.deliveryPartner || (item.deliveryPartnerId ? {
+          id: item.deliveryPartnerId._id || item.deliveryPartnerId.id,
+          name: item.deliveryPartnerId.fullName || item.deliveryPartnerId.name || 'DARSHAN THANKI',
+          phone: item.deliveryPartnerId.phoneNumber || item.deliveryPartnerId.phone || '',
+          vehicleNumber: item.deliveryPartnerId.vehicleNumber || 'GJ AE 2020',
+          rating: item.deliveryPartnerId.rating || 5,
+        } : (item.rider ? {
+          id: item.rider.id || item.rider._id,
+          name: item.rider.name || item.rider.fullName || 'DARSHAN THANKI',
+          phone: item.rider.phone || item.rider.phoneNumber || '',
+          vehicleNumber: item.rider.vehicleNumber || 'GJ AE 2020',
+          rating: item.rider.rating || 5,
+        } : undefined)),
       };
       return mapped;
     }
@@ -116,6 +140,8 @@ export const OrderService = {
 
   async createOrder(data: {
     addressId?: string;
+    storeId?: string;
+    areaId?: string;
     paymentMethod: string;
     reservationId?: string;
     deliveryInstructions?: string;

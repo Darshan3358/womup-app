@@ -21,14 +21,20 @@ router.get('/', async (req, res) => {
 
     const areas = await db.collection('areas').find(query).sort({ sortOrder: 1, name: 1 }).toArray();
 
-    // Enrich each area with assigned store info and city info
+    // Enrich each area with assigned store info and multi-store capacity info
     const enriched = await Promise.all(
       areas.map(async (area) => {
         const areaId = area._id;
-        const assignedStore = await db.collection('stores').findOne({
+        const assignedStores = await db.collection('stores').find({
           $or: [{ areaId }, { areaId: areaId.toString() }],
           isActive: true,
-        });
+        }).toArray();
+
+        const maxStores = Number(area.maxStores) || 1;
+        const currentStoreCount = assignedStores.length;
+        const availableSlots = Math.max(0, maxStores - currentStoreCount);
+        const isFull = currentStoreCount >= maxStores;
+        const primaryStore = assignedStores.length > 0 ? assignedStores[0] : null;
 
         // Resolve city name if cityId exists
         let resolvedCityName = area.cityName || area.city || 'Ahmedabad';
@@ -54,15 +60,30 @@ router.get('/', async (req, res) => {
           defaultDeliveryMinutes: area.defaultDeliveryMinutes || 9,
           sortOrder: area.sortOrder || 0,
           isActive: area.isActive !== false,
-          hasActiveStore: Boolean(assignedStore),
-          assignedStore: assignedStore
+          maxStores,
+          currentStoreCount,
+          availableSlots,
+          isFull,
+          storeRoutingStrategy: area.storeRoutingStrategy || 'NEAREST',
+          hasActiveStore: currentStoreCount > 0,
+          assignedStores: assignedStores.map((s) => ({
+            id: s._id.toString(),
+            _id: s._id,
+            name: s.name,
+            code: s.code,
+            loginId: s.loginId,
+            address: s.address,
+            phone: s.phone,
+            email: s.email,
+          })),
+          assignedStore: primaryStore
             ? {
-                id: assignedStore._id.toString(),
-                _id: assignedStore._id,
-                name: assignedStore.name,
-                code: assignedStore.code,
-                loginId: assignedStore.loginId,
-                address: assignedStore.address,
+                id: primaryStore._id.toString(),
+                _id: primaryStore._id,
+                name: primaryStore.name,
+                code: primaryStore.code,
+                loginId: primaryStore.loginId,
+                address: primaryStore.address,
               }
             : null,
           createdAt: area.createdAt,
@@ -187,6 +208,9 @@ router.post('/', async (req, res) => {
       defaultDeliveryMinutes: Number(defaultDeliveryMinutes) || 9,
       sortOrder: Number(sortOrder) || 0,
       isActive: isActive !== false,
+      maxStores: Math.max(1, Number(req.body.maxStores) || 1),
+      currentStoreCount: 0,
+      storeRoutingStrategy: req.body.storeRoutingStrategy || 'NEAREST',
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -217,6 +241,10 @@ router.put('/:id', async (req, res) => {
     const body = req.body;
     delete body._id;
     body.updatedAt = new Date();
+
+    if (body.maxStores !== undefined) {
+      body.maxStores = Math.max(1, Number(body.maxStores) || 1);
+    }
 
     if (body.cityId && ObjectId.isValid(body.cityId)) {
       const cityDoc = await db.collection('cities').findOne({ _id: new ObjectId(body.cityId) });

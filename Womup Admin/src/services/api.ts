@@ -20,6 +20,11 @@ import {
   CityItem,
   PayoutRateItem,
   PayoutStats,
+  StoreWalletItem,
+  RiderWalletItem,
+  PlatformWalletData,
+  WalletTransactionItem,
+  WalletsSummaryData,
 } from '../types/admin';
 
 const getApiBaseUrl = () => {
@@ -373,28 +378,41 @@ export const ApiService = {
 
         // 6. DYNAMICALLY MAP OPERATIONAL ZONES (AREAS) FROM LIVE MONGODB
         const dynamicZones: Zone[] = (data.areas && data.areas.length > 0)
-          ? data.areas.map((a: any, idx: number) => ({
-              id: a._id?.toString ? a._id.toString() : a._id || a.id || `z${idx + 1}`,
-              _id: a._id,
-              name: a.name,
-              code: a.code || a.name.toUpperCase().replace(/\s+/g, '_'),
-              darkStore: a.darkStore || `Wom Up ${a.name} Dark Store`,
-              address: a.address || `${a.name}, ${a.city || 'Ahmedabad'}`,
-              city: a.cityName || a.city || 'Ahmedabad',
-              cityName: a.cityName || a.city || 'Ahmedabad',
-              cityId: a.cityId?.toString ? a.cityId.toString() : (a.cityId || null),
-              isActive: a.isActive !== false,
-              activeOrders: 0,
-              gmvSharePercent: 0,
-              hasActiveStore: !!a.hasActiveStore,
-              assignedStore: a.assignedStore || null,
-              centerLat: a.centerLat,
-              centerLng: a.centerLng,
-              radiusKm: a.radiusKm,
-              defaultDeliveryMinutes: a.defaultDeliveryMinutes,
-              pincodes: a.pincodes,
-              sortOrder: a.sortOrder,
-            }))
+          ? data.areas.map((a: any, idx: number) => {
+              const maxStores = Math.max(1, Number(a.maxStores) || 1);
+              const currentStoreCount = Number(a.currentStoreCount) || (a.assignedStores ? a.assignedStores.length : (a.assignedStore || a.hasActiveStore ? 1 : 0));
+              const availableSlots = a.availableSlots !== undefined ? Number(a.availableSlots) : Math.max(0, maxStores - currentStoreCount);
+              const isFull = a.isFull !== undefined ? Boolean(a.isFull) : currentStoreCount >= maxStores;
+
+              return {
+                id: a._id?.toString ? a._id.toString() : a._id || a.id || `z${idx + 1}`,
+                _id: a._id,
+                name: a.name,
+                code: a.code || a.name.toUpperCase().replace(/\s+/g, '_'),
+                darkStore: a.darkStore || `Wom Up ${a.name} Dark Store`,
+                address: a.address || `${a.name}, ${a.city || 'Ahmedabad'}`,
+                city: a.cityName || a.city || 'Ahmedabad',
+                cityName: a.cityName || a.city || 'Ahmedabad',
+                cityId: a.cityId?.toString ? a.cityId.toString() : (a.cityId || null),
+                isActive: a.isActive !== false,
+                activeOrders: 0,
+                gmvSharePercent: 0,
+                hasActiveStore: currentStoreCount > 0,
+                assignedStore: a.assignedStore || null,
+                centerLat: a.centerLat,
+                centerLng: a.centerLng,
+                radiusKm: a.radiusKm,
+                defaultDeliveryMinutes: a.defaultDeliveryMinutes,
+                pincodes: a.pincodes,
+                sortOrder: a.sortOrder,
+                maxStores,
+                currentStoreCount,
+                availableSlots,
+                isFull,
+                storeRoutingStrategy: a.storeRoutingStrategy || 'NEAREST',
+                assignedStores: a.assignedStores || (a.assignedStore ? [a.assignedStore] : []),
+              };
+            })
           : [];
 
         const areaIdToName: Record<string, string> = {};
@@ -777,6 +795,8 @@ export const ApiService = {
     centerLng?: number;
     radiusKm?: number;
     defaultDeliveryMinutes?: number;
+    maxStores?: number;
+    storeRoutingStrategy?: string;
   }): Promise<{ success: boolean; data?: any; error?: string; id?: string }> {
     try {
       console.log('[API] Creating operational zone in MongoDB:', data);
@@ -1404,5 +1424,98 @@ export const ApiService = {
       return { success: false, error: err.message };
     }
   },
+
+  // 36. WALLETS - SUMMARY DASHBOARD
+  async getWalletsSummary(): Promise<{ success: boolean; data?: WalletsSummaryData; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/finance/wallets/summary`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed fetching wallets summary' };
+    }
+  },
+
+  // 37. WALLETS - STORE WALLETS
+  async getStoreWallets(): Promise<{ success: boolean; count?: number; data?: StoreWalletItem[]; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/finance/wallets/stores`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed fetching store wallets' };
+    }
+  },
+
+  // 38. WALLETS - RIDER WALLETS
+  async getRiderWallets(): Promise<{ success: boolean; count?: number; data?: RiderWalletItem[]; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/finance/wallets/riders`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed fetching rider wallets' };
+    }
+  },
+
+  // 39. WALLETS - PLATFORM WALLET & REVENUE
+  async getPlatformWallet(): Promise<{ success: boolean; data?: PlatformWalletData; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/finance/wallets/platform`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed fetching platform wallet' };
+    }
+  },
+
+  // 40. WALLETS - AUDIT LEDGER TRANSACTIONS
+  async getWalletTransactions(params?: {
+    walletType?: 'STORE' | 'RIDER' | 'PLATFORM';
+    limit?: number;
+  }): Promise<{ success: boolean; count?: number; data?: WalletTransactionItem[]; error?: string }> {
+    try {
+      const q = new URLSearchParams();
+      if (params?.walletType) q.append('walletType', params.walletType);
+      if (params?.limit) q.append('limit', params.limit.toString());
+      const res = await fetch(`${API_BASE_URL}/api/finance/wallets/transactions?${q.toString()}`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed fetching wallet transactions' };
+    }
+  },
+
+  // 41. WALLETS - SETTLE STORE PAYOUT
+  async settleStoreWallet(
+    storeId: string,
+    amount: number,
+    referenceNotes?: string
+  ): Promise<{ success: boolean; message?: string; newBalance?: number; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/finance/wallets/settle-store`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storeId, amount, referenceNotes }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed settling store wallet' };
+    }
+  },
+
+  // 42. WALLETS - SETTLE RIDER INSTANT IMPS
+  async settleRiderWallet(
+    riderId: string,
+    amount: number,
+    referenceNotes?: string
+  ): Promise<{ success: boolean; message?: string; newBalance?: number; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/finance/wallets/settle-rider`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ riderId, amount, referenceNotes }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed settling rider payout' };
+    }
+  },
 };
+
 

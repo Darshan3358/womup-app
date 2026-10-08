@@ -5,7 +5,15 @@ import { useStore } from '../../context/StoreContext';
 import { COLORS } from '../../theme/colors';
 
 export const ConfirmHandoverModal: React.FC = () => {
-  const { riderArrivalAlert, dismissRiderAlert, completeHandover, readyOrders } = useStore();
+  const {
+    riderArrivalAlert,
+    dismissRiderAlert,
+    completeHandover,
+    readyOrders,
+    pickingOrders,
+    setActiveOrder,
+    setSubScreen,
+  } = useStore();
   const [bagBarcode, setBagBarcode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -18,6 +26,12 @@ export const ConfirmHandoverModal: React.FC = () => {
   const expectedBag = matchedOrder?.bagBarcode;
 
   if (!expectedBag) {
+    const pendingOrder =
+      matchedOrder ||
+      pickingOrders.find(
+        (o) => o.orderNumber === riderArrivalAlert.orderNumber || o.orderId === riderArrivalAlert.orderId
+      );
+
     return (
       <Modal visible={Boolean(riderArrivalAlert)} transparent animationType="fade" onRequestClose={dismissRiderAlert}>
         <View style={styles.overlay}>
@@ -37,8 +51,26 @@ export const ConfirmHandoverModal: React.FC = () => {
             <Text style={{ color: COLORS.textSecondary, fontSize: 13, marginVertical: 14, lineHeight: 20 }}>
               Bag barcode has not been generated yet. Please complete packing and seal the bag before handing over to the rider.
             </Text>
-            <TouchableOpacity style={styles.handoverBtn} onPress={dismissRiderAlert}>
-              <Text style={styles.handoverText}>DISMISS</Text>
+            {pendingOrder ? (
+              <TouchableOpacity
+                style={[styles.handoverBtn, { backgroundColor: COLORS.primary, marginBottom: 8 }]}
+                onPress={() => {
+                  dismissRiderAlert();
+                  setActiveOrder(pendingOrder);
+                  setSubScreen('Packing');
+                }}
+              >
+                <Text style={styles.handoverText}>PACK & GENERATE BARCODE NOW</Text>
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity
+              style={[
+                styles.handoverBtn,
+                pendingOrder ? { backgroundColor: 'transparent', borderWidth: 1, borderColor: COLORS.border } : null,
+              ]}
+              onPress={dismissRiderAlert}
+            >
+              <Text style={[styles.handoverText, pendingOrder ? { color: COLORS.textMuted } : null]}>DISMISS</Text>
             </TouchableOpacity>
           </View>
         </View>

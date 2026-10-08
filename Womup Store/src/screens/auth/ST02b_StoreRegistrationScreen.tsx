@@ -33,8 +33,18 @@ interface AreaItem {
   code?: string;
   cityName?: string;
   cityId?: string;
+  maxStores?: number;
+  currentStoreCount?: number;
+  slotsLeft?: number;
+  isFull?: boolean;
   hasActiveStore?: boolean;
   isAvailable?: boolean;
+  status?: string;
+  assignedStores?: Array<{
+    storeId: string;
+    storeName: string;
+    storeCode?: string;
+  }>;
   assignedStore?: {
     storeName?: string;
     storeCode?: string;
@@ -118,10 +128,16 @@ export const ST02b_StoreRegistrationScreen: React.FC = () => {
   };
 
   const handleSelectArea = (area: AreaItem) => {
-    if (area.hasActiveStore || area.isAvailable === false) {
+    const isFull = area.isFull !== undefined
+      ? area.isFull
+      : (area.slotsLeft !== undefined ? area.slotsLeft <= 0 : (area.isAvailable === false));
+
+    if (isFull) {
+      const maxStores = area.maxStores || 1;
+      const count = area.currentStoreCount || 1;
       Alert.alert(
-        'Area Already Assigned',
-        `The area "${area.name}" already has an assigned active dark store (${area.assignedStore?.storeName || 'Registered Store'}). Womup operates on a strict 1-store-per-area model. Please select an available area.`
+        'Area at Full Capacity',
+        `The area "${area.name}" is already at full capacity (${count}/${maxStores} active stores). Please select an area with available capacity or request Admin to increase the area limit in Location Management.`
       );
       return;
     }
@@ -567,59 +583,68 @@ export const ST02b_StoreRegistrationScreen: React.FC = () => {
               data={filteredAreas}
               keyExtractor={(item, index) => item._id || item.id || `area_${index}`}
               renderItem={({ item }) => {
-                const isAssigned = item.hasActiveStore || item.isAvailable === false;
+                const isFull = item.isFull !== undefined
+                  ? item.isFull
+                  : (item.slotsLeft !== undefined ? item.slotsLeft <= 0 : (item.isAvailable === false));
                 const isSelected = selectedArea?._id === item._id || selectedArea?.name === item.name;
+                const maxStores = Math.max(1, item.maxStores || 1);
+                const currentCount = item.currentStoreCount ?? (item.hasActiveStore ? 1 : 0);
+                const slotsLeft = item.slotsLeft ?? Math.max(0, maxStores - currentCount);
 
                 return (
                   <TouchableOpacity
                     style={[
                       styles.modalItem,
-                      isAssigned && styles.modalItemDisabled,
+                      isFull && styles.modalItemDisabled,
                       isSelected && styles.modalItemSelected,
                     ]}
                     onPress={() => handleSelectArea(item)}
-                    activeOpacity={isAssigned ? 0.9 : 0.6}
+                    activeOpacity={isFull ? 0.9 : 0.6}
                   >
                     <View style={styles.modalItemLeft}>
                       <View
                         style={[
                           styles.areaStatusCircle,
-                          { backgroundColor: isAssigned ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)' },
+                          { backgroundColor: isFull ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)' },
                         ]}
                       >
                         <Ionicons
-                          name={isAssigned ? 'close' : 'checkmark'}
+                          name={isFull ? 'close' : 'checkmark'}
                           size={16}
-                          color={isAssigned ? COLORS.danger : COLORS.success}
+                          color={isFull ? COLORS.danger : COLORS.success}
                         />
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text
                           style={[
                             styles.modalItemName,
-                            isAssigned && { color: COLORS.textMuted, textDecorationLine: 'line-through' },
+                            isFull && { color: COLORS.textMuted, textDecorationLine: 'line-through' },
                           ]}
                         >
                           {item.name}
                         </Text>
                         <Text style={styles.modalItemSub}>
-                          {isAssigned
-                            ? `❌ Assigned to ${item.assignedStore?.storeName || 'Active Dark Store'}`
-                            : '✅ Available for Registration'}
+                          {isFull
+                            ? `❌ Capacity Full: ${currentCount}/${maxStores} stores assigned`
+                            : currentCount > 0
+                            ? `⚡ ${slotsLeft} slot${slotsLeft > 1 ? 's' : ''} available (${currentCount}/${maxStores} stores active)`
+                            : `✅ Available for Registration (${maxStores} slot${maxStores > 1 ? 's' : ''})`}
                         </Text>
                       </View>
                     </View>
 
                     <View>
-                      {isAssigned ? (
+                      {isFull ? (
                         <View style={styles.badgeUnavailable}>
-                          <Text style={styles.badgeUnavailableText}>ASSIGNED</Text>
+                          <Text style={styles.badgeUnavailableText}>FULL</Text>
                         </View>
                       ) : isSelected ? (
                         <Ionicons name="checkmark-circle" size={20} color={COLORS.primary} />
                       ) : (
                         <View style={styles.badgeAvailable}>
-                          <Text style={styles.badgeAvailableText}>SELECT</Text>
+                          <Text style={styles.badgeAvailableText}>
+                            {currentCount > 0 ? `SELECT (${slotsLeft})` : 'SELECT'}
+                          </Text>
                         </View>
                       )}
                     </View>

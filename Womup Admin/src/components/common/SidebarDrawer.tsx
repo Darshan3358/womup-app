@@ -30,6 +30,7 @@ import {
   MapPin,
   Layers,
   FolderTree,
+  Wallet,
 } from 'lucide-react-native';
 import { COLORS, GRADIENTS, RADIUS, SPACING } from '../../theme';
 import { useAdminState, ActiveTab, ActiveSubView } from '../../context/AdminStateContext';
@@ -306,6 +307,23 @@ export const SidebarDrawer: React.FC = () => {
               </View>
               <Text style={[styles.menuLabel, activeTab === 'PayoutRates' && subView === 'none' && styles.menuLabelActive]}>
                 Rider Payout Rates (Per-KM)
+              </Text>
+              <ChevronRight size={16} color={COLORS.secondaryText} />
+            </TouchableOpacity>
+
+            {/* 12. Wallets & Payment Revenue */}
+            <TouchableOpacity
+              style={[
+                styles.menuItem,
+                activeTab === 'Wallets' && subView === 'none' && styles.menuItemActive,
+              ]}
+              onPress={() => handleNavigateTab('Wallets')}
+            >
+              <View style={[styles.iconContainer, activeTab === 'Wallets' && subView === 'none' && styles.iconActive]}>
+                <Wallet size={18} color={activeTab === 'Wallets' && subView === 'none' ? COLORS.white : '#8B5CF6'} />
+              </View>
+              <Text style={[styles.menuLabel, activeTab === 'Wallets' && subView === 'none' && styles.menuLabelActive]}>
+                Wallets & Revenue (3-Way)
               </Text>
               <ChevronRight size={16} color={COLORS.secondaryText} />
             </TouchableOpacity>

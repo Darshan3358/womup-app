@@ -77,27 +77,41 @@ export class AreasService {
       this.storeModel.find({ isActive: true }, { areaId: 1, name: 1, code: 1 }).exec(),
     ]);
 
-    const assignedMap = new Map<string, { storeId: string; storeName: string; storeCode?: string }>();
+    const storeCountMap = new Map<string, Array<{ storeId: string; storeName: string; storeCode?: string }>>();
     for (const store of activeStores) {
       if (store.areaId) {
-        assignedMap.set(store.areaId.toString(), {
+        const key = store.areaId.toString();
+        const existing = storeCountMap.get(key) || [];
+        existing.push({
           storeId: store._id.toString(),
           storeName: store.name,
           storeCode: store.code,
         });
+        storeCountMap.set(key, existing);
       }
     }
 
     return areas.map((area) => {
       const areaObj = area.toObject();
       const areaIdStr = area._id.toString();
-      const assigned = assignedMap.get(areaIdStr);
+      const assignedList = storeCountMap.get(areaIdStr) || [];
+      const storeCount = assignedList.length;
+      const maxStores = Math.max(1, Number(areaObj.maxStores) || 1);
+      const slotsLeft = Math.max(0, maxStores - storeCount);
+      const isFull = storeCount >= maxStores;
+
       return {
         ...areaObj,
         id: areaIdStr,
-        hasActiveStore: Boolean(assigned),
-        isAvailable: !assigned,
-        assignedStore: assigned || null,
+        maxStores,
+        currentStoreCount: storeCount,
+        slotsLeft,
+        isFull,
+        isAvailable: !isFull,
+        hasActiveStore: storeCount > 0,
+        status: isFull ? 'ASSIGNED' : 'AVAILABLE',
+        assignedStores: assignedList,
+        assignedStore: assignedList[0] || null,
       };
     });
   }

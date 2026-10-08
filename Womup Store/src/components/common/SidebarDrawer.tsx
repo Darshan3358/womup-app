@@ -33,7 +33,7 @@ export const SidebarDrawer: React.FC = () => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   // Modals for secondary items
-  const [activeModal, setActiveModal] = useState<'notifications' | 'settings' | 'help' | null>(null);
+  const [activeModal, setActiveModal] = useState<'notifications' | 'settings' | 'help' | 'logoutConfirm' | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [vibrationEnabled, setVibrationEnabled] = useState(true);
   const [autoCameraScan, setAutoCameraScan] = useState(true);
@@ -93,21 +93,7 @@ export const SidebarDrawer: React.FC = () => {
   };
 
   const handleLogout = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to end your session and sign out of the Dark Store App?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: async () => {
-            handleClose();
-            await logout();
-          },
-        },
-      ]
-    );
+    setActiveModal('logoutConfirm');
   };
 
   // Clean Store Name
@@ -440,6 +426,67 @@ export const SidebarDrawer: React.FC = () => {
                     {'\n'}3. Pack into designated bag barcode
                     {'\n'}4. Handover to rider upon counter arrival
                   </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Sub-Modal: Logout Confirmation */}
+      {activeModal === 'logoutConfirm' && (
+        <Modal transparent animationType="fade" visible={true} onRequestClose={() => setActiveModal(null)}>
+          <View style={styles.dialogOverlay}>
+            <View style={styles.dialogCard}>
+              <View style={styles.dialogHeader}>
+                <Ionicons name="log-out" size={22} color="#EF4444" />
+                <Text style={styles.dialogTitle}>Sign Out of Dark Store</Text>
+                <TouchableOpacity onPress={() => setActiveModal(null)}>
+                  <Ionicons name="close" size={22} color="#94A3B8" />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.dialogBody}>
+                <Text style={{ fontSize: 14, color: '#E2E8F0', lineHeight: 20, marginBottom: 8 }}>
+                  Are you sure you want to end your session and sign out?
+                </Text>
+                <Text style={{ fontSize: 12, color: '#94A3B8', lineHeight: 18, marginBottom: 20 }}>
+                  You will be logged out of {store?.name || 'this dark store'} terminal and returned to the login screen.
+                </Text>
+
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <TouchableOpacity
+                    style={{
+                      flex: 1,
+                      paddingVertical: 12,
+                      borderRadius: 8,
+                      backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                      alignItems: 'center',
+                    }}
+                    onPress={() => setActiveModal(null)}
+                  >
+                    <Text style={{ color: '#E2E8F0', fontWeight: '600', fontSize: 13 }}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={{
+                      flex: 1,
+                      paddingVertical: 12,
+                      borderRadius: 8,
+                      backgroundColor: '#EF4444',
+                      alignItems: 'center',
+                      flexDirection: 'row',
+                      justifyContent: 'center',
+                      gap: 6,
+                    }}
+                    onPress={async () => {
+                      setActiveModal(null);
+                      handleClose();
+                      await logout();
+                    }}
+                  >
+                    <Ionicons name="log-out-outline" size={16} color="#FFF" />
+                    <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>Yes, Sign Out</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             </View>

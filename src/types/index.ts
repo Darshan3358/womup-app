@@ -114,6 +114,10 @@ export interface Order {
   discount: number;
   shoppingCoinsUsed: number;
   deliveryFee: number;
+  handlingFee?: number;
+  couponDiscount?: number;
+  coinsDiscount?: number;
+  tip?: number;
   totalAmount: number;
   deliveryAddress: Address;
   deliverySlot: string;
@@ -204,7 +208,8 @@ export type ScreenId =
   | 'Blinkit_Cart'
   | 'Blinkit_Checkout'
   | 'Blinkit_OrderSuccess'
-  | 'Blinkit_Wishlist';
+  | 'Blinkit_Wishlist'
+  | 'Local_Home';
 
 export interface BlinkitProduct {
   id: string;

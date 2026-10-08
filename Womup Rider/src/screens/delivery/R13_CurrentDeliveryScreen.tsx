@@ -1014,30 +1014,32 @@ export const CurrentDeliveryScreen: React.FC = () => {
                 <View style={styles.modalSection}>
                   <Text style={styles.modalSectionHeader}>Rider Earnings Breakdown</Text>
                   <View style={styles.earningsBreakdownCard}>
-                    <View style={styles.earningsRow}>
-                      <Text style={styles.earningsRowLabel}>Base Delivery Pay</Text>
-                      <Text style={styles.earningsRowVal}>
-                        ₹{selectedPastOrder.earnings?.basePay ?? 48}
-                      </Text>
-                    </View>
-                    <View style={styles.earningsRow}>
-                      <Text style={styles.earningsRowLabel}>Peak / On-Time Incentive</Text>
-                      <Text style={styles.earningsRowVal}>
-                        +₹{selectedPastOrder.earnings?.incentive ?? 15}
-                      </Text>
-                    </View>
-                    <View style={styles.earningsRow}>
-                      <Text style={styles.earningsRowLabel}>Customer Doorstep Tip</Text>
-                      <Text style={styles.earningsRowVal}>
-                        +₹{selectedPastOrder.earnings?.tip ?? 0}
-                      </Text>
-                    </View>
-                    <View style={[styles.earningsRow, styles.earningsTotalRow]}>
-                      <Text style={styles.earningsTotalLabel}>Total Earned for Order</Text>
-                      <Text style={styles.earningsTotalVal}>
-                        ₹{selectedPastOrder.earnings?.totalEarned ?? selectedPastOrder.earnings?.total ?? ((selectedPastOrder.earnings?.basePay ?? 48) + (selectedPastOrder.earnings?.incentive ?? 15) + (selectedPastOrder.earnings?.tip ?? 0))}
-                      </Text>
-                    </View>
+                    {(() => {
+                      const base = Number(selectedPastOrder.earnings?.basePay ?? 48);
+                      const inc = Number(selectedPastOrder.earnings?.incentive ?? 15);
+                      const tip = Number(selectedPastOrder.earnings?.tip ?? 0);
+                      const total = base + inc + tip;
+                      return (
+                        <>
+                          <View style={styles.earningsRow}>
+                            <Text style={styles.earningsRowLabel}>Base Delivery Pay</Text>
+                            <Text style={styles.earningsRowVal}>₹{base}</Text>
+                          </View>
+                          <View style={styles.earningsRow}>
+                            <Text style={styles.earningsRowLabel}>Peak / On-Time Incentive</Text>
+                            <Text style={styles.earningsRowVal}>+₹{inc}</Text>
+                          </View>
+                          <View style={styles.earningsRow}>
+                            <Text style={styles.earningsRowLabel}>Customer Doorstep Tip</Text>
+                            <Text style={styles.earningsRowVal}>+₹{tip}</Text>
+                          </View>
+                          <View style={[styles.earningsRow, styles.earningsTotalRow]}>
+                            <Text style={styles.earningsTotalLabel}>Total Earned for Order</Text>
+                            <Text style={styles.earningsTotalVal}>₹{total}</Text>
+                          </View>
+                        </>
+                      );
+                    })()}
                   </View>
                 </View>
 
@@ -1050,7 +1052,7 @@ export const CurrentDeliveryScreen: React.FC = () => {
                         <View key={i} style={styles.modalItemRow}>
                           <Text style={styles.modalItemQty}>{it.quantity || 1}x</Text>
                           <Text style={styles.modalItemName}>{it.name}</Text>
-                          <Text style={styles.modalItemPrice}>₹{it.price || 0}</Text>
+                          <Text style={[styles.modalItemPrice, { color: COLORS.textMuted }]}>Packed</Text>
                         </View>
                       ))}
                     </View>

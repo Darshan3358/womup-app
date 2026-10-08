@@ -16,6 +16,7 @@ const securityRouter = require('./routes/security');
 const citiesRouter = require('./routes/cities');
 const categoriesRouter = require('./routes/categories');
 const payoutRatesRouter = require('./routes/payoutRates');
+const cartRouter = require('./routes/cart');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -64,7 +65,7 @@ app.get('/api/realtime-data', async (req, res) => {
     const orders = await db.collection('orders').find({}).toArray();
     const products = await db.collection('products').find({}).toArray();
     const categories = await db.collection('categories').find({}).toArray();
-    const areas = await db.collection('areas').find({}).toArray();
+    const rawAreas = await db.collection('areas').find({}).toArray();
     const rawStores = await db.collection('stores').find({}).toArray();
     const storeStaffList = await db.collection('store_staff').find({}).toArray();
 
@@ -86,6 +87,39 @@ app.get('/api/realtime-data', async (req, res) => {
         staffTotal: effectiveStaffTotal,
         isOnShift: effectiveStaffOnShift > 0,
         isOnline,
+      };
+    });
+
+    const areas = rawAreas.map((area) => {
+      const aId = area._id.toString();
+      const areaStores = rawStores.filter((s) => {
+        if (s.isActive === false) return false;
+        if (s.areaId && s.areaId.toString() === aId) return true;
+        if (s.areaName && area.name && s.areaName.toLowerCase() === area.name.toLowerCase()) return true;
+        return false;
+      });
+      const maxStores = Math.max(1, Number(area.maxStores) || 1);
+      const currentStoreCount = areaStores.length;
+      const availableSlots = Math.max(0, maxStores - currentStoreCount);
+      const isFull = currentStoreCount >= maxStores;
+
+      return {
+        ...area,
+        id: aId,
+        maxStores,
+        currentStoreCount,
+        availableSlots,
+        isFull,
+        storeRoutingStrategy: area.storeRoutingStrategy || 'NEAREST',
+        hasActiveStore: currentStoreCount > 0,
+        assignedStores: areaStores.map((s) => ({
+          id: s._id.toString(),
+          _id: s._id,
+          name: s.name,
+          code: s.code,
+          loginId: s.loginId,
+        })),
+        assignedStore: areaStores[0] || null,
       };
     });
 
@@ -270,8 +304,11 @@ app.use('/api/admin/orders', ordersRouter);
 app.use('/api/admin/print-orders', printOrdersRouter);
 app.use('/api/admin/marketing', marketingRouter);
 app.use('/api/admin/finance', financeRouter);
+app.use('/api/finance', financeRouter);
 app.use('/api/admin/security', securityRouter);
 app.use('/api/admin/payout-rates', payoutRatesRouter);
+app.use('/api/v1/cart', cartRouter);
+app.use('/api/cart', cartRouter);
 
 // 404 handler
 app.use((req, res) => {

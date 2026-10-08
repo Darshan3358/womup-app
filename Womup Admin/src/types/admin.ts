@@ -184,6 +184,19 @@ export interface Zone {
   activeOrders: number;
   gmvSharePercent: number;
   hasActiveStore?: boolean;
+  maxStores?: number;
+  currentStoreCount?: number;
+  availableSlots?: number;
+  isFull?: boolean;
+  storeRoutingStrategy?: string;
+  assignedStores?: Array<{
+    id: string;
+    _id?: string;
+    name: string;
+    code: string;
+    loginId?: string;
+    address?: string;
+  }>;
   assignedStore?: {
     id: string;
     _id?: string;
@@ -430,5 +443,101 @@ export interface PayoutStats {
   rateRangeText: string;
   minRate: number;
   maxRate: number;
+}
+
+export interface StoreWalletItem {
+  storeId: string;
+  storeName: string;
+  city: string;
+  area: string;
+  balance: number;
+  pendingBalance: number;
+  totalEarned: number;
+  totalCommission: number;
+  commissionRate: number;
+  settlementCycle: string;
+  lastSettlementAt?: string | null;
+  bankAccount: {
+    accountNumber: string;
+    ifsc: string;
+    bankName: string;
+    verified: boolean;
+  };
+  isActive: boolean;
+}
+
+export interface RiderWalletItem {
+  riderId: string;
+  partnerCode: string;
+  name: string;
+  phone: string;
+  balance: number;
+  lifetimeEarnings: number;
+  codPending: number;
+  settlementCycle: string;
+  lastSettlementAt?: string | null;
+  bankAccount: {
+    accountNumber: string;
+    ifsc: string;
+    bankName: string;
+    verified: boolean;
+  };
+  todaySettlement: {
+    basePay: number;
+    tip: number;
+    incentive: number;
+    total: number;
+  };
+  isActive: boolean;
+}
+
+export interface PlatformWalletData {
+  todayRevenue: number;
+  todayHandling: number;
+  todayCommission: number;
+  todayOrdersCount: number;
+  lifetime: {
+    totalRevenue: number;
+    handlingFees: number;
+    commissions: number;
+    netProfit: number;
+  };
+}
+
+export interface WalletTransactionItem {
+  id: string;
+  walletType: 'STORE' | 'RIDER' | 'PLATFORM';
+  walletId: string;
+  orderId?: string;
+  orderNumber?: string;
+  type: 'CREDIT' | 'DEBIT';
+  category: string;
+  amount: number;
+  balanceBefore: number;
+  balanceAfter: number;
+  description: string;
+  createdAt: string;
+}
+
+export interface WalletsSummaryData {
+  stores: {
+    count: number;
+    totalBalance: number;
+    totalGross: number;
+    totalCommission: number;
+  };
+  riders: {
+    count: number;
+    totalBalance: number;
+    totalLifetime: number;
+    totalTips: number;
+    totalBasePay: number;
+  };
+  platform: {
+    handlingFees: number;
+    commissions: number;
+    totalRevenue: number;
+    netProfit: number;
+  };
 }
 

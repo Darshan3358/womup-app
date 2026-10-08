@@ -222,16 +222,61 @@ const enrichStore = (rawStore: any): StoreHub | null => {
       }
     });
 
-    // 5. Order status updates (PACKED, OUT_FOR_DELIVERY, DELIVERED, CANCELLED)
+    // 5. Order status updates (GOING_TO_STORE, ARRIVED_AT_STORE, PACKED, OUT_FOR_DELIVERY, DELIVERED, CANCELLED)
     storeSocket.on('order_status', (payload: any) => {
       console.log('[StoreContext] 📦 WS order_status update:', payload);
       const updatedOrderId = (payload?.orderId || '').toString();
       const updatedOrderNum = payload?.orderNumber?.toString();
       const updatedStatus = payload?.status;
 
-      // If active picking order is completed, packed, handed over, or delivered, clear picking state!
+      // Extract rider info if available
+      const riderPayload = payload?.rider || payload?.deliveryPartner || payload?.partner;
+      const assignedRider =
+        riderPayload?.name || payload?.partnerName || payload?.riderName
+          ? {
+              id: riderPayload?.id || riderPayload?._id || payload?.partnerId,
+              name:
+                riderPayload?.name ||
+                riderPayload?.fullName ||
+                payload?.partnerName ||
+                payload?.riderName ||
+                'Delivery Partner',
+              phone:
+                riderPayload?.phone ||
+                riderPayload?.phoneNumber ||
+                payload?.partnerPhone ||
+                payload?.phoneNumber ||
+                '',
+              vehicleNumber: riderPayload?.vehicleNumber || payload?.vehicleNumber || 'GJ AE 2020',
+            }
+          : null;
+
+      // Update incoming, picking, and ready lists with real-time assigned rider info
+      if (assignedRider || updatedStatus) {
+        const updateListWithRider = (list: StoreOrder[]) =>
+          list.map((o) => {
+            const match =
+              (updatedOrderId && (o.orderId === updatedOrderId || o.id === updatedOrderId || (o as any)._id === updatedOrderId)) ||
+              (updatedOrderNum && o.orderNumber === updatedOrderNum);
+            if (match) {
+              return {
+                ...o,
+                status: updatedStatus || o.status,
+                assignedRider: assignedRider || o.assignedRider,
+              };
+            }
+            return o;
+          });
+
+        setIncomingOrders(updateListWithRider);
+        setPickingOrders(updateListWithRider);
+        setReadyOrders(updateListWithRider);
+      }
+
+      // If active picking order is handed over, dispatched, or delivered, clear picking state!
+      // Do NOT clear during GOING_TO_STORE or ARRIVED_AT_STORE so store staff can finish picking & packing
       if (
-        ['PACKED', 'HANDED_OVER', 'GOING_TO_STORE', 'ARRIVED_AT_STORE', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'].includes(
+        ['HANDED_OVER', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'].includes(
           updatedStatus
         )
       ) {
@@ -243,12 +288,40 @@ const enrichStore = (rawStore: any): StoreHub | null => {
             (updatedOrderId && currentId === updatedOrderId) ||
             (updatedOrderNum && currentNum === updatedOrderNum)
           ) {
-            console.log(`[StoreContext] Clearing activeOrder ${currentNum || currentId} (new status: ${updatedStatus})`);
+            console.log(`[StoreContext] Clearing activeOrder ${currentNum || currentId} (dispatched/delivered: ${updatedStatus})`);
             setActivePickList(null);
             setSubScreen(null);
             return null;
           }
           return prev;
+        });
+      } else if (assignedRider) {
+        // If order was assigned a rider while active, attach rider info
+        setActiveOrder((prev) => {
+          if (!prev) return null;
+          const currentId = (prev.id || prev._id || (prev as any).orderId || '').toString();
+          const currentNum = prev.orderNumber?.toString();
+          if (
+            (updatedOrderId && currentId === updatedOrderId) ||
+            (updatedOrderNum && currentNum === updatedOrderNum)
+          ) {
+            return {
+              ...prev,
+              assignedRider,
+            };
+          }
+          return prev;
+        });
+      }
+
+      // If order is dispatched, delivered, or cancelled, dismiss any stuck handover modal
+      if (['HANDED_OVER', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'].includes(updatedStatus)) {
+        setRiderArrivalAlert((alert) => {
+          if (!alert) return null;
+          if (alert.orderId === updatedOrderId || alert.orderNumber === updatedOrderNum) {
+            return null;
+          }
+          return alert;
         });
       }
 

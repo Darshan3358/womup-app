@@ -78,8 +78,8 @@ export const ST05_StaffDashboardScreen: React.FC = () => {
           </View>
         </View>
         <View style={styles.servingLockBadge}>
-          <Ionicons name="lock-closed" size={11} color={COLORS.accentCyan} />
-          <Text style={styles.servingLockText}>Area Locked</Text>
+          <Ionicons name="business-outline" size={12} color={COLORS.accentCyan} />
+          <Text style={styles.servingLockText}>Active Dark Store</Text>
         </View>
       </View>
 

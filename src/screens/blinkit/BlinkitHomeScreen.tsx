@@ -8,7 +8,7 @@ import {
   useWindowDimensions,
   Image,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../theme/colors';
 import { BlinkitHeader } from '../../components/common/BlinkitHeader';
 import { HeroBannerCarousel, HeroBannerItem } from '../../components/common/HeroBannerCarousel';

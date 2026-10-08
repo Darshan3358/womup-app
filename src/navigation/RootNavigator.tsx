@@ -17,6 +17,7 @@ import { BlinkitProductDetailScreen } from '../screens/blinkit/BlinkitProductDet
 import { BlinkitCartScreen } from '../screens/blinkit/BlinkitCartScreen';
 import { BlinkitCheckoutScreen } from '../screens/blinkit/BlinkitCheckoutScreen';
 import { BlinkitWishlistScreen } from '../screens/blinkit/BlinkitWishlistScreen';
+import { LocalShopHomeScreen } from '../local-shop-module/screens/LocalShopHomeScreen';
 
 // Legacy screens for backward compatibility
 import { S01_SplashScreen } from '../screens/S01_SplashScreen';
@@ -97,6 +98,8 @@ export const RootNavigator: React.FC = () => {
       case 'Blinkit_Home':
       case 'C12_Home':
         return 'Home';
+      case 'Local_Home':
+        return 'Local Shop';
       case 'Blinkit_OrderAgain':
       case 'C25_OrderHistory':
         return 'Order Again';
@@ -118,6 +121,10 @@ export const RootNavigator: React.FC = () => {
       case 'Home':
         setActiveScreen('Blinkit_Home');
         break;
+      case 'Local Shop':
+      case 'App':
+        setActiveScreen('Local_Home');
+        break;
       case 'Order Again':
         setActiveScreen('Blinkit_OrderAgain');
         break;
@@ -135,6 +142,10 @@ export const RootNavigator: React.FC = () => {
 
   const renderCurrentScreen = () => {
     switch (activeScreen) {
+      // WOMUP Local Hyperlocal Shop & Earn
+      case 'Local_Home':
+        return <LocalShopHomeScreen />;
+
       // Blinkit Primary Screens
       case 'Blinkit_Home':
         return <BlinkitHomeScreen />;

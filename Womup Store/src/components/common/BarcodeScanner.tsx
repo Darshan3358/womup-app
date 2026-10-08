@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../theme/colors';
 
@@ -23,10 +23,16 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({
     const code = manualCode.trim();
     if (!code) return;
 
-    if (expectedBarcode && code !== expectedBarcode) {
+    if (expectedBarcode && code.toUpperCase() !== expectedBarcode.trim().toUpperCase()) {
       setErrorFlash(true);
       setTimeout(() => setErrorFlash(false), 1200);
+      Alert.alert(
+        'Barcode Mismatch',
+        `Entered barcode "${code}" does not match the required product barcode (${expectedBarcode}). Please check the item label.`
+      );
+      return;
     }
+
     onScan(code);
     setManualCode('');
   };

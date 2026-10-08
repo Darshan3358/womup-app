@@ -83,6 +83,23 @@ export const NewDeliveryModal: React.FC = () => {
               </View>
             </View>
 
+            {/* Dynamic Distance Payout Breakdown */}
+            <View style={{ backgroundColor: '#F0FDF4', borderRadius: 10, padding: 10, marginBottom: 12, borderWidth: 1, borderColor: '#DCFCE7' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="speedometer-outline" size={15} color="#16A34A" />
+                <Text style={{ fontSize: 12, color: '#166534', fontWeight: '700' }}>
+                  Dynamic Distance Payout Formula
+                </Text>
+              </View>
+              <Text style={{ fontSize: 11, color: '#15803D', marginTop: 4, fontWeight: '500' }}>
+                {offer.distanceKm || 3.26} km × ₹{offer.ratePerKm || 11}/km = ₹{((offer.distanceKm || 3.26) * (offer.ratePerKm || 11)).toFixed(2)}
+                {((offer.distanceKm || 3.26) * (offer.ratePerKm || 11)) < 40 ? ' → Floor Guarantee ₹40 Applied' : ''}
+              </Text>
+              <Text style={{ fontSize: 10, color: '#047857', marginTop: 2 }}>
+                100% of Delivery Fee (₹{offer.payoutAmount || 40}) + Tips credit directly to your wallet on completion.
+              </Text>
+            </View>
+
             {/* Route Cards */}
             <View style={styles.routeContainer}>
               {/* Pickup Point */}
