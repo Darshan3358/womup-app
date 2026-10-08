@@ -40,10 +40,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
       - name: Install Dependencies
-        run: npm ci
+        run: |
+          npm ci || npm install --legacy-peer-deps
+          node scripts/patch-expo-swift.js || true
 
       - name: Accept Android SDK Licenses
         run: yes | sdkmanager --licenses 2>/dev/null || true
@@ -91,7 +92,7 @@ jobs:
       - name: Install Admin Dependencies
         run: |
           cd "Womup Admin"
-          npm ci
+          npm ci || npm install --legacy-peer-deps
 
       - name: Accept Android SDK Licenses
         run: yes | sdkmanager --licenses 2>/dev/null || true
@@ -139,7 +140,7 @@ jobs:
       - name: Install Rider Dependencies
         run: |
           cd "Womup Rider"
-          npm ci
+          npm ci || npm install --legacy-peer-deps
 
       - name: Accept Android SDK Licenses
         run: yes | sdkmanager --licenses 2>/dev/null || true
@@ -187,7 +188,7 @@ jobs:
       - name: Install Store Dependencies
         run: |
           cd "Womup Store"
-          npm ci
+          npm ci || npm install --legacy-peer-deps
 
       - name: Accept Android SDK Licenses
         run: yes | sdkmanager --licenses 2>/dev/null || true
