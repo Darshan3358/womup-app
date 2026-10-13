@@ -21,6 +21,8 @@ import { AreasModule } from './areas/areas.module';
 import { DeliveryModule } from './delivery/delivery.module';
 import { StoreModule } from './store/store.module';
 import { HomeModule } from './home/home.module';
+import { SettingsModule } from './settings/settings.module';
+import { ReviewsModule } from './reviews/reviews.module';
 
 @Module({
   imports: [
@@ -54,6 +56,8 @@ import { HomeModule } from './home/home.module';
     DeliveryModule,
     StoreModule,
     HomeModule,
+    SettingsModule,
+    ReviewsModule,
   ],
   controllers: [AppController],
 })

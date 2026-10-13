@@ -1,17 +1,31 @@
 export const COLORS = {
-  // Dark Store Base Palette
-  background: '#0B0F19',
-  surface: '#111827',
-  surfaceCard: '#1F2937',
-  surfaceElevated: '#374151',
-  border: '#273549',
-  borderLight: '#374151',
+  // Global Design System Palette (Navy & Pink Premium SRS)
+  primaryNavy: '#071B52',
+  navy: '#071B52',
+  primaryPink: '#FF3B98',
+  pink: '#FF3B98',
+  hotPink: '#FF3B98',
+  successGreen: '#13B978',
+  green: '#13B978',
+  warningOrange: '#F59E0B',
+  orange: '#F59E0B',
+  dangerRed: '#EF4444',
+  danger: '#EF4444',
+  red: '#EF4444',
+  background: '#F8FAFC',
+  cardWhite: '#FFFFFF',
+  white: '#FFFFFF',
+  surfaceCard: '#FFFFFF',
+  surface: '#FFFFFF',
+  surfaceElevated: '#F1F5F9',
+  border: '#E2E8F0',
+  borderLight: '#F1F5F9',
 
   // Primary & Accents
-  primary: '#10B981',        // Quick-Commerce Emerald Green
-  primaryDark: '#059669',
-  primaryLight: '#34D399',
-  primaryGlow: 'rgba(16, 185, 129, 0.15)',
+  primary: '#FF3B98', // Main Brand Pink
+  primaryDark: '#E11D48',
+  primaryLight: '#FDF2F8',
+  primaryGlow: 'rgba(255, 59, 152, 0.15)',
 
   // Secondary & Accents
   accentCyan: '#06B6D4',
@@ -19,23 +33,30 @@ export const COLORS = {
   accentPurple: '#8B5CF6',
 
   // Status & Alerts
-  warning: '#F59E0B',        // Amber for high priority / low stock
-  warningBg: 'rgba(245, 158, 11, 0.15)',
-  danger: '#EF4444',         // Red for out of stock / barcode mismatch
-  dangerBg: 'rgba(239, 68, 68, 0.15)',
-  success: '#10B981',
-  successBg: 'rgba(16, 185, 129, 0.15)',
+  warning: '#F59E0B',
+  warningBg: 'rgba(245, 158, 11, 0.12)',
+  dangerBg: 'rgba(239, 68, 68, 0.12)',
+  success: '#13B978',
+  successBg: 'rgba(19, 185, 120, 0.12)',
   info: '#3B82F6',
 
   // Typography
-  textPrimary: '#F9FAFB',
-  textSecondary: '#9CA3AF',
-  textMuted: '#6B7280',
-  textInverse: '#0B0F19',
+  textPrimary: '#071B52',
+  textSecondary: '#64748B',
+  textMuted: '#64748B',
+  textInverse: '#FFFFFF',
 
   // Hub Special Elements
-  shelfBadgeBg: '#1E293B',
-  shelfBadgeText: '#38BDF8',
-  barcodeOverlay: 'rgba(16, 185, 129, 0.25)',
-  laserColor: '#EF4444',
+  shelfBadgeBg: '#EEF2FF',
+  shelfBadgeText: '#4F46E5',
+  barcodeOverlay: 'rgba(255, 59, 152, 0.25)',
+  laserColor: '#FF3B98',
 };
+
+export const GRADIENTS = {
+  primaryPink: ['#FF3B98', '#E11D48'] as [string, string],
+  primary: ['#FF3B98', '#E11D48'] as [string, string],
+  navyHeader: ['#071B52', '#0A0F2E'] as [string, string],
+  motivation: ['#FF3B98', '#8B5CF6'] as [string, string],
+  successGreen: ['#13B978', '#059669'] as [string, string],
+} as const;

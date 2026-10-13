@@ -672,11 +672,20 @@ export class DeliveryOrderService implements OnModuleInit {
       throw new NotFoundException('Order not found');
     }
 
-    // 1. Strict State Check: Order must be packed or ready for pickup before rider can dispatch
+    // 1. Strict State Check: Block cancelled orders
+    if (order.status === OrderStatus.CANCELLED || (order.status as any) === 'CANCELLED') {
+      throw new BadRequestException(`Order ${order.orderNumber} has been cancelled.`);
+    }
+
     const allowedStatuses: string[] = [
+      OrderStatus.ARRIVED_AT_STORE,
       OrderStatus.PACKED,
-      'READY_FOR_PICKUP',
+      OrderStatus.PACKING,
+      OrderStatus.ASSIGNED,
+      OrderStatus.PLACED,
       OrderStatus.OUT_FOR_DELIVERY,
+      'READY_FOR_PICKUP',
+      'REACHED_STORE',
     ];
     if (!allowedStatuses.includes(order.status as any)) {
       throw new BadRequestException(
@@ -685,21 +694,31 @@ export class DeliveryOrderService implements OnModuleInit {
     }
 
     // 2. Strict Bag Barcode Validation:
-    const pickList = await this.connection.collection('pick_lists').findOne({ orderId: order._id });
-    const expectedBagBarcode = (pickList?.bagBarcode || (order as any).bagBarcode || '').trim().toUpperCase();
+    const pickList = await this.connection.collection('pick_lists').findOne({
+      $or: [
+        { orderId: order._id },
+        { orderId: order._id.toString() },
+      ],
+    });
+    const expectedBagBarcode = ((order as any).bagBarcode || pickList?.bagBarcode || '').trim().toUpperCase();
 
-    if (expectedBagBarcode) {
-      const cleanPackageCode = (packageCode || '').trim().toUpperCase();
-      if (!cleanPackageCode) {
-        throw new BadRequestException(
-          `Bag barcode verification required. Please scan or enter ${expectedBagBarcode} from the sealed bag.`,
-        );
-      }
-      if (cleanPackageCode !== expectedBagBarcode) {
-        throw new BadRequestException(
-          `Invalid bag barcode "${packageCode}". Expected bag barcode is ${expectedBagBarcode}.`,
-        );
-      }
+    if (!expectedBagBarcode) {
+      throw new BadRequestException(
+        `Dark Store has not generated the bag security barcode yet. Please wait for the store to pack and seal the tote bag.`,
+      );
+    }
+
+    const cleanPackageCode = (packageCode || '').trim().toUpperCase();
+    if (!cleanPackageCode) {
+      throw new BadRequestException(
+        `Bag barcode verification required. Please scan or enter ${expectedBagBarcode} from the sealed bag.`,
+      );
+    }
+
+    if (cleanPackageCode !== expectedBagBarcode) {
+      throw new BadRequestException(
+        `Invalid bag barcode "${packageCode}". Expected bag barcode is ${expectedBagBarcode}.`,
+      );
     }
 
     assignment.status = RiderAssignmentStatus.OUT_FOR_DELIVERY;
@@ -727,6 +746,16 @@ export class DeliveryOrderService implements OnModuleInit {
   async arrivedAtCustomer(userId: string, assignmentOrOrderId: string) {
     const partner = await this.getPartner(userId);
     const assignment = await this.findAssignment(partner._id, assignmentOrOrderId);
+
+    if (
+      assignment.status !== RiderAssignmentStatus.OUT_FOR_DELIVERY &&
+      assignment.status !== RiderAssignmentStatus.ARRIVED_AT_CUSTOMER &&
+      !assignment.pickedUpAt
+    ) {
+      throw new BadRequestException(
+        'Cannot mark arrival at customer before verifying sealed bag pickup from the dark store.',
+      );
+    }
 
     assignment.status = RiderAssignmentStatus.ARRIVED_AT_CUSTOMER;
     assignment.arrivedCustomerAt = new Date();
@@ -780,6 +809,16 @@ export class DeliveryOrderService implements OnModuleInit {
           total: resolvedTotal,
         },
       };
+    }
+
+    if (
+      !assignment.pickedUpAt &&
+      assignment.status !== RiderAssignmentStatus.ARRIVED_AT_CUSTOMER &&
+      assignment.status !== RiderAssignmentStatus.OUT_FOR_DELIVERY
+    ) {
+      throw new BadRequestException(
+        'Cannot complete delivery. The order tote bag was never verified and picked up from the dark store.',
+      );
     }
 
     // Validate 4-digit Delivery PIN strictly against database OTP
@@ -1256,6 +1295,18 @@ export class DeliveryOrderService implements OnModuleInit {
       ? hubInfo.isOwnHub
       : (partner.hubId && store?._id ? partner.hubId.toString() === store._id.toString() : true);
 
+    let resolvedBagBarcode = ((order as any)?.bagBarcode || '').trim();
+    if (!resolvedBagBarcode && assignment?.orderId) {
+      try {
+        const pl = await this.connection.collection('pick_lists').findOne({
+          $or: [{ orderId: assignment.orderId }, { orderId: assignment.orderId.toString() }],
+        });
+        resolvedBagBarcode = (pl?.bagBarcode || '').trim();
+      } catch {
+        // ignore
+      }
+    }
+
     return {
       id: assignment._id.toString(),
       orderId: assignment.orderId.toString(),
@@ -1299,6 +1350,7 @@ export class DeliveryOrderService implements OnModuleInit {
       offeredAt: (assignment?.assignedAt ? new Date(assignment.assignedAt) : new Date()).toISOString(),
       // Security: never leak OTP to rider; only indicate requirement
       deliveryOtpRequired: true,
+      bagBarcode: resolvedBagBarcode,
     };
   }
 }

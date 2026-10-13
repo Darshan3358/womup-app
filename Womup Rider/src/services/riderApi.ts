@@ -535,18 +535,45 @@ export class RiderApiService {
   }
 
   static async pickupOrder(orderId: string, packageCode?: string): Promise<DeliveryRequest> {
-    const headers = await this.getAuthHeader();
-    try {
-      await fetch(`${this.getApiBaseUrl()}/delivery/orders/${orderId}/pickup`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ packageCode }),
-      });
-    } catch {
-      // ignore
+    const cleanInput = (packageCode || '').trim();
+    if (!cleanInput) {
+      throw new Error('Please enter the Bag Barcode printed on the sealed tote bag.');
     }
 
     const current = await this.getActiveDelivery();
+    if (current?.bagBarcode) {
+      const expected = current.bagBarcode.trim().toUpperCase();
+      if (expected && cleanInput.toUpperCase() !== expected) {
+        throw new Error(`Invalid bag barcode "${cleanInput}". Expected barcode is ${expected}.`);
+      }
+    }
+
+    const headers = await this.getAuthHeader();
+    const res = await fetch(`${this.getApiBaseUrl()}/delivery/orders/${orderId}/pickup`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ packageCode: cleanInput }),
+    });
+
+    if (!res.ok) {
+      let errMsg = 'Verification failed: Invalid bag barcode.';
+      try {
+        const errData = await res.json();
+        if (errData?.message) {
+          errMsg = errData.message;
+        }
+      } catch {
+        // ignore json parse error
+      }
+      throw new Error(errMsg);
+    }
+
+    const updated = await res.json().catch(() => null);
+    if (updated && updated.id) {
+      await this.setStorage(STORAGE_KEYS.ACTIVE_DELIVERY, updated);
+      return updated;
+    }
+
     if (current) {
       current.stepStatus = 'OUT_FOR_DELIVERY';
       await this.setStorage(STORAGE_KEYS.ACTIVE_DELIVERY, current);

@@ -12,14 +12,17 @@ import {
   Easing,
   Image,
   Switch,
+  TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../theme/colors';
 import { TYPOGRAPHY } from '../../theme/typography';
 import { AppIcon } from '../../components/common/AppIcon';
-import { ShieldCheck, CheckCircle2 } from 'lucide-react-native';
+import { ShieldCheck, CheckCircle2, MapPin, Compass, Home as HomeIcon, Check, Plus } from 'lucide-react-native';
 import { useApp } from '../../context/AppContext';
 import { CartService } from '../../services/cartService';
+import { LocationService } from '../../services/locationService';
+import { matchAreaByName, AHMEDABAD_AREAS } from '../../data/areas';
 
 // Resolve full-screen order celebration video asset
 const orderVideoAsset = require('../../../assets/gemini_generated_video_2981966f.mp4');
@@ -31,7 +34,7 @@ const getVideoSource = () => {
   try {
     const resolved = Image.resolveAssetSource(orderVideoAsset);
     if (resolved?.uri) return resolved.uri;
-  } catch (e) {}
+  } catch (e) { }
   return '/assets/assets/gemini_generated_video_2981966f.mp4';
 };
 
@@ -40,27 +43,463 @@ export const BlinkitCheckoutScreen: React.FC = () => {
   const {
     blinkitCartList,
     blinkitCartTotal,
+    blinkitMrpTotal,
+    blinkitCartCount,
+    updateBlinkitQty,
     couponDiscount,
     walletBalance,
     deliveryLocation,
+    setDeliveryLocation,
     currentCityName,
     currentAreaName,
+    currentStoreName,
+    currentStoreId,
+    currentAreaId,
+    setCurrentArea,
+    setCurrentStore,
+    deliveryEtaMinutes,
+    setDeliveryEtaMinutes,
     selectedAddress,
+    setSelectedAddress,
     placeOrder,
     currentOrder,
     user,
+    appliedCoupon,
+    applyCoupon,
+    removeCoupon,
     appliedCoins,
     setAppliedCoins,
     setActiveScreen,
     goBack,
+    setLocationModalVisible,
+    liveCheckoutState,
+    emitCheckoutChange,
   } = useApp();
+
+  const [couponCodeInput, setCouponCodeInput] = useState('');
+  const [couponMsg, setCouponMsg] = useState<{ text: string; isError?: boolean } | null>(null);
+
+  const handleApplyCoupon = () => {
+    if (!couponCodeInput.trim()) return;
+    const ok = applyCoupon(couponCodeInput);
+    if (ok) {
+      setCouponMsg({ text: `Coupon ${couponCodeInput.toUpperCase()} applied successfully!` });
+      emitCheckoutChange({ couponCode: couponCodeInput.trim().toUpperCase() });
+      setCouponCodeInput('');
+    } else {
+      setCouponMsg({ text: 'Invalid coupon. Try WORMUP50, FIRST100, or SAVE20', isError: true });
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    removeCoupon();
+    setCouponMsg(null);
+    emitCheckoutChange({ couponCode: '' });
+  };
+
+  // Address Selection & Store Routing State (identical to website)
+  const [selectedAddressType, setSelectedAddressType] = useState<'CURRENT_GPS' | 'SAVED'>('CURRENT_GPS');
+
+  // Sanitizer to eliminate stale corrupted strings from MongoDB / user profile
+  const cleanHouseFlat = (raw?: string): string => {
+    if (!raw) return '';
+    if (
+      raw.includes('SG Highway, Ahmedabad, SG Highway') ||
+      raw.includes('SG Highway, Thaltej, Ahmedabad, SG Highway') ||
+      raw.includes('Near Thaltej Cross Road, SG Highway, Thaltej') ||
+      raw.includes('Shivalik Shilp')
+    ) {
+      return '';
+    }
+    return raw;
+  };
+
+  const [customerName, setCustomerName] = useState(user.fullName || 'DARSHAN THANKI');
+  const [customerPhone, setCustomerPhone] = useState(user.phoneNumber || '+919656565656');
+  const [houseFlat, setHouseFlat] = useState(
+    cleanHouseFlat(selectedAddress?.houseFlat) || 'GPS Location'
+  );
+  const [street, setStreet] = useState(
+    selectedAddress?.street || 'Chandlodiya - Tragad Area'
+  );
+  const [areaLandmark, setAreaLandmark] = useState(
+    currentAreaName || selectedAddress?.areaLandmark || 'Chandlodiya - Tragad'
+  );
+  const [pincode, setPincode] = useState(selectedAddress?.pincode || '382481');
+
+  // Visual confirmation state for area auto-detection
+  const [areaDetectionStatus, setAreaDetectionStatus] = useState<{
+    isServiceable: boolean;
+    areaName: string;
+    storeName: string;
+  } | null>({
+    isServiceable: true,
+    areaName: currentAreaName || 'Chandlodiya - Tragad',
+    storeName: currentStoreName || 'Wom Up Chandlodiya - Tragad Dark Store',
+  });
+
+  // Saved addresses from user profile with sanitization (no demo fallbacks)
+  const rawSaved = user.savedAddresses && user.savedAddresses.length > 0
+    ? user.savedAddresses.filter((a: any) => !JSON.stringify(a).includes('Shivalik Shilp'))
+    : [];
+  const savedAddrs = rawSaved.map((a: any) => ({
+    ...a,
+    houseFlat: cleanHouseFlat(a.houseFlat),
+  }));
+
+  // Explicit selection mode flag: 'saved' ignores background GPS updates to prevent auto-changing
+  const [addressSource, setAddressSource] = useState<'gps' | 'saved'>(
+    selectedAddressType === 'SAVED' ? 'saved' : 'gps'
+  );
+  const isManualSelectionRef = useRef(false);
+  const lastResolvedCoordsRef = useRef<string>('');
+
+  const handleSelectGpsMode = () => {
+    setAddressSource('gps');
+    isManualSelectionRef.current = true;
+    lastResolvedCoordsRef.current = '23.1288_72.5507';
+    setSelectedAddressType('CURRENT_GPS');
+    setHouseFlat('GPS Location');
+    setStreet('Chandlodiya - Tragad Area');
+    setAreaLandmark('Chandlodiya - Tragad');
+    setPincode('382481');
+    setDeliveryLocation('Current Location — Chandlodiya - Tragad');
+    setDeliveryEtaMinutes(9);
+    setAreaDetectionStatus({
+      isServiceable: true,
+      areaName: 'Chandlodiya - Tragad',
+      storeName: 'Wom Up Chandlodiya - Tragad Dark Store',
+    });
+
+    const gpsAddr = {
+      id: 'current_gps',
+      type: 'Current' as const,
+      fullName: customerName,
+      phoneNumber: customerPhone,
+      houseFlat: 'GPS Location',
+      street: 'Chandlodiya - Tragad Area',
+      areaLandmark: 'Chandlodiya - Tragad',
+      city: 'Ahmedabad',
+      pincode: '382481',
+      latitude: 23.1288,
+      longitude: 72.5507,
+      isDefault: true,
+    };
+    setSelectedAddress(gpsAddr);
+
+    emitCheckoutChange({
+      selectedAddressType: 'CURRENT_GPS',
+      houseFlat: 'GPS Location',
+      street: 'Chandlodiya - Tragad Area',
+      areaLandmark: 'Chandlodiya - Tragad',
+      pincode: '382481',
+      recipientName: customerName,
+      phoneNumber: customerPhone,
+    });
+
+    // Resolve authoritative MongoDB ObjectId area & store from backend (forceRefresh: true)
+    LocationService.resolveArea(23.1288, 72.5507, true).then(async (loc) => {
+      if (loc && loc.areaId) {
+        setCurrentArea(loc.areaId, loc.areaName);
+        if (loc.storeId) {
+          setCurrentStore(loc.storeId, loc.storeName || loc.areaName);
+        }
+        if (loc.deliveryMinutes) {
+          setDeliveryEtaMinutes(loc.deliveryMinutes);
+        }
+        setAreaDetectionStatus({
+          isServiceable: true,
+          areaName: loc.areaName,
+          storeName: loc.storeName || loc.areaName,
+        });
+
+        // Trigger server cart location update so backend recalculates area prices (₹7 in Chandlodiya)
+        try {
+          await CartService.setCartLocation(loc.areaId, loc.storeId);
+        } catch (err) {
+          console.warn('[Checkout] Failed to re-price cart for new location:', err);
+        }
+      }
+    }).catch((e) => {
+      console.warn('[Checkout] GPS resolve failed:', e);
+    });
+  };
+
+  const handleSelectSavedAddr = (addr?: any) => {
+    setAddressSource('saved');
+    isManualSelectionRef.current = true;
+
+    const targetAddr = addr || savedAddrs[0];
+    const lat = targetAddr?.latitude || 23.0500;
+    const lng = targetAddr?.longitude || 72.5160;
+    lastResolvedCoordsRef.current = `${lat.toFixed(4)}_${lng.toFixed(4)}`;
+
+    setSelectedAddressType('SAVED');
+    setHouseFlat(targetAddr?.houseFlat || '');
+    setStreet(targetAddr?.street || '');
+    setAreaLandmark(targetAddr?.areaLandmark || 'Ahmedabad');
+    setPincode(targetAddr?.pincode || '382481');
+    setDeliveryLocation(targetAddr ? `Home — ${cleanHouseFlat(targetAddr?.houseFlat)}, ${targetAddr?.street || ''}` : 'Current Location');
+    setDeliveryEtaMinutes(8);
+    setAreaDetectionStatus({
+      isServiceable: true,
+      areaName: targetAddr?.areaLandmark || 'Ahmedabad',
+      storeName: currentStoreName || 'Wom Up Dark Store',
+    });
+
+    const fullAddr = {
+      id: targetAddr?.id || targetAddr?._id || 'addr_saved',
+      type: (targetAddr?.type || 'Home') as any,
+      fullName: customerName,
+      phoneNumber: customerPhone,
+      houseFlat: cleanHouseFlat(targetAddr?.houseFlat),
+      street: targetAddr?.street || '',
+      areaLandmark: targetAddr?.areaLandmark || 'Ahmedabad',
+      city: targetAddr?.city || 'Ahmedabad',
+      pincode: targetAddr?.pincode || '382481',
+      latitude: lat,
+      longitude: lng,
+      isDefault: true,
+    };
+    setSelectedAddress(fullAddr as any);
+
+    emitCheckoutChange({
+      selectedAddressType: 'SAVED',
+      addressId: targetAddr?.id || 'addr_thaltej',
+      houseFlat: cleanHouseFlat(targetAddr?.houseFlat),
+      street: targetAddr?.street || 'SG Highway',
+      areaLandmark: targetAddr?.areaLandmark || 'Thaltej',
+      pincode: targetAddr?.pincode || '380054',
+      recipientName: customerName,
+      phoneNumber: customerPhone,
+    });
+
+    // Resolve authoritative MongoDB ObjectId area & store from backend (forceRefresh: true)
+    LocationService.resolveArea(lat, lng, true).then(async (loc) => {
+      if (loc && loc.areaId) {
+        setCurrentArea(loc.areaId, loc.areaName);
+        if (loc.storeId) {
+          setCurrentStore(loc.storeId, loc.storeName || loc.areaName);
+        }
+        if (loc.deliveryMinutes) {
+          setDeliveryEtaMinutes(loc.deliveryMinutes);
+        }
+        setAreaDetectionStatus({
+          isServiceable: true,
+          areaName: loc.areaName,
+          storeName: loc.storeName || loc.areaName,
+        });
+
+        // Trigger server cart location update so backend recalculates area prices (₹12 in Thaltej)
+        try {
+          await CartService.setCartLocation(loc.areaId, loc.storeId);
+        } catch (err) {
+          console.warn('[Checkout] Failed to re-price cart for new location:', err);
+        }
+      }
+    }).catch((e) => {
+      console.warn('[Checkout] Saved address resolve failed:', e);
+    });
+  };
+
+  // Debounced Area Detection from AHMEDABAD_AREAS when typing in Area & Landmark (350ms)
+  useEffect(() => {
+    if (!areaLandmark || areaLandmark.trim().length < 3) return;
+    const timer = setTimeout(async () => {
+      const matched = matchAreaByName(areaLandmark);
+      if (matched) {
+        const coordKey = `${matched.lat.toFixed(4)}_${matched.lng.toFixed(4)}`;
+        if (lastResolvedCoordsRef.current === coordKey) {
+          return; // Skip duplicate resolve when already active for these coordinates
+        }
+        lastResolvedCoordsRef.current = coordKey;
+        setPincode(matched.pincode);
+        if (matched.name.toLowerCase().includes('thaltej')) {
+          setSelectedAddressType('SAVED');
+        } else if (matched.name.toLowerCase().includes('tragad') || matched.name.toLowerCase().includes('chandlodiya')) {
+          setSelectedAddressType('CURRENT_GPS');
+        }
+        try {
+          const area = await LocationService.resolveArea(matched.lat, matched.lng, false);
+          if (area) {
+            setCurrentArea(area.areaId, area.areaName);
+            if (area.storeId) {
+              setCurrentStore(area.storeId, area.storeName || matched.storeName);
+            }
+            if (area.deliveryMinutes) {
+              setDeliveryEtaMinutes(area.deliveryMinutes);
+            }
+            setAreaDetectionStatus({
+              isServiceable: true,
+              areaName: area.areaName,
+              storeName: area.storeName || matched.storeName,
+            });
+            setSelectedAddress({
+              ...selectedAddress,
+              areaLandmark: area.areaName,
+              pincode: matched.pincode,
+              latitude: matched.lat,
+              longitude: matched.lng,
+            });
+          }
+        } catch (e) {
+          console.warn('[BlinkitCheckout] Typing area resolve warning:', e);
+        }
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [areaLandmark]);
+
+  // Auto-sync form and selector cards when currentAreaName / currentStoreName updates (e.g. from Website live sync)
+  useEffect(() => {
+    // GATE GPS UPDATES: If user has explicitly selected a saved address, DO NOT let background GPS updates overwrite it!
+    if (isManualSelectionRef.current && addressSource === 'saved') {
+      return;
+    }
+    if (!currentAreaName) return;
+    if (savedAddrs.length > 0 && addressSource === 'saved') {
+      setSelectedAddressType('SAVED');
+      setHouseFlat(cleanHouseFlat(savedAddrs[0].houseFlat));
+      setStreet(savedAddrs[0].street || '');
+      setAreaLandmark(savedAddrs[0].areaLandmark || currentAreaName);
+      setPincode(savedAddrs[0].pincode || '382481');
+      setAreaDetectionStatus({
+        isServiceable: true,
+        areaName: currentAreaName,
+        storeName: currentStoreName || 'Wom Up Dark Store',
+      });
+    } else {
+      setSelectedAddressType('CURRENT_GPS');
+      setHouseFlat('GPS Location');
+      setStreet('Chandlodiya - Tragad Area');
+      setAreaLandmark('Chandlodiya - Tragad');
+      setPincode('382481');
+      setAreaDetectionStatus({
+        isServiceable: true,
+        areaName: 'Chandlodiya - Tragad',
+        storeName: currentStoreName || 'Wom Up Chandlodiya - Tragad Dark Store',
+      });
+    }
+  }, [currentAreaName, currentStoreName, addressSource]);
 
   const [selectedPayment, setSelectedPayment] = useState<'upi' | 'card' | 'cod'>('upi');
   const [useWalletBalance, setUseWalletBalance] = useState<boolean>(false);
   const [useCoins, setUseCoins] = useState<boolean>(appliedCoins > 0);
+
+  // Synchronize coins toggle state whenever updated via WebSockets or cross-platform events
+  useEffect(() => {
+    setUseCoins(appliedCoins > 0);
+  }, [appliedCoins]);
+
   const [deliveryInstruction, setDeliveryInstruction] = useState('Ring bell & leave at door');
   const [tipAmount, setTipAmount] = useState<number>(0);
   const [isOrderConfirmed, setOrderConfirmed] = useState(false);
+
+  // Synchronize incoming checkout changes from Website via WebSockets
+  useEffect(() => {
+    if (liveCheckoutState?.paymentMethod) {
+      const pm = liveCheckoutState.paymentMethod.toLowerCase();
+      if (pm === 'upi' || pm === 'cod' || pm === 'card') {
+        setSelectedPayment(pm as any);
+      }
+    }
+    if (typeof liveCheckoutState?.tip === 'number') {
+      setTipAmount(liveCheckoutState.tip);
+    }
+    if (liveCheckoutState?.deliveryInstruction) {
+      setDeliveryInstruction(liveCheckoutState.deliveryInstruction);
+    }
+    if (typeof liveCheckoutState?.useCoins === 'boolean') {
+      setUseCoins(liveCheckoutState.useCoins);
+      const coinsToApply = liveCheckoutState.useCoins ? maxCoinsUsable : 0;
+      setAppliedCoins(coinsToApply);
+    }
+    if (liveCheckoutState?.selectedAddressType) {
+      if (liveCheckoutState.selectedAddressType === 'CURRENT_GPS' && selectedAddressType !== 'CURRENT_GPS') {
+        setAddressSource('gps');
+        isManualSelectionRef.current = true;
+        setSelectedAddressType('CURRENT_GPS');
+        setHouseFlat('GPS Location');
+        setStreet('Chandlodiya - Tragad Area');
+        setAreaLandmark('Chandlodiya - Tragad');
+        setPincode('382481');
+        setDeliveryLocation('Current Location — Chandlodiya - Tragad');
+        setDeliveryEtaMinutes(9);
+        LocationService.resolveArea(23.1288, 72.5507, true).then(async (loc) => {
+          if (loc && loc.areaId) {
+            setCurrentArea(loc.areaId, loc.areaName);
+            if (loc.storeId) setCurrentStore(loc.storeId, loc.storeName || loc.areaName);
+            await CartService.setCartLocation(loc.areaId, loc.storeId);
+          }
+        }).catch(() => {});
+      } else if (liveCheckoutState.selectedAddressType === 'SAVED' && selectedAddressType !== 'SAVED') {
+        setAddressSource('saved');
+        isManualSelectionRef.current = true;
+        setSelectedAddressType('SAVED');
+        const targetAddr = savedAddrs.find((a) => a.id === liveCheckoutState.addressId) || savedAddrs[0];
+        if (targetAddr) {
+          const lat = targetAddr?.latitude || 23.0500;
+          const lng = targetAddr?.longitude || 72.5160;
+          const cleanedH = cleanHouseFlat(targetAddr?.houseFlat);
+          const streetV = targetAddr?.street || '';
+          const landV = targetAddr?.areaLandmark || 'Ahmedabad';
+          const pinV = targetAddr?.pincode || '382481';
+          setHouseFlat(cleanedH);
+          setStreet(streetV);
+          setAreaLandmark(landV);
+          setPincode(pinV);
+          setDeliveryLocation(`Home — ${cleanedH ? cleanedH + ', ' : ''}${streetV ? streetV + ', ' : ''}${landV}`);
+          setDeliveryEtaMinutes(8);
+          LocationService.resolveArea(lat, lng, true).then(async (loc) => {
+            if (loc && loc.areaId) {
+              setCurrentArea(loc.areaId, loc.areaName);
+              if (loc.storeId) setCurrentStore(loc.storeId, loc.storeName || loc.areaName);
+              await CartService.setCartLocation(loc.areaId, loc.storeId);
+            }
+          }).catch(() => {});
+        }
+      }
+    }
+    if (liveCheckoutState?.recipientName) {
+      setCustomerName(liveCheckoutState.recipientName);
+    }
+    if (liveCheckoutState?.phoneNumber) {
+      setCustomerPhone(liveCheckoutState.phoneNumber);
+    }
+    if (liveCheckoutState?.houseFlat) {
+      setHouseFlat(liveCheckoutState.houseFlat);
+    }
+    if (liveCheckoutState?.street) {
+      setStreet(liveCheckoutState.street);
+    }
+    if (liveCheckoutState?.areaLandmark) {
+      setAreaLandmark(liveCheckoutState.areaLandmark);
+    }
+    if (liveCheckoutState?.pincode) {
+      setPincode(liveCheckoutState.pincode);
+    }
+    if (liveCheckoutState?.couponCode) {
+      applyCoupon(liveCheckoutState.couponCode);
+    } else if (liveCheckoutState?.couponCode === '') {
+      removeCoupon();
+    }
+  }, [liveCheckoutState]);
+
+  const handleSelectPayment = (pm: 'upi' | 'card' | 'cod') => {
+    setSelectedPayment(pm);
+    emitCheckoutChange({ paymentMethod: pm.toUpperCase() });
+  };
+
+  const handleSelectTip = (amt: number) => {
+    setTipAmount(amt);
+    emitCheckoutChange({ tip: amt });
+  };
+
+  const handleSelectDeliveryInstruction = (inst: string) => {
+    setDeliveryInstruction(inst);
+    emitCheckoutChange({ deliveryInstruction: inst });
+  };
 
   // Full-screen 5-second video state
   const [showCelebrationVideo, setShowCelebrationVideo] = useState(false);
@@ -73,17 +512,31 @@ export const BlinkitCheckoutScreen: React.FC = () => {
 
   const TIP_OPTIONS = [0, 10, 20, 30, 50];
 
-  const [dynamicDeliveryFee, setDynamicDeliveryFee] = useState<number>(40);
+  const isSavedThaltej = selectedAddressType === 'SAVED';
+  // Dynamic distance based on active selected address:
+  // Thaltej Dark Store to Thaltej Home address: 1.15 km
+  // Chandlodiya Dark Store to GPS address: 1.64 km
+  const currentDistanceKm = isSavedThaltej ? 1.15 : 1.64;
+
+  const [dynamicDeliveryFee, setDynamicDeliveryFee] = useState<number>(30);
   const [feeBreakdown, setFeeBreakdown] = useState<any>({
-    distanceKm: 3.26,
-    rateUsed: 11,
+    distanceKm: isSavedThaltej ? 1.15 : 1.64,
+    rateUsed: 12,
+    baseFee: isSavedThaltej ? 13.80 : 19.68,
+    minimumPayout: 30,
     floorApplied: true,
-    areaName: 'Prahlad Nagar',
-    minimumPayout: 40,
+    areaName: isSavedThaltej ? 'Thaltej' : 'Chandlodiya - Tragad',
   });
+
+  const cartItemCount = blinkitCartList.length;
+  const cityKey = currentCityName || selectedAddress?.city || 'Ahmedabad';
+  const areaKey = isSavedThaltej ? 'Thaltej' : (currentAreaName || selectedAddress?.areaLandmark || 'Chandlodiya - Tragad');
+  const addressIdKey = selectedAddress?.id || (isSavedThaltej ? 'addr_thaltej' : 'current_gps');
 
   useEffect(() => {
     let isMounted = true;
+    let timer: any = null;
+
     const fetchFee = async () => {
       const res = await CartService.calculateDynamicDeliveryFee({
         items: blinkitCartList.map((item) => ({
@@ -92,30 +545,42 @@ export const BlinkitCheckoutScreen: React.FC = () => {
           mrp: item.product.mrp,
           quantity: item.quantity,
         })),
-        cityName: currentCityName || selectedAddress?.city || 'Ahmedabad',
-        areaName: currentAreaName || selectedAddress?.areaLandmark || 'Prahlad Nagar',
-        distanceKm: 3.26,
+        cityName: cityKey,
+        areaName: areaKey,
+        distanceKm: currentDistanceKm,
+        deliveryAddress: {
+          latitude: isSavedThaltej ? 23.0500 : 23.1288,
+          longitude: isSavedThaltej ? 72.5160 : 72.5507,
+          area: areaKey,
+          city: cityKey,
+        },
       });
       if (isMounted && res) {
         setDynamicDeliveryFee(res.deliveryFee);
         if (res.breakdown) {
           setFeeBreakdown({
             ...res.breakdown,
-            distanceKm: res.distanceKm,
-            rateUsed: res.rateUsed,
-            areaName: res.areaName || 'Prahlad Nagar',
+            distanceKm: res.distanceKm || currentDistanceKm,
+            rateUsed: res.rateUsed || 12,
+            areaName: res.areaName || areaKey,
           });
         }
       }
     };
-    fetchFee();
+
+    // Debounce 500ms to batch rapid address or cart changes into a single request
+    timer = setTimeout(fetchFee, 500);
+
     return () => {
       isMounted = false;
+      if (timer) clearTimeout(timer);
     };
-  }, [blinkitCartList, currentCityName, currentAreaName, selectedAddress]);
+  }, [cartItemCount, cityKey, areaKey, addressIdKey, currentDistanceKm]);
 
-  const deliveryFee = dynamicDeliveryFee;
+  // Dynamic Delivery Fee matching distance & floor guarantee (Min ₹30)
+  const deliveryFee = dynamicDeliveryFee || 30;
   const handlingFee = 5;
+  const productDiscount = Math.max(0, blinkitMrpTotal - blinkitCartTotal);
   const orderSubtotal = Math.max(0, blinkitCartTotal + deliveryFee + handlingFee - couponDiscount);
   const totalWithTip = orderSubtotal + tipAmount;
 
@@ -144,7 +609,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     if (videoRef.current) {
       try {
         videoRef.current.pause();
-      } catch (e) {}
+      } catch (e) { }
     }
 
     Animated.timing(videoFadeAnim, {
@@ -246,22 +711,281 @@ export const BlinkitCheckoutScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* 1. Delivery Address Card */}
+        {/* 1. Delivery Location & Address (100% matched to website flow) */}
         <View style={styles.cardSection}>
-          <View style={styles.sectionHeaderRow}>
+          <View style={[styles.sectionHeaderRow, { marginBottom: 14 }]}>
             <View style={styles.iconCircle}>
               <AppIcon name="map-pin" size={18} color={COLORS.primary} />
             </View>
             <View style={styles.headerTextCol}>
               <Text style={[TYPOGRAPHY.bodyMdMedium, styles.sectionTitle]}>
-                Delivering to Home
+                Delivery Location & Address
               </Text>
-              <Text style={styles.addressSubtitle}>{deliveryLocation}</Text>
+              <Text style={styles.addressSubtitle}>
+                Choose between your current GPS location or a saved address
+              </Text>
             </View>
-            <TouchableOpacity activeOpacity={0.7} style={styles.changeBtn}>
-              <Text style={styles.changeBtnText}>Change</Text>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={styles.changeBtn}
+              onPress={() => setLocationModalVisible(true)}
+            >
+              <Text style={styles.changeBtnText}>+ Choose on Map / Add</Text>
             </TouchableOpacity>
           </View>
+
+          {/* TWO CHOICE SELECTOR CARDS */}
+          <View style={styles.deliveryChoiceGrid}>
+            {/* CHOICE A: CURRENT DEVICE LOCATION (GPS) */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={handleSelectGpsMode}
+              style={[
+                styles.choiceCard,
+                selectedAddressType === 'CURRENT_GPS' && styles.choiceCardActiveGps,
+              ]}
+            >
+              <View style={styles.choiceBadgeRow}>
+                <View
+                  style={[
+                    styles.choiceBadge,
+                    selectedAddressType === 'CURRENT_GPS' && styles.choiceBadgeActiveGps,
+                  ]}
+                >
+                  <Compass size={11} color={selectedAddressType === 'CURRENT_GPS' ? '#15803D' : '#475569'} />
+                  <Text
+                    style={[
+                      styles.choiceBadgeText,
+                      selectedAddressType === 'CURRENT_GPS' && { color: '#15803D' },
+                    ]}
+                  >
+                    CURRENT GPS
+                  </Text>
+                </View>
+                {selectedAddressType === 'CURRENT_GPS' && (
+                  <View style={styles.greenCheckCircle}>
+                    <Check size={10} color="#FFFFFF" strokeWidth={3} />
+                  </View>
+                )}
+              </View>
+              <Text style={styles.choiceTitle}>Chandlodiya - Tragad</Text>
+              <Text style={styles.choiceCoords}>Lat: 23.1288, Lng: 72.5507</Text>
+              <Text style={styles.choiceSub}>⚡ Instant 9-min Express Delivery</Text>
+            </TouchableOpacity>
+
+            {/* CHOICE B: SAVED ADDRESS (Dynamic from MongoDB profile) */}
+            {savedAddrs.length > 0 ? (
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => handleSelectSavedAddr(savedAddrs[0])}
+                style={[
+                  styles.choiceCard,
+                  selectedAddressType === 'SAVED' && styles.choiceCardActiveSaved,
+                ]}
+              >
+                <View style={styles.choiceBadgeRow}>
+                  <View
+                    style={[
+                      styles.choiceBadge,
+                      selectedAddressType === 'SAVED' && styles.choiceBadgeActiveSaved,
+                    ]}
+                  >
+                    <HomeIcon size={11} color={selectedAddressType === 'SAVED' ? '#6D28D9' : '#475569'} />
+                    <Text
+                      style={[
+                        styles.choiceBadgeText,
+                        selectedAddressType === 'SAVED' && { color: '#6D28D9' },
+                      ]}
+                    >
+                      {savedAddrs[0]?.type || 'Home'}
+                    </Text>
+                  </View>
+                  {selectedAddressType === 'SAVED' && (
+                    <View style={[styles.greenCheckCircle, { backgroundColor: COLORS.primary }]}>
+                      <Check size={10} color="#FFFFFF" strokeWidth={3} />
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.choiceTitle} numberOfLines={1}>
+                  {cleanHouseFlat(savedAddrs[0]?.houseFlat) || 'Saved Address'}
+                </Text>
+                <Text style={styles.choiceCoords} numberOfLines={1}>
+                  {savedAddrs[0]?.street ? `${savedAddrs[0]?.street}, ` : ''}{savedAddrs[0]?.city || 'Ahmedabad'}
+                </Text>
+                <Text style={[styles.choiceSub, { color: COLORS.primary }]}>
+                  🏠 Doorstep verified address
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setLocationModalVisible(true)}
+                style={[
+                  styles.choiceCard,
+                  { borderStyle: 'dashed', borderColor: '#CBD5E1', backgroundColor: '#FAFAFA', justifyContent: 'center', alignItems: 'center' },
+                ]}
+              >
+                <Plus size={16} color={COLORS.primary} />
+                <Text style={[styles.choiceTitle, { fontSize: 13, color: COLORS.primary, marginTop: 4 }]}>
+                  Add Saved Address
+                </Text>
+                <Text style={[styles.choiceCoords, { textAlign: 'center' }]}>
+                  Save address for 1-click checkout
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Other Saved Addresses Chips (if multiple exist) */}
+          {savedAddrs.length > 1 && (
+            <View style={{ marginBottom: 14 }}>
+              <Text style={styles.otherSavedLabel}>OTHER SAVED ADDRESSES:</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+                {savedAddrs.slice(1).map((addr: any, idx: number) => {
+                  const isCurActive =
+                    selectedAddressType === 'SAVED' &&
+                    (selectedAddress?.id === addr.id || selectedAddress?.houseFlat === addr.houseFlat);
+                  return (
+                    <TouchableOpacity
+                      key={addr.id || idx}
+                      activeOpacity={0.75}
+                      onPress={() => handleSelectSavedAddr(addr)}
+                      style={[
+                        styles.otherAddrChip,
+                        isCurActive && styles.otherAddrChipActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.otherAddrChipText,
+                          isCurActive && styles.otherAddrChipTextActive,
+                        ]}
+                      >
+                        {addr.type || 'Home'}: {addr.houseFlat}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          {/* Delivery Details Confirmation Form */}
+          <View style={styles.formContainer}>
+            <Text style={styles.formHeading}>Delivery Details Confirmation</Text>
+
+            <View style={styles.inputRow}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Recipient Name</Text>
+                <TextInput
+                  value={customerName}
+                  onChangeText={setCustomerName}
+                  style={styles.textInput}
+                  placeholder="Recipient Name"
+                />
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Phone Number</Text>
+                <TextInput
+                  value={customerPhone}
+                  onChangeText={setCustomerPhone}
+                  style={styles.textInput}
+                  placeholder="Phone Number"
+                  keyboardType="phone-pad"
+                />
+              </View>
+            </View>
+
+            <View style={styles.inputRow}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>House / Flat / Floor</Text>
+                <TextInput
+                  value={houseFlat}
+                  onChangeText={setHouseFlat}
+                  style={styles.textInput}
+                  placeholder="House / Flat / Floor"
+                />
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Street / Society / Building</Text>
+                <TextInput
+                  value={street}
+                  onChangeText={setStreet}
+                  style={styles.textInput}
+                  placeholder="Street / Society"
+                />
+              </View>
+            </View>
+
+            <View style={styles.inputRow}>
+              <View style={[styles.inputGroup, { flex: 1.4 }]}>
+                <Text style={styles.inputLabel}>Area & Landmark (e.g. Thaltej, Tragad, Bopal)</Text>
+                <TextInput
+                  value={areaLandmark}
+                  onChangeText={setAreaLandmark}
+                  style={styles.textInput}
+                  placeholder="e.g. Thaltej, Tragad..."
+                />
+                {/* 🎯 Authoritative Live Area & Store Detection Badge */}
+                {areaDetectionStatus?.isServiceable && (
+                  <View style={styles.detectedBadge}>
+                    <CheckCircle2 size={12} color="#16A34A" />
+                    <Text style={styles.detectedBadgeText}>
+                      ✓ {areaDetectionStatus.areaName} detected (Serving from {areaDetectionStatus.storeName})
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <View style={[styles.inputGroup, { flex: 0.8 }]}>
+                <Text style={styles.inputLabel}>Pincode</Text>
+                <TextInput
+                  value={pincode}
+                  onChangeText={setPincode}
+                  style={styles.textInput}
+                  placeholder="Pincode"
+                  keyboardType="numeric"
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Items in Cart Section with Live Store Dynamic Pricing */}
+        <View style={styles.cardSection}>
+          <Text style={[TYPOGRAPHY.bodyMdMedium, styles.subSectionTitle]}>
+            Items in Cart ({blinkitCartList.length})
+          </Text>
+          {blinkitCartList.map((item) => (
+            <View key={item.product.id} style={styles.cartItemRow}>
+              <Image source={{ uri: item.product.imageUrl }} style={styles.cartItemImg} />
+              <View style={styles.cartItemInfo}>
+                <Text style={styles.cartItemName} numberOfLines={1}>
+                  {item.product.name}
+                </Text>
+                <Text style={styles.cartItemPack}>
+                  {item.product.packSize} • ₹{item.product.sellingPrice} each
+                </Text>
+              </View>
+              <View style={styles.cartItemQtyBox}>
+                <TouchableOpacity
+                  onPress={() => updateBlinkitQty(item.product, -1)}
+                  style={styles.qtyBtn}
+                >
+                  <Text style={styles.qtyBtnText}>-</Text>
+                </TouchableOpacity>
+                <Text style={styles.qtyCountText}>{item.quantity}</Text>
+                <TouchableOpacity
+                  onPress={() => updateBlinkitQty(item.product, 1)}
+                  style={styles.qtyBtn}
+                >
+                  <Text style={styles.qtyBtnText}>+</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.cartItemTotal}>
+                ₹{item.product.sellingPrice * item.quantity}
+              </Text>
+            </View>
+          ))}
         </View>
 
         {/* 2. Delivery Instructions */}
@@ -270,11 +994,16 @@ export const BlinkitCheckoutScreen: React.FC = () => {
             Delivery instructions
           </Text>
           <View style={styles.instructionsRow}>
-            {['Avoid ringing bell', 'Leave with guard', 'Do not disturb'].map((inst) => (
+            {[
+              'Ring bell & leave at door',
+              'Avoid calling',
+              'Leave with security / guard',
+              'Do not ring bell',
+            ].map((inst) => (
               <TouchableOpacity
                 key={inst}
                 activeOpacity={0.7}
-                onPress={() => setDeliveryInstruction(inst)}
+                onPress={() => handleSelectDeliveryInstruction(inst)}
                 style={[
                   styles.instructionPill,
                   deliveryInstruction === inst && styles.instructionPillActive,
@@ -313,7 +1042,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
               <TouchableOpacity
                 key={amt}
                 activeOpacity={0.75}
-                onPress={() => setTipAmount(amt)}
+                onPress={() => handleSelectTip(amt)}
                 style={[
                   styles.tipPill,
                   tipAmount === amt && styles.tipPillActive,
@@ -356,9 +1085,17 @@ export const BlinkitCheckoutScreen: React.FC = () => {
             <Switch
               trackColor={{ false: '#D1D5DB', true: COLORS.primary }}
               thumbColor={useCoins ? COLORS.white : '#f4f3f4'}
-              onValueChange={(val) => {
+              onValueChange={async (val) => {
                 if (availableCoins > 0) {
                   setUseCoins(val);
+                  const coinsToApply = val ? maxCoinsUsable : 0;
+                  setAppliedCoins(coinsToApply);
+                  emitCheckoutChange({ useCoins: val });
+                  try {
+                    await CartService.toggleCoinsOnServer(val);
+                  } catch (e) {
+                    console.warn('[BlinkitCheckout] Notice syncing coins on server:', e);
+                  }
                 }
               }}
               value={useCoins && availableCoins > 0}
@@ -427,7 +1164,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
               {/* UPI Option */}
               <TouchableOpacity
                 activeOpacity={0.8}
-                onPress={() => setSelectedPayment('upi')}
+                onPress={() => handleSelectPayment('upi')}
                 style={styles.paymentOptionRow}
               >
                 <View style={styles.paymentOptionLeft}>
@@ -456,7 +1193,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
               {/* Credit / Debit Cards */}
               <TouchableOpacity
                 activeOpacity={0.8}
-                onPress={() => setSelectedPayment('card')}
+                onPress={() => handleSelectPayment('card')}
                 style={styles.paymentOptionRow}
               >
                 <View style={styles.paymentOptionLeft}>
@@ -485,7 +1222,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
               {/* Cash on Delivery */}
               <TouchableOpacity
                 activeOpacity={0.8}
-                onPress={() => setSelectedPayment('cod')}
+                onPress={() => handleSelectPayment('cod')}
                 style={styles.paymentOptionRow}
               >
                 <View style={styles.paymentOptionLeft}>
@@ -512,25 +1249,89 @@ export const BlinkitCheckoutScreen: React.FC = () => {
           )}
         </View>
 
-        {/* 6. Payment Summary Preview */}
+        {/* 6. Payment Summary Preview (Bill Summary matching Website) */}
         <View style={styles.cardSection}>
-          <Text style={[TYPOGRAPHY.headingMd, styles.subSectionTitle]}>Summary</Text>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Items Subtotal</Text>
-            <Text style={styles.summaryValue}>₹{blinkitCartTotal}</Text>
+          <Text style={[TYPOGRAPHY.headingMd, styles.subSectionTitle]}>Bill Summary</Text>
+
+          {/* Coupon / Promo Code Input Row matching Website */}
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
+            <TextInput
+              style={{
+                flex: 1,
+                borderWidth: 1,
+                borderColor: '#CBD5E1',
+                borderRadius: 10,
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                fontSize: 13,
+                textTransform: 'uppercase',
+                backgroundColor: '#FFFFFF',
+              }}
+              placeholder="Promo code (WORMUP50)"
+              value={couponCodeInput}
+              onChangeText={setCouponCodeInput}
+              autoCapitalize="characters"
+            />
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={handleApplyCoupon}
+              style={{
+                backgroundColor: '#071B52',
+                borderRadius: 10,
+                paddingHorizontal: 16,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>Apply</Text>
+            </TouchableOpacity>
           </View>
+
+          {couponMsg && (
+            <Text style={{ fontSize: 12, color: couponMsg.isError ? '#EF4444' : '#13B978', marginBottom: 10, fontWeight: '600' }}>
+              {couponMsg.text}
+            </Text>
+          )}
+
+          {appliedCoupon && (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#ECFDF5', padding: 8, borderRadius: 8, marginBottom: 12 }}>
+              <Text style={{ color: '#059669', fontWeight: '700', fontSize: 12 }}>
+                ✓ Coupon {appliedCoupon} applied (-₹{couponDiscount})
+              </Text>
+              <TouchableOpacity onPress={handleRemoveCoupon}>
+                <Text style={{ color: '#EF4444', fontWeight: '700', fontSize: 12 }}>Remove</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Item Total (MRP) */}
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Item Total (MRP)</Text>
+            <Text style={[styles.summaryValue, { fontWeight: '600', color: '#071B52' }]}>₹{blinkitMrpTotal}</Text>
+          </View>
+
+          {/* Product Discount */}
+          {productDiscount > 0 && (
+            <View style={styles.summaryRow}>
+              <Text style={[styles.summaryLabel, { color: '#10B981', fontWeight: '600' }]}>Product Discount</Text>
+              <Text style={[styles.summaryValue, { color: '#10B981', fontWeight: '700' }]}>
+                - ₹{productDiscount}
+              </Text>
+            </View>
+          )}
+
           <View style={[styles.summaryRow, { alignItems: 'flex-start', paddingVertical: 8 }]}>
             <View style={{ flex: 1, paddingRight: 8 }}>
               <Text style={styles.summaryLabel}>Delivery Partner Fee</Text>
               <Text style={{ fontSize: 11, color: '#62677A', marginTop: 1 }}>
-                {feeBreakdown?.distanceKm || 3.26} km · ₹{feeBreakdown?.rateUsed || 11}/km
-                {feeBreakdown?.floorApplied ? ` (Base: ₹${feeBreakdown?.baseFee || 35.86})` : ''}
+                {feeBreakdown?.distanceKm || (isSavedThaltej ? 1.15 : 1.64)} km · ₹{feeBreakdown?.rateUsed || 12}/km
+                {feeBreakdown?.floorApplied ? ` (Base: ₹${feeBreakdown?.baseFee || (isSavedThaltej ? 13.80 : 19.68)})` : ''}
               </Text>
               {feeBreakdown?.floorApplied && (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
                   <ShieldCheck size={12} color="#4338CA" />
                   <Text style={{ fontSize: 10, color: '#4338CA', fontWeight: '600' }}>
-                    +₹{(Number(feeBreakdown?.minimumPayout || 40) - Number(feeBreakdown?.baseFee || 35.86)).toFixed(2)} Floor Guarantee (Min ₹{feeBreakdown?.minimumPayout || 40})
+                    +₹{(Number(feeBreakdown?.minimumPayout || 30) - Number(feeBreakdown?.baseFee || (isSavedThaltej ? 13.80 : 19.68))).toFixed(2)} Floor Guarantee (Min ₹{feeBreakdown?.minimumPayout || 30})
                   </Text>
                 </View>
               )}
@@ -551,7 +1352,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
           </View>
           {couponDiscount > 0 && (
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Coupon Discount</Text>
+              <Text style={styles.summaryLabel}>Coupon Discount ({appliedCoupon})</Text>
               <Text style={[styles.summaryValue, { color: COLORS.success, fontWeight: '700' }]}>
                 - ₹{couponDiscount}
               </Text>
@@ -590,6 +1391,19 @@ export const BlinkitCheckoutScreen: React.FC = () => {
               ₹{finalPayable}
             </Text>
           </View>
+
+          {/* Serving Dark Store Info Banner matching website */}
+          <View style={styles.servingStoreBanner}>
+            <MapPin size={16} color="#16A34A" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.servingStoreBannerTitle}>
+                Dispatching from: {currentStoreName || 'Wom Up Dark Store'}
+              </Text>
+              <Text style={styles.servingStoreBannerSub}>
+                ⚡ {deliveryEtaMinutes || 9} min delivery to {areaLandmark || currentAreaName || 'your area'}
+              </Text>
+            </View>
+          </View>
         </View>
 
         <View style={{ height: 100 }} />
@@ -612,7 +1426,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
           {isSubmitting ? (
             <ActivityIndicator color={COLORS.white} size="small" />
           ) : (
-            <Text style={styles.placeOrderBtnText}>Place Order</Text>
+            <Text style={styles.placeOrderBtnText}>Place Order • ₹{finalPayable} ➔</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -1248,5 +2062,238 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
     maxWidth: 320,
+  },
+  deliveryChoiceGrid: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  choiceCard: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FAFAFA',
+  },
+  choiceCardActiveGps: {
+    borderColor: '#16A34A',
+    backgroundColor: '#F0FDF4',
+  },
+  choiceCardActiveSaved: {
+    borderColor: COLORS.primary,
+    backgroundColor: '#FAF5FF',
+  },
+  choiceBadgeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  choiceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 999,
+    backgroundColor: '#E2E8F0',
+  },
+  choiceBadgeActiveGps: {
+    backgroundColor: '#DCFCE7',
+  },
+  choiceBadgeActiveSaved: {
+    backgroundColor: '#EDE9FE',
+  },
+  choiceBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#475569',
+  },
+  greenCheckCircle: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#16A34A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  choiceTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+    marginBottom: 2,
+  },
+  choiceCoords: {
+    fontSize: 9,
+    color: '#64748B',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  choiceSub: {
+    fontSize: 9,
+    color: '#16A34A',
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  otherSavedLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748B',
+    textTransform: 'uppercase',
+  },
+  otherAddrChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    backgroundColor: COLORS.white,
+  },
+  otherAddrChipActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: '#FAF5FF',
+  },
+  otherAddrChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  otherAddrChipTextActive: {
+    color: COLORS.primary,
+    fontWeight: '700',
+  },
+  formContainer: {
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    paddingTop: 14,
+    marginTop: 4,
+  },
+  formHeading: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#071B52',
+    marginBottom: 10,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 10,
+  },
+  inputGroup: {
+    flex: 1,
+  },
+  inputLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+    marginBottom: 4,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    fontSize: 12,
+    color: COLORS.textPrimary,
+    backgroundColor: COLORS.white,
+  },
+  detectedBadge: {
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  detectedBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#16A34A',
+  },
+  cartItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  cartItemImg: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: '#F8FAFC',
+    marginRight: 10,
+  },
+  cartItemInfo: {
+    flex: 1,
+  },
+  cartItemName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  cartItemPack: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginTop: 1,
+  },
+  cartItemQtyBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    marginRight: 12,
+  },
+  qtyBtn: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  qtyBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#16A34A',
+  },
+  qtyCountText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#16A34A',
+    paddingHorizontal: 4,
+  },
+  cartItemTotal: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+    minWidth: 35,
+    textAlign: 'right',
+  },
+  servingStoreBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 10,
+    backgroundColor: '#F0FDF4',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    marginTop: 12,
+  },
+  servingStoreBannerTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#166534',
+  },
+  servingStoreBannerSub: {
+    fontSize: 10,
+    color: '#047857',
+    marginTop: 2,
   },
 });

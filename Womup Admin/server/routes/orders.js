@@ -142,9 +142,17 @@ router.put('/:id/status', async (req, res) => {
     if (newStatus === 'DELIVERED') {
       updateFields.deliveredAt = new Date();
       updateFields.paymentStatus = 'COMPLETED';
+    } else if (newStatus === 'CANCELLED') {
+      updateFields.cancelledAt = new Date();
+      if (notes) updateFields.cancellationReason = notes;
     }
 
     await db.collection('orders').updateOne(filter, { $set: updateFields });
+
+    // Restock physical items if transitioned to CANCELLED
+    if (previousStatus !== 'CANCELLED' && newStatus === 'CANCELLED') {
+      await restockOrderItems(db, order);
+    }
 
     // Insert into order_status_history
     const historyEntry = {
@@ -168,6 +176,72 @@ router.put('/:id/status', async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
+// Helper: Restock physical inventory in products, product_variants, and store inventory
+async function restockOrderItems(db, order) {
+  if (!order || !Array.isArray(order.items) || order.items.length === 0) return;
+  for (const item of order.items) {
+    if (!item.productId) continue;
+    try {
+      const pId = ObjectId.isValid(item.productId) ? new ObjectId(item.productId) : item.productId;
+      const qty = Number(item.quantity) || 1;
+
+      // 1. Restore product stock in master products collection
+      await db.collection('products').updateOne(
+        { $or: [{ _id: pId }, { _id: item.productId.toString() }] },
+        { $inc: { stock: qty }, $set: { updatedAt: new Date() } }
+      );
+
+      // 2. Restore variant stock
+      await db.collection('product_variants').updateMany(
+        { $or: [{ productId: pId }, { productId: item.productId.toString() }] },
+        { $inc: { stock: qty }, $set: { updatedAt: new Date() } }
+      );
+
+      // 2b. Restore area_pricing stock
+      if (order.storeId) {
+        const sId = ObjectId.isValid(order.storeId) ? new ObjectId(order.storeId) : order.storeId;
+        const storeDoc = await db.collection('stores').findOne({
+          $or: [{ _id: sId }, { _id: order.storeId.toString() }]
+        });
+        const targetAreaId = storeDoc?.areaId || order.deliveryAddress?.areaId;
+        if (targetAreaId) {
+          const aObjId = ObjectId.isValid(targetAreaId) ? new ObjectId(targetAreaId) : targetAreaId;
+          const vList = await db.collection('product_variants').find({
+            $or: [{ productId: pId }, { productId: item.productId.toString() }]
+          }).toArray();
+          let matchedV = item.variantId ? vList.find(v => v._id.toString() === item.variantId.toString()) : null;
+          if (!matchedV && item.quantityLabel) {
+            matchedV = vList.find(v => v.weightOrVolume && v.weightOrVolume.trim().toLowerCase() === item.quantityLabel.trim().toLowerCase());
+          }
+          if (!matchedV) matchedV = vList[0];
+          if (matchedV) {
+            await db.collection('area_pricing').updateOne(
+              {
+                $and: [
+                  { $or: [{ variantId: matchedV._id }, { variantId: matchedV._id.toString() }] },
+                  { $or: [{ areaId: aObjId }, { areaId: targetAreaId.toString() }] },
+                ],
+              },
+              { $inc: { stock: qty }, $set: { updatedAt: new Date() } }
+            );
+          }
+        }
+      }
+
+      // 3. Restore store inventory
+      if (order.storeId) {
+        const sId = ObjectId.isValid(order.storeId) ? new ObjectId(order.storeId) : order.storeId;
+        await db.collection('inventory').updateOne(
+          { storeId: sId, productId: pId },
+          { $inc: { availableQty: qty, soldQty: -qty }, $set: { updatedAt: new Date() } }
+        );
+      }
+    } catch (err) {
+      console.warn(`[Restock Error] for item ${item.productId}:`, err.message);
+    }
+  }
+}
 
 // 4. Cancel Order
 router.post('/:id/cancel', async (req, res) => {
@@ -194,6 +268,11 @@ router.post('/:id/cancel', async (req, res) => {
         updatedAt: new Date(),
       }
     });
+
+    // Restock items
+    if (order.status !== 'CANCELLED') {
+      await restockOrderItems(db, order);
+    }
 
     // Record in history
     await db.collection('order_status_history').insertOne({

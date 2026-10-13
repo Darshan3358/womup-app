@@ -14,9 +14,9 @@ export const AHMEDABAD_HUBS: HubLocation[] = [
   {
     id: '6aac257b8f337240651ef43b',
     name: 'Chandlodiya - Tragad Dark Store',
-    latitude: 23.115,
-    longitude: 72.545,
-    address: 'Shukan Hub, Near Chandlodiya Crossing & Tragad Rd',
+    latitude: 23.1128,
+    longitude: 72.5427,
+    address: 'Shop 10-14, Shukan Hub, Near Chandlodiya Crossing & Tragad Rd',
   },
   {
     id: '6aa277a7fc02997cbe281ac4',
@@ -237,7 +237,7 @@ export class LocationTrackerService {
       if (onLocationUpdate) onLocationUpdate(initialCoords);
     }
 
-    // Stream GPS telemetry every 15 seconds while online
+    // Stream GPS telemetry every 1 second while online
     this.timer = setInterval(async () => {
       // If not simulated and location is set, try reading device GPS
       if (!this.isSimulated && this.hasSetLocation) {
@@ -263,7 +263,7 @@ export class LocationTrackerService {
           onLocationUpdate(coords);
         }
       }
-    }, 15000);
+    }, 1000);
   }
 
   static stopTracking() {

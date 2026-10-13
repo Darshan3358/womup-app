@@ -81,47 +81,97 @@ export class OrdersService {
       uId = customerUser._id;
     }
 
-    // Look up address or fall back to user's default / auto-provision
-    let address = (dto.addressId && Types.ObjectId.isValid(dto.addressId))
-      ? await this.addressModel.findOne({ _id: new Types.ObjectId(dto.addressId), userId: uId })
-      : null;
+    // Authoritative Delivery Address & Coordinates Resolution
+    const inlineAddr = dto.address || (dto as any).deliveryAddress;
+    const reqLng = Number(
+      inlineAddr?.location?.coordinates?.[0] ??
+      inlineAddr?.longitude ??
+      (dto as any).longitude ??
+      ((dto as any).coordinates?.[0])
+    );
+    const reqLat = Number(
+      inlineAddr?.location?.coordinates?.[1] ??
+      inlineAddr?.latitude ??
+      (dto as any).latitude ??
+      ((dto as any).coordinates?.[1])
+    );
+    const hasValidInlineCoords = !isNaN(reqLng) && !isNaN(reqLat) && reqLng !== 0 && reqLat !== 0;
+
+    let address: any = null;
+
+    if (hasValidInlineCoords && inlineAddr) {
+      const houseNumber = inlineAddr.houseFlat || inlineAddr.houseNumber || 'House/Flat';
+      const street = inlineAddr.street || 'Street';
+      const landmark = inlineAddr.areaLandmark || inlineAddr.landmark || '';
+      const city = inlineAddr.city || 'Ahmedabad';
+      const pincode = inlineAddr.pincode || '382481';
+      const label = inlineAddr.label || 'Delivery Address';
+
+      // If addressId was explicitly supplied and matches user, update it with active form details
+      if (dto.addressId && Types.ObjectId.isValid(dto.addressId)) {
+        address = await this.addressModel.findOneAndUpdate(
+          { _id: new Types.ObjectId(dto.addressId), userId: uId },
+          {
+            houseNumber,
+            street,
+            landmark,
+            city,
+            pincode,
+            'location.coordinates': [reqLng, reqLat],
+            updatedAt: new Date(),
+          },
+          { new: true }
+        );
+      }
+
+      // If no existing address matched, persist or provision this address so it is saved in user account
+      if (!address) {
+        address = await this.addressModel.create({
+          userId: uId,
+          label,
+          houseNumber,
+          street,
+          landmark,
+          city,
+          state: 'Gujarat',
+          pincode,
+          location: {
+            type: 'Point',
+            coordinates: [reqLng, reqLat],
+          },
+          isDefault: true,
+        });
+      }
+      this.logger.log(`[OrdersService] Resolved authoritative order delivery address for user ${userId} at [${reqLng}, ${reqLat}] (${street}, ${landmark})`);
+    } else if (dto.addressId && Types.ObjectId.isValid(dto.addressId)) {
+      address = await this.addressModel.findOne({ _id: new Types.ObjectId(dto.addressId), userId: uId });
+    }
 
     if (!address) {
       address = await this.addressModel.findOne({ userId: uId }).sort({ isDefault: -1, createdAt: -1 });
     }
 
-    // Auto-provision address from inline dto.address or user GPS/defaults so order is NEVER rejected
     if (!address) {
-      const inlineAddr = dto.address || (dto as any).deliveryAddress;
-      const lat = Number(inlineAddr?.latitude ?? (dto as any).latitude ?? 23.0827);
-      const lng = Number(inlineAddr?.longitude ?? (dto as any).longitude ?? 72.5606);
-      const houseNumber = inlineAddr?.houseNumber || inlineAddr?.houseFlat || 'A-101, Green View';
-      const street = inlineAddr?.street || inlineAddr?.areaLandmark || 'Chandlodiya';
-      const city = inlineAddr?.city || 'Ahmedabad';
-      const pincode = inlineAddr?.pincode || '382481';
-      const label = inlineAddr?.label || inlineAddr?.type || 'Home';
-
       address = await this.addressModel.create({
         userId: uId,
-        label,
-        houseNumber,
-        street,
-        city,
+        label: 'Home',
+        houseNumber: 'A-101, Green View',
+        street: 'Chandlodiya - Tragad',
+        city: 'Ahmedabad',
         state: 'Gujarat',
-        pincode,
+        pincode: '382481',
         location: {
           type: 'Point',
-          coordinates: [lng, lat],
+          coordinates: [72.5507, 23.1288],
         },
         isDefault: true,
       });
-      this.logger.log(`[OrdersService] Auto-provisioned address ${address._id} for user ${userId} at [${lng}, ${lat}]`);
     }
 
     if (!address.location?.coordinates || address.location.coordinates.length < 2) {
       address.location = {
         type: 'Point',
-        coordinates: [72.5606, 23.0827],
+        coordinates: [72.5507, 23.1288],
       };
       await address.save();
     }
@@ -150,10 +200,14 @@ export class OrdersService {
         itemSubtotal += sub;
         mrpTotal += unitMrp * qty;
 
+        const rawVid = (it as any).variantId;
+        const variantId = rawVid && Types.ObjectId.isValid(rawVid) ? new Types.ObjectId(rawVid) : undefined;
+
         orderItems.push({
           productId: prodId,
+          variantId,
           name: it.name || 'Worm Up Item',
-          imageUrl: it.imageUrl || '',
+          imageUrl: it.imageUrl || (it as any).image || '',
           quantityLabel: it.quantityLabel || '1 unit',
           quantity: qty,
           unitPrice,
@@ -177,9 +231,12 @@ export class OrdersService {
 
       orderItems = summary.items.map((i) => ({
         productId: new Types.ObjectId(i.product.id),
+        variantId: i.variantId && Types.ObjectId.isValid(i.variantId)
+          ? new Types.ObjectId(i.variantId)
+          : (i.variant?.id && Types.ObjectId.isValid(i.variant.id) ? new Types.ObjectId(i.variant.id) : undefined),
         name: i.product.name,
         imageUrl: i.product.imageUrl,
-        quantityLabel: i.product.quantityLabel,
+        quantityLabel: i.variant?.label || i.product.quantityLabel,
         quantity: i.quantity,
         unitPrice: i.product.sellingPrice,
         unitMrp: i.product.mrp,
@@ -204,18 +261,49 @@ export class OrdersService {
     const lng = coords[0];
     const lat = coords[1];
 
-    // 2. Select Serviceable Dark Store using Serviceability Engine (Polygon / 2dsphere / Explicit Store)
+    // 2. Select Serviceable Dark Store using Geospatial Engine (Polygon / 2dsphere)
+    // Priority: Always route to the nearest dark store for the delivery address coordinates [lng, lat]
     let store: StoreDocument | null = null;
-
-    if (dto.storeId && Types.ObjectId.isValid(dto.storeId)) {
-      store = await this.storeModel.findOne({ _id: new Types.ObjectId(dto.storeId), isActive: true }).exec();
-    }
-
-    if (!store && dto.areaId && Types.ObjectId.isValid(dto.areaId)) {
-      store = await this.storeModel.findOne({ areaId: new Types.ObjectId(dto.areaId), isActive: true }).exec();
-    }
-
     let matchedArea: any = null;
+
+    // Step A: Validate dto.storeId if provided by frontend and within 6 km of delivery address
+    if (dto.storeId && Types.ObjectId.isValid(dto.storeId)) {
+      const explicitStore = await this.storeModel.findOne({ _id: new Types.ObjectId(dto.storeId), isActive: true }).exec();
+      if (explicitStore && explicitStore.location?.coordinates) {
+        const [sLng, sLat] = explicitStore.location.coordinates;
+        const R = 6371;
+        const dLat = ((lat - sLat) * Math.PI) / 180;
+        const dLng = ((lng - sLng) * Math.PI) / 180;
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos((sLat * Math.PI) / 180) * Math.cos((lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+        const distKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        if (distKm <= 6.0) {
+          store = explicitStore;
+        }
+      }
+    }
+
+    // Step B: Find nearest Dark Store within 6 km using 2dsphere geometry ($near)
+    // In 9-minute instant delivery, physically closest store to customer takes precedence over overlapping polygons
+    if (!store) {
+      const nearest = await this.storeModel.find({
+        isActive: true,
+        location: {
+          $near: {
+            $geometry: {
+              type: 'Point',
+              coordinates: [lng, lat],
+            },
+            $maxDistance: 6000, // Strict 6 km delivery radius for 9-11 min quick commerce
+          },
+        },
+      }).limit(1).exec();
+
+      if (nearest && nearest.length > 0) {
+        store = nearest[0];
+      }
+    }
+
+    // Step C: Fallback to Area Polygon intersection if $near didn't match
     if (!store) {
       matchedArea = await this.storeModel.db.collection('areas').findOne({
         polygon: {
@@ -228,37 +316,143 @@ export class OrdersService {
         },
         isActive: true,
       });
-    }
 
-    if (!store && matchedArea) {
-      store = await this.resolveStoreForOrder([lng, lat], matchedArea, dto.items);
-    }
-
-    if (!store) {
-      const nearest = await this.storeModel.find({
-        isActive: true,
-        location: {
-          $near: {
-            $geometry: {
-              type: 'Point',
-              coordinates: [lng, lat],
-            },
-            $maxDistance: 8000,
-          },
-        },
-      }).limit(1).exec();
-
-      if (nearest && nearest.length > 0) {
-        store = nearest[0];
+      if (matchedArea) {
+        store = await this.resolveStoreForOrder([lng, lat], matchedArea, dto.items);
       }
     }
 
+    // STRICT REJECTION: If no active dark store is found near delivery address, reject order.
+    // NEVER fall back to a far-away store (e.g. Tragad) for a Thaltej address!
     if (!store) {
-      store = await this.storeModel.findOne({ isActive: true }).exec();
+      throw new BadRequestException('Delivery not available in your area. No active Dark Store found within 9-minute delivery radius.');
     }
 
     if (!store) {
       throw new BadRequestException('No active dark store available for this delivery address');
+    }
+
+    // 2b. Authoritative Price & Area-Specific Integrity Check
+    // Re-verify every item price against the resolved store's area_pricing and products catalog
+    const priceAdjustments: Array<{
+      productId: any;
+      name: string;
+      oldPrice: number;
+      newPrice: number;
+      quantity: number;
+      adjustment: number;
+    }> = [];
+    let itemSubtotalAdjustment = 0;
+    let mrpAdjustment = 0;
+
+    for (const item of orderItems) {
+      const prodId = item.productId;
+      const vId = item.variantId;
+
+      let authoritativePrice: number | null = null;
+      let authoritativeMrp: number | null = null;
+      let authoritativeStock: number | null = null;
+
+      // 1. Check if area pricing override exists for this store's area
+      if (store.areaId) {
+        const areaPricingQuery: any = {
+          areaId: Types.ObjectId.isValid(store.areaId.toString()) ? new Types.ObjectId(store.areaId.toString()) : store.areaId,
+        };
+        if (vId) {
+          areaPricingQuery.variantId = Types.ObjectId.isValid(vId.toString()) ? new Types.ObjectId(vId.toString()) : vId;
+        } else if (prodId) {
+          areaPricingQuery.productId = Types.ObjectId.isValid(prodId.toString()) ? new Types.ObjectId(prodId.toString()) : prodId;
+        }
+
+        const areaPricingDoc = await this.connection.collection('area_pricing').findOne(areaPricingQuery);
+        if (areaPricingDoc && typeof areaPricingDoc.price === 'number') {
+          authoritativePrice = areaPricingDoc.price;
+          if (typeof areaPricingDoc.mrp === 'number') authoritativeMrp = areaPricingDoc.mrp;
+          if (typeof areaPricingDoc.stock === 'number') authoritativeStock = areaPricingDoc.stock;
+        }
+      }
+
+      // 2. If no area pricing override, check variant or master product
+      if (authoritativePrice === null) {
+        if (vId) {
+          const variantDoc = await this.connection.collection('product_variants').findOne({
+            _id: Types.ObjectId.isValid(vId.toString()) ? new Types.ObjectId(vId.toString()) : vId,
+          });
+          if (variantDoc) {
+            authoritativePrice = variantDoc.sellingPrice;
+            authoritativeMrp = variantDoc.mrp || variantDoc.sellingPrice;
+            if (typeof variantDoc.stock === 'number') authoritativeStock = variantDoc.stock;
+          }
+        }
+        if (authoritativePrice === null && prodId) {
+          const productDoc = await this.connection.collection('products').findOne({
+            _id: Types.ObjectId.isValid(prodId.toString()) ? new Types.ObjectId(prodId.toString()) : prodId,
+          });
+          if (productDoc) {
+            authoritativePrice = productDoc.sellingPrice;
+            authoritativeMrp = productDoc.mrp || productDoc.sellingPrice;
+            if (typeof productDoc.stock === 'number') authoritativeStock = productDoc.stock;
+          }
+        }
+      }
+
+      // Check stock in serving dark store
+      if (authoritativeStock !== null && authoritativeStock <= 0) {
+        throw new BadRequestException(
+          `"${item.name}" is currently out of stock at ${store.name || 'serving store'}. Please remove it to continue.`,
+        );
+      }
+      if (authoritativeStock !== null && authoritativeStock < item.quantity) {
+        throw new BadRequestException(
+          `Insufficient stock for "${item.name}" at ${store.name || 'serving store'}. Available: ${authoritativeStock}, Requested: ${item.quantity}`,
+        );
+      }
+
+      // Auto-correct price mismatch instead of throwing error:
+      if (authoritativePrice !== null && typeof item.unitPrice === 'number' && item.unitPrice !== authoritativePrice) {
+        const oldUnit = item.unitPrice;
+        const newUnit = authoritativePrice;
+        const oldSub = oldUnit * item.quantity;
+        const newSub = newUnit * item.quantity;
+        const diff = newSub - oldSub;
+
+        priceAdjustments.push({
+          productId: item.productId,
+          name: item.name,
+          oldPrice: oldUnit,
+          newPrice: newUnit,
+          quantity: item.quantity,
+          adjustment: diff,
+        });
+
+        itemSubtotalAdjustment += diff;
+        item.unitPrice = newUnit;
+        item.subtotal = newSub;
+
+        if (authoritativeMrp !== null && typeof item.unitMrp === 'number') {
+          const oldMrpSub = item.unitMrp * item.quantity;
+          const newMrpSub = authoritativeMrp * item.quantity;
+          mrpAdjustment += (newMrpSub - oldMrpSub);
+          item.unitMrp = authoritativeMrp;
+        }
+      }
+    }
+
+    // Recalculate totals if price adjustments occurred
+    const originalTotal = totalAmount;
+    if (itemSubtotalAdjustment !== 0) {
+      itemSubtotal = Math.max(0, itemSubtotal + itemSubtotalAdjustment);
+      mrpTotal = Math.max(itemSubtotal, mrpTotal + mrpAdjustment);
+      totalAmount = Math.max(
+        0,
+        itemSubtotal + deliveryFee + handlingFee + tip - couponDiscount - coinDiscount,
+      );
+
+      // Fraud / Extreme variance safety guard:
+      // If adjustment swings total by more than 50% of original total, reject
+      if (originalTotal > 0 && Math.abs(totalAmount - originalTotal) > originalTotal * 0.5) {
+        throw new BadRequestException('Significant price change detected. Please refresh your cart.');
+      }
     }
 
     // 3. Confirm Inventory Reservation if supplied or reserve
@@ -340,6 +534,7 @@ export class OrdersService {
       handlingFee,
       tip,
       totalAmount,
+      priceAdjustments,
       paymentMethod: dto.paymentMethod,
       paymentStatus: dto.paymentMethod === 'COD' ? 'PENDING' : 'COMPLETED',
       deliverySlot: 'Instant 9 Minutes',
@@ -393,30 +588,119 @@ export class OrdersService {
       this.logger.warn(`Failed to auto-dispatch order #${orderNumber}: ${dispatchErr.message}`);
     }
 
-    // 9b. Real-Time Stock Management: Decrement availableQty and Increment reservedQty
-    if (store && order.items && order.items.length > 0) {
+    // 9b. Real-Time Stock Management & Atomic Deduction
+    if (order.items && order.items.length > 0) {
       for (const item of order.items) {
         try {
-          const updatedInv = await this.connection.collection('inventory').findOneAndUpdate(
-            {
-              storeId: new Types.ObjectId(store._id.toString()),
-              productId: new Types.ObjectId(item.productId.toString()),
-            },
-            {
-              $inc: {
-                availableQty: -item.quantity,
-                reservedQty: item.quantity,
-              },
-            },
-            { upsert: true, returnDocument: 'after' }
+          const prodObjId = Types.ObjectId.isValid(item.productId.toString())
+            ? new Types.ObjectId(item.productId.toString())
+            : item.productId;
+
+          // 1. Atomically deduct stock from master products collection
+          await this.connection.collection('products').updateOne(
+            { _id: prodObjId as any },
+            { $inc: { stock: -item.quantity }, $set: { updatedAt: new Date() } }
           );
 
+          // 2. Atomically deduct stock from ONLY the specific ordered product_variant
+          const vList = await this.connection.collection('product_variants').find({
+            $or: [
+              { productId: prodObjId as any },
+              { productId: item.productId.toString() },
+            ],
+          }).toArray();
+
+          if (vList.length > 0) {
+            let matchedV = null;
+            if (item.variantId) {
+              matchedV = vList.find((v) => v._id.toString() === item.variantId.toString());
+            }
+            if (!matchedV && item.quantityLabel) {
+              matchedV = vList.find((v) =>
+                v.weightOrVolume &&
+                v.weightOrVolume.trim().toLowerCase() === item.quantityLabel.trim().toLowerCase()
+              );
+            }
+            if (!matchedV && item.name) {
+              matchedV = vList.find((v) =>
+                v.weightOrVolume && item.name.toLowerCase().includes(v.weightOrVolume.toLowerCase())
+              );
+            }
+            if (!matchedV) {
+              matchedV = vList.find((v) => v.isDefault) || vList[0];
+            }
+
+            if (matchedV) {
+              await this.connection.collection('product_variants').updateOne(
+                { _id: matchedV._id },
+                { $inc: { stock: -item.quantity }, $set: { updatedAt: new Date() } }
+              );
+
+              // 2b. Atomically deduct stock from area_pricing for this dark store's area / delivery zone
+              let targetAreaId = store?.areaId || (matchedArea as any)?._id || (order.deliveryAddress as any)?.areaId;
+              if (!targetAreaId && store?._id) {
+                const storeObjId = Types.ObjectId.isValid(store._id.toString()) ? new Types.ObjectId(store._id.toString()) : store._id;
+                const sDoc = await this.connection.collection('stores').findOne({
+                  $or: [
+                    { _id: storeObjId as any },
+                    { _id: store._id.toString() as any },
+                  ],
+                });
+                targetAreaId = sDoc?.areaId;
+              }
+              if (targetAreaId) {
+                const aObjId = Types.ObjectId.isValid(targetAreaId.toString())
+                  ? new Types.ObjectId(targetAreaId.toString())
+                  : targetAreaId;
+
+                await this.connection.collection('area_pricing').updateOne(
+                  {
+                    $and: [
+                      { $or: [{ variantId: matchedV._id }, { variantId: matchedV._id.toString() }] },
+                      { $or: [{ areaId: aObjId }, { areaId: targetAreaId.toString() }] },
+                    ],
+                  },
+                  {
+                    $inc: { stock: -item.quantity },
+                    $set: { updatedAt: new Date() },
+                  }
+                );
+              }
+            }
+          }
+
+          // 3. Atomically update store-specific inventory
+          let updatedInv: any = null;
+          if (store) {
+            updatedInv = await this.connection.collection('inventory').findOneAndUpdate(
+              {
+                storeId: new Types.ObjectId(store._id.toString()),
+                productId: prodObjId,
+              },
+              {
+                $inc: {
+                  availableQty: -item.quantity,
+                  reservedQty: item.quantity,
+                  soldQty: item.quantity,
+                },
+              },
+              { upsert: true, returnDocument: 'after' }
+            );
+          }
+
+          // Fetch fresh master product to get updated stock
+          const freshProd = await this.connection.collection('products').findOne({
+            _id: prodObjId as any,
+          });
+
+          // 4. Broadcast real-time stock update to Admin and Store App
           this.trackingGateway.broadcastInventoryUpdate({
-            storeId: store._id.toString(),
+            storeId: store?._id?.toString() || '',
             productId: item.productId.toString(),
             productName: item.name,
-            availableQty: updatedInv?.availableQty ?? 0,
+            availableQty: freshProd?.stock ?? (updatedInv?.availableQty ?? 0),
             reservedQty: updatedInv?.reservedQty ?? item.quantity,
+            newAvailableStock: freshProd?.stock ?? (updatedInv?.availableQty ?? 0),
           });
         } catch (invErr: any) {
           this.logger.warn(`Failed to update real-time stock for product ${item.productId}: ${invErr.message}`);
@@ -425,19 +709,46 @@ export class OrdersService {
     }
 
     // 10. Clear customer cart
-    await this.cartService.clearCart(userId);
+    if (userId) {
+      await this.cartService.clearCart(userId);
+    }
 
-    // 11. Emit real-time WebSocket events to all apps
+    const resolvedUserIdStr = uId.toString();
+
+    // 11. Emit real-time WebSocket events to all apps (Web, Mobile App, Store, Rider, Admin)
     this.trackingGateway.broadcastNewOrder(order);
     this.trackingGateway.notifyOrderStatus(order._id.toString(), OrderStatus.PLACED, {
       orderId: order._id.toString(),
       orderNumber: order.orderNumber,
       deliveryOtp: order.deliveryOtp,
       status: OrderStatus.PLACED,
+      userId: resolvedUserIdStr,
+      order,
+    });
+    this.trackingGateway.emitOrderCreated(resolvedUserIdStr, order);
+    this.trackingGateway.emitWalletUpdated(resolvedUserIdStr, {
+      shoppingCoins: user.shoppingCoins,
+      walletBalance: (user as any).walletBalance || 0,
     });
 
+    if (priceAdjustments.length > 0) {
+      this.trackingGateway.emitOrderPriceAdjusted(resolvedUserIdStr, {
+        orderId: order._id.toString(),
+        orderNumber: order.orderNumber,
+        priceAdjustments,
+        oldTotal: originalTotal,
+        newTotal: totalAmount,
+        storeName: store.name || 'Serving Dark Store',
+      });
+    }
+
     this.logger.log(`Order #${orderNumber} placed. Delivery PIN: ${deliveryOtp}. Total: ₹${order.totalAmount}`);
-    return order;
+    const populated = await this.orderModel
+      .findById(order._id)
+      .populate('deliveryPartnerId', 'fullName phoneNumber vehicleNumber rating currentLocation')
+      .populate('storeId', 'name address location')
+      .lean();
+    return populated || order;
   }
 
   async updateOrderStatus(
@@ -470,6 +781,11 @@ export class OrdersService {
     }
     await order.save();
 
+    // Restock inventory and master products if transitioning to CANCELLED
+    if (currentStatus !== OrderStatus.CANCELLED && targetStatus === OrderStatus.CANCELLED) {
+      await this.restockOrderItems(order);
+    }
+
     await this.historyModel.create({
       orderId: order._id,
       previousStatus: currentStatus,
@@ -479,10 +795,170 @@ export class OrdersService {
       notes,
     });
 
-    // Emit live WebSocket notification
-    this.trackingGateway.notifyOrderStatus(order._id.toString(), targetStatus);
+    // Emit live WebSocket notification across order room, user sync room, and global
+    this.trackingGateway.notifyOrderStatus(order._id.toString(), targetStatus, {
+      orderId: order._id.toString(),
+      orderNumber: order.orderNumber,
+      userId: order.userId?.toString(),
+      order,
+    });
+    if (order.userId) {
+      this.trackingGateway.emitOrderStatusToUser(
+        order.userId.toString(),
+        order._id.toString(),
+        targetStatus,
+        { orderNumber: order.orderNumber, order },
+      );
+    }
+
+    // Auto-trigger Rider Review Prompt when delivered
+    if (targetStatus === OrderStatus.DELIVERED && order.userId) {
+      setTimeout(async () => {
+        try {
+          const freshOrder = await this.orderModel.findById(order._id).populate('deliveryPartnerId');
+          const partner = (freshOrder?.deliveryPartnerId as any) || (order as any).deliveryPartner;
+          this.trackingGateway.emitReviewPromptRequested(order.userId.toString(), {
+            orderId: order._id.toString(),
+            orderNumber: order.orderNumber,
+            rider: {
+              id: partner?._id?.toString() || 'default_rider',
+              name: partner?.fullName || 'DARSHAN THANKI',
+              photo: partner?.avatar || '',
+              vehicleNumber: partner?.vehicleNumber || 'GJ AE 2020',
+              averageRating: partner?.averageRating || partner?.rating || 4.88,
+              totalReviews: partner?.totalReviews || 128,
+            },
+          });
+        } catch (err) {
+          // silent fallback
+        }
+      }, 3000);
+    }
 
     return order;
+  }
+
+  /**
+   * Atomically restores physical stock in products, product_variants, and store inventory
+   */
+  private async restockOrderItems(order: any) {
+    if (!order.items || order.items.length === 0) return;
+    for (const item of order.items) {
+      try {
+        const prodObjId = Types.ObjectId.isValid(item.productId.toString())
+          ? new Types.ObjectId(item.productId.toString())
+          : item.productId;
+
+        // 1. Restock master products collection
+        await this.connection.collection('products').updateOne(
+          { _id: prodObjId as any },
+          { $inc: { stock: item.quantity }, $set: { updatedAt: new Date() } }
+        );
+
+        // 2. Restock ONLY the specific ordered product_variant
+        const vList = await this.connection.collection('product_variants').find({
+          $or: [
+            { productId: prodObjId as any },
+            { productId: item.productId.toString() },
+          ],
+        }).toArray();
+
+        if (vList.length > 0) {
+          let matchedV = null;
+          if (item.variantId) {
+            matchedV = vList.find((v) => v._id.toString() === item.variantId.toString());
+          }
+          if (!matchedV && item.quantityLabel) {
+            matchedV = vList.find((v) =>
+              v.weightOrVolume &&
+              v.weightOrVolume.trim().toLowerCase() === item.quantityLabel.trim().toLowerCase()
+            );
+          }
+          if (!matchedV && item.name) {
+            matchedV = vList.find((v) =>
+              v.weightOrVolume && item.name.toLowerCase().includes(v.weightOrVolume.toLowerCase())
+            );
+          }
+          if (!matchedV) {
+            matchedV = vList.find((v) => v.isDefault) || vList[0];
+          }
+
+          if (matchedV) {
+            await this.connection.collection('product_variants').updateOne(
+              { _id: matchedV._id },
+              { $inc: { stock: item.quantity }, $set: { updatedAt: new Date() } }
+            );
+
+            // 2b. Restock area_pricing
+            let targetAreaId = (order.deliveryAddress as any)?.areaId;
+            if (!targetAreaId && order.storeId) {
+              const sDoc = await this.connection.collection('stores').findOne({
+                $or: [
+                  { _id: Types.ObjectId.isValid(order.storeId.toString()) ? new Types.ObjectId(order.storeId.toString()) : order.storeId },
+                  { _id: order.storeId.toString() },
+                ],
+              });
+              targetAreaId = sDoc?.areaId;
+            }
+            if (targetAreaId) {
+              const aObjId = Types.ObjectId.isValid(targetAreaId.toString())
+                ? new Types.ObjectId(targetAreaId.toString())
+                : targetAreaId;
+              await this.connection.collection('area_pricing').updateOne(
+                {
+                  $and: [
+                    { $or: [{ variantId: matchedV._id }, { variantId: matchedV._id.toString() }] },
+                    { $or: [{ areaId: aObjId }, { areaId: targetAreaId.toString() }] },
+                  ],
+                },
+                {
+                  $inc: { stock: item.quantity },
+                  $set: { updatedAt: new Date() },
+                }
+              );
+            }
+          }
+        }
+
+        // 3. Restock dark store inventory
+        let updatedInv: any = null;
+        if (order.storeId) {
+          const sId = Types.ObjectId.isValid(order.storeId.toString())
+            ? new Types.ObjectId(order.storeId.toString())
+            : order.storeId;
+          updatedInv = await this.connection.collection('inventory').findOneAndUpdate(
+            {
+              storeId: sId,
+              productId: prodObjId,
+            },
+            {
+              $inc: {
+                availableQty: item.quantity,
+                reservedQty: -item.quantity,
+                soldQty: -item.quantity,
+              },
+            },
+            { returnDocument: 'after' }
+          );
+        }
+
+        const freshProd = await this.connection.collection('products').findOne({
+          _id: prodObjId as any,
+        });
+
+        // 4. Broadcast real-time stock update
+        this.trackingGateway.broadcastInventoryUpdate({
+          storeId: order.storeId?.toString() || '',
+          productId: item.productId.toString(),
+          productName: item.name,
+          availableQty: freshProd?.stock ?? (updatedInv?.availableQty ?? 0),
+          reservedQty: Math.max(0, updatedInv?.reservedQty ?? 0),
+          newAvailableStock: freshProd?.stock ?? (updatedInv?.availableQty ?? 0),
+        });
+      } catch (invErr: any) {
+        this.logger.warn(`Failed to restore inventory on cancel for product ${item.productId}: ${invErr.message}`);
+      }
+    }
   }
 
   async cancelOrder(orderId: string, userId: string, reason?: string) {
@@ -528,6 +1004,10 @@ export class OrdersService {
         const before = user.shoppingCoins;
         user.shoppingCoins += order.coinsUsed;
         await user.save();
+        this.trackingGateway.emitWalletUpdated(uId.toString(), {
+          shoppingCoins: user.shoppingCoins,
+          walletBalance: (user as any).walletBalance || 0,
+        });
 
         await this.coinTxModel.create({
           userId: uId,
@@ -542,36 +1022,8 @@ export class OrdersService {
       }
     }
 
-    // Reverse Inventory: decrement reservedQty and increment availableQty
-    if (order.storeId && order.items && order.items.length > 0) {
-      for (const item of order.items) {
-        try {
-          const updatedInv = await this.connection.collection('inventory').findOneAndUpdate(
-            {
-              storeId: new Types.ObjectId(order.storeId.toString()),
-              productId: new Types.ObjectId(item.productId.toString()),
-            },
-            {
-              $inc: {
-                availableQty: item.quantity,
-                reservedQty: -item.quantity,
-              },
-            },
-            { returnDocument: 'after' }
-          );
-
-          this.trackingGateway.broadcastInventoryUpdate({
-            storeId: order.storeId.toString(),
-            productId: item.productId.toString(),
-            productName: item.name,
-            availableQty: updatedInv?.availableQty ?? 0,
-            reservedQty: Math.max(0, updatedInv?.reservedQty ?? 0),
-          });
-        } catch (invErr: any) {
-          this.logger.warn(`Failed to restore inventory on cancel for product ${item.productId}: ${invErr.message}`);
-        }
-      }
-    }
+    // Reverse Inventory & Restock
+    await this.restockOrderItems(order);
 
     return this.updateOrderStatus(
       orderId,
@@ -763,6 +1215,11 @@ export class OrdersService {
             select: 'fullName phoneNumber vehicleNumber',
             options: { lean: true },
           })
+          .populate({
+            path: 'storeId',
+            select: 'name code address cityName areaName location',
+            options: { lean: true },
+          })
           .lean()
           .exec(),
         this.orderModel.countDocuments(userQuery).exec(),
@@ -789,6 +1246,54 @@ export class OrdersService {
         orders = [];
         total = 0;
       }
+    }
+
+    // Enrich storeName from storeId or store collection if missing
+    for (const ord of orders) {
+      if (!ord.storeName) {
+        if (ord.storeId && typeof ord.storeId === 'object' && ord.storeId.name) {
+          ord.storeName = ord.storeId.name;
+        }
+      }
+    }
+
+    // Enrich missing item images from products collection for older orders
+    const missingProductIds = new Set<string>();
+    for (const ord of orders) {
+      if (Array.isArray(ord.items)) {
+        for (const it of ord.items) {
+          if (!it.imageUrl && it.productId) {
+            missingProductIds.add(it.productId.toString());
+          }
+        }
+      }
+    }
+
+    if (missingProductIds.size > 0) {
+      try {
+        const validIds = Array.from(missingProductIds)
+          .filter((id) => Types.ObjectId.isValid(id))
+          .map((id) => new Types.ObjectId(id));
+        if (validIds.length > 0 && this.connection?.db) {
+          const prods = await this.connection.db
+            .collection('products')
+            .find({ _id: { $in: validIds } }, { projection: { _id: 1, imageUrl: 1, images: 1 } })
+            .toArray();
+          const prodMap = new Map(
+            prods.map((p: any) => [p._id.toString(), p.imageUrl || (p.images && p.images[0]) || '']),
+          );
+          for (const ord of orders) {
+            if (Array.isArray(ord.items)) {
+              for (const it of ord.items) {
+                if (!it.imageUrl && it.productId) {
+                  const img = prodMap.get(it.productId.toString());
+                  if (img) it.imageUrl = img;
+                }
+              }
+            }
+          }
+        }
+      } catch (_) {}
     }
 
     return {
@@ -897,7 +1402,7 @@ export class OrdersService {
     }
 
     if (!candidateStores || candidateStores.length === 0) {
-      return this.storeModel.findOne({ isActive: true }).exec();
+      return null;
     }
 
     // Single store in pool - direct routing

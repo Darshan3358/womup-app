@@ -638,6 +638,7 @@ export class StoreOrdersService {
       await pickList.save();
     }
 
+    order.bagBarcode = bagBarcode;
     order.status = OrderStatus.PACKED;
     await order.save();
 
@@ -680,10 +681,16 @@ export class StoreOrdersService {
       await pickList.save();
     }
 
+    order.shelfSlot = slot;
+    if (order.status !== OrderStatus.OUT_FOR_DELIVERY && order.status !== OrderStatus.DELIVERED) {
+      order.status = OrderStatus.PACKED;
+    }
+    await order.save();
+
     this.trackingGateway.notifyOrderStatus(order._id.toString(), 'READY_FOR_PICKUP', {
       orderNumber: order.orderNumber,
       shelfSlot: slot,
-      bagBarcode: pickList?.bagBarcode,
+      bagBarcode: pickList?.bagBarcode || order.bagBarcode,
     });
 
     return {
@@ -722,7 +729,6 @@ export class StoreOrdersService {
           productId: item.productId,
         });
         if (inv) {
-          inv.availableQty = Math.max(0, inv.availableQty - item.quantity);
           inv.reservedQty = Math.max(0, inv.reservedQty - item.quantity);
           inv.soldQty = (inv.soldQty || 0) + item.quantity;
           await inv.save();
@@ -862,10 +868,29 @@ export class StoreOrdersService {
     const order = await this.orderModel.findById(orderId);
     if (!order) throw new NotFoundException('Order not found');
 
+    const pickList = await this.pickListModel.findOne({ orderId: order._id });
+
+    // Lock barcode: if already generated, lock and return existing barcode
+    if (order.bagBarcode) {
+      if (pickList && !pickList.bagBarcode) {
+        pickList.bagBarcode = order.bagBarcode;
+        await pickList.save();
+      }
+      return { success: true, bagBarcode: order.bagBarcode };
+    }
+
+    if (pickList && pickList.bagBarcode) {
+      order.bagBarcode = pickList.bagBarcode;
+      await order.save();
+      return { success: true, bagBarcode: pickList.bagBarcode };
+    }
+
     const cleanNum = order.orderNumber.replace(/[^0-9]/g, '');
     const bagBarcode = `BAG-${cleanNum || Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    const pickList = await this.pickListModel.findOne({ orderId: order._id });
+    order.bagBarcode = bagBarcode;
+    await order.save();
+
     if (pickList) {
       pickList.bagBarcode = bagBarcode;
       await pickList.save();

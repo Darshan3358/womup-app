@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -26,5 +26,29 @@ export class UsersController {
     @Body() body: UpdateUserDto,
   ) {
     return this.usersService.updateProfile(user.id, body);
+  }
+
+  @Get('wishlist')
+  @ApiOperation({ summary: 'Get current user wishlist items' })
+  async getWishlist(@CurrentUser() user: any) {
+    const items = await this.usersService.getWishlist(user.id);
+    return { success: true, data: items };
+  }
+
+  @Post('wishlist/toggle')
+  @ApiOperation({ summary: 'Toggle product in current user wishlist' })
+  async toggleWishlist(
+    @CurrentUser() user: any,
+    @Body('productId') productId: string,
+  ) {
+    const result = await this.usersService.toggleWishlist(user.id, productId);
+    return { success: true, data: result };
+  }
+
+  @Delete('wishlist')
+  @ApiOperation({ summary: 'Clear current user wishlist' })
+  async clearWishlist(@CurrentUser() user: any) {
+    const result = await this.usersService.clearWishlist(user.id);
+    return { success: true, data: result };
   }
 }

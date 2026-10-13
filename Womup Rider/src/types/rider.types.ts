@@ -105,6 +105,7 @@ export interface DeliveryRequest {
   ratePerKm?: number;
   rateSource?: 'AREA' | 'CITY' | 'GLOBAL' | string;
   basePayout?: number;
+  bagBarcode?: string;
 }
 
 export interface RiderProfile {

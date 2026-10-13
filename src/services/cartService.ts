@@ -14,7 +14,18 @@ export interface CartSummary {
   totalCoinsEarnable: number;
 }
 
+const _feeCache = new Map<string, { data: any; ts: number }>();
+const _inFlightRequests = new Map<string, Promise<any>>();
+
+export const clearFeeCache = () => {
+  _feeCache.clear();
+  _inFlightRequests.clear();
+};
+
 export const CartService = {
+  clearCache() {
+    clearFeeCache();
+  },
   calculateSummary(
     items: CartItem[],
     appliedCoins = 0,
@@ -58,8 +69,12 @@ export const CartService = {
   },
 
   // Authoritative server API methods
-  async getServerCart(): Promise<any> {
-    const res = await api.get<any>('/cart');
+  async getServerCart(areaId?: string, storeId?: string): Promise<any> {
+    const params = new URLSearchParams();
+    if (areaId) params.append('areaId', areaId);
+    if (storeId) params.append('storeId', storeId);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const res = await api.get<any>(`/cart${qs}`);
     return res.success ? res.data : null;
   },
 
@@ -88,8 +103,18 @@ export const CartService = {
     return res.success ? res.data : null;
   },
 
+  async toggleCoinsOnServer(useCoins: boolean): Promise<any> {
+    const res = await api.post<any>('/cart/toggle-coins', { useCoins });
+    return res.success ? res.data : null;
+  },
+
   async applyCouponOnServer(couponCode: string): Promise<any> {
     const res = await api.post<any>('/cart/apply-coupon', { couponCode });
+    return res.success ? res.data : null;
+  },
+
+  async setCartLocation(areaId?: string, storeId?: string): Promise<any> {
+    const res = await api.post<any>('/cart/set-location', { areaId, storeId });
     return res.success ? res.data : null;
   },
 
@@ -125,56 +150,81 @@ export const CartService = {
       explanation?: string;
     };
   }> {
-    try {
-      const host = typeof window !== 'undefined' && window.location?.hostname
-        ? window.location.hostname
-        : 'localhost';
+    const cacheKey = `${params.areaName || ''}_${params.cityName || ''}_${params.distanceKm || 3.26}_${params.items?.length || 0}`;
 
-      const res = await fetch(`http://${host}:5001/api/v1/cart/calculate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(params),
-      });
-      const json = await res.json();
-      if (json.success && json.data) {
-        return json.data;
-      }
-    } catch (err) {
-      console.warn('[CartService] /api/v1/cart/calculate fetch failed, using rate engine fallback:', err);
+    // 1. Check completed cache first (60s TTL)
+    const cached = _feeCache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < 60000) {
+      return cached.data;
     }
 
-    // High fidelity fallback matching configured Admin Prahlad Nagar / Ahmedabad rates:
-    // Distance 3.26 km × ₹11/km = ₹35.86, Floor ₹40, Cap ₹180 -> ₹40
-    const dist = params.distanceKm || 3.26;
-    const rate = 11;
-    const minPayout = 40;
-    const maxPayout = 180;
-    const baseFee = Number((dist * rate).toFixed(2));
-    const floorApplied = baseFee < minPayout;
-    const floorAdjustment = floorApplied ? Number((minPayout - baseFee).toFixed(2)) : 0;
-    const finalFee = Math.round(Math.min(Math.max(baseFee, minPayout), maxPayout));
+    // 2. Check if identical request is already in-flight (deduplication)
+    const inFlight = _inFlightRequests.get(cacheKey);
+    if (inFlight) {
+      return inFlight;
+    }
 
-    return {
-      deliveryFee: finalFee,
-      handlingFee: 5,
-      distanceKm: dist,
-      rateUsed: rate,
-      rateSource: 'AREA',
-      areaName: 'Prahlad Nagar',
-      cityName: 'Ahmedabad',
-      total: (params.items?.reduce((s, it) => s + (it.price || 0) * (it.quantity || 1), 0) || 60) + finalFee + 5,
-      breakdown: {
-        baseFee,
-        minimumPayout: minPayout,
-        maximumPayout: maxPayout,
-        floorApplied,
-        floorAdjustment,
-        capApplied: false,
-        formula: `${dist} km × ₹${rate}/km = ₹${baseFee} (Floor: ₹${minPayout}, Cap: ₹${maxPayout}) → ₹${finalFee}`,
-        explanation: floorApplied
-          ? `Includes ₹${floorAdjustment} minimum pay guarantee for delivery partner`
-          : `Distance-based fee at ₹${rate}/km`,
-      },
-    };
+    // 3. Create single shared promise
+    const promise = (async () => {
+      try {
+        const host = typeof window !== 'undefined' && window.location?.hostname
+          ? window.location.hostname
+          : 'localhost';
+
+        const res = await fetch(`http://${host}:5001/api/v1/cart/calculate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(params),
+        });
+        const json = await res.json();
+        if (json.success && json.data) {
+          _feeCache.set(cacheKey, { data: json.data, ts: Date.now() });
+          return json.data;
+        }
+      } catch (err) {
+        console.warn('[CartService] /api/v1/cart/calculate fetch failed, using fallback:', err);
+      } finally {
+        _inFlightRequests.delete(cacheKey);
+      }
+
+      // High fidelity fallback matching configured Admin rates:
+      const dist = params.distanceKm || 3.26;
+      const rate = 11;
+      const minPayout = 30;
+      const maxPayout = 180;
+      const baseFee = Number((dist * rate).toFixed(2));
+      const floorApplied = baseFee < minPayout;
+      const floorAdjustment = floorApplied ? Number((minPayout - baseFee).toFixed(2)) : 0;
+      const finalFee = Math.round(Math.min(Math.max(baseFee, minPayout), maxPayout));
+
+      const fallbackData = {
+        deliveryFee: finalFee,
+        handlingFee: 5,
+        distanceKm: dist,
+        rateUsed: rate,
+        rateSource: 'AREA',
+        areaName: 'Prahlad Nagar',
+        cityName: 'Ahmedabad',
+        total: (params.items?.reduce((s, it) => s + (it.price || 0) * (it.quantity || 1), 0) || 60) + finalFee + 5,
+        breakdown: {
+          baseFee,
+          minimumPayout: minPayout,
+          maximumPayout: maxPayout,
+          floorApplied,
+          floorAdjustment,
+          capApplied: false,
+          formula: `${dist} km × ₹${rate}/km = ₹${baseFee} (Floor: ₹${minPayout}, Cap: ₹${maxPayout}) → ₹${finalFee}`,
+          explanation: floorApplied
+            ? `Includes ₹${floorAdjustment} minimum pay guarantee for delivery partner`
+            : `Distance-based fee at ₹${rate}/km`,
+        },
+      };
+
+      _feeCache.set(cacheKey, { data: fallbackData, ts: Date.now() });
+      return fallbackData;
+    })();
+
+    _inFlightRequests.set(cacheKey, promise);
+    return promise;
   },
 };

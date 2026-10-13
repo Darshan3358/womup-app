@@ -18,6 +18,7 @@ import { useApp } from '../../context/AppContext';
 import { LocationService, DetectedLocation, ResolvedArea } from '../../services/locationService';
 import { AddressService } from '../../services/addressService';
 import { StorageService } from '../../services/storageService';
+import { matchAreaByName } from '../../data/areas';
 
 export const LocationPickerModal: React.FC = () => {
   const {
@@ -490,11 +491,20 @@ export const LocationPickerModal: React.FC = () => {
                     key={addr.id || formatted}
                     activeOpacity={0.7}
                     onPress={() => {
+                      const matched = matchAreaByName(`${addr.houseFlat} ${addr.areaLandmark || ''} ${addr.city || ''}`);
+                      const targetLat = addr.latitude || matched?.lat;
+                      const targetLng = addr.longitude || matched?.lng;
+                      const addrWithCoords = {
+                        ...addr,
+                        latitude: targetLat || addr.latitude,
+                        longitude: targetLng || addr.longitude,
+                      };
+
                       setDeliveryLocation(`${label} — ${formatted}`);
-                      setSelectedAddress(addr);
-                      if (addr.latitude && addr.longitude) {
+                      setSelectedAddress(addrWithCoords);
+                      if (targetLat && targetLng) {
                         LocationService.clearCache();
-                        LocationService.resolveArea(addr.latitude, addr.longitude, true).then((area) => {
+                        LocationService.resolveArea(targetLat, targetLng, true).then((area) => {
                           if (area) {
                             setCurrentArea(area.areaId, area.areaName);
                             if (area.storeId) {

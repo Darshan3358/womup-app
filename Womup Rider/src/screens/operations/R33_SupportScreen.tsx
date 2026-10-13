@@ -10,7 +10,6 @@ import {
   Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../../theme/colors';
 import { useRider } from '../../context/RiderContext';
 import { RiderApiService } from '../../services/riderApi';
 
@@ -24,15 +23,15 @@ interface HelpCategory {
 }
 
 const HELP_CATEGORIES: HelpCategory[] = [
-  { id: '1', icon: 'cube-outline', iconColor: '#4F46E5', bgColor: '#EEF2FF', title: 'Order & Packaging Problem', desc: 'Missing item, leaky milk bag or damaged box' },
-  { id: '2', icon: 'location-outline', iconColor: '#E11D48', bgColor: '#FFE4E6', title: 'Wrong Customer Address', desc: 'GPS pin mismatch or society gate security denied entry' },
-  { id: '3', icon: 'bicycle-outline', iconColor: '#D97706', bgColor: '#FEF3C7', title: 'Vehicle Breakdown', desc: 'Flat tyre, EV battery drained or accident' },
-  { id: '4', icon: 'cash-outline', iconColor: '#059669', bgColor: '#ECFDF5', title: 'Cash on Delivery (COD) Dispute', desc: 'Customer refused to pay or exact change unavailable' },
+  { id: '1', icon: 'cube-outline', iconColor: '#4F46E5', bgColor: '#EEF2FF', title: 'Order & Packaging Problem', desc: 'Missing item, leaky bag or damaged product' },
+  { id: '2', icon: 'location-outline', iconColor: '#E11D48', bgColor: '#FFE4E6', title: 'Customer Address Issue', desc: 'GPS pin mismatch or society security denied entry' },
+  { id: '3', icon: 'bicycle-outline', iconColor: '#D97706', bgColor: '#FEF3C7', title: 'Vehicle Breakdown', desc: 'Flat tyre, EV battery drained or puncture' },
+  { id: '4', icon: 'cash-outline', iconColor: '#059669', bgColor: '#ECFDF5', title: 'Cash on Delivery (COD) Dispute', desc: 'Customer refused to pay or exact change problem' },
   { id: '5', icon: 'phone-portrait-outline', iconColor: '#2563EB', bgColor: '#EFF6FF', title: 'App or GPS Malfunction', desc: 'App lagging, location not syncing or OTP error' },
 ];
 
 export const SupportScreen: React.FC = () => {
-  const { setShowEmergencyModal, activeDelivery } = useRider();
+  const { setShowEmergencyModal, activeDelivery, setSubScreen } = useRider();
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
   const [issueNote, setIssueNote] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
@@ -77,44 +76,73 @@ export const SupportScreen: React.FC = () => {
     }
   };
 
+  const handleOpenWhatsApp = () => {
+    const url = 'https://wa.me/917940008899?text=Hello%20WormUp%20Support,%20I%20am%20a%20Rider%20needing%20assistance.';
+    Linking.openURL(url).catch(() => {
+      Alert.alert('Support Chat', 'WhatsApp support helpline: +91 79 4000 8899');
+    });
+  };
+
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* SOS Emergency Banner */}
-      <TouchableOpacity
-        style={styles.sosBanner}
-        onPress={() => setShowEmergencyModal(true)}
-        activeOpacity={0.85}
-      >
-        <View style={styles.sosLeft}>
-          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
-            <Ionicons name="warning" size={20} color="#FFF" />
-          </View>
-          <View>
-            <Text style={styles.sosTitle}>EMERGENCY / ACCIDENT HELPLINE</Text>
-            <Text style={styles.sosSub}>Tap here for Police, Ambulance or Immediate SOS</Text>
-          </View>
-        </View>
-        <Ionicons name="arrow-forward" size={18} color="#FFF" />
-      </TouchableOpacity>
-
-      {/* Direct Hub Manager Call */}
-      <View style={styles.hubCallCard}>
-        <View style={styles.hubCallInfo}>
-          <Text style={styles.hubCallTitle}>Satellite Hub Operations Dispatch</Text>
-          <Text style={styles.hubCallSub}>Available 24x7 for active delivery issues</Text>
-        </View>
+      {/* Header Row */}
+      <View style={styles.headerRow}>
         <TouchableOpacity
-          style={[styles.callBtn, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}
-          onPress={handleCallManager}
-          activeOpacity={0.8}
+          style={styles.backBtn}
+          onPress={() => setSubScreen('None')}
+          activeOpacity={0.7}
         >
-          <Ionicons name="call" size={14} color="#FFF" />
-          <Text style={styles.callBtnText}>Call Hub</Text>
+          <Ionicons name="arrow-back" size={20} color="#071B52" />
+        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.screenTitle}>Help & Support</Text>
+          <Text style={styles.screenSubtitle}>Delivering Smiles • Fast · Safe · Together</Text>
+        </View>
+      </View>
+
+      {/* 1. Hero Support Card (Wireframe Screen 16) */}
+      <View style={styles.heroSupportCard}>
+        <View style={styles.heroIconCircle}>
+          <Ionicons name="headset" size={28} color="#FF3B98" />
+        </View>
+        <Text style={styles.heroTitle}>24x7 Fleet Assistance</Text>
+        <Text style={styles.heroSubtitle}>
+          Dedicated rider support helpline & dark store dispatch team
+        </Text>
+      </View>
+
+      {/* 2. 3 Action Buttons (Wireframe Screen 16: Call / Chat / SOS) */}
+      <View style={styles.actionButtonsRow}>
+        <TouchableOpacity
+          style={[styles.quickActionBtn, { backgroundColor: '#13B978' }]}
+          onPress={handleCallManager}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="call" size={18} color="#FFFFFF" />
+          <Text style={styles.quickActionBtnText}>Call Hub</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.quickActionBtn, { backgroundColor: '#3B82F6' }]}
+          onPress={handleOpenWhatsApp}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="chatbubble-ellipses" size={18} color="#FFFFFF" />
+          <Text style={styles.quickActionBtnText}>Chat Support</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.quickActionBtn, { backgroundColor: '#EF4444' }]}
+          onPress={() => setShowEmergencyModal(true)}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="warning" size={18} color="#FFFFFF" />
+          <Text style={styles.quickActionBtnText}>SOS Alert</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Issue Categories */}
-      <Text style={styles.sectionTitle}>Report an Issue</Text>
+      {/* 3. Issue Categories (Wireframe Screen 16) */}
+      <Text style={styles.sectionHeading}>Select Issue Category</Text>
       <View style={styles.categoriesList}>
         {HELP_CATEGORIES.map((cat) => {
           const isSelected = selectedIssue === cat.id;
@@ -125,7 +153,7 @@ export const SupportScreen: React.FC = () => {
               onPress={() => setSelectedIssue(cat.id)}
               activeOpacity={0.7}
             >
-              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: cat.bgColor, alignItems: 'center', justifyContent: 'center' }}>
+              <View style={[styles.catIconWrap, { backgroundColor: cat.bgColor }]}>
                 <Ionicons name={cat.icon} size={20} color={cat.iconColor} />
               </View>
               <View style={styles.catInfo}>
@@ -134,21 +162,24 @@ export const SupportScreen: React.FC = () => {
                 </Text>
                 <Text style={styles.catDesc}>{cat.desc}</Text>
               </View>
-              {isSelected && (
-                <Ionicons name="checkmark-circle" size={20} color={COLORS.hotPink} />
+              {isSelected ? (
+                <Ionicons name="checkmark-circle" size={20} color="#FF3B98" />
+              ) : (
+                <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
               )}
             </TouchableOpacity>
           );
         })}
       </View>
 
+      {/* 4. Ticket Form (If Category Selected) */}
       {selectedIssue && (
         <View style={styles.ticketForm}>
-          <Text style={styles.formLabel}>Describe the situation (Optional):</Text>
+          <Text style={styles.formLabel}>Describe Situation (Optional):</Text>
           <TextInput
             style={styles.textArea}
-            placeholder="Add any extra detail (e.g. customer phone unreachable, tyre punctured at SG Highway)..."
-            placeholderTextColor={COLORS.secondaryText}
+            placeholder="Add extra details (e.g. flat tyre on SG Highway, customer unreachable)..."
+            placeholderTextColor="#94A3B8"
             multiline
             numberOfLines={3}
             value={issueNote}
@@ -160,12 +191,10 @@ export const SupportScreen: React.FC = () => {
             disabled={submitting}
             activeOpacity={0.85}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              <Text style={styles.submitBtnText}>
-                {submitting ? 'DISPATCHING TICKET...' : 'SUBMIT PRIORITY TICKET'}
-              </Text>
-              {!submitting && <Ionicons name="arrow-forward" size={14} color="#FFF" />}
-            </View>
+            <Text style={styles.submitBtnText}>
+              {submitting ? 'DISPATCHING TICKET...' : 'SUBMIT PRIORITY TICKET'}
+            </Text>
+            {!submitting && <Ionicons name="arrow-forward" size={16} color="#FFF" style={{ marginLeft: 6 }} />}
           </TouchableOpacity>
         </View>
       )}
@@ -178,84 +207,105 @@ export const SupportScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#F8FAFC',
     padding: 16,
   },
-  sosBanner: {
-    backgroundColor: COLORS.error,
-    borderRadius: 18,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-    elevation: 3,
-  },
-  sosLeft: {
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    flex: 1,
+    marginBottom: 16,
+    paddingTop: 4,
   },
-  sosEmoji: {
-    fontSize: 26,
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
-  sosTitle: {
-    color: COLORS.white,
-    fontWeight: '900',
-    fontSize: 13,
-    letterSpacing: 0.5,
+  screenTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#071B52',
+    letterSpacing: -0.3,
   },
-  sosSub: {
-    color: '#FEE2E2',
-    fontSize: 11,
+  screenSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
     marginTop: 2,
   },
-  sosArrow: {
-    color: COLORS.white,
+  heroSupportCard: {
+    backgroundColor: '#071B52',
+    borderRadius: 22,
+    padding: 22,
+    alignItems: 'center',
+    marginBottom: 16,
+    shadowColor: '#071B52',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  heroIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255, 59, 152, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 59, 152, 0.3)',
+  },
+  heroTitle: {
     fontSize: 18,
     fontWeight: '800',
+    color: '#FFFFFF',
   },
-  hubCallCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 18,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+  heroSubtitle: {
+    fontSize: 12,
+    color: '#94A3B8',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  actionButtonsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 10,
     marginBottom: 20,
   },
-  hubCallInfo: {
+  quickActionBtn: {
     flex: 1,
-    marginRight: 12,
+    height: 50,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  hubCallTitle: {
-    fontSize: 14,
+  quickActionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
     fontWeight: '800',
-    color: COLORS.navy,
   },
-  hubCallSub: {
-    fontSize: 11,
-    color: COLORS.textMuted,
-    marginTop: 2,
-  },
-  callBtn: {
-    backgroundColor: COLORS.blue,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
-  },
-  callBtnText: {
-    color: COLORS.white,
+  sectionHeading: {
+    fontSize: 16,
     fontWeight: '800',
-    fontSize: 12,
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: COLORS.navy,
+    color: '#071B52',
     marginBottom: 12,
   },
   categoriesList: {
@@ -265,83 +315,94 @@ const styles = StyleSheet.create({
   catCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.white,
-    padding: 14,
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
+    padding: 14,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    gap: 12,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 3,
+    elevation: 1,
   },
   catCardSelected: {
-    borderColor: COLORS.hotPink,
-    backgroundColor: '#FFF5FA',
+    borderColor: '#FF3B98',
+    backgroundColor: '#FDF2F8',
   },
-  catEmoji: {
-    fontSize: 22,
+  catIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
   catInfo: {
     flex: 1,
   },
   catTitle: {
     fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
+    fontWeight: '800',
+    color: '#071B52',
   },
   catTitleSelected: {
-    color: COLORS.hotPink,
+    color: '#FF3B98',
   },
   catDesc: {
     fontSize: 11,
-    color: COLORS.textMuted,
+    color: '#64748B',
     marginTop: 2,
   },
-  checkmark: {
-    color: COLORS.hotPink,
-    fontWeight: '900',
-    fontSize: 16,
-  },
   ticketForm: {
-    backgroundColor: COLORS.white,
-    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
     padding: 16,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: '#E2E8F0',
     marginBottom: 20,
   },
   formLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: COLORS.textPrimary,
+    color: '#071B52',
     marginBottom: 8,
   },
   textArea: {
-    height: 70,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    backgroundColor: '#F8FAFC',
     borderRadius: 12,
-    padding: 10,
-    fontSize: 12,
+    padding: 12,
+    fontSize: 13,
+    color: '#071B52',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     textAlignVertical: 'top',
-    backgroundColor: '#F9FAFB',
+    height: 80,
     marginBottom: 14,
-    color: COLORS.textPrimary,
   },
   submitBtn: {
-    backgroundColor: COLORS.hotPink,
-    paddingVertical: 14,
-    borderRadius: 12,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FF3B98',
+    paddingVertical: 14,
+    borderRadius: 14,
+    shadowColor: '#FF3B98',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
   },
   disabledBtn: {
     opacity: 0.6,
   },
   submitBtnText: {
-    color: COLORS.white,
+    color: '#FFFFFF',
     fontWeight: '800',
     fontSize: 13,
     letterSpacing: 0.5,
   },
   bottomSpacer: {
-    height: 30,
+    height: 36,
   },
 });

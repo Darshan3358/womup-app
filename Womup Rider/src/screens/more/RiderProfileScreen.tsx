@@ -13,12 +13,12 @@ import { useRider } from '../../context/RiderContext';
 import { COLORS } from '../../theme/colors';
 
 export const RiderProfileScreen: React.FC = () => {
-  const { profile, updateProfile, setSubScreen, detectedHubName } = useRider();
+  const { profile, updateProfile, setSubScreen, detectedHubName, isOnline } = useRider();
 
-  const [name, setName] = useState(profile?.name || '');
-  const [phone, setPhone] = useState(profile?.phone || '');
-  const [email, setEmail] = useState(profile?.email || '');
-  const [city, setCity] = useState(profile?.city || '');
+  const [name, setName] = useState(profile?.name || 'Darshan Parmar');
+  const [phone, setPhone] = useState(profile?.phone || '+91 98765 43210');
+  const [email, setEmail] = useState(profile?.email || 'darshan@wormup.in');
+  const [city, setCity] = useState(profile?.city || 'Ahmedabad (Satellite Hub)');
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
@@ -39,59 +39,133 @@ export const RiderProfileScreen: React.FC = () => {
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <TouchableOpacity style={[styles.backRow, { flexDirection: 'row', alignItems: 'center', gap: 4 }]} onPress={() => setSubScreen('None')}>
-        <Ionicons name="arrow-back" size={16} color={COLORS.hotPink} />
-        <Text style={styles.backArrow}>Back to Menu</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.screenTitle}>Rider Partner Profile</Text>
-      <Text style={styles.screenSubtitle}>
-        Manage your contact details and operational hub assignment.
-      </Text>
-
-      {/* Hero Stats Card */}
-      <View style={styles.statsCard}>
-        <View style={styles.avatarPill}>
-          <Ionicons name="person" size={26} color={COLORS.navy} />
+      {/* Header Row */}
+      <View style={styles.headerRow}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => setSubScreen('None')}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={20} color="#071B52" />
+        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.screenTitle}>My Profile</Text>
+          <Text style={styles.screenSubtitle}>Delivering Smiles • Fast · Safe · Together</Text>
         </View>
-        <View style={styles.statsInfo}>
-          <Text style={styles.statsName}>{profile?.name}</Text>
-          <Text style={styles.statsId}>Partner ID: #{profile?.id}</Text>
-          <View style={styles.pillRow}>
-            <View style={[styles.badgeSuccess, { flexDirection: 'row', alignItems: 'center', gap: 3 }]}>
-              <Ionicons name="shield-checkmark" size={11} color="#059669" />
-              <Text style={styles.badgeSuccessText}>{profile?.status || 'APPROVED'}</Text>
-            </View>
-            <View style={[styles.badgeRating, { flexDirection: 'row', alignItems: 'center', gap: 3 }]}>
-              <Ionicons name="star" size={11} color="#D97706" />
-              <Text style={styles.badgeRatingText}>{profile?.rating ?? 5.0}</Text>
-            </View>
-            <View style={[styles.badgeDrops, { flexDirection: 'row', alignItems: 'center', gap: 3 }]}>
-              <Ionicons name="cube-outline" size={11} color="#2563EB" />
-              <Text style={styles.badgeDropsText}>{profile?.completedDeliveries ?? 0} drops</Text>
-            </View>
+      </View>
+
+      {/* 1. Hero Profile Card (Wireframe Screen 14) */}
+      <View style={styles.heroProfileCard}>
+        <View style={styles.avatarWrapper}>
+          <View style={styles.avatarCircle}>
+            <Ionicons name="person" size={40} color="#071B52" />
+          </View>
+          <TouchableOpacity style={styles.cameraIconBtn} activeOpacity={0.8}>
+            <Ionicons name="camera" size={14} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+
+        <Text style={styles.profileName}>{profile?.name || name}</Text>
+        <Text style={styles.profileRiderId}>Rider ID: #WU0123</Text>
+
+        <View style={styles.badgesRow}>
+          <View style={styles.onlineStatusPill}>
+            <View style={[styles.statusDot, { backgroundColor: isOnline ? '#13B978' : '#94A3B8' }]} />
+            <Text style={[styles.onlineStatusText, { color: isOnline ? '#13B978' : '#64748B' }]}>
+              {isOnline ? 'Online' : 'Offline'}
+            </Text>
+          </View>
+
+          <View style={styles.ratingBadgePill}>
+            <Ionicons name="star" size={12} color="#F59E0B" />
+            <Text style={styles.ratingBadgeText}>{profile?.rating ?? 4.9}</Text>
           </View>
         </View>
       </View>
 
-      {/* Edit Form */}
+      {/* 2. Quick Navigation Sections (Wireframe Screen 14) */}
+      <View style={styles.quickNavCard}>
+        <TouchableOpacity
+          style={styles.navRow}
+          onPress={() => setSubScreen('VehicleDetails')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.navLeft}>
+            <View style={[styles.navIconBox, { backgroundColor: '#FEF3C7' }]}>
+              <Ionicons name="bicycle" size={18} color="#D97706" />
+            </View>
+            <View>
+              <Text style={styles.navTitle}>Vehicle Details</Text>
+              <Text style={styles.navSubtitle}>Hero Electric • GJ-01-AB-1234</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
+        </TouchableOpacity>
+
+        <View style={styles.navDivider} />
+
+        <TouchableOpacity
+          style={styles.navRow}
+          onPress={() => setSubScreen('Documents')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.navLeft}>
+            <View style={[styles.navIconBox, { backgroundColor: '#ECFDF5' }]}>
+              <Ionicons name="document-text" size={18} color="#059669" />
+            </View>
+            <View>
+              <Text style={styles.navTitle}>Documents</Text>
+              <Text style={styles.navSubtitle}>Aadhaar, DL, PAN & RC Verified</Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={styles.verifiedSmallBadge}>
+              <Text style={styles.verifiedSmallText}>VERIFIED</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
+          </View>
+        </TouchableOpacity>
+
+        <View style={styles.navDivider} />
+
+        <TouchableOpacity
+          style={styles.navRow}
+          onPress={() => setSubScreen('BankSettlement')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.navLeft}>
+            <View style={[styles.navIconBox, { backgroundColor: '#EFF6FF' }]}>
+              <Ionicons name="card" size={18} color="#2563EB" />
+            </View>
+            <View>
+              <Text style={styles.navTitle}>Bank Details</Text>
+              <Text style={styles.navSubtitle}>Direct IMPS Payout Account</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
+        </TouchableOpacity>
+      </View>
+
+      {/* 3. Personal Information Form */}
       <View style={styles.formCard}>
+        <Text style={styles.formSectionTitle}>Personal Information</Text>
+
         <Text style={styles.fieldLabel}>FULL NAME</Text>
         <TextInput
           style={styles.input}
           value={name}
           onChangeText={setName}
           placeholder="Enter full name"
-          placeholderTextColor={COLORS.textMuted}
+          placeholderTextColor="#94A3B8"
         />
 
-        <Text style={styles.fieldLabel}>REGISTERED MOBILE NUMBER</Text>
+        <Text style={styles.fieldLabel}>MOBILE NUMBER</Text>
         <TextInput
           style={styles.input}
           value={phone}
           onChangeText={setPhone}
           placeholder="+91 98765 43210"
-          placeholderTextColor={COLORS.textMuted}
+          placeholderTextColor="#94A3B8"
           keyboardType="phone-pad"
         />
 
@@ -101,30 +175,25 @@ export const RiderProfileScreen: React.FC = () => {
           value={email}
           onChangeText={setEmail}
           placeholder="rider@wormup.in"
-          placeholderTextColor={COLORS.textMuted}
+          placeholderTextColor="#94A3B8"
           keyboardType="email-address"
           autoCapitalize="none"
         />
 
-        <Text style={styles.fieldLabel}>ASSIGNED OPERATIONAL HUB / CITY</Text>
+        <Text style={styles.fieldLabel}>OPERATIONAL CITY / HUB</Text>
         <TextInput
           style={styles.input}
           value={city}
           onChangeText={setCity}
           placeholder="e.g. Ahmedabad (Satellite Hub)"
-          placeholderTextColor={COLORS.textMuted}
+          placeholderTextColor="#94A3B8"
         />
 
-        <Text style={styles.fieldLabel}>CURRENT OPERATING HUB (GPS / DISPATCH)</Text>
-        <View style={[styles.hubStatusBox, !detectedHubName && styles.hubStatusBoxWarning]}>
-          <Ionicons
-            name={detectedHubName ? "location-sharp" : "alert-circle-outline"}
-            size={16}
-            color={detectedHubName ? COLORS.primary : "#D97706"}
-            style={{ marginRight: 6 }}
-          />
-          <Text style={[styles.hubStatusText, !detectedHubName && styles.hubStatusTextWarning]}>
-            {detectedHubName ? detectedHubName.split('(')[0].trim() : 'No Hub Selected (Please detect GPS or select hub)'}
+        <Text style={styles.fieldLabel}>CURRENT DISPATCH GPS HUB</Text>
+        <View style={styles.hubStatusBox}>
+          <Ionicons name="location-sharp" size={16} color="#FF3B98" style={{ marginRight: 6 }} />
+          <Text style={styles.hubStatusText}>
+            {detectedHubName ? detectedHubName.split('(')[0].trim() : 'Ahmedabad Central Dark Store'}
           </Text>
         </View>
 
@@ -146,168 +215,257 @@ export const RiderProfileScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#F8FAFC',
     padding: 16,
   },
-  backRow: {
-    marginBottom: 12,
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+    paddingTop: 4,
   },
-  backArrow: {
-    color: COLORS.hotPink,
-    fontWeight: '800',
-    fontSize: 14,
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   screenTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '800',
-    color: COLORS.navy,
+    color: '#071B52',
+    letterSpacing: -0.3,
   },
   screenSubtitle: {
     fontSize: 12,
-    color: COLORS.textMuted,
-    marginTop: 4,
-    marginBottom: 16,
-    lineHeight: 18,
+    color: '#64748B',
+    fontWeight: '500',
+    marginTop: 2,
   },
-  statsCard: {
+  heroProfileCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    padding: 24,
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  avatarWrapper: {
+    position: 'relative',
+    marginBottom: 12,
+  },
+  avatarCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
+  },
+  cameraIconBtn: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#FF3B98',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  profileName: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#071B52',
+  },
+  profileRiderId: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '600',
+    marginTop: 2,
+    marginBottom: 12,
+  },
+  badgesRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  onlineStatusPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.navy,
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 6,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  onlineStatusText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  ratingBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  ratingBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#D97706',
+  },
+  quickNavCard: {
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     marginBottom: 16,
-    gap: 14,
   },
-  avatarPill: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: '#1E2260',
+  navRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+  },
+  navLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  navIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarEmoji: {
-    fontSize: 28,
-  },
-  statsInfo: {
-    flex: 1,
-  },
-  statsName: {
-    color: COLORS.white,
-    fontSize: 17,
+  navTitle: {
+    fontSize: 14,
     fontWeight: '800',
+    color: '#071B52',
   },
-  statsId: {
-    color: COLORS.secondaryText,
+  navSubtitle: {
     fontSize: 11,
+    color: '#64748B',
     marginTop: 2,
-    marginBottom: 6,
   },
-  pillRow: {
-    flexDirection: 'row',
-    gap: 6,
+  navDivider: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginVertical: 4,
   },
-  badgeSuccess: {
-    backgroundColor: 'rgba(16, 185, 129, 0.25)',
-    paddingHorizontal: 8,
+  verifiedSmallBadge: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 6,
+    borderRadius: 4,
   },
-  badgeSuccessText: {
-    color: COLORS.onlineGreen,
-    fontSize: 10,
+  verifiedSmallText: {
+    fontSize: 9,
     fontWeight: '800',
-  },
-  badgeRating: {
-    backgroundColor: 'rgba(251, 191, 36, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  badgeRatingText: {
-    color: '#FBBF24',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  badgeDrops: {
-    backgroundColor: 'rgba(245, 98, 175, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  badgeDropsText: {
-    color: COLORS.hotPink,
-    fontSize: 10,
-    fontWeight: '800',
+    color: '#13B978',
   },
   formCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 18,
-    padding: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 18,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: '#E2E8F0',
     marginBottom: 20,
+  },
+  formSectionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#071B52',
+    marginBottom: 8,
   },
   fieldLabel: {
     fontSize: 10,
     fontWeight: '800',
-    color: COLORS.secondaryText,
+    color: '#64748B',
     letterSpacing: 0.5,
-    marginTop: 10,
+    marginTop: 12,
     marginBottom: 6,
   },
   input: {
-    backgroundColor: COLORS.cardBackground,
+    backgroundColor: '#F8FAFC',
     borderRadius: 12,
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 12,
     fontSize: 13,
-    color: COLORS.textPrimary,
+    color: '#071B52',
     fontWeight: '600',
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: '#E2E8F0',
   },
   hubStatusBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0FDF4',
+    backgroundColor: '#FDF2F8',
     borderWidth: 1,
-    borderColor: '#BBF7D0',
+    borderColor: 'rgba(255, 59, 152, 0.25)',
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     marginTop: 2,
   },
-  hubStatusBoxWarning: {
-    backgroundColor: '#FEF3C7',
-    borderColor: '#FCD34D',
-  },
   hubStatusText: {
     fontSize: 13,
-    color: '#15803D',
+    color: '#071B52',
     fontWeight: '700',
     flex: 1,
   },
-  hubStatusTextWarning: {
-    color: '#92400E',
-  },
   saveBtn: {
-    backgroundColor: COLORS.hotPink,
+    backgroundColor: '#FF3B98',
     paddingVertical: 14,
     borderRadius: 14,
     alignItems: 'center',
     marginTop: 20,
+    shadowColor: '#FF3B98',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
   },
   disabledBtn: {
     opacity: 0.6,
   },
   saveBtnText: {
-    color: COLORS.white,
+    color: '#FFFFFF',
     fontWeight: '800',
-    fontSize: 13,
+    fontSize: 14,
     letterSpacing: 0.5,
   },
   bottomSpacer: {
-    height: 30,
+    height: 36,
   },
 });

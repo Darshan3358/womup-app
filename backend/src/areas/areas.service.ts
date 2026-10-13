@@ -116,13 +116,20 @@ export class AreasService {
     });
   }
 
-  /** Get area-specific pricing for a batch of variantIds */
   async getPricingForVariants(
     variantIds: Types.ObjectId[],
-    areaId: Types.ObjectId,
+    areaId: Types.ObjectId | string,
   ): Promise<Map<string, AreaPricingDocument>> {
+    const variantIdStrings = variantIds.map((v) => v.toString());
+    const areaQueries: any[] = [{ areaId: areaId.toString() }];
+    if (Types.ObjectId.isValid(areaId.toString())) {
+      areaQueries.push({ areaId: new Types.ObjectId(areaId.toString()) });
+    }
     const records = await this.areaPricingModel
-      .find({ variantId: { $in: variantIds }, areaId })
+      .find({
+        variantId: { $in: [...variantIds, ...variantIdStrings] },
+        $or: areaQueries,
+      })
       .exec();
     const map = new Map<string, AreaPricingDocument>();
     for (const r of records) {

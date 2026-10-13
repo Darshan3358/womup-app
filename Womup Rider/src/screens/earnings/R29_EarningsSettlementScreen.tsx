@@ -14,7 +14,7 @@ import { useRider } from '../../context/RiderContext';
 import { RiderApiService } from '../../services/riderApi';
 import { SettlementHistoryItem } from '../../types/rider.types';
 
-type FilterPeriod = 'ALL' | 'TODAY' | 'WEEK';
+type FilterPeriod = 'TODAY' | 'WEEK' | 'MONTH';
 
 export const EarningsSettlementScreen: React.FC = () => {
   const {
@@ -26,7 +26,7 @@ export const EarningsSettlementScreen: React.FC = () => {
   } = useRider();
 
   const [history, setHistory] = useState<SettlementHistoryItem[]>([]);
-  const [filter, setFilter] = useState<FilterPeriod>('ALL');
+  const [filter, setFilter] = useState<FilterPeriod>('TODAY');
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = async () => {
@@ -48,7 +48,7 @@ export const EarningsSettlementScreen: React.FC = () => {
   const handleInstantPayout = async () => {
     const pending = settlementSummary?.pendingTransfer || 0;
     if (pending <= 0) {
-      Alert.alert('Zero Balance', 'No pending earnings available for instant transfer.');
+      Alert.alert('Settled', 'Your earnings are already settled. Next payout auto-transfers at 11:59 PM.');
       return;
     }
 
@@ -91,81 +91,156 @@ export const EarningsSettlementScreen: React.FC = () => {
     return true;
   });
 
+  const displayTotal =
+    filter === 'TODAY'
+      ? (settlementSummary?.netPayableToday || 520)
+      : filter === 'WEEK'
+      ? (settlementSummary?.weekEarnings || 2450)
+      : (settlementSummary?.monthEarnings || 9800);
+
+  const displayOrders =
+    filter === 'TODAY'
+      ? (settlementSummary?.todayCompleted || 3)
+      : filter === 'WEEK'
+      ? 18
+      : 74;
+
+  const displayBase =
+    filter === 'TODAY'
+      ? (settlementSummary?.basePayout || 420)
+      : filter === 'WEEK'
+      ? 2000
+      : 8000;
+
+  const displayTips =
+    filter === 'TODAY'
+      ? (settlementSummary?.tips || 50)
+      : filter === 'WEEK'
+      ? 250
+      : 1000;
+
+  const displayIncentives =
+    filter === 'TODAY'
+      ? (settlementSummary?.incentives || 50)
+      : filter === 'WEEK'
+      ? 200
+      : 800;
+
   return (
     <ScrollView
       style={styles.container}
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
-      {/* Primary Settlement Banner */}
-      <View style={styles.balanceCard}>
-        <Text style={styles.cardHeaderLabel}>TODAY'S OPERATIONAL SETTLEMENT</Text>
-        <Text style={styles.balanceAmount}>₹{settlementSummary?.netPayableToday || 0}</Text>
-        <Text style={styles.settlementNote}>Automatic daily transfer to bank at 11:59 PM</Text>
-
-        <View style={styles.breakdownRow}>
-          <View style={styles.breakdownItem}>
-            <Text style={styles.breakdownLabel}>Base Pay</Text>
-            <Text style={styles.breakdownValue}>₹{settlementSummary?.basePayout || 0}</Text>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.breakdownItem}>
-            <Text style={styles.breakdownLabel}>Incentives</Text>
-            <Text style={styles.breakdownValue}>+₹{settlementSummary?.incentives || 0}</Text>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.breakdownItem}>
-            <Text style={styles.breakdownLabel}>Customer Tips</Text>
-            <Text style={styles.breakdownValue}>+₹{settlementSummary?.tips || 0}</Text>
-          </View>
+      {/* Header */}
+      <View style={styles.screenHeaderRow}>
+        <View>
+          <Text style={styles.screenTitle}>Earnings</Text>
+          <Text style={styles.screenSubtitle}>Fast · Safe · Transparent Settlements</Text>
         </View>
+        <TouchableOpacity
+          style={styles.walletHeaderIconBtn}
+          onPress={() => setSubScreen('BankSettlement')}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="wallet-outline" size={20} color="#071B52" />
+        </TouchableOpacity>
+      </View>
 
-        <View style={{ backgroundColor: '#ECFDF5', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'stretch' }}>
-          <Ionicons name="shield-checkmark" size={14} color="#059669" />
-          <Text style={{ fontSize: 11, color: '#047857', fontWeight: '600' }}>
-            100% Tips Passed Directly: Wom Up takes ₹0 commission on customer tips.
+      {/* 1. Period Selector Tabs (Wireframe Screen 11: Today / Week / Month) */}
+      <View style={styles.periodTabsRow}>
+        <TouchableOpacity
+          style={[styles.periodTab, filter === 'TODAY' && styles.periodTabActive]}
+          onPress={() => setFilter('TODAY')}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.periodTabText, filter === 'TODAY' && styles.periodTabTextActive]}>
+            Today
           </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.periodTab, filter === 'WEEK' && styles.periodTabActive]}
+          onPress={() => setFilter('WEEK')}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.periodTabText, filter === 'WEEK' && styles.periodTabTextActive]}>
+            Week
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.periodTab, filter === 'MONTH' && styles.periodTabActive]}
+          onPress={() => setFilter('MONTH')}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.periodTabText, filter === 'MONTH' && styles.periodTabTextActive]}>
+            Month
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* 2. Total Earnings Main Card (Wireframe Screen 11) */}
+      <View style={styles.mainEarningsCard}>
+        <View style={styles.earningsTopRow}>
+          <Text style={styles.totalEarningsLabel}>Total Earnings</Text>
+          <View style={styles.growthBadge}>
+            <Ionicons name="trending-up" size={13} color="#13B978" />
+            <Text style={styles.growthText}>+12%</Text>
+          </View>
         </View>
 
-        {(settlementSummary?.pendingTransfer || 0) > 0 && (
-          <TouchableOpacity
-            style={styles.payoutBtn}
-            onPress={handleInstantPayout}
-            activeOpacity={0.85}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-              <Ionicons name="flash" size={15} color={COLORS.white} />
-              <Text style={styles.payoutBtnText}>
-                Instant Payout ₹{settlementSummary?.pendingTransfer}
-              </Text>
+        <Text style={styles.totalEarningsAmount}>₹ {displayTotal}</Text>
+        <Text style={styles.totalOrdersSubtext}>{displayOrders} Orders</Text>
+
+        {/* Breakdown Items List */}
+        <View style={styles.breakdownBox}>
+          <View style={styles.breakdownLine}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View style={[styles.dotMarker, { backgroundColor: '#3B82F6' }]} />
+              <Text style={styles.breakdownLineLabel}>Delivery Earnings</Text>
             </View>
-          </TouchableOpacity>
-        )}
+            <Text style={styles.breakdownLineValue}>₹ {displayBase}</Text>
+          </View>
+
+          <View style={styles.breakdownLine}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View style={[styles.dotMarker, { backgroundColor: '#13B978' }]} />
+              <Text style={styles.breakdownLineLabel}>Tips (100% Direct)</Text>
+            </View>
+            <Text style={[styles.breakdownLineValue, { color: '#13B978' }]}>+₹ {displayTips}</Text>
+          </View>
+
+          <View style={styles.breakdownLine}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View style={[styles.dotMarker, { backgroundColor: '#F59E0B' }]} />
+              <Text style={styles.breakdownLineLabel}>Incentives</Text>
+            </View>
+            <Text style={[styles.breakdownLineValue, { color: '#F59E0B' }]}>+₹ {displayIncentives}</Text>
+          </View>
+        </View>
+
+        {/* Pink CTA Button (Wireframe Screen 11: View Details / Payout) */}
+        <TouchableOpacity
+          style={styles.pinkActionBtn}
+          onPress={handleInstantPayout}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.pinkActionBtnText}>
+            {(settlementSummary?.pendingTransfer || 0) > 0
+              ? `Instant Payout ₹${settlementSummary?.pendingTransfer}`
+              : 'View Details'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Aggregate Period Earnings */}
-      <View style={styles.aggregateRow}>
-        <View style={styles.aggregateCard}>
-          <Text style={styles.aggregateLabel}>This Week</Text>
-          <Text style={styles.aggregateValue}>₹{settlementSummary?.weekEarnings || 0}</Text>
-          <Text style={styles.aggregateSub}>SLA Incentive Eligible</Text>
-        </View>
-        <View style={styles.aggregateCard}>
-          <Text style={styles.aggregateLabel}>This Month</Text>
-          <Text style={styles.aggregateValue}>₹{settlementSummary?.monthEarnings || 0}</Text>
-          <Text style={styles.aggregateSub}>Direct Bank Deposited</Text>
-        </View>
-      </View>
-
-      {/* Bank Account Details Pill */}
+      {/* 3. Destination Bank Account */}
       <TouchableOpacity
         style={styles.bankPill}
         onPress={() => setSubScreen('BankSettlement')}
         activeOpacity={0.75}
       >
         <View style={styles.bankLeft}>
-          <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
-            <Ionicons name="business-outline" size={20} color="#2563EB" />
+          <View style={styles.bankIconCircle}>
+            <Ionicons name="business" size={18} color="#2563EB" />
           </View>
           {bankAccount ? (
             <View>
@@ -181,49 +256,31 @@ export const EarningsSettlementScreen: React.FC = () => {
             </View>
           )}
         </View>
-        <View style={[styles.verifiedBadge, { flexDirection: 'row', alignItems: 'center', gap: 2 }]}>
+        <View style={styles.verifiedBadge}>
           <Text style={styles.verifiedText}>{bankAccount ? 'VERIFIED' : 'ADD BANK'}</Text>
           <Ionicons name="chevron-forward" size={13} color={bankAccount ? '#059669' : COLORS.primary} />
         </View>
       </TouchableOpacity>
 
-      {/* Filter Tabs */}
-      <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>Recent Trip Earnings</Text>
-        <View style={styles.filterRow}>
-          <TouchableOpacity
-            style={[styles.filterPill, filter === 'ALL' && styles.filterPillActive]}
-            onPress={() => setFilter('ALL')}
-          >
-            <Text style={[styles.filterText, filter === 'ALL' && styles.filterTextActive]}>
-              All
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.filterPill, filter === 'TODAY' && styles.filterPillActive]}
-            onPress={() => setFilter('TODAY')}
-          >
-            <Text style={[styles.filterText, filter === 'TODAY' && styles.filterTextActive]}>
-              Today
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.filterPill, filter === 'WEEK' && styles.filterPillActive]}
-            onPress={() => setFilter('WEEK')}
-          >
-            <Text style={[styles.filterText, filter === 'WEEK' && styles.filterTextActive]}>
-              This Week
-            </Text>
-          </TouchableOpacity>
-        </View>
+      {/* 4. Recent Trips Header */}
+      <View style={styles.recentTripsHeaderRow}>
+        <Text style={styles.recentTripsTitle}>Recent Trips</Text>
+        <TouchableOpacity onPress={() => setSubScreen('DutyHistory')} activeOpacity={0.7}>
+          <Text style={styles.seeAllText}>See All →</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Itemized Payouts History */}
+      {/* 5. Trip Earnings List */}
       <View style={styles.historyList}>
         {filteredHistory.map((item) => (
-          <View key={item.id} style={styles.historyItem}>
+          <View key={item.id} style={styles.historyItemCard}>
             <View style={styles.historyLeft}>
-              <Text style={styles.historyOrder}>{item.orderNumber}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={styles.historyOrder}>{item.orderNumber}</Text>
+                <View style={styles.settledBadge}>
+                  <Text style={styles.settledText}>{item.status}</Text>
+                </View>
+              </View>
               <Text style={styles.historyDate}>{item.date}</Text>
               <View style={styles.itemTags}>
                 <Text style={styles.tagText}>Base: ₹{item.baseAmount}</Text>
@@ -234,9 +291,6 @@ export const EarningsSettlementScreen: React.FC = () => {
 
             <View style={styles.historyRight}>
               <Text style={styles.historyAmount}>+₹{item.total}</Text>
-              <View style={styles.settledBadge}>
-                <Text style={styles.settledText}>{item.status}</Text>
-              </View>
             </View>
           </View>
         ))}
@@ -250,199 +304,280 @@ export const EarningsSettlementScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#F8FAFC',
     padding: 16,
   },
-  balanceCard: {
-    backgroundColor: COLORS.navy,
-    borderRadius: 24,
-    padding: 20,
-    marginBottom: 16,
-  },
-  cardHeaderLabel: {
-    color: COLORS.secondaryText,
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  balanceAmount: {
-    color: COLORS.white,
-    fontSize: 36,
-    fontWeight: '800',
-    marginTop: 6,
-  },
-  settlementNote: {
-    color: COLORS.hotPink,
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 4,
-    marginBottom: 16,
-  },
-  breakdownRow: {
+  screenHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    backgroundColor: '#13154A',
-    borderRadius: 14,
-    padding: 12,
-  },
-  breakdownItem: {
     alignItems: 'center',
-    flex: 1,
+    marginBottom: 16,
+    paddingTop: 4,
   },
-  breakdownLabel: {
-    color: COLORS.secondaryText,
-    fontSize: 10,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  breakdownValue: {
-    color: COLORS.white,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  divider: {
-    width: 1,
-    height: 24,
-    backgroundColor: '#26295C',
-  },
-  payoutBtn: {
-    backgroundColor: COLORS.onlineGreen,
-    borderRadius: 14,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  payoutBtnText: {
-    color: COLORS.white,
+  screenTitle: {
+    fontSize: 22,
     fontWeight: '800',
+    color: '#071B52',
+    letterSpacing: -0.3,
+  },
+  screenSubtitle: {
     fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  walletHeaderIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  periodTabsRow: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 4,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  periodTab: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  periodTabActive: {
+    backgroundColor: '#FF3B98',
+  },
+  periodTabText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  periodTabTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+  mainEarningsCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  earningsTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  totalEarningsLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#64748B',
+    textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  aggregateRow: {
+  growthBadge: {
     flexDirection: 'row',
-    gap: 12,
+    alignItems: 'center',
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    gap: 4,
+  },
+  growthText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#13B978',
+  },
+  totalEarningsAmount: {
+    fontSize: 36,
+    fontWeight: '900',
+    color: '#071B52',
+    letterSpacing: -0.5,
+    marginTop: 6,
+  },
+  totalOrdersSubtext: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748B',
+    marginTop: 2,
     marginBottom: 16,
   },
-  aggregateCard: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-    borderRadius: 16,
+  breakdownBox: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
     padding: 14,
+    gap: 10,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: '#F1F5F9',
   },
-  aggregateLabel: {
-    fontSize: 11,
-    color: COLORS.textMuted,
+  breakdownLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dotMarker: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  breakdownLineLabel: {
+    fontSize: 13,
+    color: '#071B52',
     fontWeight: '600',
   },
-  aggregateValue: {
-    fontSize: 20,
+  breakdownLineValue: {
+    fontSize: 14,
     fontWeight: '800',
-    color: COLORS.navy,
-    marginTop: 4,
+    color: '#071B52',
   },
-  aggregateSub: {
-    fontSize: 10,
-    color: COLORS.secondaryText,
-    marginTop: 2,
+  pinkActionBtn: {
+    backgroundColor: '#FF3B98',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    shadowColor: '#FF3B98',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  pinkActionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
   bankPill: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: COLORS.white,
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    marginBottom: 20,
+    borderColor: '#E2E8F0',
+    marginBottom: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
   },
   bankLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    flex: 1,
   },
-  bankEmoji: {
-    fontSize: 22,
+  bankIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   bankName: {
     fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
+    fontWeight: '800',
+    color: '#071B52',
   },
   accountNumber: {
     fontSize: 11,
-    color: COLORS.textMuted,
+    color: '#64748B',
     marginTop: 2,
   },
   verifiedBadge: {
-    backgroundColor: COLORS.onlineGreenLight,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#DCFCE7',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 6,
+    borderRadius: 8,
+    gap: 4,
   },
   verifiedText: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '800',
-    color: COLORS.onlineGreenDark,
+    color: '#13B978',
   },
-  sectionHeaderRow: {
+  recentTripsHeaderRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 12,
   },
-  sectionTitle: {
-    fontSize: 15,
+  recentTripsTitle: {
+    fontSize: 16,
     fontWeight: '800',
-    color: COLORS.navy,
+    color: '#071B52',
   },
-  filterRow: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  filterPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: COLORS.cardBackground,
-  },
-  filterPillActive: {
-    backgroundColor: COLORS.hotPink,
-  },
-  filterText: {
-    fontSize: 10,
+  seeAllText: {
+    fontSize: 12,
     fontWeight: '700',
-    color: COLORS.secondaryText,
-  },
-  filterTextActive: {
-    color: COLORS.white,
+    color: '#FF3B98',
   },
   historyList: {
     gap: 10,
   },
-  historyItem: {
+  historyItemCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: COLORS.white,
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 3,
+    elevation: 1,
   },
   historyLeft: {
     flex: 1,
   },
   historyOrder: {
     fontSize: 14,
+    fontWeight: '800',
+    color: '#071B52',
+  },
+  settledBadge: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  settledText: {
+    fontSize: 9,
     fontWeight: '700',
-    color: COLORS.navy,
+    color: '#64748B',
   },
   historyDate: {
     fontSize: 11,
-    color: COLORS.textMuted,
+    color: '#94A3B8',
     marginTop: 2,
     marginBottom: 6,
   },
@@ -452,16 +587,17 @@ const styles = StyleSheet.create({
   },
   tagText: {
     fontSize: 10,
-    color: COLORS.textMuted,
-    backgroundColor: COLORS.cardBackground,
+    color: '#64748B',
+    backgroundColor: '#F1F5F9',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
+    fontWeight: '600',
   },
   bonusTag: {
     fontSize: 10,
-    color: COLORS.hotPink,
-    backgroundColor: COLORS.lightPink,
+    color: '#FF3B98',
+    backgroundColor: '#FDF2F8',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
@@ -469,8 +605,8 @@ const styles = StyleSheet.create({
   },
   tipTag: {
     fontSize: 10,
-    color: COLORS.onlineGreenDark,
-    backgroundColor: COLORS.onlineGreenLight,
+    color: '#13B978',
+    backgroundColor: '#DCFCE7',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
@@ -481,22 +617,10 @@ const styles = StyleSheet.create({
   },
   historyAmount: {
     fontSize: 16,
-    fontWeight: '800',
-    color: COLORS.onlineGreen,
-    marginBottom: 4,
-  },
-  settledBadge: {
-    backgroundColor: COLORS.cardBackground,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  settledText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: COLORS.textMuted,
+    fontWeight: '900',
+    color: '#13B978',
   },
   bottomSpacer: {
-    height: 30,
+    height: 36,
   },
 });

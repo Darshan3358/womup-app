@@ -166,6 +166,38 @@ export const BlinkitPrintIcon: React.FC<IconProps> = ({
   );
 };
 
+// Profile Icon matching Blinkit: Rounded user head & shoulders
+export const BlinkitProfileIcon: React.FC<IconProps> = ({
+  size = 24,
+  isActive = false,
+  color,
+}) => {
+  const fillColor = isActive ? COLORS.hotPink : 'none';
+  const strokeColor = color || (isActive ? COLORS.hotPink : COLORS.textMuted);
+
+  return (
+    <Svg width={size} height={size} viewBox="0 0 28 28" fill="none">
+      {/* Head */}
+      <Circle
+        cx="14"
+        cy="9"
+        r="4.5"
+        fill={fillColor}
+        stroke={strokeColor}
+        strokeWidth="2.2"
+      />
+      {/* Torso/Shoulders */}
+      <Path
+        d="M6 23C6 19.134 9.134 16 13 16H15C18.866 16 22 19.134 22 23"
+        fill={fillColor}
+        stroke={strokeColor}
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+};
+
 // 5. Header: 'All' Categories Tab Icon matching Blinkit (Tote bag / crate with groceries)
 export const BlinkitAllHeaderIcon: React.FC<IconProps> = ({
   size = 24,

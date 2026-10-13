@@ -9,6 +9,7 @@ import { Cart, CartDocument } from './schemas/cart.schema';
 import { Product, ProductDocument } from '../products/schemas/product.schema';
 import { Coupon, CouponDocument } from '../coupons/schemas/coupon.schema';
 import { User, UserDocument } from '../users/schemas/user.schema';
+import { TrackingGateway } from '../tracking/tracking.gateway';
 
 @Injectable()
 export class CartService {
@@ -18,6 +19,7 @@ export class CartService {
     @InjectModel(Coupon.name) private couponModel: Model<CouponDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectConnection() private connection: Connection,
+    private readonly trackingGateway: TrackingGateway,
   ) {}
 
   async getOrCreateCart(userId: string) {
@@ -34,9 +36,30 @@ export class CartService {
     return cart;
   }
 
-  async getCartSummary(userId: string) {
+  async getCartSummary(userId: string, areaId?: string, storeId?: string) {
     const cart = await this.getOrCreateCart(userId);
     const user = await this.userModel.findById(userId);
+
+    // Save location to cart if provided
+    if (areaId && Types.ObjectId.isValid(areaId)) {
+      cart.areaId = new Types.ObjectId(areaId);
+    }
+    if (storeId && Types.ObjectId.isValid(storeId)) {
+      cart.storeId = new Types.ObjectId(storeId);
+    }
+    if ((areaId || storeId) && (cart.isModified('areaId') || cart.isModified('storeId'))) {
+      await cart.save();
+    }
+
+    // Determine target areaId for area_pricing lookup
+    let targetAreaId = areaId || (cart.areaId ? cart.areaId.toString() : undefined);
+    if (!targetAreaId && (storeId || cart.storeId)) {
+      const sId = storeId || cart.storeId?.toString();
+      if (sId && Types.ObjectId.isValid(sId)) {
+        const sDoc = await this.connection.collection('stores').findOne({ _id: new Types.ObjectId(sId) });
+        if (sDoc?.areaId) targetAreaId = sDoc.areaId.toString();
+      }
+    }
 
     const detailedItems: any[] = [];
     let itemSubtotal = 0;
@@ -45,8 +68,73 @@ export class CartService {
     for (const entry of cart.items) {
       const product = await this.productModel.findById(entry.productId).exec();
       if (product && product.isActive) {
-        const linePrice = product.sellingPrice * entry.quantity;
-        const lineMrp = product.mrp * entry.quantity;
+        let sellingPrice = product.sellingPrice;
+        let mrp = product.mrp;
+        let quantityLabel = product.quantityLabel;
+        let variantObj: any = null;
+
+        if (entry.variantId && Types.ObjectId.isValid(entry.variantId.toString())) {
+          const vObjId = new Types.ObjectId(entry.variantId.toString());
+          const varDoc = await this.connection.collection('product_variants').findOne({
+            _id: vObjId,
+          });
+          if (varDoc) {
+            sellingPrice = varDoc.sellingPrice ?? sellingPrice;
+            mrp = varDoc.mrp ?? mrp;
+            quantityLabel = varDoc.weightOrVolume ?? quantityLabel;
+
+            // Dynamic area pricing lookup matching user's selected area
+            if (targetAreaId) {
+              try {
+                const targetAreaObjId = Types.ObjectId.isValid(targetAreaId)
+                  ? new Types.ObjectId(targetAreaId)
+                  : targetAreaId;
+                const areaPricing = await this.connection.collection('area_pricing').findOne({
+                  variantId: { $in: [vObjId, entry.variantId.toString()] },
+                  $or: [
+                    { areaId: targetAreaObjId },
+                    { areaId: targetAreaId.toString() },
+                  ],
+                });
+                if (areaPricing && typeof areaPricing.price === 'number') {
+                  sellingPrice = areaPricing.price;
+                  if (areaPricing.mrp) mrp = areaPricing.mrp;
+                }
+              } catch {
+                // fallback to varDoc
+              }
+            }
+
+            variantObj = {
+              id: varDoc._id.toString(),
+              _id: varDoc._id.toString(),
+              label: varDoc.weightOrVolume,
+              price: sellingPrice,
+              mrp: mrp,
+            };
+          }
+        } else if (targetAreaId) {
+          // Dynamic master product area pricing lookup
+          try {
+            const targetAreaObjId = Types.ObjectId.isValid(targetAreaId)
+              ? new Types.ObjectId(targetAreaId)
+              : targetAreaId;
+            const areaPricing = await this.connection.collection('area_pricing').findOne({
+              productId: { $in: [product._id, product._id.toString()] },
+              $or: [
+                { areaId: targetAreaObjId },
+                { areaId: targetAreaId.toString() },
+              ],
+            });
+            if (areaPricing && typeof areaPricing.price === 'number') {
+              sellingPrice = areaPricing.price;
+              if (areaPricing.mrp) mrp = areaPricing.mrp;
+            }
+          } catch {}
+        }
+
+        const linePrice = sellingPrice * entry.quantity;
+        const lineMrp = mrp * entry.quantity;
         itemSubtotal += linePrice;
         mrpTotal += lineMrp;
 
@@ -56,12 +144,14 @@ export class CartService {
             name: product.name,
             brand: product.brand,
             imageUrl: product.imageUrl,
-            sellingPrice: product.sellingPrice,
-            mrp: product.mrp,
-            discountPercent: product.discountPercent,
-            quantityLabel: product.quantityLabel,
+            sellingPrice: sellingPrice,
+            mrp: mrp,
+            discountPercent: mrp > sellingPrice ? Math.round(((mrp - sellingPrice) / mrp) * 100) : product.discountPercent,
+            quantityLabel: quantityLabel,
             stock: product.stock,
           },
+          variant: variantObj,
+          variantId: entry.variantId ? entry.variantId.toString() : undefined,
           quantity: entry.quantity,
           subtotal: linePrice,
           totalMrp: lineMrp,
@@ -93,20 +183,29 @@ export class CartService {
       }
     }
 
-    // Validate and calculate shopping coins discount (1 coin = ₹1, max 20% of subtotal)
-    let coinDiscount = 0;
-    const maxCoinsAllowed = Math.floor(itemSubtotal * 0.2);
-    const userCoinBalance = user?.shoppingCoins || 0;
-    const validCoins = Math.min(cart.appliedCoins, userCoinBalance, maxCoinsAllowed);
-    coinDiscount = validCoins;
-
     const deliveryFee = itemSubtotal >= 199 || itemSubtotal === 0 ? 0 : 25; // Free over ₹199
     const handlingFee = itemSubtotal > 0 ? 5 : 0;
     const tip = cart.tip || 0;
 
+    // Validate and calculate shopping coins discount (1 coin = ₹1, max 20% of order subtotal, min 10, matching App)
+    let coinDiscount = 0;
+    const orderSubtotal = Math.max(0, itemSubtotal + deliveryFee + handlingFee - couponDiscount);
+    const maxCoinsAllowed = Math.max(10, Math.floor(orderSubtotal * 0.2));
+    const userCoinBalance = user?.shoppingCoins || 0;
+
+    const isUsingCoins = !!cart.useCoins || (cart.appliedCoins && cart.appliedCoins > 0);
+    const validCoins = isUsingCoins
+      ? Math.min(
+          cart.appliedCoins > 0 ? cart.appliedCoins : maxCoinsAllowed,
+          userCoinBalance,
+          maxCoinsAllowed,
+        )
+      : 0;
+    coinDiscount = validCoins;
+
     const totalAmount = Math.max(
       0,
-      itemSubtotal - couponDiscount - coinDiscount + deliveryFee + handlingFee + tip,
+      orderSubtotal - coinDiscount + tip,
     );
 
     return {
@@ -117,9 +216,12 @@ export class CartService {
       itemDiscount,
       couponDiscount,
       couponCode: cart.couponCode,
+      useCoins: isUsingCoins && validCoins > 0,
+      appliedCoins: validCoins,
       coinsUsed: validCoins,
       coinDiscount,
       availableCoins: userCoinBalance,
+      maxCoinsAllowed,
       deliveryFee,
       handlingFee,
       tip,
@@ -128,38 +230,60 @@ export class CartService {
     };
   }
 
-  async addItem(userId: string, productId: string, quantity: number) {
+  async addItem(userId: string, productId: string, quantity: number, variantId?: string) {
     if (quantity <= 0) {
       throw new BadRequestException('Quantity must be greater than zero');
     }
 
-    const product = await this.productModel.findById(productId);
+    const product = Types.ObjectId.isValid(productId)
+      ? await this.productModel.findById(productId).exec()
+      : await this.productModel.findOne({
+          $or: [{ slug: productId }, { name: new RegExp(productId, 'i') }],
+        }).exec();
+
     if (!product || !product.isActive) {
       throw new NotFoundException('Product not available');
     }
 
+    const resolvedProductId = product._id;
+    const resolvedVariantId = variantId && Types.ObjectId.isValid(variantId) ? new Types.ObjectId(variantId) : undefined;
     const cart = await this.getOrCreateCart(userId);
-    const existingIndex = cart.items.findIndex(
-      (i) => i.productId.toString() === productId,
-    );
+    const existingIndex = cart.items.findIndex((i) => {
+      const pMatch = i.productId.toString() === resolvedProductId.toString();
+      if (!pMatch) return false;
+      if (resolvedVariantId && i.variantId) {
+        return i.variantId.toString() === resolvedVariantId.toString();
+      }
+      return !resolvedVariantId && !i.variantId;
+    });
 
     if (existingIndex > -1) {
       cart.items[existingIndex].quantity += quantity;
     } else {
       cart.items.push({
-        productId: new Types.ObjectId(productId),
+        productId: resolvedProductId,
+        variantId: resolvedVariantId,
         quantity,
       } as any);
     }
 
     await cart.save();
-    return this.getCartSummary(userId);
+    const summary = await this.getCartSummary(userId);
+    this.trackingGateway.emitCartUpdated(userId, summary);
+    return summary;
   }
 
   async updateQuantity(userId: string, productId: string, delta: number) {
+    const product = Types.ObjectId.isValid(productId)
+      ? await this.productModel.findById(productId).exec()
+      : await this.productModel.findOne({
+          $or: [{ slug: productId }, { name: new RegExp(productId, 'i') }],
+        }).exec();
+
+    const targetIdStr = product ? product._id.toString() : productId;
     const cart = await this.getOrCreateCart(userId);
     const existingIndex = cart.items.findIndex(
-      (i) => i.productId.toString() === productId,
+      (i) => i.productId.toString() === targetIdStr || i.productId.toString() === productId,
     );
 
     if (existingIndex > -1) {
@@ -168,33 +292,114 @@ export class CartService {
         cart.items.splice(existingIndex, 1);
       }
       await cart.save();
+    } else if (delta > 0 && product) {
+      cart.items.push({
+        productId: product._id,
+        quantity: delta,
+      } as any);
+      await cart.save();
     }
 
-    return this.getCartSummary(userId);
+    const summary = await this.getCartSummary(userId);
+    this.trackingGateway.emitCartUpdated(userId, summary);
+    return summary;
+  }
+
+  async setExactQuantity(userId: string, productId: string, quantity: number) {
+    const product = Types.ObjectId.isValid(productId)
+      ? await this.productModel.findById(productId).exec()
+      : await this.productModel.findOne({
+          $or: [{ slug: productId }, { name: new RegExp(productId, 'i') }],
+        }).exec();
+
+    const targetIdStr = product ? product._id.toString() : productId;
+    const cart = await this.getOrCreateCart(userId);
+    const existingIndex = cart.items.findIndex(
+      (i) => i.productId.toString() === targetIdStr || i.productId.toString() === productId,
+    );
+
+    if (quantity <= 0) {
+      if (existingIndex > -1) {
+        cart.items.splice(existingIndex, 1);
+        await cart.save();
+      }
+    } else {
+      if (existingIndex > -1) {
+        cart.items[existingIndex].quantity = quantity;
+        await cart.save();
+      } else if (product) {
+        cart.items.push({
+          productId: product._id,
+          quantity,
+        } as any);
+        await cart.save();
+      }
+    }
+
+    const summary = await this.getCartSummary(userId);
+    this.trackingGateway.emitCartUpdated(userId, summary);
+    return summary;
   }
 
   async removeItem(userId: string, productId: string) {
+    const product = Types.ObjectId.isValid(productId)
+      ? await this.productModel.findById(productId).exec()
+      : await this.productModel.findOne({
+          $or: [{ slug: productId }, { name: new RegExp(productId, 'i') }],
+        }).exec();
+    const targetIdStr = product ? product._id.toString() : productId;
+
     const cart = await this.getOrCreateCart(userId);
-    cart.items = cart.items.filter((i) => i.productId.toString() !== productId);
+    cart.items = cart.items.filter(
+      (i) => i.productId.toString() !== targetIdStr && i.productId.toString() !== productId,
+    );
     await cart.save();
-    return this.getCartSummary(userId);
+
+    const summary = await this.getCartSummary(userId);
+    this.trackingGateway.emitCartUpdated(userId, summary);
+    return summary;
   }
 
   async clearCart(userId: string) {
     const cart = await this.getOrCreateCart(userId);
     cart.items = [];
+    cart.useCoins = false;
     cart.appliedCoins = 0;
     cart.couponCode = undefined;
     cart.tip = 0;
     await cart.save();
-    return this.getCartSummary(userId);
+
+    const summary = await this.getCartSummary(userId);
+    this.trackingGateway.emitCartUpdated(userId, summary);
+    return summary;
+  }
+
+  async toggleCoins(userId: string, useCoins: boolean) {
+    const cart = await this.getOrCreateCart(userId);
+    cart.useCoins = !!useCoins;
+    if (!useCoins) {
+      cart.appliedCoins = 0;
+    } else {
+      const user = await this.userModel.findById(userId).exec();
+      const userBalance = user?.shoppingCoins || 0;
+      cart.appliedCoins = userBalance;
+    }
+    await cart.save();
+
+    const summary = await this.getCartSummary(userId);
+    this.trackingGateway.emitCartUpdated(userId, summary);
+    return summary;
   }
 
   async applyCoins(userId: string, coins: number) {
     const cart = await this.getOrCreateCart(userId);
+    cart.useCoins = coins > 0;
     cart.appliedCoins = Math.max(0, coins);
     await cart.save();
-    return this.getCartSummary(userId);
+
+    const summary = await this.getCartSummary(userId);
+    this.trackingGateway.emitCartUpdated(userId, summary);
+    return summary;
   }
 
   async applyCoupon(userId: string, couponCode: string) {
@@ -210,14 +415,20 @@ export class CartService {
     const cart = await this.getOrCreateCart(userId);
     cart.couponCode = coupon.code;
     await cart.save();
-    return this.getCartSummary(userId);
+
+    const summary = await this.getCartSummary(userId);
+    this.trackingGateway.emitCartUpdated(userId, summary);
+    return summary;
   }
 
   async setTip(userId: string, tip: number) {
     const cart = await this.getOrCreateCart(userId);
     cart.tip = Math.max(0, tip);
     await cart.save();
-    return this.getCartSummary(userId);
+
+    const summary = await this.getCartSummary(userId);
+    this.trackingGateway.emitCartUpdated(userId, summary);
+    return summary;
   }
 
   /**
@@ -396,5 +607,25 @@ export class CartService {
         },
       },
     };
+  }
+
+  async setCartLocation(userId: string, areaId?: string, storeId?: string) {
+    const cart = await this.getOrCreateCart(userId);
+    if (areaId && Types.ObjectId.isValid(areaId)) {
+      cart.areaId = new Types.ObjectId(areaId);
+    }
+    if (storeId && Types.ObjectId.isValid(storeId)) {
+      cart.storeId = new Types.ObjectId(storeId);
+      if (!areaId) {
+        const sDoc = await this.connection.collection('stores').findOne({ _id: new Types.ObjectId(storeId) });
+        if (sDoc?.areaId) {
+          cart.areaId = sDoc.areaId;
+        }
+      }
+    }
+    await cart.save();
+    const summary = await this.getCartSummary(userId, areaId, storeId);
+    this.trackingGateway.emitCartUpdated(userId, summary);
+    return summary;
   }
 }

@@ -144,6 +144,8 @@ export const AuthService = {
         const res = await api.get<any>('/users/me');
         if (res.success && res.data) {
           return {
+            id: res.data._id ? res.data._id.toString() : (res.data.id || ''),
+            _id: res.data._id ? res.data._id.toString() : (res.data.id || ''),
             fullName: res.data.name || '',
             phoneNumber: res.data.phone || '',
             email: res.data.email || '',

@@ -20,7 +20,7 @@ export const R02_MobileLoginScreen: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const { requestOtp } = useRider();
+  const { requestOtp, setAuthStep } = useRider();
 
   const handleSendOtp = async () => {
     const cleanEmail = email.trim().toLowerCase();
@@ -47,69 +47,93 @@ export const R02_MobileLoginScreen: React.FC = () => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView contentContainerStyle={styles.scrollContent} bounces={false}>
-        {/* Header Hero */}
-        <LinearGradient colors={GRADIENTS.navyHeader} style={styles.topHeader}>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>PARTNER ACCESS</Text>
-          </View>
-          <Text style={styles.heading}>Delivery Partner Login</Text>
-          <Text style={styles.subHeading}>Enter your email address to receive OTP</Text>
-        </LinearGradient>
+        {/* Top Navy Header Bar */}
+        <View style={styles.topHeaderBar} />
 
-        <View style={styles.card}>
-          <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
-
-          <View style={styles.emailInputRow}>
-            <View style={styles.emailIconBox}>
-              <Ionicons name="mail-outline" size={18} color={COLORS.navy} />
+        <View style={styles.mainContent}>
+          {/* Brand Logo & Title */}
+          <View style={styles.logoBadgeWrapper}>
+            <View style={styles.logoBadge}>
+              <Ionicons name="bicycle" size={40} color={COLORS.primaryPink} />
             </View>
-            <TextInput
-              style={styles.emailTextInput}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              placeholder="example@gmail.com"
-              placeholderTextColor={COLORS.secondaryText}
-              value={email}
-              onChangeText={(txt) => {
-                setEmail(txt);
-                if (errorMsg) setErrorMsg(null);
-              }}
-            />
+            <View style={styles.brandTitleRow}>
+              <Text style={styles.brandTitleWorm}>Worm</Text>
+              <Text style={styles.brandTitleUp}>Up</Text>
+            </View>
+            <Text style={styles.brandSubTitle}>Delivery Partner</Text>
           </View>
 
-          {errorMsg ? (
-            <View style={[styles.errorContainer, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
-              <Ionicons name="alert-circle" size={14} color={COLORS.error} />
-              <Text style={styles.errorText}>{errorMsg}</Text>
-            </View>
-          ) : null}
+          {/* Heading */}
+          <Text style={styles.heading}>Welcome Back</Text>
+          <Text style={styles.subHeading}>Login to continue</Text>
 
-          {/* Primary CTA */}
-          <TouchableOpacity
-            style={[styles.primaryButton, loading && styles.buttonDisabled]}
-            disabled={loading}
-            onPress={handleSendOtp}
-            activeOpacity={0.85}
-          >
-            <LinearGradient
-              colors={GRADIENTS.primary}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.gradientButton}
+          {/* Form Fields Card */}
+          <View style={styles.formContainer}>
+            <Text style={styles.inputLabel}>EMAIL / MOBILE NUMBER</Text>
+            <View style={styles.inputRow}>
+              <View style={styles.inputIconBox}>
+                <Ionicons name="mail-outline" size={18} color={COLORS.navy} />
+              </View>
+              <TextInput
+                style={styles.textInput}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                placeholder="rider@wormup.in"
+                placeholderTextColor={COLORS.secondaryText}
+                value={email}
+                onChangeText={(txt) => {
+                  setEmail(txt);
+                  if (errorMsg) setErrorMsg(null);
+                }}
+              />
+            </View>
+
+            {errorMsg ? (
+              <View style={styles.errorContainer}>
+                <Ionicons name="alert-circle" size={14} color={COLORS.error} />
+                <Text style={styles.errorText}>{errorMsg}</Text>
+              </View>
+            ) : null}
+
+            {/* Login CTA Button */}
+            <TouchableOpacity
+              style={[styles.primaryButton, loading && styles.buttonDisabled]}
+              disabled={loading}
+              onPress={handleSendOtp}
+              activeOpacity={0.85}
             >
-              {loading ? (
-                <ActivityIndicator color={COLORS.white} />
-              ) : (
-                <Text style={styles.primaryButtonText}>GET OTP</Text>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
+              <LinearGradient
+                colors={GRADIENTS.primary}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.gradientButton}
+              >
+                {loading ? (
+                  <ActivityIndicator color={COLORS.white} size="small" />
+                ) : (
+                  <View style={styles.buttonContent}>
+                    <Text style={styles.buttonText}>Login</Text>
+                    <Ionicons name="arrow-forward" size={18} color={COLORS.white} />
+                  </View>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
 
-          <View style={styles.legalBox}>
-            <Text style={styles.legalText}>
-              By continuing, you agree to Worm Up Fleet Partner Terms of Service and Privacy Policy.
-            </Text>
+            <TouchableOpacity
+              style={styles.forgotLink}
+              onPress={() => setErrorMsg('Enter registered email to receive OTP login code')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.forgotText}>Forgot Password?</Text>
+            </TouchableOpacity>
+
+            <View style={styles.registerRow}>
+              <Text style={styles.noAccountText}>Don't have an account? </Text>
+              <TouchableOpacity onPress={() => setAuthStep('REGISTER')} activeOpacity={0.7}>
+                <Text style={styles.registerLinkText}>Register</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -120,100 +144,124 @@ export const R02_MobileLoginScreen: React.FC = () => {
 const styles = StyleSheet.create({
   keyboardContainer: {
     flex: 1,
-    backgroundColor: COLORS.navy,
+    backgroundColor: '#FFFFFF',
   },
   scrollContent: {
     flexGrow: 1,
-    backgroundColor: COLORS.background,
-  },
-  topHeader: {
-    paddingTop: 56,
+    backgroundColor: '#FFFFFF',
     paddingBottom: 40,
+  },
+  topHeaderBar: {
+    height: 44,
+    backgroundColor: COLORS.navy,
+    width: '100%',
+  },
+  mainContent: {
     paddingHorizontal: 24,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
+    paddingTop: 32,
+    alignItems: 'center',
   },
-  badge: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(245, 98, 175, 0.2)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(245, 98, 175, 0.4)',
-    marginBottom: 12,
+  logoBadgeWrapper: {
+    alignItems: 'center',
+    marginBottom: 24,
   },
-  badgeText: {
-    color: COLORS.hotPink,
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1,
+  logoBadge: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: 'rgba(255, 59, 152, 0.1)',
+    borderWidth: 2,
+    borderColor: COLORS.primaryPink,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+    ...Platform.select({
+      web: {
+        filter: 'drop-shadow(0px 4px 12px rgba(255, 59, 152, 0.25))',
+      },
+      default: {
+        shadowColor: COLORS.primaryPink,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
+        elevation: 4,
+      },
+    }),
+  },
+  brandTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  brandTitleWorm: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: COLORS.navy,
+  },
+  brandTitleUp: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: COLORS.primaryPink,
+  },
+  brandSubTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748B',
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    marginTop: 2,
   },
   heading: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '800',
-    color: COLORS.white,
-    letterSpacing: 0.5,
+    color: COLORS.navy,
+    textAlign: 'center',
   },
   subHeading: {
-    fontSize: 13,
-    color: COLORS.secondaryText,
-    marginTop: 6,
-    lineHeight: 18,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 4,
+    marginBottom: 28,
   },
-  card: {
-    marginHorizontal: 16,
-    marginTop: -20,
-    backgroundColor: COLORS.white,
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
+  formContainer: {
+    width: '100%',
   },
   inputLabel: {
     fontSize: 11,
     fontWeight: '800',
-    color: COLORS.textMuted,
-    letterSpacing: 1,
+    color: COLORS.navy,
+    letterSpacing: 0.8,
     marginBottom: 8,
   },
-  emailInputRow: {
+  inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#F8FAFC',
     borderWidth: 1.5,
-    borderColor: COLORS.border,
-    borderRadius: 12,
-    backgroundColor: COLORS.cardBackground,
-    overflow: 'hidden',
+    borderColor: '#E2E8F0',
+    borderRadius: 16,
+    height: 54,
+    paddingHorizontal: 12,
   },
-  emailIconBox: {
-    flexDirection: 'row',
+  inputIconBox: {
+    width: 32,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    backgroundColor: 'rgba(0,0,0,0.03)',
-    borderRightWidth: 1,
-    borderRightColor: COLORS.border,
   },
-  emailIcon: {
-    fontSize: 18,
-  },
-  emailTextInput: {
+  textInput: {
     flex: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    fontSize: 16,
+    height: '100%',
+    fontSize: 15,
     fontWeight: '600',
-    color: COLORS.textPrimary,
+    color: COLORS.navy,
+    paddingLeft: 8,
   },
   errorContainer: {
-    marginTop: 10,
-    padding: 10,
-    backgroundColor: COLORS.errorLight,
-    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 6,
   },
   errorText: {
     color: COLORS.error,
@@ -221,39 +269,63 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   primaryButton: {
-    marginTop: 20,
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: COLORS.hotPink,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    marginTop: 24,
+    ...Platform.select({
+      web: {
+        filter: 'drop-shadow(0px 4px 14px rgba(255, 59, 152, 0.35))',
+      },
+      default: {
+        shadowColor: COLORS.primaryPink,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.35,
+        shadowRadius: 10,
+        elevation: 5,
+      },
+    }),
   },
   gradientButton: {
-    paddingVertical: 15,
-    alignItems: 'center',
+    height: 54,
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
   },
   buttonDisabled: {
-    opacity: 0.6,
+    opacity: 0.65,
   },
-  primaryButtonText: {
-    color: COLORS.white,
-    fontSize: 15,
-    fontWeight: '800',
-    letterSpacing: 1,
+  forgotLink: {
+    alignItems: 'center',
+    marginTop: 18,
   },
-  legalBox: {
+  forgotText: {
+    color: COLORS.primaryPink,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  registerRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginTop: 24,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.05)',
   },
-  legalText: {
-    fontSize: 11,
-    color: COLORS.textMuted,
-    textAlign: 'center',
-    lineHeight: 16,
+  noAccountText: {
+    color: '#64748B',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  registerLinkText: {
+    color: COLORS.primaryPink,
+    fontSize: 13,
+    fontWeight: '800',
   },
 });

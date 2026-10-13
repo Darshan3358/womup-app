@@ -24,6 +24,7 @@ import { StorageService } from '../../services/storageService';
 import { api } from '../../services/api';
 import { AddressService } from '../../services/addressService';
 import { AuthService } from '../../services/authService';
+import { SettingsService } from '../../services/settingsService';
 
 
 export const BlinkitProfileScreen: React.FC = () => {
@@ -46,34 +47,69 @@ export const BlinkitProfileScreen: React.FC = () => {
     goBack,
   } = useApp();
 
-  // Sync live profile data directly from MongoDB Atlas when Profile screen opens
+  // Sync live profile and settings data directly from MongoDB Atlas when Profile screen opens
   useEffect(() => {
     let isMounted = true;
-    if (!api.getToken()) return;
     (async () => {
       try {
-        const liveProfile = await AuthService.getProfile();
-        if (liveProfile && isMounted) {
-          const updatedUser: UserProfile = {
-            ...user,
-            ...liveProfile,
-            savedAddresses:
-              user.savedAddresses && user.savedAddresses.length > 0
-                ? user.savedAddresses
-                : liveProfile.savedAddresses,
-          };
-          setUser(updatedUser);
-          await StorageService.saveItem(StorageService.KEYS.USER, updatedUser);
+        if (api.getToken()) {
+          const liveProfile = await AuthService.getProfile();
+          if (liveProfile && isMounted) {
+            const updatedUser: UserProfile = {
+              ...user,
+              ...liveProfile,
+              savedAddresses:
+                user.savedAddresses && user.savedAddresses.length > 0
+                  ? user.savedAddresses
+                  : liveProfile.savedAddresses,
+            };
+            setUser(updatedUser);
+            await StorageService.saveItem(StorageService.KEYS.USER, updatedUser);
+          }
+        }
+
+        const [sRes, pmRes, rwRes] = await Promise.allSettled([
+          SettingsService.getSettings(),
+          SettingsService.getPaymentMethods(),
+          SettingsService.getRewards(),
+        ]);
+
+        if (isMounted) {
+          if (sRes.status === 'fulfilled' && sRes.value) {
+            const s = sRes.value;
+            setPrivacyPersonalizedAds(s.personalizedFeeds ?? true);
+            setPrivacyAnalytics(s.anonymousAnalytics ?? false);
+            if (s.hideSensitiveItems !== undefined) {
+              setHideSensitiveItems(s.hideSensitiveItems);
+            }
+            if (s.notificationPrefs) {
+              setNotifOrderUpdates(s.notificationPrefs.liveOrderTracking ?? true);
+              setNotifWhatsApp(s.notificationPrefs.whatsappInvoices ?? true);
+              setNotifOffers(s.notificationPrefs.exclusiveOffers ?? true);
+            }
+          }
+          if (pmRes.status === 'fulfilled' && pmRes.value) {
+            const pm = pmRes.value;
+            const defUpi = pm.methods?.find((m: any) => m.isDefault);
+            if (defUpi?.upiId) setSavedUpiId(defUpi.upiId);
+            if (pm.codEnabled !== undefined) setIsCodEnabled(pm.codEnabled);
+          }
+          if (rwRes.status === 'fulfilled' && rwRes.value) {
+            const rw = rwRes.value;
+            setHasScratchedReward(!rw.scratchCardAvailable);
+            if (typeof rw.shoppingCoins === 'number') {
+              setUser((prev) => ({ ...prev, shoppingCoins: rw.shoppingCoins }));
+            }
+          }
         }
       } catch (err) {
-        console.warn('[BlinkitProfileScreen] Live profile sync error:', err);
+        console.warn('[BlinkitProfileScreen] Live data sync error:', err);
       }
     })();
     return () => {
       isMounted = false;
     };
   }, []);
-''
   // --- Modal Visibility States ---
   const [isAppearanceModalVisible, setAppearanceModalVisible] = useState(false);
   const [isLogoutModalVisible, setLogoutModalVisible] = useState(false);
@@ -179,31 +215,22 @@ export const BlinkitProfileScreen: React.FC = () => {
     const year = birthdayYear.trim();
     const formatted = `${day} ${month} ${year}`; // e.g. "07 August 2005"
 
-    const isFirstTimeSave = !user.birthday;
-    const updatedCoins = isFirstTimeSave ? user.shoppingCoins + 50 : user.shoppingCoins;
-
-    // 1. Update local user state immediately (optimistic)
-    const updatedUser = { ...user, birthday: formatted, shoppingCoins: updatedCoins };
-    setUser(updatedUser);
-
-    // 2. Persist to AsyncStorage so it survives a page refresh
-    StorageService.saveItem(StorageService.KEYS.USER, updatedUser);
-
-    // 3. Persist to MongoDB via PATCH /api/v1/users/me
     try {
-      await api.patch('/users/me', { birthday: formatted });
-    } catch (e) {
-      console.warn('Birthday backend save failed, stored locally:', e);
-    }
+      const res = await SettingsService.updateBirthday(formatted);
+      const newCoins = res.newCoinBalance ?? (user.shoppingCoins + (res.coinsAwarded || 0));
+      const updatedUser = { ...user, birthday: formatted, shoppingCoins: newCoins };
+      setUser(updatedUser);
+      StorageService.saveItem(StorageService.KEYS.USER, updatedUser);
 
-    setBirthdayModalVisible(false);
-    if (isFirstTimeSave) {
-      Alert.alert(
-        'Birthday Saved! 🎂',
-        `Your birthday is set to ${formatted}.\n50 bonus Shopping Coins have been added to your account!`,
-      );
-    } else {
-      Alert.alert('Birthday Updated! 🎂', `Your birthday has been updated to ${formatted}.`);
+      setBirthdayModalVisible(false);
+      Alert.alert('Birthday Saved! 🎂', res.message || `Your birthday is set to ${formatted}.`);
+    } catch (e: any) {
+      // Optimistic fallback
+      const updatedUser = { ...user, birthday: formatted };
+      setUser(updatedUser);
+      StorageService.saveItem(StorageService.KEYS.USER, updatedUser);
+      setBirthdayModalVisible(false);
+      Alert.alert('Birthday Saved! 🎂', `Your birthday has been updated to ${formatted}.`);
     }
   };
 
@@ -217,25 +244,22 @@ export const BlinkitProfileScreen: React.FC = () => {
     Alert.alert('GST Verified ✓', `GSTIN ${gstin.toUpperCase()} has been saved to your billing profile.`);
   };
 
-  const handleClaimGiftCard = () => {
+  const handleClaimGiftCard = async () => {
     const code = claimVoucherCode.trim().toUpperCase();
     if (!code) {
       Alert.alert('Code Required', 'Please enter a gift card code or promo voucher.');
       return;
     }
-    if (code === 'WELCOME50' || code === 'WORMUP50') {
-      addWalletBalance(50);
-      setClaimSuccessMessage('₹50 credited to your Worm Up Money wallet! 🎉');
-      setClaimVoucherCode('');
-    } else if (code === 'WORMUP100' || code === 'FESTIVE100') {
-      addWalletBalance(100);
-      setClaimSuccessMessage('₹100 credited to your Worm Up Money wallet! 🎉');
-      setClaimVoucherCode('');
-    } else {
-      // General credit for testing
-      addWalletBalance(25);
-      setClaimSuccessMessage(`Voucher ${code} successfully redeemed! ₹25 credited to your wallet.`);
-      setClaimVoucherCode('');
+    try {
+      const res = await SettingsService.redeemGiftCard(code);
+      if (res.success) {
+        addWalletBalance(res.amount);
+        setClaimSuccessMessage(res.message);
+        setClaimVoucherCode('');
+        Alert.alert('Gift Card Claimed! 🎉', res.message);
+      }
+    } catch (err: any) {
+      Alert.alert('Redemption Failed', err.message || 'Invalid or expired gift card code');
     }
   };
 
@@ -271,12 +295,92 @@ export const BlinkitProfileScreen: React.FC = () => {
     Alert.alert('Ingredients Added! 🛒', `All ingredients for "${recipeName}" have been added to your cart.`);
   };
 
-  const handleScratchReward = () => {
+  const handleScratchReward = async () => {
     if (hasScratchedReward) return;
-    setHasScratchedReward(true);
-    const coinsWon = 75;
-    setUser({ ...user, shoppingCoins: user.shoppingCoins + coinsWon });
-    setRewardScratchMessage(`🎉 Woohoo! You won ${coinsWon} Shopping Coins! Added to your balance.`);
+    try {
+      const res = await SettingsService.scratchCard();
+      setHasScratchedReward(true);
+      if (typeof res.newTotal === 'number') {
+        setUser((prev) => ({ ...prev, shoppingCoins: res.newTotal }));
+      }
+      setRewardScratchMessage(res.message);
+      Alert.alert('Congratulations! 🎉', res.message);
+    } catch (err: any) {
+      Alert.alert('Daily Scratch Card', err.message || 'You have already scratched today!');
+    }
+  };
+
+  // Privacy handlers
+  const handleTogglePersonalizedFeeds = async (val: boolean) => {
+    setPrivacyPersonalizedAds(val);
+    await SettingsService.updatePrivacy({ personalizedFeeds: val }).catch(() => {});
+  };
+
+  const handleToggleAnalytics = async (val: boolean) => {
+    setPrivacyAnalytics(val);
+    await SettingsService.updatePrivacy({ anonymousAnalytics: val }).catch(() => {});
+  };
+
+  const handleClearHistory = async () => {
+    try {
+      const res = await SettingsService.clearHistory();
+      Alert.alert('Search History Cleared', res.message);
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to clear search history');
+    }
+  };
+
+  const handleDownloadData = async () => {
+    try {
+      const res = await SettingsService.downloadDataArchive();
+      Alert.alert('Archive Requested 📦', res.message);
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to request archive');
+    }
+  };
+
+  // Notification handlers
+  const handleToggleOrderUpdates = async (val: boolean) => {
+    setNotifOrderUpdates(val);
+    await SettingsService.updateNotifications({ liveOrderTracking: val, orderUpdates: val }).catch(() => {});
+  };
+
+  const handleToggleWhatsApp = async (val: boolean) => {
+    setNotifWhatsApp(val);
+    await SettingsService.updateNotifications({ whatsappInvoices: val }).catch(() => {});
+  };
+
+  const handleToggleOffers = async (val: boolean) => {
+    setNotifOffers(val);
+    await SettingsService.updateNotifications({ exclusiveOffers: val }).catch(() => {});
+  };
+
+  // Payment handlers
+  const handleVerifyAndAddUpi = async () => {
+    const clean = newUpiInput.trim();
+    if (!clean || !clean.includes('@')) {
+      Alert.alert('Invalid UPI ID', 'Please enter a valid VPA with @ (e.g. name@okhdfcbank)');
+      return;
+    }
+    try {
+      const verified = await SettingsService.verifyUpi(clean);
+      await SettingsService.addPaymentMethod({
+        type: 'UPI',
+        upiId: verified.upiId,
+        label: `${verified.accountHolder} (${verified.bank})`,
+        isDefault: true,
+      });
+      setSavedUpiId(verified.upiId);
+      setNewUpiInput('');
+      Alert.alert('UPI Verified ✓', `${verified.accountHolder}'s UPI ID (${verified.bank}) verified via NPCI and set as default.`);
+    } catch (e: any) {
+      Alert.alert('Verification Failed', e.message || 'Could not verify UPI ID');
+    }
+  };
+
+  const handleToggleCod = async (val: boolean) => {
+    setIsCodEnabled(val);
+    await SettingsService.toggleCod(val).catch(() => {});
   };
 
   const handleShareApp = async () => {
@@ -578,24 +682,6 @@ export const BlinkitProfileScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Appearance Row */}
-          <View style={styles.cardBlockStandalone}>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => setAppearanceModalVisible(true)}
-              style={styles.preferenceRow}
-            >
-              <View style={styles.rowLeft}>
-                <AppIcon name="sun" size={20} color={COLORS.textPrimary} />
-                <Text style={[TYPOGRAPHY.bodyMd, styles.rowLabel]}>Appearance</Text>
-              </View>
-              <View style={styles.appearanceRight}>
-                <Text style={styles.appearanceValueText}>{appearance}</Text>
-                <AppIcon name="chevron-down" size={16} color={COLORS.textMuted} />
-              </View>
-            </TouchableOpacity>
-          </View>
-
           {/* Hide Sensitive Items Row */}
           <View style={styles.cardBlockStandalone}>
             <View style={styles.sensitiveRow}>
@@ -634,34 +720,10 @@ export const BlinkitProfileScreen: React.FC = () => {
               onPress: () => setAddressBookModalVisible(true),
             },
             {
-              icon: 'sparkles',
-              label: 'Bookmarked recipes',
-              badge: 'Chef specials',
-              onPress: () => setRecipesModalVisible(true),
-            },
-            {
               icon: 'heart',
               label: 'Your wishlist',
               badge: wishlist.length > 0 ? `${wishlist.length}` : undefined,
               onPress: () => setActiveScreen('Blinkit_Wishlist'),
-            },
-            {
-              icon: 'file-text',
-              label: 'GST details',
-              badge: savedGst ? 'Verified ✓' : 'Add',
-              onPress: () => setGstModalVisible(true),
-            },
-            {
-              icon: 'gift',
-              label: 'E-gift cards',
-              badge: giftCardBalance > 0 ? `₹${giftCardBalance}` : undefined,
-              onPress: () => setGiftCardsModalVisible(true),
-            },
-            {
-              icon: 'file-text',
-              label: 'Your prescriptions',
-              badge: `${prescriptionsList.length} active`,
-              onPress: () => setPrescriptionsModalVisible(true),
             },
           ])}
 
@@ -699,12 +761,6 @@ export const BlinkitProfileScreen: React.FC = () => {
               badge: '8 meals funded',
               onPress: () => setFeedingIndiaModalVisible(true),
             },
-            {
-              icon: 'file-text',
-              label: 'Get donation receipt',
-              badge: '80G Tax Exemption',
-              onPress: () => setDonationReceiptModalVisible(true),
-            },
           ])}
 
           {/* Section 4: Other Information */}
@@ -719,12 +775,6 @@ export const BlinkitProfileScreen: React.FC = () => {
               icon: 'help-circle',
               label: 'About us',
               onPress: () => setAboutUsModalVisible(true),
-            },
-            {
-              icon: 'shopping-bag',
-              label: 'Sell on Worm Up',
-              badge: 'Partner',
-              onPress: () => setPartnerModalVisible(true),
             },
             {
               icon: 'lock',
@@ -1155,15 +1205,7 @@ export const BlinkitProfileScreen: React.FC = () => {
                 />
                 <TouchableOpacity
                   activeOpacity={0.8}
-                  onPress={() => {
-                    if (newUpiInput.includes('@')) {
-                      setSavedUpiId(newUpiInput);
-                      setNewUpiInput('');
-                      Alert.alert('UPI Verified', 'New UPI ID set as primary payment method.');
-                    } else {
-                      Alert.alert('Invalid UPI ID', 'Please enter a valid VPA with @ (e.g. name@okhdfcbank)');
-                    }
-                  }}
+                  onPress={handleVerifyAndAddUpi}
                   style={styles.verifyUpiBtn}
                 >
                   <Text style={styles.verifyUpiBtnText}>Verify</Text>
@@ -1178,7 +1220,7 @@ export const BlinkitProfileScreen: React.FC = () => {
               </View>
               <Switch
                 value={isCodEnabled}
-                onValueChange={setIsCodEnabled}
+                onValueChange={handleToggleCod}
                 trackColor={{ false: COLORS.border, true: COLORS.primary }}
                 thumbColor={COLORS.white}
               />
@@ -1506,7 +1548,7 @@ export const BlinkitProfileScreen: React.FC = () => {
               </View>
               <Switch
                 value={privacyPersonalizedAds}
-                onValueChange={setPrivacyPersonalizedAds}
+                onValueChange={handleTogglePersonalizedFeeds}
                 trackColor={{ false: COLORS.border, true: COLORS.primary }}
                 thumbColor={COLORS.white}
               />
@@ -1519,7 +1561,7 @@ export const BlinkitProfileScreen: React.FC = () => {
               </View>
               <Switch
                 value={privacyAnalytics}
-                onValueChange={setPrivacyAnalytics}
+                onValueChange={handleToggleAnalytics}
                 trackColor={{ false: COLORS.border, true: COLORS.primary }}
                 thumbColor={COLORS.white}
               />
@@ -1527,7 +1569,7 @@ export const BlinkitProfileScreen: React.FC = () => {
 
             <TouchableOpacity
               activeOpacity={0.85}
-              onPress={() => Alert.alert('Search History Cleared', 'Your previous search queries and recent item views have been purged.')}
+              onPress={handleClearHistory}
               style={styles.outlineActionBtn}
             >
               <Ionicons name="trash-outline" size={18} color={COLORS.error} style={{ marginRight: 6 }} />
@@ -1536,7 +1578,7 @@ export const BlinkitProfileScreen: React.FC = () => {
 
             <TouchableOpacity
               activeOpacity={0.85}
-              onPress={() => Alert.alert('Archive Requested 📦', 'A copy of your account profile and orders will be emailed within 48 hours.')}
+              onPress={handleDownloadData}
               style={[styles.outlineActionBtn, { marginTop: 10 }]}
             >
               <Ionicons name="download-outline" size={18} color={COLORS.textPrimary} style={{ marginRight: 6 }} />
@@ -1567,7 +1609,7 @@ export const BlinkitProfileScreen: React.FC = () => {
               </View>
               <Switch
                 value={notifOrderUpdates}
-                onValueChange={setNotifOrderUpdates}
+                onValueChange={handleToggleOrderUpdates}
                 trackColor={{ false: COLORS.border, true: COLORS.primary }}
                 thumbColor={COLORS.white}
               />
@@ -1580,7 +1622,7 @@ export const BlinkitProfileScreen: React.FC = () => {
               </View>
               <Switch
                 value={notifWhatsApp}
-                onValueChange={setNotifWhatsApp}
+                onValueChange={handleToggleWhatsApp}
                 trackColor={{ false: COLORS.border, true: COLORS.primary }}
                 thumbColor={COLORS.white}
               />
@@ -1593,7 +1635,7 @@ export const BlinkitProfileScreen: React.FC = () => {
               </View>
               <Switch
                 value={notifOffers}
-                onValueChange={setNotifOffers}
+                onValueChange={handleToggleOffers}
                 trackColor={{ false: COLORS.border, true: COLORS.primary }}
                 thumbColor={COLORS.white}
               />

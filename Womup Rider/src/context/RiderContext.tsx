@@ -160,7 +160,18 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const detectLocation = useCallback(async () => {
     try {
-      const coords = await LocationTrackerService.detectRealGps();
+      let coords = await LocationTrackerService.detectRealGps();
+      if (!coords) {
+        // Auto-detect fallback: use saved hub or default Chandlodiya Dark Store Hub
+        const savedHubRaw = await AsyncStorage.getItem('@womup_rider_selected_hub');
+        let hub = AHMEDABAD_HUBS[0];
+        if (savedHubRaw) {
+          try {
+            hub = JSON.parse(savedHubRaw);
+          } catch {}
+        }
+        coords = await LocationTrackerService.setSimulatedLocation(hub.latitude, hub.longitude);
+      }
       if (coords) {
         setCurrentLocation(coords);
         const nearest = LocationTrackerService.getNearestHub(coords.latitude, coords.longitude);
@@ -215,32 +226,28 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setActiveDelivery(null);
       }
 
-      const coords = LocationTrackerService.getCurrentCoordinates();
+      let coords = LocationTrackerService.getCurrentCoordinates();
+      if (!coords) {
+        // Automatically detect GPS or assign nearest dark store hub on launch
+        coords = await LocationTrackerService.detectRealGps();
+        if (!coords) {
+          const savedHubRaw = await AsyncStorage.getItem('@womup_rider_selected_hub');
+          let hub = AHMEDABAD_HUBS[0];
+          if (savedHubRaw) {
+            try {
+              hub = JSON.parse(savedHubRaw);
+            } catch {}
+          }
+          coords = await LocationTrackerService.setSimulatedLocation(hub.latitude, hub.longitude);
+        }
+      }
+
       if (coords) {
         setCurrentLocation(coords);
         const nearest = LocationTrackerService.getNearestHub(coords.latitude, coords.longitude);
         setDetectedHubName(`${nearest.hub.name} (${nearest.distanceKm} km away)`);
         const addr = await LocationTrackerService.getAddressForCoords(coords.latitude, coords.longitude);
         setDetectedAddress(addr);
-      } else {
-        const savedHubRaw = await AsyncStorage.getItem('@womup_rider_selected_hub');
-        if (savedHubRaw) {
-          try {
-            const savedHub: HubLocation = JSON.parse(savedHubRaw);
-            const simCoords = await LocationTrackerService.setSimulatedLocation(savedHub.latitude, savedHub.longitude);
-            setCurrentLocation(simCoords);
-            setDetectedHubName(`${savedHub.name} (0.1 km away)`);
-            setDetectedAddress(savedHub.address);
-          } catch {
-            setDetectedHubName(null);
-            setDetectedAddress(null);
-            setCurrentLocation(null);
-          }
-        } else {
-          setDetectedHubName(null);
-          setDetectedAddress(null);
-          setCurrentLocation(null);
-        }
       }
 
       await refreshAvailableJobs();
@@ -473,7 +480,45 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     });
 
+    // Stream live rider GPS updates to backend every 1 second during active delivery
+    const locationInterval = setInterval(() => {
+      const current = activeDeliveryRef.current;
+      if (!current || !socket.connected) return;
+
+      const orderId = current.id || (current as any).orderId || (current as any)._id;
+      if (!orderId) return;
+
+      let coords = LocationTrackerService.getCurrentCoordinates();
+      if (!coords) {
+        // Fallback to nearest hub if GPS hasn't been locked yet
+        const hub = AHMEDABAD_HUBS[0]; // Chandlodiya Dark Store (23.1128, 72.5427)
+        LocationTrackerService.setSimulatedLocation(hub.latitude, hub.longitude);
+        coords = LocationTrackerService.getCurrentCoordinates();
+      }
+
+      if (coords) {
+        const payload = {
+          orderId,
+          lat: coords.latitude,
+          lng: coords.longitude,
+          speed: coords.speed ?? 18,
+          heading: coords.heading ?? 0,
+        };
+
+        // Emit via both standard event names for maximum cross-gateway compatibility
+        socket.emit('update_rider_location', payload);
+        socket.emit('rider_location_update', payload);
+
+        const cleanOrderId = typeof orderId === 'string' ? orderId.replace(/^#/, '') : orderId;
+        if (cleanOrderId !== orderId) {
+          socket.emit('update_rider_location', { ...payload, orderId: cleanOrderId });
+          socket.emit('rider_location_update', { ...payload, orderId: cleanOrderId });
+        }
+      }
+    }, 1000);
+
     return () => {
+      clearInterval(locationInterval);
       socket.removeAllListeners();
       socket.disconnect();
     };
@@ -546,7 +591,7 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const success = await RiderApiService.verifyDeliveryOtp(activeDelivery.id, otp);
       if (success) {
         setActiveDelivery(null);
-        setShowOtpModal(false);
+        // Modal handles showing celebration card and closing itself
         if (profile) {
           setProfile({
             ...profile,

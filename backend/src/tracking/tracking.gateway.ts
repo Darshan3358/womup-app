@@ -44,13 +44,26 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: any,
   ) {
-    const orderId = typeof payload === 'string' ? payload : payload?.orderId;
-    if (orderId) {
+    const rawId = typeof payload === 'string' ? payload : (payload?.orderId || payload?.id);
+    if (rawId) {
+      const orderId = String(rawId);
+      const cleanId = orderId.replace(/^#/, '');
       client.join(`order_${orderId}`);
+      if (cleanId !== orderId) {
+        client.join(`order_${cleanId}`);
+      }
       this.logger.log(`Client ${client.id} joined tracking room: order_${orderId}`);
       return { event: 'joined', orderId };
     }
     return { event: 'error', message: 'Missing orderId' };
+  }
+
+  @SubscribeMessage('join_order_room')
+  handleJoinOrderRoom(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: any,
+  ) {
+    return this.handleJoinOrder(client, payload);
   }
 
   @SubscribeMessage('leave_order')
@@ -58,9 +71,12 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: any,
   ) {
-    const orderId = typeof payload === 'string' ? payload : payload?.orderId;
-    if (orderId) {
+    const rawId = typeof payload === 'string' ? payload : (payload?.orderId || payload?.id);
+    if (rawId) {
+      const orderId = String(rawId);
+      const cleanId = orderId.replace(/^#/, '');
       client.leave(`order_${orderId}`);
+      client.leave(`order_${cleanId}`);
       return { event: 'left', orderId };
     }
   }
@@ -91,39 +107,152 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
   }
 
+  // Cross-device synchronization rooms for User Cart & Wishlist
+  @SubscribeMessage('join_user')
+  handleJoinUser(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: any,
+  ) {
+    const userId = typeof payload === 'string' ? payload : (payload?.userId || payload?.id);
+    if (userId) {
+      client.join(`user_${userId}`);
+      this.logger.log(`Client ${client.id} joined user sync room: user_${userId}`);
+      return { event: 'joined', userId };
+    }
+    return { event: 'error', message: 'Missing userId' };
+  }
+
+  @SubscribeMessage('leave_user')
+  handleLeaveUser(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: any,
+  ) {
+    const userId = typeof payload === 'string' ? payload : (payload?.userId || payload?.id);
+    if (userId) {
+      client.leave(`user_${userId}`);
+      return { event: 'left', userId };
+    }
+  }
+
+  // Cross-device synchronization for Active Delivery Area & Store (Web <-> Mobile App)
+  @SubscribeMessage('location_changed')
+  @SubscribeMessage('set_location')
+  handleLocationChanged(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: any,
+  ) {
+    const userId = payload?.userId;
+    if (userId) {
+      this.server?.to(`user_${userId}`).emit('location_updated', payload);
+    }
+    // Broadcast to all connected clients/tabs so Web and Mobile App sync instantly
+    client.broadcast.emit('location_updated', payload);
+    this.server?.emit('location_updated', payload);
+    this.logger.log(`[WebSocket] Real-time location_updated broadcasted: ${payload?.areaName} -> ${payload?.storeName}`);
+    return { event: 'location_synced', payload };
+  }
+
+  // Cross-device synchronization for Checkout Configuration (Payment, Tip, Instructions, Coins)
+  @SubscribeMessage('checkout_changed')
+  handleCheckoutChanged(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: any,
+  ) {
+    const userId = payload?.userId;
+    if (userId) {
+      this.server?.to(`user_${userId}`).emit('checkout_updated', payload);
+    }
+    client.broadcast.emit('checkout_updated', payload);
+    this.server?.emit('checkout_updated', payload);
+    this.logger.log(`[WebSocket] Real-time checkout_updated broadcasted: payment=${payload?.paymentMethod}, tip=${payload?.tip}, instr=${payload?.deliveryInstruction}`);
+    return { event: 'checkout_synced', payload };
+  }
+
   // Delivery partner updates GPS location
   @SubscribeMessage('update_delivery_location')
   handleLocationUpdate(
     @MessageBody()
     data: {
       orderId: string;
-      partnerId: string;
-      latitude: number;
-      longitude: number;
+      partnerId?: string;
+      latitude?: number;
+      longitude?: number;
+      lat?: number;
+      lng?: number;
       speed?: number;
       heading?: number;
     },
   ) {
     if (!data?.orderId) return;
 
+    const lat = data.lat ?? data.latitude ?? 23.0245;
+    const lng = data.lng ?? data.longitude ?? 72.5298;
+    const orderId = String(data.orderId);
+    const cleanOrderId = orderId.replace(/^#/, '');
+
     const payload = {
-      orderId: data.orderId,
-      partnerId: data.partnerId,
-      latitude: data.latitude,
-      longitude: data.longitude,
+      orderId,
+      partnerId: data.partnerId || '',
+      latitude: lat,
+      longitude: lng,
+      lat,
+      lng,
       speed: data.speed,
       heading: data.heading,
       timestamp: new Date().toISOString(),
     };
 
     if (this.server) {
-      // 1. Emit to customer tracking room
-      this.server.to(`order_${data.orderId}`).emit('update_delivery_location', payload);
-      this.server.to(`order_${data.orderId}`).emit('delivery.location.updated', payload);
+      // 1. Emit to customer tracking room (both orderId and cleanOrderId)
+      this.server.to(`order_${orderId}`).emit('rider_location_update', payload);
+      this.server.to(`order_${orderId}`).emit('update_delivery_location', payload);
+      this.server.to(`order_${orderId}`).emit('delivery.location.updated', payload);
 
-      // 2. Broadcast to Admin Console live fleet
+      if (cleanOrderId !== orderId) {
+        this.server.to(`order_${cleanOrderId}`).emit('rider_location_update', payload);
+        this.server.to(`order_${cleanOrderId}`).emit('update_delivery_location', payload);
+        this.server.to(`order_${cleanOrderId}`).emit('delivery.location.updated', payload);
+      }
+
+      // 2. Broadcast to Admin Console and all connected apps
+      this.server.emit('rider_location_update', payload);
       this.server.emit('update_delivery_location', payload);
     }
+  }
+
+  @SubscribeMessage('update_rider_location')
+  handleRiderLocation(
+    @MessageBody()
+    data: {
+      orderId: string;
+      partnerId?: string;
+      riderId?: string;
+      latitude?: number;
+      longitude?: number;
+      lat?: number;
+      lng?: number;
+      speed?: number;
+      heading?: number;
+    },
+  ) {
+    return this.handleLocationUpdate({
+      orderId: data.orderId,
+      partnerId: data.partnerId || data.riderId || '',
+      latitude: data.latitude,
+      longitude: data.longitude,
+      lat: data.lat,
+      lng: data.lng,
+      speed: data.speed,
+      heading: data.heading,
+    });
+  }
+
+  @SubscribeMessage('rider_location_update')
+  handleRiderLocationDirect(
+    @MessageBody()
+    data: any,
+  ) {
+    return this.handleLocationUpdate(data);
   }
 
   // Broadcast new order to Admin Console, Rider Radar, and Store Hub
@@ -133,7 +262,7 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
       const payload = {
         orderId: order._id?.toString() || order.id,
         orderNumber: order.orderNumber,
-        status: order.status,
+        sxtatus: order.status,
         totalAmount: order.totalAmount,
         itemCount: order.items?.length || 0,
         customerName: order.deliveryAddress?.label || 'Customer',
@@ -144,11 +273,12 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
         order,
       };
 
-      // Emit strictly to specific store room and admin console
+      // Emit to targeted store room, admin console, and global broadcast fallback
       if (storeId) {
         this.server.to(`store_${storeId}`).emit('new_order', payload);
       }
       this.server.to('admin').emit('new_order', payload);
+      this.server.emit('new_order', payload);
       this.logger.log(`[WebSocket] Dispatched new_order to store_${storeId}: ${order.orderNumber}`);
     }
   }
@@ -236,6 +366,14 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
         this.server.to(`order_${clean}`).emit('orderStatusUpdated', payload);
         this.server.to(`order_${clean}`).emit('orderUpdate', payload);
         this.server.to(`order_${clean}`).emit(`orderStatusUpdate_${clean}`, payload);
+      }
+
+      // Emit to user device room if userId is present
+      if (additionalData?.userId) {
+        const uId = additionalData.userId.toString();
+        this.server.to(`user_${uId}`).emit('order_status', payload);
+        this.server.to(`user_${uId}`).emit('order_status_updated', payload);
+        this.server.to(`user_${uId}`).emit('order.status.updated', payload);
       }
 
       // 2. Emit globally to Admin Console Kanban, Rider Radar, and Customer App listeners
@@ -413,6 +551,199 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
           payload.isOnShift ? 'ON SHIFT' : 'OFF SHIFT'
         } (Active pickers: ${payload.staffOnShiftCount ?? 'N/A'})`
       );
+    }
+  }
+
+  // Cross-device synchronization for Cart
+  emitCartUpdated(userId: string, cartData: any) {
+    if (this.server) {
+      const payload = {
+        userId: userId?.toString(),
+        cart: cartData,
+        timestamp: new Date().toISOString(),
+      };
+      // Targeted room for user's devices (Web, Mobile, Tablet)
+      this.server.to(`user_${userId}`).emit('cart_updated', payload);
+      // Also broadcast with userId metadata for universal listeners
+      this.server.emit('cart_updated', payload);
+      this.logger.log(`[WebSocket] Emitted cart_updated to room user_${userId}`);
+    }
+  }
+
+  // Cross-device synchronization for Wishlist
+  emitWishlistUpdated(userId: string, wishlistData: any) {
+    if (this.server) {
+      const payload = {
+        userId: userId?.toString(),
+        wishlist: wishlistData,
+        timestamp: new Date().toISOString(),
+      };
+      // Targeted room for user's devices (Web, Mobile, Tablet)
+      this.server.to(`user_${userId}`).emit('wishlist_updated', payload);
+      // Also broadcast with userId metadata for universal listeners
+      this.server.emit('wishlist_updated', payload);
+      this.logger.log(`[WebSocket] Emitted wishlist_updated to room user_${userId}`);
+    }
+  }
+
+  // Cross-device synchronization for Orders (Created / Placed)
+  emitOrderCreated(userId: string, orderData: any) {
+    if (this.server && userId) {
+      const payload = {
+        userId: userId.toString(),
+        order: orderData,
+        orderId: orderData?._id?.toString() || orderData?.id,
+        orderNumber: orderData?.orderNumber,
+        status: orderData?.status,
+        timestamp: new Date().toISOString(),
+      };
+      // Targeted room for user's devices (Web, Mobile, Tablet)
+      this.server.to(`user_${userId}`).emit('order_created', payload);
+      this.server.to(`user_${userId}`).emit('order_placed', payload);
+      this.server.emit('order_created', payload);
+      this.logger.log(`[WebSocket] Emitted order_created to room user_${userId}: ${payload.orderNumber || payload.orderId}`);
+    }
+  }
+
+  // Cross-device notification when order price was auto-adjusted due to store/area pricing
+  emitOrderPriceAdjusted(userId: string, payload: {
+    orderId: string;
+    orderNumber?: string;
+    priceAdjustments: any[];
+    oldTotal?: number;
+    newTotal?: number;
+    storeName?: string;
+  }) {
+    if (this.server && userId) {
+      const data = {
+        userId: userId.toString(),
+        ...payload,
+        timestamp: new Date().toISOString(),
+      };
+      this.server.to(`user_${userId}`).emit('order_price_adjusted', data);
+      this.server.to(`order_${payload.orderId}`).emit('order_price_adjusted', data);
+      this.server.emit('order_price_adjusted', data);
+      this.logger.log(`[WebSocket] Emitted order_price_adjusted to room user_${userId} for order ${payload.orderNumber || payload.orderId}`);
+    }
+  }
+
+  // Cross-device synchronization for Order Status (Updated / Cancelled / Delivered)
+  emitOrderStatusToUser(userId: string, orderId: string, status: string, orderData: any = {}) {
+    if (this.server && userId) {
+      const payload = {
+        userId: userId.toString(),
+        orderId: orderId?.toString(),
+        status,
+        ...orderData,
+        timestamp: new Date().toISOString(),
+      };
+      this.server.to(`user_${userId}`).emit('order_status_updated', payload);
+      this.server.to(`user_${userId}`).emit('order_status', payload);
+      this.server.to(`order_${orderId}`).emit('order_status_updated', payload);
+      this.server.to(`order_${orderId}`).emit('order_status', payload);
+      this.logger.log(`[WebSocket] Emitted order_status_updated (${status}) to room user_${userId} for order ${orderId}`);
+    }
+  }
+
+  // Cross-device synchronization for Shopping Coins & Wallet
+  emitWalletUpdated(userId: string, walletData: { shoppingCoins?: number; walletBalance?: number }) {
+    if (this.server && userId) {
+      const payload = {
+        userId: userId.toString(),
+        ...walletData,
+        timestamp: new Date().toISOString(),
+      };
+      this.server.to(`user_${userId}`).emit('wallet_updated', payload);
+      this.server.to(`user_${userId}`).emit('coins_updated', payload);
+      this.logger.log(`[WebSocket] Emitted wallet_updated to room user_${userId}: SC=${walletData.shoppingCoins} WB=${walletData.walletBalance}`);
+    }
+  }
+
+  // Cross-device synchronization for User Profile
+  emitProfileUpdated(userId: string, profileData: any) {
+    if (this.server && userId) {
+      const payload = {
+        userId: userId.toString(),
+        profile: profileData,
+        timestamp: new Date().toISOString(),
+      };
+      this.server.to(`user_${userId}`).emit('profile_updated', payload);
+      this.logger.log(`[WebSocket] Emitted profile_updated to room user_${userId}`);
+    }
+  }
+
+  // Cross-device synchronization for User Settings (Privacy & Notifications)
+  emitSettingsUpdated(userId: string, settings: any) {
+    if (this.server && userId) {
+      this.server.to(`user_${userId}`).emit('settings_updated', {
+        userId: userId.toString(),
+        settings,
+        timestamp: new Date().toISOString(),
+      });
+      this.logger.log(`[WebSocket] Emitted settings_updated to room user_${userId}`);
+    }
+  }
+
+  // Cross-device synchronization for Payment Methods
+  emitPaymentMethodsUpdated(userId: string, methods: any) {
+    if (this.server && userId) {
+      this.server.to(`user_${userId}`).emit('payment_methods_updated', {
+        userId: userId.toString(),
+        methods,
+        timestamp: new Date().toISOString(),
+      });
+      this.logger.log(`[WebSocket] Emitted payment_methods_updated to room user_${userId}`);
+    }
+  }
+
+  // Cross-device synchronization for Gift Card Redemption
+  emitGiftCardRedeemed(userId: string, payload: { code: string; amount: number; newWalletBalance: number }) {
+    if (this.server && userId) {
+      this.server.to(`user_${userId}`).emit('gift_card_redeemed', {
+        userId: userId.toString(),
+        ...payload,
+        timestamp: new Date().toISOString(),
+      });
+      this.emitWalletUpdated(userId, { walletBalance: payload.newWalletBalance });
+      this.logger.log(`[WebSocket] Emitted gift_card_redeemed to room user_${userId}: ₹${payload.amount}`);
+    }
+  }
+
+  // Cross-device synchronization for Scratch Card Results
+  emitScratchResult(userId: string, payload: { coinsEarned: number; newTotal: number; streak: number }) {
+    if (this.server && userId) {
+      this.server.to(`user_${userId}`).emit('scratch_result', {
+        userId: userId.toString(),
+        ...payload,
+        timestamp: new Date().toISOString(),
+      });
+      this.emitWalletUpdated(userId, { shoppingCoins: payload.newTotal });
+      this.logger.log(`[WebSocket] Emitted scratch_result to room user_${userId}: +${payload.coinsEarned} Coins`);
+    }
+  }
+
+  // Cross-device synchronization for Rider Reviews
+  emitRiderReviewSubmitted(riderId: string, payload: any) {
+    if (this.server) {
+      if (riderId) {
+        this.server.to(`rider_${riderId}`).emit('rider_review_submitted', payload);
+      }
+      this.server.to('admin').emit('rider_review_submitted', payload);
+      this.server.emit('rider_review_submitted', payload);
+      if (payload.orderId) {
+        this.server.to(`order_${payload.orderId}`).emit('order_reviewed', payload);
+      }
+      this.logger.log(`[WebSocket] Emitted rider_review_submitted for rider ${riderId}: ${payload.stars} stars`);
+    }
+  }
+
+  emitReviewPromptRequested(customerId: string, payload: any) {
+    if (this.server && customerId) {
+      this.server.to(`user_${customerId}`).emit('review_prompt_requested', payload);
+      if (payload.orderId) {
+        this.server.to(`order_${payload.orderId}`).emit('review_prompt_requested', payload);
+      }
+      this.logger.log(`[WebSocket] Emitted review_prompt_requested to user_${customerId} for order ${payload.orderNumber}`);
     }
   }
 }

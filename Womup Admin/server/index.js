@@ -48,8 +48,8 @@ app.get('/api/health', (req, res) => {
 app.get('/api/realtime-data', async (req, res) => {
   try {
     const db = getDB();
-    const deliveryPartners = await db.collection('delivery_partners').find({}).toArray();
-    const partnerUserIds = deliveryPartners.map(p => p.userId?.toString()).filter(Boolean);
+    const rawDeliveryPartners = await db.collection('delivery_partners').find({}).toArray();
+    const partnerUserIds = rawDeliveryPartners.map(p => p.userId?.toString()).filter(Boolean);
 
     // Only genuine customers (exclude delivery partners and admins)
     const users = await db.collection('users').find({
@@ -63,10 +63,36 @@ app.get('/api/realtime-data', async (req, res) => {
       },
     }).toArray();
     const orders = await db.collection('orders').find({}).toArray();
+
+    // Enrich delivery partners with exact completed and active orders count
+    const deliveryPartners = rawDeliveryPartners.map((p) => {
+      const pIdStr = p._id.toString();
+      const uIdStr = p.userId ? p.userId.toString() : '';
+
+      const isOrderOfPartner = (o) => {
+        const oPartnerId = (typeof o.deliveryPartnerId === 'object' ? o.deliveryPartnerId?._id : o.deliveryPartnerId)?.toString();
+        const oRiderId = (typeof o.riderId === 'object' ? o.riderId?._id : o.riderId)?.toString();
+        return oPartnerId === pIdStr || oRiderId === pIdStr || (uIdStr && (oPartnerId === uIdStr || oRiderId === uIdStr));
+      };
+
+      const deliveredOrdersCount = orders.filter((o) => isOrderOfPartner(o) && ['DELIVERED', 'COMPLETED'].includes(o.status)).length;
+      const activeOrdersCount = orders.filter((o) => isOrderOfPartner(o) && ['OUT_FOR_DELIVERY', 'PICKED_UP', 'REACHED_STORE', 'ASSIGNED'].includes(o.status)).length;
+      const effectiveCompleted = Math.max(deliveredOrdersCount, Number(p.completedDeliveries) || Number(p.totalDeliveries) || 0);
+
+      return {
+        ...p,
+        completedDeliveries: effectiveCompleted,
+        totalDeliveries: effectiveCompleted,
+        activeDeliveries: activeOrdersCount,
+      };
+    });
     const products = await db.collection('products').find({}).toArray();
     const categories = await db.collection('categories').find({}).toArray();
     const rawAreas = await db.collection('areas').find({}).toArray();
-    const rawStores = await db.collection('stores').find({}).toArray();
+    const rawStores = await db.collection('stores').find({
+      deletedAt: { $exists: false },
+      isActive: { $ne: false },
+    }).toArray();
     const storeStaffList = await db.collection('store_staff').find({}).toArray();
 
     const stores = rawStores.map((store) => {
@@ -244,7 +270,7 @@ app.get('/api/admin/riders/:id', async (req, res) => {
   }
 });
 
-app.patch('/api/admin/riders/:id', async (req, res) => {
+const handleUpdateRider = async (req, res) => {
   try {
     const db = getDB();
     const { id } = req.params;
@@ -270,6 +296,7 @@ app.patch('/api/admin/riders/:id', async (req, res) => {
     if (updates.vehicleType !== undefined) fieldsToUpdate.vehicleType = updates.vehicleType;
     if (updates.vehicleNumber !== undefined) fieldsToUpdate.vehicleNumber = updates.vehicleNumber;
     if (updates.hubName !== undefined) fieldsToUpdate.hubName = updates.hubName;
+    if (updates.hubId !== undefined) fieldsToUpdate.hubId = updates.hubId;
     if (updates.city !== undefined) fieldsToUpdate.city = updates.city;
     if (updates.status !== undefined) fieldsToUpdate.status = updates.status;
     if (updates.verificationStatus !== undefined) fieldsToUpdate.verificationStatus = updates.verificationStatus;
@@ -290,7 +317,10 @@ app.patch('/api/admin/riders/:id', async (req, res) => {
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
-});
+};
+
+app.patch('/api/admin/riders/:id', handleUpdateRider);
+app.put('/api/admin/riders/:id', handleUpdateRider);
 
 // Mount Admin Management Modules
 app.use('/api/admin/dashboard', dashboardRouter);
@@ -306,9 +336,93 @@ app.use('/api/admin/marketing', marketingRouter);
 app.use('/api/admin/finance', financeRouter);
 app.use('/api/finance', financeRouter);
 app.use('/api/admin/security', securityRouter);
-app.use('/api/admin/payout-rates', payoutRatesRouter);
 app.use('/api/v1/cart', cartRouter);
 app.use('/api/cart', cartRouter);
+
+// Direct /api/* aliases for portal & integrations
+app.put('/api/products/price', async (req, res) => {
+  try {
+    const db = getDB();
+    const { productName, sellingPrice, productId } = req.body;
+    const sPrice = Number(sellingPrice);
+    if (!productName && !productId) {
+      return res.status(400).json({ success: false, error: 'Product name or ID is required' });
+    }
+    const filter = productId && ObjectId.isValid(productId) ? { _id: new ObjectId(productId) } : { name: productName };
+    const prod = await db.collection('products').findOne(filter);
+    if (prod) {
+      await db.collection('products').updateOne(
+        { _id: prod._id },
+        {
+          $set: { sellingPrice: sPrice, updatedAt: new Date() },
+          $push: {
+            priceHistory: {
+              id: 'ph_' + Date.now(),
+              oldSellingPrice: prod.sellingPrice,
+              newSellingPrice: sPrice,
+              changedBy: 'Admin Portal',
+              changedAt: new Date(),
+              notes: 'Inline price update from Admin Portal',
+            },
+          },
+        }
+      );
+      await db.collection('product_variants').updateMany(
+        { productId: prod._id },
+        { $set: { sellingPrice: sPrice, updatedAt: new Date() } }
+      );
+    }
+    res.json({ success: true, message: 'Price updated successfully in MongoDB Atlas' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/coins/adjust', async (req, res) => {
+  try {
+    const db = getDB();
+    const { userId, amount, type, reason } = req.body;
+    const numAmount = Number(amount);
+    const filter = ObjectId.isValid(userId) ? { _id: new ObjectId(userId) } : { _id: userId };
+    const user = await db.collection('users').findOne(filter);
+    const current = (user && (user.shoppingCoins !== undefined ? user.shoppingCoins : user.coins)) || 0;
+    const delta = type === 'Debit' ? -Math.abs(numAmount) : Math.abs(numAmount);
+    const nextBalance = Math.max(0, current + delta);
+    if (user) {
+      await db.collection('users').updateOne(filter, {
+        $set: {
+          coins: nextBalance,
+          shoppingCoins: nextBalance,
+          updatedAt: new Date(),
+        },
+      });
+      await db.collection('coin_transactions').insertOne({
+        userId: user._id,
+        amount: Math.abs(numAmount),
+        type: type || 'Credit',
+        reason: reason || 'Admin adjustment',
+        balanceBefore: current,
+        balanceAfter: nextBalance,
+        createdAt: new Date(),
+      });
+    }
+    res.json({ success: true, newBalance: nextBalance });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.use('/api/stores', storesRouter);
+app.use('/api/users', usersRouter);
+app.use('/api/catalog', catalogRouter);
+app.use('/api/categories', categoriesRouter);
+app.use('/api/cities', citiesRouter);
+app.use('/api/areas', areasRouter);
+app.use('/api/orders', ordersRouter);
+app.use('/api/print-orders', printOrdersRouter);
+app.use('/api/marketing', marketingRouter);
+app.use('/api/payout-rates', payoutRatesRouter);
+app.use('/api/finance', financeRouter);
 
 // 404 handler
 app.use((req, res) => {

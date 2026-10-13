@@ -7,6 +7,8 @@ import { User, UserSchema } from '../users/schemas/user.schema';
 import { CartService } from './cart.service';
 import { CartController } from './cart.controller';
 
+import { TrackingModule } from '../tracking/tracking.module';
+
 @Module({
   imports: [
     MongooseModule.forFeature([
@@ -15,6 +17,7 @@ import { CartController } from './cart.controller';
       { name: Coupon.name, schema: CouponSchema },
       { name: User.name, schema: UserSchema },
     ]),
+    TrackingModule,
   ],
   controllers: [CartController],
   providers: [CartService],

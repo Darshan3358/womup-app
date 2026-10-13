@@ -122,6 +122,7 @@ router.get('/products', async (req, res) => {
       return {
         ...p,
         id: p._id.toString(),
+        stock: p.stock !== undefined ? Number(p.stock) : 50,
         variants: pVariants,
       };
     });
@@ -472,6 +473,44 @@ router.post('/variants', async (req, res) => {
 
     const result = await db.collection('product_variants').insertOne(newVariant);
     res.status(201).json({ success: true, id: result.insertedId, data: newVariant });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.put('/variants/:id', async (req, res) => {
+  try {
+    const db = getDB();
+    const { id } = req.params;
+    const body = req.body;
+    let filter = {};
+    if (ObjectId.isValid(id)) filter._id = new ObjectId(id);
+    else filter._id = id;
+
+    const updateDoc = { updatedAt: new Date() };
+    if (body.sellingPrice !== undefined) updateDoc.sellingPrice = Number(body.sellingPrice);
+    if (body.mrp !== undefined) updateDoc.mrp = Number(body.mrp);
+    if (body.stock !== undefined) updateDoc.stock = Number(body.stock);
+    if (updateDoc.mrp !== undefined && updateDoc.sellingPrice !== undefined) {
+      updateDoc.discountPercent = updateDoc.mrp > 0 ? Math.round(((updateDoc.mrp - updateDoc.sellingPrice) / updateDoc.mrp) * 100) : 0;
+    }
+
+    await db.collection('product_variants').updateOne(filter, { $set: updateDoc });
+
+    // Also update parent product if needed
+    const variant = await db.collection('product_variants').findOne(filter);
+    if (variant && variant.productId) {
+      const pFilter = ObjectId.isValid(variant.productId) ? { _id: new ObjectId(variant.productId) } : { _id: variant.productId };
+      await db.collection('products').updateOne(pFilter, {
+        $set: {
+          sellingPrice: updateDoc.sellingPrice !== undefined ? updateDoc.sellingPrice : variant.sellingPrice,
+          mrp: updateDoc.mrp !== undefined ? updateDoc.mrp : variant.mrp,
+          updatedAt: new Date()
+        }
+      });
+    }
+
+    res.json({ success: true, message: 'Variant updated successfully' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

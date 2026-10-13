@@ -6,13 +6,13 @@ import { StoreApiService } from '../../services/storeApi';
 import { COLORS } from '../../theme/colors';
 
 export const ST10_PackingScreen: React.FC = () => {
-  const { activeOrder, activePickList, completePacking, placeOnReadyShelf, setSubScreen } = useStore();
+  const { activeOrder, activePickList, completePacking, placeOnReadyShelf, setSubScreen, setCurrentTab } = useStore();
   const [selectedBagSize, setSelectedBagSize] = useState<'SMALL' | 'MEDIUM' | 'LARGE'>('MEDIUM');
   const [bagBarcode, setBagBarcode] = useState<string | null>(
-    activePickList?.bagBarcode || null
+    activePickList?.bagBarcode || activeOrder?.bagBarcode || null
   );
   const [shelfSlot, setShelfSlot] = useState<string | null>(
-    activePickList?.shelfSlot || 'READY-01'
+    activePickList?.shelfSlot || activeOrder?.shelfSlot || 'READY-01'
   );
   const [isGeneratingBag, setIsGeneratingBag] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -24,6 +24,7 @@ export const ST10_PackingScreen: React.FC = () => {
   const pickedItems = items.filter((i) => i.status === 'PICKED');
 
   const handleGenerateBag = async () => {
+    if (bagBarcode) return; // Locked once generated
     setIsGeneratingBag(true);
     try {
       const res = await StoreApiService.generateBagBarcode(activeOrder.orderId);
@@ -49,8 +50,9 @@ export const ST10_PackingScreen: React.FC = () => {
       setIsSubmitting(false);
 
       setTimeout(() => {
+        setCurrentTab('Ready');
         setSubScreen(null);
-      }, 1200);
+      }, 1000);
     } catch (e) {
       setIsSubmitting(false);
     }

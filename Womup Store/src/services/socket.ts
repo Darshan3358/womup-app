@@ -34,6 +34,13 @@ class StoreSocketService {
       }
     });
 
+    this.socket.on('reconnect', () => {
+      console.log('[StoreSocket] Reconnected to backend gateway.');
+      if (this.currentStoreId) {
+        this.joinStore(this.currentStoreId);
+      }
+    });
+
     this.socket.on('disconnect', (reason) => {
       console.log('[StoreSocket] Disconnected:', reason);
     });
@@ -43,9 +50,11 @@ class StoreSocketService {
 
   joinStore(storeId: string) {
     if (!this.socket) return;
-    this.currentStoreId = storeId;
-    this.socket.emit('join_store', { storeId });
-    console.log(`[StoreSocket] Subscribed to room: store_${storeId}`);
+    const cleanId = String(storeId).trim();
+    this.currentStoreId = cleanId;
+    this.socket.emit('join_store', { storeId: cleanId });
+    this.socket.emit('join_store', cleanId);
+    console.log(`[StoreSocket] Subscribed to room: store_${cleanId}`);
   }
 
   leaveStore(storeId: string) {

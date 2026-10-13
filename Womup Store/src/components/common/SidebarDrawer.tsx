@@ -10,6 +10,7 @@ import {
   ScrollView,
   Alert,
   Switch,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../context/StoreContext';
@@ -395,38 +396,65 @@ export const SidebarDrawer: React.FC = () => {
         </Modal>
       )}
 
-      {/* Sub-Modal: Help & Support */}
+      {/* Sub-Modal: Help & Support (Wireframe Screen 18) */}
       {activeModal === 'help' && (
         <Modal transparent animationType="fade" visible={true} onRequestClose={() => setActiveModal(null)}>
           <View style={styles.dialogOverlay}>
             <View style={styles.dialogCard}>
               <View style={styles.dialogHeader}>
-                <Ionicons name="help-circle" size={22} color="#06B6D4" />
-                <Text style={styles.dialogTitle}>Help & Operations Support</Text>
+                <Ionicons name="help-circle" size={22} color="#FF3B98" />
+                <Text style={styles.dialogTitle}>Help & Support</Text>
                 <TouchableOpacity onPress={() => setActiveModal(null)}>
                   <Ionicons name="close" size={22} color="#94A3B8" />
                 </TouchableOpacity>
               </View>
               <View style={styles.dialogBody}>
-                <View style={styles.helpItem}>
-                  <Text style={styles.helpLabel}>Dark Store Operations Hotline</Text>
-                  <Text style={styles.helpValue}>📞 1800-WOMUP-STORE (Toll-Free)</Text>
-                </View>
-
-                <View style={styles.helpItem}>
-                  <Text style={styles.helpLabel}>Central Hub Dispatch Desk</Text>
-                  <Text style={styles.helpValue}>✉️ ops@womup.com</Text>
-                </View>
-
-                <View style={styles.helpItem}>
-                  <Text style={styles.helpLabel}>Picking Standard Operating Procedure</Text>
-                  <Text style={styles.helpValue}>
-                    1. Walk by shelf coordinate (e.g. A3-R2)
-                    {'\n'}2. Verify barcode and pack size
-                    {'\n'}3. Pack into designated bag barcode
-                    {'\n'}4. Handover to rider upon counter arrival
+                {/* Hero Illustration */}
+                <View style={{ alignItems: 'center', marginBottom: 14 }}>
+                  <Image
+                    source={require('../../../assets/store_support_hero.png')}
+                    style={{ width: 88, height: 88 }}
+                    resizeMode="contain"
+                  />
+                  <Text style={{ fontSize: 17, fontWeight: '800', color: '#071B52', marginTop: 4 }}>
+                    How can we help you?
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#64748B', textAlign: 'center', marginTop: 2 }}>
+                    Our dedicated dark store support desk is active 24/7.
                   </Text>
                 </View>
+
+                {/* Support Option Rows */}
+                <View style={styles.helpItem}>
+                  <Text style={styles.helpLabel}>📖 FAQ</Text>
+                  <Text style={styles.helpValue}>Find answers to common operational questions</Text>
+                </View>
+
+                <View style={styles.helpItem}>
+                  <Text style={styles.helpLabel}>📞 Call Us (24/7 Toll-Free)</Text>
+                  <Text style={styles.helpValue}>+91 98765 43210</Text>
+                </View>
+
+                <View style={styles.helpItem}>
+                  <Text style={styles.helpLabel}>⚠️ Report an Issue</Text>
+                  <Text style={styles.helpValue}>Device, scanner or network not working?</Text>
+                </View>
+
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#FF3B98',
+                    paddingVertical: 13,
+                    borderRadius: 14,
+                    alignItems: 'center',
+                    marginTop: 8,
+                  }}
+                  onPress={() => {
+                    Alert.alert('Support Chat', 'Connecting with Central Dark Store Operations Desk...');
+                  }}
+                  activeOpacity={0.88}
+                >
+                  <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 14 }}>Chat Now</Text>
+                </TouchableOpacity>
               </View>
             </View>
           </View>

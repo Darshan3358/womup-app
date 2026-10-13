@@ -15,12 +15,12 @@ export const OrderCard: React.FC<OrderCardProps> = ({
   order,
   onPress,
   ctaText = 'START PICKING',
-  ctaColor = COLORS.primary,
+  ctaColor = COLORS.primaryPink,
 }) => {
   const isHighPriority = order.priority === 'HIGH';
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.88}>
       <View style={styles.topRow}>
         <View style={styles.orderIdGroup}>
           <Text style={styles.orderNumber}>{order.orderNumber}</Text>
@@ -39,6 +39,14 @@ export const OrderCard: React.FC<OrderCardProps> = ({
         )}
       </View>
 
+      {/* Customer Name if available */}
+      {order.customerName ? (
+        <View style={styles.customerRow}>
+          <Ionicons name="person-circle-outline" size={14} color="#64748B" />
+          <Text style={styles.customerName}>Customer: {order.customerName}</Text>
+        </View>
+      ) : null}
+
       {/* Item Previews */}
       <View style={styles.itemsPreview}>
         <Text style={styles.itemsCountText}>
@@ -52,7 +60,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
       {/* Progress or Ready Details */}
       {order.shelfSlot ? (
         <View style={styles.shelfSlotBanner}>
-          <Ionicons name="location" size={14} color={COLORS.shelfBadgeText} />
+          <Ionicons name="location" size={14} color="#4F46E5" />
           <Text style={styles.shelfSlotText}>Ready on Slot: {order.shelfSlot}</Text>
           {order.bagBarcode && (
             <Text style={styles.bagBarcodeText}>({order.bagBarcode})</Text>
@@ -62,7 +70,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
 
       {order.assignedRider ? (
         <View style={styles.riderBanner}>
-          <Ionicons name="bicycle" size={14} color={COLORS.accentCyan} />
+          <Ionicons name="bicycle" size={14} color="#059669" />
           <Text style={styles.riderText}>
             Rider: {order.assignedRider.name} ({order.assignedRider.vehicleNumber})
           </Text>
@@ -71,9 +79,13 @@ export const OrderCard: React.FC<OrderCardProps> = ({
 
       {/* Bottom CTA */}
       <View style={styles.bottomRow}>
-        <TouchableOpacity style={[styles.ctaButton, { backgroundColor: ctaColor }]} onPress={onPress}>
+        <TouchableOpacity
+          style={[styles.ctaButton, { backgroundColor: ctaColor }]}
+          onPress={onPress}
+          activeOpacity={0.85}
+        >
           <Text style={styles.ctaButtonText}>{ctaText}</Text>
-          <Ionicons name="chevron-forward" size={16} color="#FFF" />
+          <Ionicons name="arrow-forward" size={14} color="#FFF" />
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -82,18 +94,23 @@ export const OrderCard: React.FC<OrderCardProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: COLORS.surfaceCard,
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     padding: 14,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: '#E2E8F0',
+    shadowColor: '#071B52',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
   },
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   orderIdGroup: {
     flexDirection: 'row',
@@ -101,22 +118,23 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   orderNumber: {
-    color: COLORS.textPrimary,
-    fontSize: 14,
-    fontWeight: '700',
+    color: '#071B52',
+    fontSize: 15,
+    fontWeight: '800',
     letterSpacing: 0.3,
   },
   timeAgo: {
-    color: COLORS.textMuted,
-    fontSize: 11,
+    color: '#64748B',
+    fontSize: 12,
+    fontWeight: '500',
   },
   priorityBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.danger,
+    backgroundColor: '#EF4444',
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 6,
+    borderRadius: 12,
     gap: 3,
   },
   priorityText: {
@@ -125,77 +143,89 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   statusBadge: {
-    backgroundColor: COLORS.surfaceElevated,
+    backgroundColor: '#F1F5F9',
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 6,
+    borderRadius: 12,
   },
   statusText: {
-    color: COLORS.textSecondary,
-    fontSize: 10,
+    color: '#64748B',
+    fontSize: 11,
     fontWeight: '700',
+  },
+  customerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 6,
+  },
+  customerName: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '600',
   },
   itemsPreview: {
     marginBottom: 10,
   },
   itemsCountText: {
-    color: COLORS.primaryLight,
-    fontSize: 12,
+    color: '#071B52',
+    fontSize: 13,
     fontWeight: '700',
   },
   itemNamesList: {
-    color: COLORS.textSecondary,
-    fontSize: 11,
+    color: '#64748B',
+    fontSize: 12,
     marginTop: 2,
   },
   shelfSlotBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.shelfBadgeBg,
+    backgroundColor: '#EEF2FF',
     padding: 8,
-    borderRadius: 6,
+    borderRadius: 8,
     marginBottom: 10,
     gap: 5,
   },
   shelfSlotText: {
-    color: COLORS.shelfBadgeText,
+    color: '#4F46E5',
     fontSize: 11,
     fontWeight: '700',
   },
   bagBarcodeText: {
-    color: COLORS.textSecondary,
+    color: '#64748B',
     fontSize: 10,
   },
   riderBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(6, 182, 212, 0.12)',
+    backgroundColor: '#ECFDF5',
     padding: 8,
-    borderRadius: 6,
+    borderRadius: 8,
     marginBottom: 10,
     gap: 6,
   },
   riderText: {
-    color: COLORS.accentCyan,
+    color: '#059669',
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   bottomRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
+    marginTop: 2,
   },
   ctaButton: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 8,
-    gap: 4,
+    borderRadius: 20,
+    gap: 5,
   },
   ctaButtonText: {
     color: '#FFF',
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '800',
     letterSpacing: 0.5,
   },
 });

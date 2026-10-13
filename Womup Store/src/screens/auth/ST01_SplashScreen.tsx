@@ -1,21 +1,27 @@
 import React from 'react';
-import { StyleSheet, View, Text, ActivityIndicator } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../../theme/colors';
+import {
+  StyleSheet,
+  View,
+  Image,
+  Dimensions,
+  ActivityIndicator,
+  StatusBar,
+} from 'react-native';
+
+const { width, height } = Dimensions.get('window');
 
 export const ST01_SplashScreen: React.FC = () => {
   return (
     <View style={styles.container}>
-      <View style={styles.logoCircle}>
-        <Ionicons name="storefront" size={54} color={COLORS.primary} />
-      </View>
-      <Text style={styles.appName}>WORM UP</Text>
-      <Text style={styles.appRole}>DARK STORE OPERATIONS</Text>
-      <Text style={styles.tagline}>9-Minute Hyperlocal Fulfillment Hub</Text>
-
+      <StatusBar barStyle="light-content" backgroundColor="#071B52" translucent />
+      <Image
+        source={require('../../../assets/splashstorescreen.png')}
+        style={styles.splashImage}
+        resizeMode="cover"
+      />
+      {/* Subtle bottom loader */}
       <View style={styles.loaderArea}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Initializing Dark Store Terminal...</Text>
+        <ActivityIndicator size="small" color="#FF3B98" />
       </View>
     </View>
   );
@@ -24,48 +30,26 @@ export const ST01_SplashScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
-    alignItems: 'center',
+    backgroundColor: '#071B52',
     justifyContent: 'center',
-    padding: 24,
-  },
-  logoCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
-    borderWidth: 2,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
+    position: 'relative',
   },
-  appName: {
-    color: COLORS.textPrimary,
-    fontSize: 28,
-    fontWeight: '900',
-    letterSpacing: 2,
-  },
-  appRole: {
-    color: COLORS.primary,
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 1.5,
-    marginTop: 4,
-  },
-  tagline: {
-    color: COLORS.textSecondary,
-    fontSize: 12,
-    marginTop: 6,
+  splashImage: {
+    width: width,
+    height: height,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   loaderArea: {
     position: 'absolute',
-    bottom: 60,
-    alignItems: 'center',
-  },
-  loadingText: {
-    color: COLORS.textMuted,
-    fontSize: 11,
-    marginTop: 10,
+    bottom: 40,
+    alignSelf: 'center',
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(7, 27, 82, 0.4)',
   },
 });

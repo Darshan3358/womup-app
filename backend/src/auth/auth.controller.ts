@@ -1,12 +1,28 @@
 import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { SendOtpDto, VerifyOtpDto, RegisterDto, RegisterRiderDto, RefreshTokenDto } from './dto/auth.dto';
+import { SendOtpDto, VerifyOtpDto, RegisterDto, RegisterRiderDto, RefreshTokenDto, GoogleAuthDto, LinkPhoneDto } from './dto/auth.dto';
 
 @ApiTags('Authentication')
 @Controller('api/v1/auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Post('google')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Authenticate or register customer via Google OAuth' })
+  @ApiResponse({ status: 200, description: 'Google authentication successful' })
+  async googleAuth(@Body() dto: GoogleAuthDto) {
+    return this.authService.googleLogin(dto);
+  }
+
+  @Post('link-phone')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Link mobile number to Google-authenticated user' })
+  @ApiResponse({ status: 200, description: 'Mobile number linked successfully' })
+  async linkPhone(@Body() dto: LinkPhoneDto) {
+    return this.authService.linkPhone(dto);
+  }
 
   @Post('send-otp')
   @HttpCode(HttpStatus.OK)
@@ -44,6 +60,13 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'New access and refresh tokens' })
   async refreshToken(@Body() dto: RefreshTokenDto) {
     return this.authService.refreshToken(dto.refreshToken);
+  }
+
+  @Post('token-for-user')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Restore session tokens for verified customer' })
+  async getTokenForUser(@Body('identifier') identifier: string) {
+    return this.authService.getTokenForUser(identifier);
   }
 
   @Post('logout')

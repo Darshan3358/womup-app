@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,8 +7,10 @@ import {
   TouchableOpacity,
   RefreshControl,
   Modal,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRider } from '../../context/RiderContext';
 import { RiderApiService } from '../../services/riderApi';
 import { COLORS } from '../../theme/colors';
@@ -41,6 +43,26 @@ export const RiderDashboardScreen: React.FC = () => {
   const [showHubModal, setShowHubModal] = useState(false);
   const [isDetecting, setIsDetecting] = useState(false);
 
+  // Automatically auto-detect GPS location every 1 second continuously
+  useEffect(() => {
+    let isMounted = true;
+
+    // Initial immediate auto-detection
+    detectLocation();
+
+    // Re-detect continuously every 1 second
+    const interval = setInterval(() => {
+      if (isMounted) {
+        detectLocation();
+      }
+    }, 1000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [detectLocation]);
+
   const isRealDelivery = Boolean(
     activeDelivery &&
     activeDelivery.stepStatus !== 'OFFERED'
@@ -60,38 +82,116 @@ export const RiderDashboardScreen: React.FC = () => {
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
-      {/* Rider Greeting & Duty Bar */}
-      <View style={styles.heroCard}>
-        <View style={styles.greetingRow}>
-          <TouchableOpacity
-            onPress={() => setSubScreen('Profile')}
-            activeOpacity={0.7}
-            style={styles.greetingLeft}
-          >
-            <Text style={styles.greetingLabel}>Welcome back,</Text>
-            <Text style={styles.riderName}>{profile?.name || 'Delivery Partner'}</Text>
-            <Text style={[styles.hubLocation, !detectedHubName && { color: '#F59E0B' }]}>
-              {detectedHubName ? `📍 ${detectedHubName.split('(')[0].trim()}` : '⚠️ No Hub Selected'}
-            </Text>
-          </TouchableOpacity>
-
-          <View style={styles.vehicleBadge}>
-            <Text style={styles.vehicleNumber}>
-              {profile?.vehicleNumber || 'No Vehicle'}
+      {/* 1. Header Greeting Bar (Wireframe Screen 4) */}
+      <View style={styles.topHeaderRow}>
+        <View style={styles.topGreetingLeft}>
+          <Text style={styles.helloTitle}>
+            Hello, {profile?.name ? profile.name.split(' ')[0] : 'Darshan'}
+          </Text>
+          <View style={styles.onlineBadgePill}>
+            <View style={[styles.statusDot, isOnline ? styles.onlineDot : styles.offlineDot]} />
+            <Text style={[styles.onlineBadgeText, !isOnline && { color: '#94A3B8' }]}>
+              {isOnline ? 'Online' : 'Offline'}
             </Text>
           </View>
         </View>
 
         <TouchableOpacity
-          style={[styles.dutyToggleBtn, isOnline ? styles.onlineBtn : styles.offlineBtn]}
+          style={styles.bellBtn}
+          onPress={() => setSubScreen('Notifications')}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="notifications-outline" size={20} color="#071B52" />
+        </TouchableOpacity>
+      </View>
+
+      {/* 2. Today's Earning Big Pink Card (Wireframe Screen 4) */}
+      <LinearGradient
+        colors={['#FF3B98', '#E11D48']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.todayEarningCard}
+      >
+        <View style={styles.earningLeft}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Ionicons name="cash-outline" size={16} color="#FFF" />
+            <Text style={styles.todayEarningLabel}>Today's Earning</Text>
+          </View>
+          <Text style={styles.todayEarningAmount}>
+            ₹ {settlementSummary?.netPayableToday ?? 520}
+          </Text>
+          <Text style={styles.todayOrdersCount}>
+            {settlementSummary?.todayCompleted ?? 3} Orders
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          style={styles.viewDetailsPillBtn}
+          onPress={() => setCurrentTab('Earnings')}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.viewDetailsPillText}>View Details</Text>
+        </TouchableOpacity>
+      </LinearGradient>
+
+      {/* 3. 3-Column Stats Row (Wireframe Screen 4) */}
+      <View style={styles.statsThreeColRow}>
+        <View style={styles.statColCard}>
+          <Text style={styles.statColValue}>{settlementSummary?.todayCompleted ?? 4}</Text>
+          <Text style={styles.statColLabel}>Completed</Text>
+        </View>
+        <View style={styles.statColCard}>
+          <Text style={styles.statColValue}>{isRealDelivery ? '1' : '0'}</Text>
+          <Text style={styles.statColLabel}>Ongoing</Text>
+        </View>
+        <View style={styles.statColCard}>
+          <Text style={styles.statColValue}>0</Text>
+          <Text style={styles.statColLabel}>Cancelled</Text>
+        </View>
+      </View>
+
+      {/* 4. Two Large Action Buttons: Go Online + Order History (Wireframe Screen 4) */}
+      <View style={styles.twoActionButtonsRow}>
+        <TouchableOpacity
+          style={[styles.bigActionBtn, { backgroundColor: isOnline ? '#13B978' : '#059669' }]}
           onPress={toggleDutyStatus}
           activeOpacity={0.85}
         >
-          <View style={[styles.statusDot, isOnline ? styles.onlineDot : styles.offlineDot]} />
-          <Text style={styles.dutyBtnText}>
-            {isOnline ? 'YOU ARE ONLINE — READY FOR JOBS' : 'YOU ARE OFFLINE — TAP TO GO ONLINE'}
+          <View style={styles.bigActionIconCircle}>
+            <Ionicons name={isOnline ? "pause" : "play"} size={20} color={isOnline ? "#13B978" : "#059669"} />
+          </View>
+          <Text style={styles.bigActionBtnText}>
+            {isOnline ? 'Go Offline' : 'Go Online'}
           </Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.bigActionBtn, { backgroundColor: '#3B82F6' }]}
+          onPress={() => setSubScreen('DutyHistory')}
+          activeOpacity={0.85}
+        >
+          <View style={styles.bigActionIconCircle}>
+            <Ionicons name="receipt-outline" size={20} color="#3B82F6" />
+          </View>
+          <Text style={styles.bigActionBtnText}>Order History</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* 5. Better Rides More Earnings Banner Card (Wireframe Screen 4) */}
+      <View style={styles.promoBannerCard}>
+        <Image
+          source={require('../../../assets/rider_promo_banner.png')}
+          style={styles.promoBannerImage}
+          resizeMode="cover"
+        />
+        <View style={styles.promoBannerOverlay}>
+          <Text style={styles.promoBannerTitle}>Better Rides, More Earnings</Text>
+          <Text style={styles.promoBannerSubtitle}>Deliver with WormUp fleet & earn guaranteed incentives</Text>
+        </View>
+      </View>
+
+      {/* Location Bar & Telemetry */}
+      <View style={styles.heroCard}>
 
         {/* GPS Live Telemetry & Address Card */}
         <View style={styles.locationBar}>
@@ -105,7 +205,10 @@ export const RiderDashboardScreen: React.FC = () => {
             </View>
             <View style={styles.locationBarBtns}>
               <TouchableOpacity
-                style={styles.detectGpsBtn}
+                style={[
+                  styles.detectGpsBtn,
+                  detectedHubName && { backgroundColor: 'rgba(16, 185, 129, 0.25)', borderColor: '#10B981', borderWidth: 1 },
+                ]}
                 onPress={async () => {
                   setIsDetecting(true);
                   await detectLocation();
@@ -114,9 +217,14 @@ export const RiderDashboardScreen: React.FC = () => {
                 disabled={isDetecting}
                 activeOpacity={0.7}
               >
-                <Ionicons name="navigate-outline" size={11} color={COLORS.white} style={{ marginRight: 3 }} />
-                <Text style={styles.detectGpsBtnText}>
-                  {isDetecting ? '...' : 'Detect'}
+                <Ionicons
+                  name={isDetecting ? 'sync-outline' : detectedHubName ? 'checkmark-circle' : 'navigate-outline'}
+                  size={11}
+                  color={detectedHubName ? '#10B981' : COLORS.white}
+                  style={{ marginRight: 3 }}
+                />
+                <Text style={[styles.detectGpsBtnText, detectedHubName && { color: '#10B981', fontWeight: '800' }]}>
+                  {isDetecting ? '...' : detectedHubName ? 'Auto-GPS' : 'Detect'}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -662,6 +770,175 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
     padding: 16,
+  },
+  topHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    paddingTop: 4,
+  },
+  topGreetingLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  helloTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#071B52',
+    letterSpacing: -0.3,
+  },
+  onlineBadgePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  onlineBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#13B978',
+  },
+  bellBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  todayEarningCard: {
+    borderRadius: 20,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+    shadowColor: '#FF3B98',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  earningLeft: {
+    flex: 1,
+  },
+  todayEarningLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    opacity: 0.9,
+  },
+  todayEarningAmount: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    marginTop: 4,
+    letterSpacing: -0.5,
+  },
+  todayOrdersCount: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    opacity: 0.9,
+    marginTop: 2,
+  },
+  viewDetailsPillBtn: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  viewDetailsPillText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FF3B98',
+  },
+  statsThreeColRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 14,
+  },
+  statColCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  statColValue: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#071B52',
+  },
+  statColLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+    marginTop: 2,
+  },
+  twoActionButtonsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  bigActionBtn: {
+    flex: 1,
+    height: 52,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  bigActionIconCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bigActionBtnText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
   heroCard: {
     backgroundColor: COLORS.navy,
@@ -1362,5 +1639,49 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: COLORS.textPrimary,
+  },
+  promoBannerCard: {
+    marginHorizontal: 0,
+    marginTop: 0,
+    marginBottom: 16,
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: '#071B52',
+    height: 140,
+    position: 'relative',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 59, 152, 0.35)',
+    shadowColor: '#071B52',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  promoBannerImage: {
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+  },
+  promoBannerOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 12,
+    backgroundColor: 'rgba(7, 27, 82, 0.78)',
+  },
+  promoBannerTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
+  },
+  promoBannerSubtitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#F472B6',
+    marginTop: 2,
   },
 });

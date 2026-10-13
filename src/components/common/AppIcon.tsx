@@ -6,6 +6,7 @@ import {
   BlinkitOrderAgainIcon,
   BlinkitCategoriesIcon,
   BlinkitPrintIcon,
+  BlinkitProfileIcon,
   BlinkitAllHeaderIcon,
   BlinkitGaneshaHeaderIcon,
   BlinkitHeadphonesHeaderIcon,
@@ -105,7 +106,7 @@ export const AppIcon: React.FC<AppIconProps> = ({
     case 'share-2':
       return <Feather name="share-2" size={size} color={color} />;
     case 'user':
-      return <Feather name="user" size={size} color={color} />;
+      return <BlinkitProfileIcon size={size} isActive={isActive} color={color} />;
     case 'user-circle':
       return <Feather name="user-check" size={size} color={color} />;
     case 'shopping-bag':

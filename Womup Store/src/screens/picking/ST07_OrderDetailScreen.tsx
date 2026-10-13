@@ -20,10 +20,20 @@ export const ST07_OrderDetailScreen: React.FC = () => {
   }
 
   const items = activePickList?.items || activeOrder.items || [];
+  const normalizedStatus = (activeOrder.status || '').toUpperCase();
   const isDelivered =
-    activeOrder.status === 'DELIVERED' ||
-    activeOrder.status === 'COMPLETED';
-  const isPacking = activeOrder.status === 'PACKING';
+    normalizedStatus === 'DELIVERED' ||
+    normalizedStatus === 'COMPLETED' ||
+    normalizedStatus === 'CANCELLED';
+  const isReadyForHandover =
+    normalizedStatus === 'PACKED' ||
+    normalizedStatus === 'READY' ||
+    normalizedStatus === 'READY_FOR_PICKUP' ||
+    normalizedStatus === 'HANDED_OVER';
+  const isOutForDelivery =
+    normalizedStatus === 'OUT_FOR_DELIVERY' ||
+    normalizedStatus === 'ARRIVED_AT_CUSTOMER';
+  const isPacking = normalizedStatus === 'PACKING';
 
   return (
     <View style={styles.container}>
@@ -222,7 +232,7 @@ export const ST07_OrderDetailScreen: React.FC = () => {
 
       {/* Bottom CTA Bar */}
       <View style={styles.bottomBar}>
-        {isDelivered ? (
+        {isDelivered || isOutForDelivery ? (
           <TouchableOpacity
             style={[styles.startPickBtn, styles.backToOrdersBtn]}
             onPress={() => setSubScreen(null)}
@@ -230,6 +240,15 @@ export const ST07_OrderDetailScreen: React.FC = () => {
           >
             <Ionicons name="arrow-back" size={18} color="#FFF" style={{ marginRight: 6 }} />
             <Text style={styles.startPickText}>BACK TO ORDERS</Text>
+          </TouchableOpacity>
+        ) : isReadyForHandover ? (
+          <TouchableOpacity
+            style={[styles.startPickBtn, { backgroundColor: COLORS.primary }]}
+            onPress={() => setSubScreen('HandoverScan')}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="shield-checkmark" size={20} color="#FFF" style={{ marginRight: 6 }} />
+            <Text style={styles.startPickText}>HANDOVER TO RIDER</Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity

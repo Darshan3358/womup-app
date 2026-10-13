@@ -6,7 +6,7 @@ import { OrderCard } from '../../components/OrderCard';
 import { COLORS } from '../../theme/colors';
 
 export const ST11_ReadyForPickupScreen: React.FC = () => {
-  const { readyOrders, selectOrderForDetail, setSubScreen, setCurrentTab, refreshReady, isLoading, store } = useStore();
+  const { readyOrders, selectOrderForHandover, setCurrentTab, refreshReady, isLoading, store } = useStore();
 
   const areaName =
     store?.areaName ||
@@ -16,8 +16,7 @@ export const ST11_ReadyForPickupScreen: React.FC = () => {
   const cityName = store?.cityName || store?.city || 'Ahmedabad';
 
   const handleHandoverPress = (orderId: string) => {
-    selectOrderForDetail(orderId);
-    setSubScreen('HandoverScan');
+    selectOrderForHandover(orderId);
   };
 
   return (

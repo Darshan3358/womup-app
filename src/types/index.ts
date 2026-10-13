@@ -83,6 +83,7 @@ export interface Address {
   fullName: string;
   phoneNumber: string;
   houseFlat: string;
+  street?: string;
   areaLandmark: string;
   city: string;
   cityId?: string;
@@ -142,6 +143,8 @@ export interface Order {
 }
 
 export interface UserProfile {
+  id?: string;
+  _id?: string;
   fullName: string;
   phoneNumber: string;
   email: string;

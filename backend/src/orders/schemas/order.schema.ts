@@ -153,6 +153,25 @@ export class Order {
     index: true,
   })
   deliveryOtp: string;
+
+  @Prop({ default: '' })
+  bagBarcode?: string;
+
+  @Prop({ default: '' })
+  shelfSlot?: string;
+
+  @Prop({ type: [Object], default: [] })
+  priceAdjustments?: any[];
+
+  @Prop({
+    type: Object,
+    default: { isSubmitted: false, stars: 0 },
+  })
+  riderReview?: {
+    isSubmitted: boolean;
+    stars: number;
+    reviewedAt?: Date;
+  };
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);

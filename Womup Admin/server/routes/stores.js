@@ -19,7 +19,10 @@ function generateRandomPassword() {
 router.get('/', async (req, res) => {
   try {
     const db = getDB();
-    const stores = await db.collection('stores').find({}).sort({ createdAt: -1 }).toArray();
+    const stores = await db.collection('stores').find({
+      deletedAt: { $exists: false },
+      isActive: { $ne: false },
+    }).sort({ createdAt: -1 }).toArray();
 
     // Enrich with live operational metrics
     const enriched = await Promise.all(stores.map(async (store) => {
@@ -276,6 +279,9 @@ router.delete('/:id', async (req, res) => {
   try {
     const db = getDB();
     const { id } = req.params;
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, error: 'Invalid Store ID' });
+    }
     const storeId = new ObjectId(id);
 
     // Safety check: prevent deleting stores with active orders
@@ -291,12 +297,16 @@ router.delete('/:id', async (req, res) => {
       });
     }
 
-    await db.collection('stores').updateOne(
-      { _id: storeId },
-      { $set: { isActive: false, deletedAt: new Date() } }
-    );
+    // Permanently remove from stores collection, plus inventory and staff
+    await db.collection('stores').deleteOne({ _id: storeId });
+    await db.collection('inventory').deleteMany({
+      $or: [{ storeId }, { storeId: id }],
+    });
+    await db.collection('store_staff').deleteMany({
+      $or: [{ storeId }, { storeId: id }],
+    });
 
-    res.json({ success: true, message: 'Store deactivated successfully' });
+    res.json({ success: true, message: 'Store deleted successfully from MongoDB' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

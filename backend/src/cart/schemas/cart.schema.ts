@@ -20,8 +20,17 @@ export class Cart {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true, unique: true, index: true })
   userId: Types.ObjectId;
 
+  @Prop({ type: Types.ObjectId, ref: 'Area' })
+  areaId?: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, ref: 'Store' })
+  storeId?: Types.ObjectId;
+
   @Prop({ type: [CartItemEntry], default: [] })
   items: CartItemEntry[];
+
+  @Prop({ default: false })
+  useCoins: boolean;
 
   @Prop({ default: 0 })
   appliedCoins: number;

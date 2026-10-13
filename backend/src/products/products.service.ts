@@ -51,11 +51,19 @@ export class ProductsService {
       variantsByProduct.get(key)!.push(v);
     }
 
-    let pricingByVariant = new Map<string, AreaPricingDocument>();
-    if (areaId && Types.ObjectId.isValid(areaId)) {
-      const variantIds = allVariants.map((v) => (v as any)._id);
+    let pricingByVariant = new Map<string, any>();
+    if (areaId) {
+      const variantObjectIds = allVariants.map((v) => (v as any)._id);
+      const variantStringIds = allVariants.map((v) => (v as any)._id.toString());
+      const areaQueries: any[] = [{ areaId: areaId.toString() }];
+      if (Types.ObjectId.isValid(areaId)) {
+        areaQueries.push({ areaId: new Types.ObjectId(areaId) });
+      }
       const pricingRecords = await this.areaPricingModel
-        .find({ variantId: { $in: variantIds }, areaId: new Types.ObjectId(areaId) })
+        .find({
+          variantId: { $in: [...variantObjectIds, ...variantStringIds] },
+          $or: areaQueries,
+        })
         .exec();
       for (const p of pricingRecords) {
         pricingByVariant.set(p.variantId.toString(), p);
@@ -80,8 +88,7 @@ export class ProductsService {
       const variants = (variantsByProduct.get(prodId) || []).map((v) => {
         const vidStr = (v as any)._id.toString();
         const pricing = pricingByVariant.get(vidStr);
-        const storeStock = inventoryByProduct.get(prodId);
-        const effectiveStock = storeStock !== undefined ? storeStock : (pricing?.stock ?? 100);
+        const effectiveStock = pricing?.stock !== undefined ? pricing.stock : ((v as any).stock !== undefined ? (v as any).stock : ((product as any).stock ?? 50));
         return {
           id: vidStr,
           label: v.weightOrVolume,

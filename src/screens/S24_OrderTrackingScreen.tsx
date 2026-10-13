@@ -20,6 +20,7 @@ import { useApp } from '../context/AppContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { DynamicLiveMap } from '../components/tracking/DynamicLiveMap';
 import { S27_ChatModal } from '../components/tracking/S27_ChatModal';
+import { RiderReviewModal } from '../components/tracking/RiderReviewModal';
 
 export const S24_OrderTrackingScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -68,6 +69,8 @@ export const S24_OrderTrackingScreen: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [etaText, setEtaText] = useState('9-12 minutes');
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [hasReviewed, setHasReviewed] = useState(Boolean((order as any)?.riderReview?.isSubmitted));
 
   // Sync real-time updates whenever currentOrder changes in AppContext
   useEffect(() => {
@@ -95,6 +98,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
   }, [order]);
 
   const isPartnerAssigned = Boolean(
+    !['PLACED', 'CONFIRMED', 'CANCELLED'].includes(liveStatus) &&
     partner.name &&
     partner.name.trim() !== '' &&
     partner.name.toLowerCase() !== 'delivery partner' &&
@@ -209,7 +213,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
       const pObj = data.rider || data.partner || data.deliveryPartner;
       const rawName = pObj?.name || pObj?.fullName || data.partnerName || data.riderName || '';
       const cleanName = rawName.replace(/\s*\(Worm Up Express\)/gi, '').trim();
-      const finalName = cleanName.toLowerCase() === 'darshanthanki' ? 'DARSHAN THANKI' : (cleanName || 'DARSHAN THANKI');
+      const finalName = cleanName.toLowerCase() === 'darshanthanki' ? 'DARSHAN THANKI' : cleanName;
       if (finalName && !finalName.toLowerCase().includes('rohit') && finalName.toLowerCase() !== 'delivery partner') {
         setPartner((prev) => ({
           ...prev,
@@ -235,6 +239,20 @@ export const S24_OrderTrackingScreen: React.FC = () => {
       const clean = orderNum.replace(/^#/, '');
       socket.on(`orderStatusUpdate_${clean}`, handleStatusUpdate);
     }
+
+    socket.on('review_prompt_requested', (data: any) => {
+      const eventOrderId = data?.orderId?.toString();
+      const eventOrderNum = data?.orderNumber?.toString();
+      if (!eventOrderId || eventOrderId === orderId || eventOrderNum === orderNum) {
+        setIsReviewModalOpen(true);
+      }
+    });
+
+    socket.on('order_reviewed', (data: any) => {
+      if (data?.orderId === orderId || data?.orderNumber === orderNum) {
+        setHasReviewed(true);
+      }
+    });
 
     socket.on('update_delivery_location', (data: any) => {
       if (!data) return;
@@ -273,7 +291,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
           if (pObj) {
             const raw = pObj.name || pObj.fullName || '';
             const clean = raw.replace(/\s*\(Worm Up Express\)/gi, '').trim();
-            const finalName = clean.toLowerCase() === 'darshanthanki' ? 'DARSHAN THANKI' : (clean || 'DARSHAN THANKI');
+            const finalName = clean.toLowerCase() === 'darshanthanki' ? 'DARSHAN THANKI' : clean;
             if (finalName && !finalName.toLowerCase().includes('rohit') && finalName.toLowerCase() !== 'delivery partner') {
               setPartner((prev) => ({
                 ...prev,
@@ -334,7 +352,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
     {
       title: 'Packed & Dispatched',
       time: isPacked ? 'Completed' : 'In 3 mins',
-      status: isPacked ? 'completed' : 'active',
+      status: isPacked ? 'completed' : (['PACKING', 'PACKED', 'GOING_TO_STORE', 'ARRIVED_AT_STORE'].includes(liveStatus) ? 'active' : 'pending'),
     },
     {
       title: 'Out for Delivery',
@@ -470,19 +488,31 @@ export const S24_OrderTrackingScreen: React.FC = () => {
                 </Text>
               </View>
             </LinearGradient>
+
+            {/* Rate Delivery Partner Action Button */}
+            <TouchableOpacity
+              style={styles.ratePartnerBtn}
+              onPress={() => setIsReviewModalOpen(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="star" size={18} color="#F59E0B" />
+              <Text style={styles.ratePartnerBtnText}>
+                {hasReviewed ? '★ Rated Delivery Partner' : 'Rate Your Delivery Experience'}
+              </Text>
+            </TouchableOpacity>
           </View>
         )}
 
         {/* Dynamic Real-Time Live Map Tracker */}
         <DynamicLiveMap
           storeCoords={{
-            latitude: (order as any)?.storeId?.location?.coordinates?.[1] || 23.0305,
-            longitude: (order as any)?.storeId?.location?.coordinates?.[0] || 72.56,
+            latitude: (order as any)?.storeId?.location?.coordinates?.[1] || 23.1128,
+            longitude: (order as any)?.storeId?.location?.coordinates?.[0] || 72.5427,
           }}
-          storeName={(order as any)?.storeId?.name || 'Worm Up Dark Store #01'}
+          storeName={(order as any)?.storeId?.name || 'Wom Up Chandlodiya - Tragad Dark Store'}
           customerCoords={{
-            latitude: (order as any)?.deliveryAddress?.coordinates?.[1] || 23.0225,
-            longitude: (order as any)?.deliveryAddress?.coordinates?.[0] || 72.5714,
+            latitude: (order as any)?.deliveryAddress?.coordinates?.[1] || 23.1288,
+            longitude: (order as any)?.deliveryAddress?.coordinates?.[0] || 72.5507,
           }}
           customerAddress={
             order?.deliveryAddress?.houseFlat
@@ -495,6 +525,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
           partnerVehicle={partner.vehicleNumber}
           etaText={etaText}
           orderNumber={orderNum}
+          isPartnerAssigned={isPartnerAssigned}
         />
 
         {/* Timeline Progress */}
@@ -721,6 +752,22 @@ export const S24_OrderTrackingScreen: React.FC = () => {
         liveStatus={liveStatus}
         socket={socketRef.current}
       />
+
+      {/* Real-Time Rider Rating & Review Modal */}
+      <RiderReviewModal
+        visible={isReviewModalOpen}
+        orderId={orderId || orderNum}
+        orderNumber={orderNum}
+        rider={{
+          id: (order as any)?.deliveryPartnerId?._id || 'default_rider',
+          name: partner.name || 'DARSHAN THANKI',
+          vehicleNumber: partner.vehicleNumber || 'GJ AE 2020',
+          averageRating: 4.88,
+          totalReviews: 128,
+        }}
+        onClose={() => setIsReviewModalOpen(false)}
+        onSubmitted={() => setHasReviewed(true)}
+      />
     </View>
   );
 };
@@ -893,6 +940,29 @@ const styles = StyleSheet.create({
     color: '#D1FAE5',
     marginTop: 2,
     lineHeight: 16,
+  },
+  ratePartnerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginTop: 10,
+    borderWidth: 1.5,
+    borderColor: '#FDE68A',
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  ratePartnerBtnText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#7C3AED',
   },
   mapCard: {
     backgroundColor: COLORS.white,

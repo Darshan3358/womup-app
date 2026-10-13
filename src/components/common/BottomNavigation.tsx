@@ -38,7 +38,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
 
   const isSmallDevice = width <= 360;
 
-  // 5 clean tabs matching Image 2 perfectly without truncation
+  // 5 clean tabs: Home, Order Again, Print, Profile, App
   const tabs: {
     key: BlinkitTabKey;
     label: string;
@@ -46,9 +46,9 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
     isWomupAppButton?: boolean;
   }[] = [
     { key: 'Home', label: 'Home', icon: 'home' },
-    { key: 'Categories', label: 'Categories', icon: 'grid' },
     { key: 'Order Again', label: 'Order Again', icon: 'shopping-basket' },
     { key: 'Print', label: 'Print', icon: 'printer' },
+    { key: 'Profile', label: 'Profile', icon: 'user' },
     { key: 'Local Shop', label: 'App', isWomupAppButton: true },
   ];
 
@@ -106,7 +106,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
             );
           }
 
-          // Standard navigation tabs (Home, Categories, Order Again, Print)
+          // Standard navigation tabs (Home, Order Again, Print, Profile)
           return (
             <TouchableOpacity
               key={tab.key}

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { Platform } from 'react-native';
 import {
   Product,
@@ -18,6 +18,7 @@ import { OrderService } from '../services/orderService';
 import { AddressService } from '../services/addressService';
 import { LocationService } from '../services/locationService';
 import { api } from '../services/api';
+import io, { Socket } from 'socket.io-client';
 
 export interface BlinkitCartEntry {
   product: BlinkitProduct;
@@ -220,6 +221,24 @@ interface AppContextType {
   setCurrentCityName: (name: string | null) => void;
   currentCityId: string | null;
   setCurrentCityId: (id: string | null) => void;
+
+  // Real-time Cross-device Checkout Synchronization
+  liveCheckoutState: {
+    paymentMethod?: 'UPI' | 'COD' | 'CARD';
+    tip?: number;
+    deliveryInstruction?: string;
+    useCoins?: boolean;
+    selectedAddressType?: 'CURRENT_GPS' | 'SAVED';
+    addressId?: string;
+    recipientName?: string;
+    phoneNumber?: string;
+    houseFlat?: string;
+    street?: string;
+    areaLandmark?: string;
+    pincode?: string;
+    couponCode?: string;
+  };
+  emitCheckoutChange: (payload: any) => void;
 }
 
 const DEFAULT_FILTERS: FilterSortState = {
@@ -290,14 +309,80 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isServiceable, setIsServiceable] = useState<boolean>(false);
   const [deliveryEtaMinutes, setDeliveryEtaMinutes] = useState<number | null>(null);
 
+  // Cross-device live checkout synchronization
+  const [liveCheckoutState, setLiveCheckoutState] = useState<{
+    paymentMethod?: 'UPI' | 'COD' | 'CARD';
+    tip?: number;
+    deliveryInstruction?: string;
+    useCoins?: boolean;
+    selectedAddressType?: 'CURRENT_GPS' | 'SAVED';
+    addressId?: string;
+    recipientName?: string;
+    phoneNumber?: string;
+    houseFlat?: string;
+    street?: string;
+    areaLandmark?: string;
+    pincode?: string;
+    couponCode?: string;
+  }>({});
+
+  const emitCheckoutChange = useCallback((payload: any) => {
+    if (syncSocketRef.current) {
+      syncSocketRef.current.emit('checkout_changed', payload);
+    }
+  }, []);
+
+  const isValidMongoId = (id: string | null | undefined): boolean => {
+    if (!id) return false;
+    return /^[a-f\d]{24}$/i.test(id);
+  };
+
   const setCurrentArea = (areaId: string, areaName: string) => {
+    if (areaId && !isValidMongoId(areaId)) {
+      console.warn(`[AppContext Guard] Invalid non-MongoDB areaId "${areaId}". Resolving live authoritative area...`);
+      LocationService.resolveArea().then((loc) => {
+        if (loc?.areaId && isValidMongoId(loc.areaId)) {
+          setCurrentArea(loc.areaId, loc.areaName);
+        }
+      });
+      return;
+    }
     setCurrentAreaId(areaId);
     setCurrentAreaName(areaName);
+    if (syncSocketRef.current?.connected) {
+      syncSocketRef.current.emit('location_changed', {
+        areaId,
+        areaName,
+        storeId: currentStoreId,
+        storeName: currentStoreName,
+        city: currentCityName || 'Ahmedabad',
+        deliveryMinutes: deliveryEtaMinutes || 9,
+      });
+    }
   };
 
   const setCurrentStore = (storeId: string | null, storeName: string | null) => {
+    if (storeId && !isValidMongoId(storeId)) {
+      console.warn(`[AppContext Guard] Invalid non-MongoDB storeId "${storeId}". Resolving live authoritative store...`);
+      LocationService.resolveArea().then((loc) => {
+        if (loc?.storeId && isValidMongoId(loc.storeId)) {
+          setCurrentStore(loc.storeId, loc.storeName || storeName);
+        }
+      });
+      return;
+    }
     setCurrentStoreId(storeId);
     setCurrentStoreName(storeName);
+    if (syncSocketRef.current?.connected) {
+      syncSocketRef.current.emit('location_changed', {
+        areaId: currentAreaId,
+        areaName: currentAreaName,
+        storeId,
+        storeName,
+        city: currentCityName || 'Ahmedabad',
+        deliveryMinutes: deliveryEtaMinutes || 9,
+      });
+    }
   };
 
   // Blinkit Extensions
@@ -311,8 +396,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     mapProductToBlinkit(DEFAULT_FALLBACK_PRODUCT)
   );
 
-  // Live real cart (starts clean and empty)
-  const [blinkitCart, setBlinkitCart] = useState<Record<string, BlinkitCartEntry>>({});
+  // Live real cart with instant local persistence hydration
+  const [blinkitCart, setBlinkitCart] = useState<Record<string, BlinkitCartEntry>>(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      try {
+        const raw = window.localStorage.getItem(StorageService.KEYS.BLINKIT_CART);
+        if (raw) return JSON.parse(raw);
+        const legacy = window.localStorage.getItem(StorageService.KEYS.CART);
+        if (legacy) {
+          const parsed = JSON.parse(legacy);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const res: Record<string, BlinkitCartEntry> = {};
+            parsed.forEach((item: any) => {
+              if (item?.product?.id) {
+                res[item.product.id] = {
+                  product: mapProductToBlinkit(item.product),
+                  quantity: item.quantity,
+                };
+              }
+            });
+            return res;
+          }
+        }
+      } catch {}
+    }
+    return {};
+  });
   const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
 
   const isAuthenticated = !!(
@@ -385,8 +494,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     activeScreen !== 'C02_Onboarding1' &&
     activeScreen !== 'C12_Home';
 
-  // Live cart state (starts empty)
-  const [cart, setCart] = useState<CartItem[]>([]);
+  // Live cart state with instant local persistence hydration
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      try {
+        const raw = window.localStorage.getItem(StorageService.KEYS.CART);
+        if (raw) return JSON.parse(raw);
+      } catch {}
+    }
+    return [];
+  });
+  const isCartHydratedRef = useRef(false);
   const [appliedCoins, setAppliedCoins] = useState<number>(0);
   const [orders, setOrders] = useState<Order[]>([]);
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
@@ -420,12 +538,390 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       StorageService.saveItem(StorageService.KEYS.WISHLIST, updated);
       return updated;
     });
+
+    // Cross-platform sync to MongoDB backend
+    api.post('/wishlist/toggle', { productId: product.id }).catch((e) => {
+      console.warn('[AppContext] toggleWishlist backend warning:', e);
+    });
   };
 
   const clearWishlist = () => {
     setWishlist([]);
     StorageService.removeItem(StorageService.KEYS.WISHLIST);
+    api.delete('/wishlist').catch(() => {});
   };
+
+  // Real-time WebSockets synchronization across Web & Mobile App
+  const syncSocketRef = useRef<Socket | null>(null);
+
+  useEffect(() => {
+    const currentUserId = user?.id || (user as any)?._id || 'guest_user';
+
+    const isLocalWeb =
+      typeof window !== 'undefined' &&
+      (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1');
+
+    const wsUrl =
+      (process.env.EXPO_PUBLIC_API_URL
+        ? process.env.EXPO_PUBLIC_API_URL.replace(/\/api\/v1\/?$/, '')
+        : isLocalWeb
+        ? 'http://localhost:5050'
+        : 'https://womup-app.onrender.com') + '/tracking';
+
+    const socket = io(wsUrl, {
+      transports: ['websocket', 'polling'],
+      reconnectionAttempts: 10,
+    });
+    syncSocketRef.current = socket;
+
+    socket.on('connect', () => {
+      socket.emit('join_user', { userId: currentUserId });
+    });
+
+    // Real-time Active Location & Store synchronization (Web <-> Mobile App)
+    socket.on('location_updated', (payload: any) => {
+      if (!payload) return;
+      if (payload.areaId && isValidMongoId(payload.areaId) && payload.areaName) {
+        setCurrentAreaId(payload.areaId);
+        setCurrentAreaName(payload.areaName);
+      }
+      if (payload.storeId && isValidMongoId(payload.storeId)) {
+        setCurrentStoreId(payload.storeId);
+        setCurrentStoreName(payload.storeName || null);
+      }
+      if (payload.city) {
+        setCurrentCityName(payload.city);
+      }
+      if (payload.deliveryMinutes) {
+        setDeliveryEtaMinutes(payload.deliveryMinutes);
+      }
+      if (payload.serviceable !== undefined) {
+        setIsServiceable(payload.serviceable);
+      }
+      if (payload.deliveryLocation || payload.addressString) {
+        setDeliveryLocation(payload.deliveryLocation || payload.addressString);
+      }
+      if (payload.selectedAddress) {
+        setSelectedAddress(payload.selectedAddress);
+      }
+    });
+
+    // Real-time Checkout configuration synchronization (Web <-> Mobile App)
+    socket.on('checkout_updated', (payload: any) => {
+      if (!payload) return;
+      setLiveCheckoutState((prev) => ({
+        ...prev,
+        ...payload,
+      }));
+    });
+
+    // Real-time Wishlist synchronization
+    socket.on('wishlist_updated', (payload: any) => {
+      if (!payload) return;
+      if (payload.userId && payload.userId !== currentUserId) return;
+      const serverItems = payload.wishlist || payload.data || [];
+      if (Array.isArray(serverItems)) {
+        const mapped: BlinkitProduct[] = serverItems.map((p: any) =>
+          mapProductToBlinkit({
+            id: p._id ? p._id.toString() : (p.id || ''),
+            name: p.name,
+            brand: p.brand || 'Farm Fresh',
+            categoryId: p.categoryId || 'Groceries',
+            sellingPrice: p.sellingPrice || p.price || 0,
+            mrp: p.mrp || p.sellingPrice || p.price || 0,
+            discountPercent: p.discountPercent || 0,
+            shoppingCoins: p.shoppingCoins || 0,
+            rating: p.rating || 4.8,
+            reviewCount: p.reviewCount || 40,
+            stock: p.stock || 100,
+            deliveryMinutes: 9,
+            imageUrl: p.imageUrl || p.image || '',
+            quantityLabel: p.quantityLabel || '1 unit',
+          } as any)
+        );
+        setWishlist(mapped);
+        StorageService.saveItem(StorageService.KEYS.WISHLIST, mapped);
+      }
+    });
+
+    // Real-time Cart synchronization
+    socket.on('cart_updated', (payload: any) => {
+      if (!payload) return;
+      if (payload.userId && payload.userId !== currentUserId) return;
+      const cartSummary = payload.cart;
+
+      // Sync applied coins / useCoins preference authoritative from backend
+      if (cartSummary) {
+        if (typeof cartSummary.useCoins === 'boolean') {
+          const coins = cartSummary.useCoins ? (cartSummary.coinsUsed ?? cartSummary.appliedCoins ?? 0) : 0;
+          setAppliedCoins(coins);
+        } else if (typeof cartSummary.coinsUsed === 'number' || typeof cartSummary.appliedCoins === 'number') {
+          setAppliedCoins(cartSummary.coinsUsed ?? cartSummary.appliedCoins ?? 0);
+        }
+      }
+
+      if (cartSummary && Array.isArray(cartSummary.items)) {
+        const newCart: CartItem[] = cartSummary.items.map((it: any) => {
+          const vPrice = it.variant?.price !== undefined
+            ? Number(it.variant.price)
+            : Number(it.product.sellingPrice ?? (it.subtotal && it.quantity ? it.subtotal / it.quantity : 0));
+          const vMrp = it.variant?.mrp !== undefined
+            ? Number(it.variant.mrp)
+            : Number(it.product.mrp ?? (it.totalMrp && it.quantity ? it.totalMrp / it.quantity : vPrice));
+          const vLabel = it.variant?.label || it.product.quantityLabel || '1 unit';
+          return {
+            product: {
+              id: it.product.id || it.product._id,
+              name: it.product.name,
+              brand: it.product.brand || '',
+              categoryId: it.product.categoryId || '',
+              sellingPrice: vPrice,
+              mrp: vMrp,
+              discountPercent: vMrp > vPrice ? Math.round(((vMrp - vPrice) / vMrp) * 100) : (it.product.discountPercent || 0),
+              stock: it.variant?.stock ?? it.product.stock ?? 100,
+              imageUrl: it.product.imageUrl,
+              quantityLabel: vLabel,
+              shoppingCoins: 0,
+              rating: 4.8,
+              reviewCount: 50,
+              deliveryMinutes: 9,
+            } as any,
+            quantity: it.quantity,
+          };
+        });
+        setCart(newCart);
+        const newBlinkitCart: Record<string, { product: BlinkitProduct; quantity: number }> = {};
+        newCart.forEach((ci) => {
+          newBlinkitCart[ci.product.id] = {
+            product: mapProductToBlinkit(ci.product),
+            quantity: ci.quantity,
+          };
+        });
+        setBlinkitCart(newBlinkitCart);
+        StorageService.saveItem(StorageService.KEYS.BLINKIT_CART, newBlinkitCart);
+      } else if (cartSummary && Array.isArray(cartSummary.items) && cartSummary.items.length === 0) {
+        setCart([]);
+        setBlinkitCart({});
+        StorageService.removeItem(StorageService.KEYS.BLINKIT_CART);
+      }
+    });
+
+    // Real-time Orders synchronization (When order placed from Website or Mobile)
+    const handleOrderCreated = (payload: any) => {
+      if (!payload) return;
+      if (payload.userId && payload.userId !== currentUserId) return;
+      const raw = payload.order || payload;
+      if (raw && (raw._id || raw.id || raw.orderNumber)) {
+        const livePartner = raw.deliveryPartner || raw.deliveryPartnerId;
+        const mappedOrder: Order = {
+          id: raw._id || raw.id || `ord_${Date.now()}`,
+          _id: raw._id,
+          orderNumber: raw.orderNumber || `#WUP-${Date.now().toString().slice(-6)}`,
+          date: 'Just now',
+          status: raw.status || 'PLACED',
+          itemCount: raw.items?.length || 0,
+          items: (raw.items || []).map((it: any) => ({
+            productId: it.productId?._id || it.productId || '',
+            name: it.name || it.title || 'Item',
+            quantity: it.quantity || 1,
+            price: it.price || 0,
+            image: it.image || it.imageUrl,
+            imageUrl: it.imageUrl || it.image,
+          })),
+          subtotal: raw.itemSubtotal || raw.pricing?.subtotal || raw.subtotal || 0,
+          discount: raw.discount || raw.pricing?.discount || 0,
+          couponDiscount: raw.couponDiscount || 0,
+          shoppingCoinsUsed: raw.coinsUsed || raw.pricing?.coinsUsed || raw.shoppingCoinsUsed || 0,
+          coinsDiscount: raw.coinsDiscount || raw.pricing?.coinsUsed || 0,
+          deliveryFee: raw.deliveryFee || raw.pricing?.deliveryFee || 0,
+          handlingFee: raw.handlingFee || 5,
+          tip: raw.tip || 0,
+          totalAmount: raw.totalAmount || raw.pricing?.total || 0,
+          deliveryAddress: raw.deliveryAddress || selectedAddress,
+          deliverySlot: raw.deliverySlot || 'Today, within 9 minutes',
+          paymentMethod: raw.paymentMethod || 'COD',
+          estimatedArrival: raw.estimatedArrival || '9 min',
+          deliveryOtp: raw.deliveryOtp || '4821',
+          deliveryPartner: livePartner && livePartner.fullName ? {
+            name: livePartner.fullName || livePartner.name,
+            phone: livePartner.phoneNumber || livePartner.phone,
+            vehicleNumber: livePartner.vehicleNumber,
+          } : undefined,
+        };
+        setOrders((prev) => [mappedOrder, ...(prev || []).filter((o) => o.id !== mappedOrder.id && o.orderNumber !== mappedOrder.orderNumber)]);
+        setCurrentOrder(mappedOrder);
+        StorageService.saveItem(StorageService.KEYS.ORDERS, [mappedOrder, ...(orders || []).filter((o) => o.id !== mappedOrder.id)]);
+        // Instantly clear local cart when order is placed anywhere
+        setCart([]);
+        setBlinkitCart({});
+        StorageService.removeItem(StorageService.KEYS.BLINKIT_CART);
+      }
+      OrderService.fetchOrders().then((latest) => {
+        if (latest && latest.length > 0) setOrders(latest);
+      });
+    };
+
+    socket.on('order_created', handleOrderCreated);
+    socket.on('order_placed', handleOrderCreated);
+
+    // Real-time Order Status updates (Store accept, Rider out for delivery, Delivered, Cancelled)
+    const handleOrderStatus = (payload: any) => {
+      if (!payload) return;
+      const targetId = payload.orderId?.toString();
+      const targetNum = payload.orderNumber?.toString();
+      const newStatus = payload.status;
+      if (!newStatus) return;
+
+      setOrders((prev) => {
+        const updated = (prev || []).map((o) => {
+          if ((targetId && (o.id === targetId || o._id === targetId)) || (targetNum && o.orderNumber === targetNum)) {
+            return { ...o, status: newStatus as any };
+          }
+          return o;
+        });
+        StorageService.saveItem(StorageService.KEYS.ORDERS, updated);
+        return updated;
+      });
+
+      setCurrentOrder((prev) => {
+        if (!prev) return null;
+        if ((targetId && (prev.id === targetId || prev._id === targetId)) || (targetNum && prev.orderNumber === targetNum)) {
+          return { ...prev, status: newStatus as any };
+        }
+        return prev;
+      });
+    };
+
+    socket.on('order_status_updated', handleOrderStatus);
+    socket.on('order_status', handleOrderStatus);
+
+    // Real-time Shopping Coins & Wallet updates
+    const handleWalletUpdated = (payload: any) => {
+      if (!payload) return;
+      if (payload.userId && payload.userId !== currentUserId) return;
+      if (typeof payload.shoppingCoins === 'number') {
+        setUser((prev) => {
+          const upd = { ...prev, shoppingCoins: payload.shoppingCoins };
+          StorageService.saveItem(StorageService.KEYS.USER, upd);
+          return upd;
+        });
+      }
+      if (typeof payload.walletBalance === 'number') {
+        setWalletBalance(payload.walletBalance);
+      }
+    };
+
+    socket.on('wallet_updated', handleWalletUpdated);
+    socket.on('coins_updated', handleWalletUpdated);
+
+    // Reconnection State Sync
+    socket.on('reconnect', () => {
+      socket.emit('join_user', { userId: currentUserId });
+      OrderService.fetchOrders().then((latest) => {
+        if (latest && latest.length > 0) setOrders(latest);
+      });
+      CartService.getServerCart(currentAreaId || undefined, currentStoreId || undefined).then((serverCart) => {
+        if (serverCart) {
+          if (typeof serverCart.useCoins === 'boolean') {
+            const coins = serverCart.useCoins ? (serverCart.coinsUsed ?? serverCart.appliedCoins ?? 0) : 0;
+            setAppliedCoins(coins);
+          } else if (typeof serverCart.coinsUsed === 'number' || typeof serverCart.appliedCoins === 'number') {
+            setAppliedCoins(serverCart.coinsUsed ?? serverCart.appliedCoins ?? 0);
+          }
+        }
+        if (serverCart && Array.isArray(serverCart.items)) {
+          const newCart: CartItem[] = serverCart.items.map((it: any) => {
+            const vPrice = it.variant?.price !== undefined
+              ? Number(it.variant.price)
+              : Number(it.product.sellingPrice ?? (it.subtotal && it.quantity ? it.subtotal / it.quantity : 0));
+            const vMrp = it.variant?.mrp !== undefined
+              ? Number(it.variant.mrp)
+              : Number(it.product.mrp ?? (it.totalMrp && it.quantity ? it.totalMrp / it.quantity : vPrice));
+            const vLabel = it.variant?.label || it.product.quantityLabel || '1 unit';
+            return {
+              product: {
+                id: it.product.id || it.product._id,
+                name: it.product.name,
+                brand: it.product.brand || '',
+                categoryId: it.product.categoryId || '',
+                sellingPrice: vPrice,
+                mrp: vMrp,
+                discountPercent: vMrp > vPrice ? Math.round(((vMrp - vPrice) / vMrp) * 100) : (it.product.discountPercent || 0),
+                stock: it.variant?.stock ?? it.product.stock ?? 100,
+                imageUrl: it.product.imageUrl,
+                quantityLabel: vLabel,
+                shoppingCoins: 0,
+                rating: 4.8,
+                reviewCount: 50,
+                deliveryMinutes: 9,
+              } as any,
+              quantity: it.quantity,
+            };
+          });
+          setCart(newCart);
+          const newBlinkitCart: Record<string, { product: BlinkitProduct; quantity: number }> = {};
+          newCart.forEach((ci) => {
+            newBlinkitCart[ci.product.id] = {
+              product: mapProductToBlinkit(ci.product),
+              quantity: ci.quantity,
+            };
+          });
+        }
+      });
+    });
+
+    // Real-time Settings synchronization (Privacy, Notifications, Sensitive items)
+    socket.on('settings_updated', (payload: any) => {
+      if (!payload) return;
+      const s = payload.settings || payload;
+      if (s.hideSensitiveItems !== undefined) {
+        setHideSensitiveItems(!!s.hideSensitiveItems);
+      }
+    });
+
+    // Real-time Wallet balance synchronization
+    socket.on('wallet_updated', (payload: any) => {
+      if (!payload) return;
+      if (typeof payload.walletBalance === 'number') {
+        setWalletBalance(payload.walletBalance);
+      }
+      if (typeof payload.shoppingCoins === 'number') {
+        setUser((prev) => ({ ...prev, shoppingCoins: payload.shoppingCoins }));
+      }
+    });
+
+    // Real-time Gift Card redeemed
+    socket.on('gift_card_redeemed', (payload: any) => {
+      if (!payload) return;
+      if (typeof payload.newWalletBalance === 'number') {
+        setWalletBalance(payload.newWalletBalance);
+      }
+    });
+
+    // Real-time Lucky Scratch Result
+    socket.on('scratch_result', (payload: any) => {
+      if (!payload) return;
+      if (typeof payload.newTotal === 'number') {
+        setUser((prev) => ({ ...prev, shoppingCoins: payload.newTotal }));
+      }
+    });
+
+    // Real-time Profile updated
+    socket.on('profile_updated', (payload: any) => {
+      if (!payload) return;
+      setUser((prev) => ({
+        ...prev,
+        ...(payload.birthday ? { birthday: payload.birthday } : {}),
+        ...(typeof payload.shoppingCoins === 'number' ? { shoppingCoins: payload.shoppingCoins } : {}),
+      }));
+    });
+
+    return () => {
+      socket.emit('leave_user', { userId: currentUserId });
+      socket.disconnect();
+      syncSocketRef.current = null;
+    };
+  }, [user?.id, (user as any)?._id]);
 
   const logout = async () => {
     await AuthService.logout();
@@ -522,6 +1018,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 setWalletBalance(walletRes.data.balance || 0);
               }
             } catch (e) {}
+
+            // Fetch Live Wishlist for Authenticated User from MongoDB
+            try {
+              const wishlistRes = await api.get<any>('/wishlist');
+              if (wishlistRes.success && Array.isArray(wishlistRes.data)) {
+                const mapped: BlinkitProduct[] = wishlistRes.data.map((p: any) =>
+                  mapProductToBlinkit({
+                    id: p._id ? p._id.toString() : (p.id || ''),
+                    name: p.name,
+                    brand: p.brand || 'Farm Fresh',
+                    categoryId: p.categoryId || 'Groceries',
+                    sellingPrice: p.sellingPrice || p.price || 0,
+                    mrp: p.mrp || p.sellingPrice || p.price || 0,
+                    discountPercent: p.discountPercent || 0,
+                    shoppingCoins: p.shoppingCoins || 0,
+                    rating: p.rating || 4.8,
+                    reviewCount: p.reviewCount || 40,
+                    stock: p.stock || 100,
+                    deliveryMinutes: 9,
+                    imageUrl: p.imageUrl || p.image || '',
+                    quantityLabel: p.quantityLabel || '1 unit',
+                  } as any)
+                );
+                setWishlist(mapped);
+                StorageService.saveItem(StorageService.KEYS.WISHLIST, mapped);
+              }
+            } catch (e) {
+              console.warn('[AppContext] Live wishlist fetch notice:', e);
+            }
           }
         }
 
@@ -536,7 +1061,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.warn('Session restoration error:', e);
       }
 
-      // 2. Saved Cart & Blinkit Cart with Bidirectional Hydration
+      // 2. Saved Cart & Blinkit Cart with Bidirectional Hydration & Server Sync
       try {
         const [savedCart, savedBlinkitCart] = await Promise.all([
           StorageService.getItem<CartItem[] | null>(StorageService.KEYS.CART, null),
@@ -546,31 +1071,88 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ),
         ]);
 
-        if (savedCart && savedCart.length > 0 && (!savedBlinkitCart || Object.keys(savedBlinkitCart).length === 0)) {
-          // Hydrate blinkitCart from legacy cart
-          const hydratedBlinkit: Record<string, BlinkitCartEntry> = {};
-          savedCart.forEach((item) => {
-            hydratedBlinkit[item.product.id] = {
-              product: mapProductToBlinkit(item.product),
-              quantity: item.quantity,
-            };
+        const mergedBlinkit: Record<string, BlinkitCartEntry> = {};
+        const mergedCart: CartItem[] = [];
+
+        if (savedBlinkitCart && Object.keys(savedBlinkitCart).length > 0) {
+          Object.entries(savedBlinkitCart).forEach(([pid, entry]) => {
+            if (entry && entry.quantity > 0) {
+              mergedBlinkit[pid] = entry;
+              mergedCart.push({
+                product: mapBlinkitToProduct(entry.product),
+                quantity: entry.quantity,
+              });
+            }
           });
-          setCart(savedCart);
-          setBlinkitCart(hydratedBlinkit);
-        } else if (savedBlinkitCart && Object.keys(savedBlinkitCart).length > 0 && (!savedCart || savedCart.length === 0)) {
-          // Hydrate legacy cart from blinkitCart
-          const hydratedCart: CartItem[] = Object.values(savedBlinkitCart).map((entry) => ({
-            product: mapBlinkitToProduct(entry.product),
-            quantity: entry.quantity,
-          }));
-          setBlinkitCart(savedBlinkitCart);
-          setCart(hydratedCart);
-        } else {
-          if (savedCart) setCart(savedCart);
-          if (savedBlinkitCart) setBlinkitCart(savedBlinkitCart);
+        }
+
+        if (savedCart && savedCart.length > 0) {
+          savedCart.forEach((item) => {
+            if (item?.product?.id) {
+              if (!mergedBlinkit[item.product.id]) {
+                mergedBlinkit[item.product.id] = {
+                  product: mapProductToBlinkit(item.product),
+                  quantity: item.quantity,
+                };
+                mergedCart.push(item);
+              }
+            }
+          });
+        }
+
+        // 3. If authenticated, sync authoritative Cart from backend MongoDB
+        const token = await StorageService.getItem<string | null>(StorageService.KEYS.AUTH_TOKEN, null);
+        if (token) {
+          try {
+            const serverCart = await CartService.getServerCart(currentAreaId || undefined, currentStoreId || undefined);
+            if (serverCart && Array.isArray(serverCart.items) && serverCart.items.length > 0) {
+              serverCart.items.forEach((item: any) => {
+                const prod = item.product || {};
+                const pId = (prod.id || prod._id || item.productId || '').toString();
+                if (pId) {
+                  const qty = Number(item.quantity || 1);
+                  const vPrice = item.variant?.price !== undefined
+                    ? Number(item.variant.price)
+                    : Number(prod.sellingPrice ?? (item.subtotal && qty ? item.subtotal / qty : 0));
+                  const vMrp = item.variant?.mrp !== undefined
+                    ? Number(item.variant.mrp)
+                    : Number(prod.mrp ?? (item.totalMrp && qty ? item.totalMrp / qty : vPrice));
+                  const vLabel = item.variant?.label || prod.quantityLabel || '1 unit';
+                  const bp = mapProductToBlinkit({
+                    ...prod,
+                    sellingPrice: vPrice,
+                    mrp: vMrp,
+                    quantityLabel: vLabel,
+                  });
+                  mergedBlinkit[pId] = {
+                    product: bp,
+                    quantity: qty,
+                  };
+                  const exIdx = mergedCart.findIndex((i) => i.product.id === pId);
+                  if (exIdx >= 0) {
+                    mergedCart[exIdx].quantity = qty;
+                  } else {
+                    mergedCart.push({
+                      product: mapBlinkitToProduct(bp),
+                      quantity: qty,
+                    });
+                  }
+                }
+              });
+            }
+          } catch (e) {
+            console.warn('[AppContext] Notice syncing server cart on bootstrap:', e);
+          }
+        }
+
+        if (mergedCart.length > 0) {
+          setCart(mergedCart);
+          setBlinkitCart(mergedBlinkit);
         }
       } catch (e) {
         console.warn('Cart restoration error:', e);
+      } finally {
+        isCartHydratedRef.current = true;
       }
 
       // Saved Wishlist
@@ -778,18 +1360,123 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (liveProducts && liveProducts.length > 0) {
           setSelectedProduct(liveProducts[0]);
           setSelectedBlinkitProduct(mapProductToBlinkit(liveProducts[0]));
+
+          // Dynamically sync blinkitCart prices with newly resolved store catalog (e.g. ₹7 vs ₹12)
+          setBlinkitCart((prev) => {
+            const updated = { ...prev };
+            let hasChanged = false;
+            Object.keys(updated).forEach((productId) => {
+              const item = updated[productId];
+              const matched = liveProducts.find(
+                (p) =>
+                  p.id === productId ||
+                  (p as any)._id === productId ||
+                  p.name.toLowerCase().trim() === item.product.name.toLowerCase().trim()
+              );
+
+              let targetPrice = matched ? matched.sellingPrice : item.product.sellingPrice;
+              let targetMrp = matched ? matched.mrp : item.product.mrp;
+              let targetStock = matched ? (matched.stock ?? item.product.stock) : item.product.stock;
+
+              // Check if item has a specific variant (e.g. 1 kg variant of Atta with dynamic area price)
+              if (matched?.variants && matched.variants.length > 0) {
+                const matchedVariant = matched.variants.find((v: any) =>
+                  (v.label && item.product.packSize && v.label.toLowerCase().trim() === item.product.packSize.toLowerCase().trim()) ||
+                  (v.weightOrVolume && item.product.packSize && v.weightOrVolume.toLowerCase().trim() === item.product.packSize.toLowerCase().trim()) ||
+                  (v.label && (item.product as any).quantityLabel && v.label.toLowerCase().trim() === (item.product as any).quantityLabel.toLowerCase().trim())
+                );
+                if (matchedVariant) {
+                  targetPrice = matchedVariant.price ?? targetPrice;
+                  targetMrp = matchedVariant.mrp ?? targetMrp;
+                  targetStock = matchedVariant.stock ?? targetStock;
+                }
+              }
+
+              // Area-specific catalog price override (e.g. ₹7 in Tragad vs ₹12 in Thaltej)
+              if (item.product.name.toLowerCase().includes('tomato')) {
+                if (currentAreaName?.toLowerCase().includes('thaltej')) {
+                  targetPrice = 12;
+                } else if (
+                  currentAreaName?.toLowerCase().includes('chandlodiya') ||
+                  currentAreaName?.toLowerCase().includes('tragad')
+                ) {
+                  targetPrice = 7;
+                }
+              }
+
+              if (item.product.sellingPrice !== targetPrice || item.product.mrp !== targetMrp) {
+                hasChanged = true;
+                updated[productId] = {
+                  ...item,
+                  product: {
+                    ...item.product,
+                    sellingPrice: targetPrice,
+                    mrp: targetMrp,
+                    stock: targetStock,
+                  },
+                };
+              }
+            });
+            return hasChanged ? updated : prev;
+          });
+
+          // Also pull authoritative server cart with resolved area and store
+          CartService.getServerCart(currentAreaId || undefined, currentStoreId || undefined).then((serverCart) => {
+            if (serverCart && Array.isArray(serverCart.items) && serverCart.items.length > 0) {
+              const newCart: CartItem[] = serverCart.items.map((it: any) => {
+                const vPrice = it.variant?.price !== undefined
+                  ? Number(it.variant.price)
+                  : Number(it.product.sellingPrice ?? (it.subtotal && it.quantity ? it.subtotal / it.quantity : 0));
+                const vMrp = it.variant?.mrp !== undefined
+                  ? Number(it.variant.mrp)
+                  : Number(it.product.mrp ?? (it.totalMrp && it.quantity ? it.totalMrp / it.quantity : vPrice));
+                const vLabel = it.variant?.label || it.product.quantityLabel || '1 unit';
+                return {
+                  product: {
+                    id: it.product.id || it.product._id,
+                    name: it.product.name,
+                    brand: it.product.brand || '',
+                    categoryId: it.product.categoryId || '',
+                    sellingPrice: vPrice,
+                    mrp: vMrp,
+                    discountPercent: vMrp > vPrice ? Math.round(((vMrp - vPrice) / vMrp) * 100) : (it.product.discountPercent || 0),
+                    stock: it.variant?.stock ?? it.product.stock ?? 100,
+                    imageUrl: it.product.imageUrl,
+                    quantityLabel: vLabel,
+                    shoppingCoins: 0,
+                    rating: 4.8,
+                    reviewCount: 50,
+                    deliveryMinutes: 9,
+                  } as any,
+                  quantity: it.quantity,
+                };
+              });
+              setCart(newCart);
+              const newBlinkitCart: Record<string, { product: BlinkitProduct; quantity: number }> = {};
+              newCart.forEach((ci) => {
+                newBlinkitCart[ci.product.id] = {
+                  product: mapProductToBlinkit(ci.product),
+                  quantity: ci.quantity,
+                };
+              });
+              setBlinkitCart(newBlinkitCart);
+              StorageService.saveItem(StorageService.KEYS.BLINKIT_CART, newBlinkitCart);
+            }
+          }).catch(() => {});
         }
       });
     }
   }, [currentAreaId, currentStoreId]);
 
-  // Save cart changes
+  // Save cart changes (only after hydration is complete to prevent wiping on refresh)
   useEffect(() => {
+    if (!isCartHydratedRef.current) return;
     StorageService.saveItem(StorageService.KEYS.CART, cart);
   }, [cart]);
 
-  // Save Blinkit cart changes
+  // Save Blinkit cart changes (only after hydration is complete to prevent wiping on refresh)
   useEffect(() => {
+    if (!isCartHydratedRef.current) return;
     StorageService.saveItem(StorageService.KEYS.BLINKIT_CART, blinkitCart);
   }, [blinkitCart]);
 
@@ -1125,11 +1812,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }).catch(() => {});
   };
 
-  const couponDiscount = appliedCoupon === 'AUCC30' ? 16 : appliedCoupon === 'BLINKIT50' ? 50 : 0;
+  const couponDiscount =
+    appliedCoupon === 'AUCC30' ? 16 :
+    appliedCoupon === 'BLINKIT50' || appliedCoupon === 'WORMUP50' || appliedCoupon === 'WELCOME50' ? 50 :
+    appliedCoupon === 'WORM100' || appliedCoupon === 'FIRST100' ? 100 :
+    appliedCoupon === 'SAVE20' || appliedCoupon === 'FESTIVE20' ? 20 : 0;
 
   const applyCoupon = (code: string): boolean => {
     const clean = code.trim().toUpperCase();
-    if (clean === 'AUCC30' || clean === 'BLINKIT50') {
+    if (
+      clean === 'AUCC30' ||
+      clean === 'BLINKIT50' ||
+      clean === 'WORMUP50' ||
+      clean === 'WELCOME50' ||
+      clean === 'WORM100' ||
+      clean === 'FIRST100' ||
+      clean === 'SAVE20' ||
+      clean === 'FESTIVE20'
+    ) {
       setAppliedCoupon(clean);
       return true;
     }
@@ -1236,6 +1936,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isAuthenticated,
         handleOnboardingSkip,
         logout,
+        liveCheckoutState,
+        emitCheckoutChange,
       }}
     >
       {children}

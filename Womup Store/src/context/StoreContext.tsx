@@ -69,6 +69,7 @@ interface StoreContextType {
   logout: () => Promise<void>;
 
   selectOrderForDetail: (orderId: string) => Promise<void>;
+  selectOrderForHandover: (orderId: string) => Promise<void>;
   acceptOrderAndStartPick: (orderId: string) => Promise<void>;
   scanPickItem: (orderId: string, itemId: string, barcode: string) => Promise<{ isCompleted: boolean; nextItem: any }>;
   markOutOfStock: (orderId: string, itemId: string, reason: string, substituteId?: string) => Promise<void>;
@@ -120,8 +121,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
 const enrichStore = (rawStore: any): StoreHub | null => {
   if (!rawStore) return null;
+  const storeId = (rawStore.id || rawStore._id?.toString() || rawStore._id || '').toString();
   return {
     ...rawStore,
+    id: storeId,
+    _id: storeId,
     cityName: rawStore.cityName || rawStore.city || 'Ahmedabad',
     areaName:
       rawStore.areaName ||
@@ -151,7 +155,7 @@ const enrichStore = (rawStore: any): StoreHub | null => {
       try {
         const token = await AsyncStorage.getItem(TOKEN_STORAGE_KEY);
         if (!token) {
-          setAuthStep('LOGIN');
+          setTimeout(() => setAuthStep('LOGIN'), 1800);
           return;
         }
 
@@ -167,17 +171,17 @@ const enrichStore = (rawStore: any): StoreHub | null => {
             currentStreak: me.performance?.currentStreak ?? 0,
             totalOrdersPicked: me.performance?.totalOrdersPicked ?? me.performance?.todayPicked ?? 0,
           });
-          setAuthStep('AUTHENTICATED');
+          setTimeout(() => setAuthStep('AUTHENTICATED'), 1800);
 
           if (me.store?.id) {
             storeSocket.connect(me.store.id);
           }
         } else {
-          setAuthStep('LOGIN');
+          setTimeout(() => setAuthStep('LOGIN'), 1800);
         }
       } catch (err) {
         console.log('[StoreContext] Init session error, routing to login:', err);
-        setAuthStep('LOGIN');
+        setTimeout(() => setAuthStep('LOGIN'), 1800);
       }
     };
 
@@ -186,14 +190,16 @@ const enrichStore = (rawStore: any): StoreHub | null => {
 
   // WebSocket Live Listeners
   useEffect(() => {
-    if (authStep !== 'AUTHENTICATED' || !store?.id) return;
+    const activeStoreId = store?.id || (store as any)?._id;
+    if (authStep !== 'AUTHENTICATED' || !activeStoreId) return;
 
-    storeSocket.connect(store.id);
+    storeSocket.connect(activeStoreId);
 
     // 1. New Order incoming
     storeSocket.on('new_order', (payload: any) => {
       console.log('[StoreContext] 🔔 WS new_order received:', payload);
       refreshIncoming();
+      refreshPicking();
     });
 
     // 2. Rider arrived at counter
@@ -369,6 +375,21 @@ const enrichStore = (rawStore: any): StoreHub | null => {
     }
   }, []);
 
+  // 10-Second Auto-Poll Fallback for Incoming Orders (guarantees queue parity even if WS drops)
+  useEffect(() => {
+    if (authStep !== 'AUTHENTICATED') return;
+
+    // Load immediately on auth
+    refreshIncoming();
+    refreshPicking();
+
+    const pollInterval = setInterval(() => {
+      refreshIncoming();
+    }, 10000);
+
+    return () => clearInterval(pollInterval);
+  }, [authStep, store?.id, refreshIncoming, refreshPicking]);
+
   const refreshCompletedOrders = useCallback(async () => {
     try {
       const orders = await StoreApiService.getCompletedOrders();
@@ -540,6 +561,24 @@ const enrichStore = (rawStore: any): StoreHub | null => {
     }
   };
 
+  const selectOrderForHandover = async (orderId: string) => {
+    setIsLoading(true);
+    try {
+      const detail = await StoreApiService.getOrderDetail(orderId);
+      setActiveOrder(detail);
+      setActivePickList(detail.pickList || null);
+      setSubScreen('HandoverScan');
+      setIsLoading(false);
+    } catch (err: any) {
+      const fallback = readyOrders.find((o) => o.orderId === orderId);
+      if (fallback) {
+        setActiveOrder(fallback as any);
+      }
+      setSubScreen('HandoverScan');
+      setIsLoading(false);
+    }
+  };
+
   const acceptOrderAndStartPick = async (orderId: string) => {
     setIsLoading(true);
     try {
@@ -700,6 +739,7 @@ const enrichStore = (rawStore: any): StoreHub | null => {
         toggleShift,
         logout,
         selectOrderForDetail,
+        selectOrderForHandover,
         acceptOrderAndStartPick,
         scanPickItem,
         markOutOfStock,

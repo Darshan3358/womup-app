@@ -15,7 +15,7 @@ interface TabItem {
 }
 
 export const BottomNav: React.FC = () => {
-  const { currentTab, setCurrentTab, setSubScreen, incomingOrders, pickingOrders, readyOrders } = useStore();
+  const { currentTab, setCurrentTab, setSubScreen, incomingOrders, pickingOrders } = useStore();
   const insets = useSafeAreaInsets();
   const bottomPadding = Math.max(insets.bottom, 6);
 
@@ -28,24 +28,28 @@ export const BottomNav: React.FC = () => {
     },
     {
       id: 'Incoming',
-      label: 'Incoming',
-      icon: 'flash-outline',
-      activeIcon: 'flash',
-      badge: incomingOrders.length,
+      label: 'Orders',
+      icon: 'receipt-outline',
+      activeIcon: 'receipt',
+      badge: incomingOrders.length + pickingOrders.length,
     },
     {
-      id: 'Picking',
-      label: 'Picking',
+      id: 'Inventory',
+      label: 'Inventory',
       icon: 'cube-outline',
       activeIcon: 'cube',
-      badge: pickingOrders.length,
     },
     {
-      id: 'Ready',
-      label: 'Ready',
-      icon: 'checkmark-circle-outline',
-      activeIcon: 'checkmark-circle',
-      badge: readyOrders.length,
+      id: 'History',
+      label: 'Earnings',
+      icon: 'cash-outline',
+      activeIcon: 'cash',
+    },
+    {
+      id: 'Profile',
+      label: 'Profile',
+      icon: 'person-outline',
+      activeIcon: 'person',
     },
   ];
 
@@ -55,7 +59,7 @@ export const BottomNav: React.FC = () => {
   };
 
   return (
-    <View style={[styles.navContainer, { height: 60 + bottomPadding, paddingBottom: bottomPadding }]}>
+    <View style={[styles.navContainer, { height: 58 + bottomPadding, paddingBottom: bottomPadding }]}>
       {tabs.map((tab) => {
         const isActive = currentTab === tab.id;
         return (
@@ -68,8 +72,8 @@ export const BottomNav: React.FC = () => {
             <View style={styles.iconContainer}>
               <Ionicons
                 name={isActive ? tab.activeIcon : tab.icon}
-                size={24}
-                color={isActive ? '#EC4A9D' : '#9296A7'}
+                size={22}
+                color={isActive ? '#FF3B98' : '#64748B'}
               />
               {Boolean(tab.badge && tab.badge > 0) && (
                 <View style={styles.badge}>
@@ -83,8 +87,8 @@ export const BottomNav: React.FC = () => {
               style={[
                 styles.tabLabel,
                 {
-                  color: isActive ? '#EC4A9D' : '#9296A7',
-                  fontWeight: isActive ? '700' : '500',
+                  color: isActive ? '#FF3B98' : '#64748B',
+                  fontWeight: isActive ? '800' : '500',
                 },
               ]}
             >
@@ -100,13 +104,17 @@ export const BottomNav: React.FC = () => {
 const styles = StyleSheet.create({
   navContainer: {
     flexDirection: 'row',
-    backgroundColor: COLORS.surface,
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    height: 64,
+    borderTopColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'space-around',
     paddingHorizontal: 8,
+    shadowColor: '#071B52',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 8,
   },
   tabBtn: {
     alignItems: 'center',
@@ -116,8 +124,8 @@ const styles = StyleSheet.create({
   },
   iconContainer: {
     position: 'relative',
-    width: 28,
-    height: 28,
+    width: 26,
+    height: 26,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -125,15 +133,15 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -4,
     right: -8,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#EF4444',
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#FF3B98',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
     borderWidth: 1.5,
-    borderColor: COLORS.surface,
+    borderColor: '#FFFFFF',
   },
   badgeText: {
     color: '#FFF',

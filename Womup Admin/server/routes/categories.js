@@ -239,8 +239,8 @@ router.post('/', async (req, res) => {
   }
 });
 
-// 4. UPDATE CATEGORY
-router.patch('/:id', async (req, res) => {
+// 4. UPDATE CATEGORY (Support both PATCH and PUT)
+const handleUpdateCategory = async (req, res) => {
   try {
     const db = getDB();
     const { id } = req.params;
@@ -257,8 +257,16 @@ router.patch('/:id', async (req, res) => {
 
     const fieldsToSet = {};
     if (updates.name !== undefined) fieldsToSet.name = updates.name.trim();
+    if (updates.slug !== undefined) fieldsToSet.slug = updates.slug.trim();
     if (updates.icon !== undefined) fieldsToSet.icon = updates.icon;
-    if (updates.image !== undefined) fieldsToSet.image = updates.image;
+    if (updates.image !== undefined) {
+      fieldsToSet.image = updates.image;
+      fieldsToSet.imageUrl = updates.image;
+    }
+    if (updates.imageUrl !== undefined) {
+      fieldsToSet.image = updates.imageUrl;
+      fieldsToSet.imageUrl = updates.imageUrl;
+    }
     if (updates.bgColor !== undefined) fieldsToSet.bgColor = updates.bgColor;
     if (updates.description !== undefined) fieldsToSet.description = updates.description.trim();
     if (updates.sortOrder !== undefined || updates.displayOrder !== undefined) {
@@ -283,13 +291,10 @@ router.patch('/:id', async (req, res) => {
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
-});
+};
 
-// Also support PUT
-router.put('/:id', async (req, res) => {
-  req.method = 'PATCH';
-  router.handle(req, res);
-});
+router.patch('/:id', handleUpdateCategory);
+router.put('/:id', handleUpdateCategory);
 
 // 5. TOGGLE ACTIVE/INACTIVE STATUS
 router.patch('/:id/status', async (req, res) => {

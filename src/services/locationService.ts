@@ -31,71 +31,91 @@ const AREA_CACHE_KEY = '@wormup_resolved_area';
 const AREA_CACHE_TTL_MS = 5 * 60 * 1000; // Fresh 5-minute TTL for hyperlocal routing
 
 let _cachedArea: ResolvedArea | null = null;
+const _inFlightAreaRequests = new Map<string, Promise<ResolvedArea | null>>();
 
 export const LocationService = {
   /**
    * Resolve GPS coordinates to a delivery area and dark store via the backend.
    * Results are cached in memory + AsyncStorage. Pass forceRefresh = true to bypass cache.
+   * Concurrent duplicate requests are automatically deduplicated in-flight.
    */
   async resolveArea(
     lat?: number,
     lng?: number,
     forceRefresh = false,
   ): Promise<ResolvedArea | null> {
-    // 1. Skip cache if forceRefresh is requested
-    if (!forceRefresh) {
-      if (_cachedArea) return _cachedArea;
+    const requestKey = `${lat !== undefined ? lat.toFixed(4) : 'default'}_${lng !== undefined ? lng.toFixed(4) : 'default'}`;
 
-      try {
-        const stored = await StorageService.getItem<{ area: ResolvedArea; ts: number } | null>(
-          AREA_CACHE_KEY,
-          null,
-        );
-        if (stored && Date.now() - stored.ts < AREA_CACHE_TTL_MS) {
-          _cachedArea = stored.area;
-          return stored.area;
-        }
-      } catch (_) {}
+    // 1. Always deduplicate concurrent in-flight requests for the exact same coordinates
+    const inFlight = _inFlightAreaRequests.get(requestKey);
+    if (inFlight) {
+      return inFlight;
     }
 
-    // 2. Call backend for authoritative live serviceability resolution
-    try {
-      const res = await api.post<any>('/location/resolve', {
-        latitude: lat ?? null,
-        longitude: lng ?? null,
-      });
-      const resData = (res && (res as any).data) ? (res as any).data : res;
-      if (res && res.success && resData) {
-        const serviceable =
-          resData.serviceable !== undefined
-            ? Boolean(resData.serviceable)
-            : Boolean(resData.areaId || resData.storeId);
+    if (!forceRefresh && _cachedArea) {
+      return _cachedArea;
+    }
 
-        const area: ResolvedArea = {
-          areaId: resData.areaId || '',
-          areaName: resData.areaName || 'Ahmedabad Hub',
-          city: resData.city || 'Ahmedabad',
-          deliveryMinutes: resData.deliveryMinutes ?? 9,
-          serviceable,
-          storeId: resData.storeId,
-          storeName: resData.storeName || (serviceable ? 'Wom Up Dark Store' : undefined),
-          storeCode: resData.storeCode,
-          distanceKm: resData.distanceKm,
-          message: resData.message,
-        };
-        _cachedArea = area;
-        StorageService.saveItem(AREA_CACHE_KEY, { area, ts: Date.now() });
-        return area;
+    // 2. Create deduplicated in-flight promise
+    const promise = (async () => {
+      if (!forceRefresh) {
+        try {
+          const stored = await StorageService.getItem<{ area: ResolvedArea; ts: number } | null>(
+            AREA_CACHE_KEY,
+            null,
+          );
+          if (stored && Date.now() - stored.ts < AREA_CACHE_TTL_MS) {
+            _cachedArea = stored.area;
+            return stored.area;
+          }
+        } catch (_) {}
       }
-    } catch (e) {
-      console.warn('[LocationService] resolveArea failed:', e);
-    }
-    return null;
+
+      // 3. Call backend for authoritative live serviceability resolution
+      try {
+        const res = await api.post<any>('/location/resolve', {
+          latitude: lat ?? null,
+          longitude: lng ?? null,
+        });
+        const resData = (res && (res as any).data) ? (res as any).data : res;
+        if (res && res.success && resData) {
+          const serviceable =
+            resData.serviceable !== undefined
+              ? Boolean(resData.serviceable)
+              : Boolean(resData.areaId || resData.storeId);
+
+          const area: ResolvedArea = {
+            areaId: resData.areaId || '',
+            areaName: resData.areaName || 'Ahmedabad Hub',
+            city: resData.city || 'Ahmedabad',
+            deliveryMinutes: resData.deliveryMinutes ?? 9,
+            serviceable,
+            storeId: resData.storeId,
+            storeName: resData.storeName || (serviceable ? 'Wom Up Dark Store' : undefined),
+            storeCode: resData.storeCode,
+            distanceKm: resData.distanceKm,
+            message: resData.message,
+          };
+          _cachedArea = area;
+          StorageService.saveItem(AREA_CACHE_KEY, { area, ts: Date.now() });
+          return area;
+        }
+      } catch (e) {
+        console.warn('[LocationService] resolveArea failed:', e);
+      } finally {
+        _inFlightAreaRequests.delete(requestKey);
+      }
+      return null;
+    })();
+
+    _inFlightAreaRequests.set(requestKey, promise);
+    return promise;
   },
 
   /** Invalidate cache (call when user changes delivery address or forces re-detection) */
   clearCache() {
     _cachedArea = null;
+    _inFlightAreaRequests.clear();
     StorageService.removeItem(AREA_CACHE_KEY);
   },
 

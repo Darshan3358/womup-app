@@ -64,6 +64,27 @@ export class DeliveryPartner {
   @Prop({ default: 4.88 })
   rating: number;
 
+  @Prop({ default: 4.88 })
+  averageRating: number;
+
+  @Prop({ default: 128 })
+  totalReviews: number;
+
+  @Prop({
+    type: Object,
+    default: { five: 104, four: 18, three: 4, two: 1, one: 1 },
+  })
+  ratingBreakdown: {
+    five: number;
+    four: number;
+    three: number;
+    two: number;
+    one: number;
+  };
+
+  @Prop()
+  lastRatedAt?: Date;
+
   @Prop({ default: 428 })
   totalDeliveries: number;
 

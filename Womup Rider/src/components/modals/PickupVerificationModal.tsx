@@ -8,14 +8,23 @@ export const PickupVerificationModal: React.FC = () => {
   const { showPickupModal, setShowPickupModal, pickupOrder, activeDelivery } = useRider();
   const [bagBarcode, setBagBarcode] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [errorMsg, setErrorMsg] = useState<string>('');
 
   const handleConfirmPickup = async () => {
+    setErrorMsg('');
     const code = bagBarcode.trim();
     if (!code) {
-      Alert.alert(
-        'Bag Barcode Required',
-        'Please scan or enter the Bag Barcode (e.g., BAG-WORM-...) printed on the sealed grocery tote bag before confirming pickup.'
-      );
+      const msg = 'Please scan or enter the Bag Barcode (e.g., BAG-WORM-...) printed on the sealed tote bag.';
+      setErrorMsg(msg);
+      Alert.alert('Bag Barcode Required', msg);
+      return;
+    }
+
+    const expected = (activeDelivery?.bagBarcode || '').trim().toUpperCase();
+    if (expected && code.toUpperCase() !== expected) {
+      const msg = `Entered barcode "${code}" does not match the sealed bag barcode (${expected}).`;
+      setErrorMsg(msg);
+      Alert.alert('Invalid Bag Barcode', msg);
       return;
     }
 
@@ -24,11 +33,11 @@ export const PickupVerificationModal: React.FC = () => {
       await pickupOrder(code);
       setShowPickupModal(false);
       setBagBarcode('');
+      setErrorMsg('');
     } catch (err: any) {
-      Alert.alert(
-        'Pickup Verification Failed',
-        err?.message || 'The store has not finished packing this order, or the barcode does not match.'
-      );
+      const msg = err?.message || 'The store has not finished packing this order, or the barcode does not match.';
+      setErrorMsg(msg);
+      Alert.alert('Pickup Verification Failed', msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -76,9 +85,19 @@ export const PickupVerificationModal: React.FC = () => {
             placeholder="Scan / Enter Bag Barcode (BAG-...)"
             placeholderTextColor={COLORS.secondaryText}
             value={bagBarcode}
-            onChangeText={setBagBarcode}
+            onChangeText={(txt) => {
+              setBagBarcode(txt);
+              if (errorMsg) setErrorMsg('');
+            }}
             autoCapitalize="characters"
           />
+
+          {errorMsg ? (
+            <View style={{ width: '100%', padding: 10, backgroundColor: '#FEF2F2', borderRadius: 8, borderWidth: 1, borderColor: '#FCA5A5', marginTop: 10, flexDirection: 'row', alignItems: 'center' }}>
+              <Ionicons name="alert-circle" size={18} color="#DC2626" style={{ marginRight: 6 }} />
+              <Text style={{ flex: 1, fontSize: 12, color: '#B91C1C', fontWeight: '600' }}>{errorMsg}</Text>
+            </View>
+          ) : null}
 
           <View style={styles.actionButtons}>
             <TouchableOpacity

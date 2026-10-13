@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
@@ -23,19 +24,62 @@ export class CartController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current cart items with authoritative server-calculated pricing breakdown' })
   @ApiResponse({ status: 200, description: 'Cart summary with subtotal, discounts, fees, coins and total' })
-  async getCart(@CurrentUser() user: any) {
-    return this.cartService.getCartSummary(user.id);
+  async getCart(
+    @CurrentUser() user: any,
+    @Query('areaId') areaId?: string,
+    @Query('storeId') storeId?: string,
+  ) {
+    return this.cartService.getCartSummary(user.id, areaId, storeId);
   }
 
+  @Post('set-location')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Set user active delivery area/store for cart pricing recalculation' })
+  async setLocation(
+    @CurrentUser() user: any,
+    @Body() body: { areaId?: string; storeId?: string },
+  ) {
+    return this.cartService.setCartLocation(user.id, body.areaId, body.storeId);
+  }
+
+  // Standard SRS Cart Add API
+  @Post('add')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Add product item to cart (SRS standardized)' })
+  async addCartItem(
+    @CurrentUser() user: any,
+    @Body() body: { productId: string; variantId?: string; quantity?: number },
+  ) {
+    return this.cartService.addItem(user.id, body.productId, body.quantity || 1, body.variantId);
+  }
+
+  // Legacy Cart Add API
   @Post('items')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Add product item to cart' })
   async addItem(
     @CurrentUser() user: any,
-    @Body() body: { productId: string; quantity: number },
+    @Body() body: { productId: string; variantId?: string; quantity: number },
   ) {
-    return this.cartService.addItem(user.id, body.productId, body.quantity || 1);
+    return this.cartService.addItem(user.id, body.productId, body.quantity || 1, body.variantId);
+  }
+
+  // Standard SRS Cart Update API
+  @Post('update')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update cart quantity (SRS standardized)' })
+  async updateCartItem(
+    @CurrentUser() user: any,
+    @Body() body: { productId: string; variantId?: string; quantity?: number; delta?: number },
+  ) {
+    if (typeof body.quantity === 'number') {
+      return this.cartService.setExactQuantity(user.id, body.productId, body.quantity);
+    }
+    return this.cartService.updateQuantity(user.id, body.productId, body.delta ?? 1);
   }
 
   @Patch('items/:productId')
@@ -50,12 +94,35 @@ export class CartController {
     return this.cartService.updateQuantity(user.id, productId, delta);
   }
 
+  // Standard SRS Cart Remove API
+  @Delete('remove')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Remove product item from cart (SRS standardized)' })
+  async removeCartItem(
+    @CurrentUser() user: any,
+    @Body() body: { productId?: string; variantId?: string },
+    @Param() params: any,
+  ) {
+    const pId = body?.productId || params?.productId;
+    return this.cartService.removeItem(user.id, pId);
+  }
+
   @Delete('items/:productId')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Remove product item from cart completely' })
   async removeItem(@CurrentUser() user: any, @Param('productId') productId: string) {
     return this.cartService.removeItem(user.id, productId);
+  }
+
+  // Standard SRS Cart Clear API
+  @Delete('clear')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Clear all items from cart (SRS standardized)' })
+  async clearCartAlias(@CurrentUser() user: any) {
+    return this.cartService.clearCart(user.id);
   }
 
   @Delete()
@@ -72,6 +139,18 @@ export class CartController {
   @ApiOperation({ summary: 'Apply Shopping Coins for direct checkout deduction' })
   async applyCoins(@CurrentUser() user: any, @Body('coins') coins: number) {
     return this.cartService.applyCoins(user.id, coins);
+  }
+
+  @Post('toggle-coins')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Toggle Shopping Coins on/off with instant real-time synchronization' })
+  async toggleCoins(
+    @CurrentUser() user: any,
+    @Body() body: { useCoins?: boolean; enabled?: boolean },
+  ) {
+    const flag = typeof body.useCoins === 'boolean' ? body.useCoins : !!body.enabled;
+    return this.cartService.toggleCoins(user.id, flag);
   }
 
   @Post('apply-coupon')

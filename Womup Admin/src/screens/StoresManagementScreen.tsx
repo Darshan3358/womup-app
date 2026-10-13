@@ -1292,12 +1292,36 @@ export const StoresManagementScreen: React.FC = () => {
                       keyboardType="numeric"
                     />
                   </View>
+                </View>
+
+                {/* Physical Store GPS Coordinates Callout */}
+                <View style={{ backgroundColor: '#EEF2FF', borderWidth: 1, borderColor: '#C7D2FE', borderRadius: 8, padding: 10, marginTop: 10, marginBottom: 8 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#3730A3', marginBottom: 2 }}>
+                    📍 Physical Store GPS Coordinates (Unique per Store)
+                  </Text>
+                  <Text style={{ fontSize: 10, color: '#4338CA', lineHeight: 14 }}>
+                    Each dark store must have its own physical coordinates separate from the Area center. The system routes orders to the nearest physical dark store in this area.
+                  </Text>
+                </View>
+
+                <View style={styles.formRow}>
                   <View style={styles.formCol}>
-                    <Text style={styles.inputLabel}>Latitude</Text>
+                    <Text style={styles.inputLabel}>Store Latitude *</Text>
                     <TextInput
                       style={styles.textInput}
+                      placeholder="e.g. 23.0250"
                       value={newLatitude}
                       onChangeText={setNewLatitude}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <View style={styles.formCol}>
+                    <Text style={styles.inputLabel}>Store Longitude *</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="e.g. 72.5780"
+                      value={newLongitude}
+                      onChangeText={setNewLongitude}
                       keyboardType="numeric"
                     />
                   </View>

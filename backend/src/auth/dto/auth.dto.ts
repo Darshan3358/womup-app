@@ -140,3 +140,42 @@ export class RefreshTokenDto {
   @IsNotEmpty()
   refreshToken: string;
 }
+
+export class GoogleAuthDto {
+  @ApiProperty({ required: false, description: 'Google Identity JWT ID Token' })
+  @IsString()
+  @IsOptional()
+  credential?: string;
+
+  @ApiProperty({ example: 'customer@gmail.com', required: true, description: 'User Gmail address' })
+  @IsEmail({}, { message: 'Please provide a valid Google email address' })
+  email: string;
+
+  @ApiProperty({ example: 'Mukesh Thanki', required: false })
+  @IsString()
+  @IsOptional()
+  name?: string;
+
+  @ApiProperty({ example: '1029384756', required: false })
+  @IsString()
+  @IsOptional()
+  googleId?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  photoUrl?: string;
+}
+
+export class LinkPhoneDto {
+  @ApiProperty({ example: '9876543210', description: '10-digit mobile number' })
+  @IsString()
+  @IsNotEmpty()
+  phone: string;
+
+  @ApiProperty({ required: false, description: 'User ID if linking without bearer token' })
+  @IsString()
+  @IsOptional()
+  userId?: string;
+}
+

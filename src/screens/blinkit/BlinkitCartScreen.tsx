@@ -35,6 +35,7 @@ export const BlinkitCartScreen: React.FC = () => {
     selectedAddress,
     setActiveScreen,
     goBack,
+    setLocationModalVisible,
   } = useApp();
 
   const [couponInput, setCouponInput] = useState('');
@@ -155,16 +156,23 @@ export const BlinkitCartScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Delivery ETA banner */}
-        <View style={styles.etaBanner}>
+        {/* Delivery ETA banner (Interactive Location Selector) */}
+        <TouchableOpacity
+          activeOpacity={0.75}
+          onPress={() => setLocationModalVisible(true)}
+          style={styles.etaBanner}
+        >
           <View style={styles.etaLeft}>
             <AppIcon name="clock" size={18} color={COLORS.primary} />
             <Text style={styles.etaTitle}>Delivery in 9 minutes</Text>
           </View>
-          <Text style={styles.etaLocationText} numberOfLines={1}>
-            {deliveryLocation}
-          </Text>
-        </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, justifyContent: 'flex-end', marginLeft: 8 }}>
+            <Text style={styles.etaLocationText} numberOfLines={1}>
+              {deliveryLocation}
+            </Text>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: COLORS.primary }}>Change</Text>
+          </View>
+        </TouchableOpacity>
 
         {/* Itemized Cart List */}
         <View style={styles.itemsCard}>

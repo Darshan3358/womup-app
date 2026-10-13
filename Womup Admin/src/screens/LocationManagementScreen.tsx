@@ -884,7 +884,7 @@ export const LocationManagementScreen: React.FC = () => {
                                     {st.name}
                                   </Text>
                                   <Text style={styles.assignedStoreMetaText}>
-                                    Code: {st.code || st.loginId}
+                                    Code: {st.code || st.loginId} · 📍 {st.location?.coordinates ? `${st.location.coordinates[1]?.toFixed(4)}, ${st.location.coordinates[0]?.toFixed(4)}` : st.latitude ? `${st.latitude}, ${st.longitude}` : 'GPS Linked'}
                                   </Text>
                                 </View>
                               </View>

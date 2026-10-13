@@ -2,6 +2,7 @@ import {
   Injectable,
   BadRequestException,
   UnauthorizedException,
+  NotFoundException,
   Logger,
   ConflictException,
 } from '@nestjs/common';
@@ -14,7 +15,7 @@ import * as crypto from 'crypto';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { OtpVerification, OtpVerificationDocument } from './schemas/otp.schema';
 import { RefreshToken, RefreshTokenDocument } from './schemas/refresh-token.schema';
-import { SendOtpDto, VerifyOtpDto, RegisterDto, RegisterRiderDto } from './dto/auth.dto';
+import { SendOtpDto, VerifyOtpDto, RegisterDto, RegisterRiderDto, GoogleAuthDto, LinkPhoneDto } from './dto/auth.dto';
 import { CoinTransaction, CoinTransactionDocument } from '../coins/schemas/coin-transaction.schema';
 import { DeliveryPartner, DeliveryPartnerDocument } from '../delivery/schemas/delivery-partner.schema';
 import { EmailService } from './email.service';
@@ -635,6 +636,41 @@ export class AuthService {
     return this.generateTokens(user);
   }
 
+  async getTokenForUser(identifier: string) {
+    const clean = (identifier || '').trim().toLowerCase();
+    const cleanPhone = clean.replace(/\D/g, '').slice(-10);
+    const query: any[] = [
+      { email: clean },
+      { phone: clean },
+    ];
+    if (cleanPhone) {
+      query.push({ phone: `+91${cleanPhone}` });
+      query.push({ phone: cleanPhone });
+    }
+    if (Types.ObjectId.isValid(identifier)) {
+      query.push({ _id: new Types.ObjectId(identifier) });
+    }
+
+    const user = await this.userModel.findOne({ $or: query });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const tokens = await this.generateTokens(user);
+    return {
+      success: true,
+      user: {
+        id: user._id.toString(),
+        name: user.name,
+        phone: user.phone,
+        email: user.email,
+        walletBalance: user.walletBalance,
+        shoppingCoins: user.shoppingCoins,
+      },
+      ...tokens,
+    };
+  }
+
   private async generateTokens(user: UserDocument) {
     const payload = {
       sub: user._id.toString(),
@@ -673,6 +709,142 @@ export class AuthService {
       refreshToken,
       tokenType: 'Bearer',
       expiresIn: 900,
+    };
+  }
+
+  async googleLogin(dto: GoogleAuthDto) {
+    let email = (dto.email || '').trim().toLowerCase();
+    let name = dto.name?.trim() || '';
+    let googleId = dto.googleId || '';
+    let photoUrl = dto.photoUrl || '';
+
+    // If credential (Google ID token) provided, try decoding safely
+    if (dto.credential) {
+      try {
+        const parts = dto.credential.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+          if (payload.email) email = payload.email.toLowerCase();
+          if (payload.name && !name) name = payload.name;
+          if (payload.sub && !googleId) googleId = payload.sub;
+          if (payload.picture && !photoUrl) photoUrl = payload.picture;
+        }
+      } catch (e) {
+        this.logger.warn(`Failed to parse Google credential token: ${e}`);
+      }
+    }
+
+    if (!email) {
+      throw new BadRequestException('A valid Google email address is required');
+    }
+
+    let user = await this.userModel.findOne({
+      $or: [
+        ...(googleId ? [{ googleId }] : []),
+        { email },
+      ],
+    });
+
+    let isNewUser = false;
+
+    if (user) {
+      // Existing user: Link googleId if missing
+      let modified = false;
+      if (googleId && !user.googleId) {
+        user.googleId = googleId;
+        modified = true;
+      }
+      if (photoUrl && !user.avatar) {
+        user.avatar = photoUrl;
+        modified = true;
+      }
+      if (!user.isEmailVerified) {
+        user.isEmailVerified = true;
+        modified = true;
+      }
+      if (modified) {
+        await user.save();
+      }
+    } else {
+      // New user registration via Google
+      isNewUser = true;
+      user = await this.userModel.create({
+        name: name || email.split('@')[0],
+        email,
+        googleId: googleId || undefined,
+        avatar: photoUrl || undefined,
+        role: Role.CUSTOMER,
+        authProvider: 'GOOGLE',
+        shoppingCoins: 50, // Welcome reward coins
+        isEmailVerified: true,
+        isPhoneVerified: false,
+      });
+    }
+
+    const tokens = await this.generateTokens(user);
+
+    return {
+      isNewUser,
+      requiresPhone: !user.phone,
+      message: user.phone ? 'Login successful' : 'Please link mobile number for delivery updates',
+      user: {
+        id: user._id.toString(),
+        name: user.name,
+        phone: user.phone || '',
+        email: user.email,
+        avatar: user.avatar,
+        shoppingCoins: user.shoppingCoins,
+        walletBalance: user.walletBalance,
+        role: user.role,
+        googleId: user.googleId,
+        authProvider: user.authProvider || 'GOOGLE',
+      },
+      ...tokens,
+    };
+  }
+
+  async linkPhone(dto: LinkPhoneDto, currentUserId?: string) {
+    const rawPhone = dto.phone.replace(/\D/g, '');
+    const cleanPhone = rawPhone.length === 10 ? `+91${rawPhone}` : rawPhone.startsWith('91') ? `+${rawPhone}` : `+91${rawPhone}`;
+
+    if (rawPhone.length < 10) {
+      throw new BadRequestException('Please provide a valid 10-digit mobile number');
+    }
+
+    const targetId = dto.userId || currentUserId;
+    if (!targetId) {
+      throw new BadRequestException('User identification required to link phone number');
+    }
+
+    const user = await this.userModel.findById(targetId);
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    // Check if another user already has this phone number
+    const existing = await this.userModel.findOne({ phone: cleanPhone });
+    if (existing && existing._id.toString() !== user._id.toString()) {
+      user.shoppingCoins = Math.max(user.shoppingCoins || 0, existing.shoppingCoins || 0);
+      user.walletBalance = Math.max(user.walletBalance || 0, existing.walletBalance || 0);
+      await this.userModel.deleteOne({ _id: existing._id });
+    }
+
+    user.phone = cleanPhone;
+    user.isPhoneVerified = true;
+    await user.save();
+
+    return {
+      success: true,
+      message: 'Mobile number linked successfully',
+      user: {
+        id: user._id.toString(),
+        name: user.name,
+        phone: user.phone,
+        email: user.email,
+        shoppingCoins: user.shoppingCoins,
+        walletBalance: user.walletBalance,
+        role: user.role,
+      },
     };
   }
 }
