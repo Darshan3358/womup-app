@@ -150,6 +150,12 @@ export class Vendor {
   @Prop({ default: 0 })
   totalEarned: number;
 
+  @Prop({ default: 0 })
+  totalCollections: number;
+
+  @Prop({ default: 0 })
+  totalCommissionPaid: number;
+
   @Prop({ default: '' })
   qrCodeData: string;
 }

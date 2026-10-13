@@ -52,6 +52,25 @@ export class VendorTransaction {
 
   @Prop({ required: false })
   verifiedAt?: Date;
+
+  // Razorpay Payment Gateway Tracking
+  @Prop({ required: false, sparse: true, index: true })
+  razorpayOrderId?: string;
+
+  @Prop({ required: false, sparse: true })
+  razorpayPaymentId?: string;
+
+  @Prop({ required: false })
+  razorpaySignature?: string;
+
+  @Prop({ default: 'INTERNAL', enum: ['RAZORPAY', 'INTERNAL', 'CASH'] })
+  paymentGateway: string;
+
+  @Prop({ default: 'CREATED', enum: ['CREATED', 'AUTHORIZED', 'CAPTURED', 'FAILED', 'REFUNDED'] })
+  gatewayStatus: string;
+
+  @Prop({ type: Object, default: {} })
+  gatewayResponse?: Record<string, any>;
 }
 
 export const VendorTransactionSchema = SchemaFactory.createForClass(VendorTransaction);

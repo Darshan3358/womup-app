@@ -260,4 +260,34 @@ export const LocalShopApi = {
   async getCoinHistory(): Promise<CoinLedgerItem[]> {
     return [];
   },
+
+  // 8. Razorpay Payment Gateway (Test Mode)
+  async createRazorpayOrder(vendorId: string, billAmount: number, extra?: any): Promise<any> {
+    try {
+      const res = await api.post<any>('/payments/create-order', {
+        vendorId,
+        billAmount,
+        paymentMethod: 'UPI',
+        ...extra,
+      });
+      return res;
+    } catch (err: any) {
+      return { success: false, message: err?.message || 'Failed to create Razorpay order' };
+    }
+  },
+
+  async verifyRazorpayPayment(payload: {
+    razorpayOrderId: string;
+    razorpayPaymentId: string;
+    razorpaySignature: string;
+    vendorId?: string;
+    billAmount?: number;
+  }): Promise<any> {
+    try {
+      const res = await api.post<any>('/payments/verify', payload);
+      return res;
+    } catch (err: any) {
+      return { success: false, message: err?.message || 'Payment signature verification failed' };
+    }
+  },
 };

@@ -144,6 +144,10 @@ export const VendorAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           setActiveModalRequest((prev) => (prev?.id === cancelledId ? null : prev));
           setStats((prev) => ({ ...prev, pendingCount: Math.max(0, prev.pendingCount - 1) }));
         },
+        (paymentData: any) => {
+          console.log('[Vendor Auth] Received real-time Razorpay UPI payment:', paymentData);
+          refreshData();
+        },
       );
     } else {
       vendorSocket.disconnect();

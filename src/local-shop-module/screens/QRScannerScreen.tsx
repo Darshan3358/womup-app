@@ -60,6 +60,10 @@ export const QRScannerScreen: React.FC<QRScannerScreenProps> = ({
   const [earnedCoinsFinal, setEarnedCoinsFinal] = useState(0);
   const [cashPaidFinal, setCashPaidFinal] = useState(0);
   const [coinsUsedFinal, setCoinsUsedFinal] = useState(0);
+  const [razorpayOrder, setRazorpayOrder] = useState<any>(null);
+  const [isRazorpayModalOpen, setIsRazorpayModalOpen] = useState(false);
+  const [razorpayPaymentIdFinal, setRazorpayPaymentIdFinal] = useState('');
+  const [selectedTestUpi, setSelectedTestUpi] = useState<'success@razorpay' | 'failure@razorpay' | 'card'>('success@razorpay');
 
   // Fetch customer coin balance & app download wallet balance
   useEffect(() => {
@@ -212,14 +216,79 @@ export const QRScannerScreen: React.FC<QRScannerScreenProps> = ({
       return;
     }
 
+    // 3. Counter UPI Method: Razorpay Payment Gateway Integration
+    if (paymentMethod === 'UPI') {
+      setIsConfirming(true);
+      try {
+        const orderRes = await LocalShopApi.createRazorpayOrder(
+          selectedVendor.id,
+          numAmount,
+          {
+            vendorCode: (selectedVendor as any).vendorCode || 'VND001',
+            customerName: 'Darshan Thanki',
+          }
+        );
+
+        setIsConfirming(false);
+
+        if (!orderRes.success || !orderRes.data) {
+          Alert.alert('Razorpay Order Failed', orderRes.message || 'Could not initiate Razorpay order.');
+          return;
+        }
+
+        const rzpData = orderRes.data;
+        setRazorpayOrder(rzpData);
+
+        // If on web and window.Razorpay SDK is loaded, open native Razorpay checkout
+        if (Platform.OS === 'web' && typeof (window as any).Razorpay !== 'undefined') {
+          const options = {
+            key: rzpData.keyId,
+            amount: rzpData.amount,
+            currency: 'INR',
+            name: 'WormUp Store Payment',
+            description: `Payment to ${rzpData.vendorName || 'Vendor'}`,
+            order_id: rzpData.razorpayOrderId,
+            prefill: {
+              name: rzpData.customerName || 'Customer',
+              contact: rzpData.customerPhone || '9876543210',
+              email: rzpData.prefillEmail || 'customer@wormup.in',
+            },
+            theme: { color: '#071B52' },
+            handler: async (resp: any) => {
+              await handleRazorpaySuccess(
+                resp.razorpay_order_id,
+                resp.razorpay_payment_id,
+                resp.razorpay_signature
+              );
+            },
+            modal: {
+              ondismiss: () => setIsConfirming(false),
+            },
+          };
+          const rzp = new (window as any).Razorpay(options);
+          rzp.open();
+          return;
+        }
+
+        // Open in-app Razorpay Test Checkout Modal (Mobile & Web)
+        setIsRazorpayModalOpen(true);
+        return;
+      } catch (err: any) {
+        setIsConfirming(false);
+        Alert.alert('Razorpay Error', err?.message || 'Could not initiate Razorpay checkout');
+        return;
+      }
+    }
+
+    // 4. Coins, Income Wallet, and Cash at Store flows
     setIsConfirming(true);
     try {
       const actualCoinsUsed = paymentMethod === 'COIN' ? coinsApplied : 0;
       const actualWalletUsed = paymentMethod === 'WALLET' ? numAmount : 0;
       const actualCashToCollect = paymentMethod === 'COIN' ? remainingCash : paymentMethod === 'CASH' ? numAmount : 0;
-      const actualUpiAmount = paymentMethod === 'UPI' ? numAmount : 0;
+      const actualUpiAmount = 0;
 
-      // 1. Submit real-time collection request to vendor terminal
+      // Submit real-time collection request to vendor terminal
       try {
         await LocalShopApi.submitCollectionRequest({
           vendorCode: (selectedVendor as any).vendorCode || selectedVendor.id || 'VND001',
@@ -237,7 +306,7 @@ export const QRScannerScreen: React.FC<QRScannerScreenProps> = ({
         console.warn('Real-time collection notice error:', wsErr);
       }
 
-      // 2. Finalize payment record
+      // Finalize payment record
       await LocalShopApi.payVendorQR({
         vendorId: selectedVendor.id,
         amount: numAmount,
@@ -255,6 +324,55 @@ export const QRScannerScreen: React.FC<QRScannerScreenProps> = ({
       setIsConfirming(false);
       Alert.alert('Payment Failed', 'Could not process payment. Please try again.');
     }
+  };
+
+  const handleRazorpaySuccess = async (orderId: string, paymentId: string, signature: string) => {
+    setIsConfirming(true);
+    try {
+      const verifyRes = await LocalShopApi.verifyRazorpayPayment({
+        razorpayOrderId: orderId,
+        razorpayPaymentId: paymentId,
+        razorpaySignature: signature,
+        vendorId: selectedVendor?.id,
+        billAmount: numAmount,
+      });
+
+      setIsConfirming(false);
+      setIsRazorpayModalOpen(false);
+      setIsManualModalOpen(false);
+
+      if (verifyRes.success) {
+        setRazorpayPaymentIdFinal(paymentId);
+        setEarnedCoinsFinal(verifyRes.data?.coinsEarned || maxEligibleCoins);
+        setCashPaidFinal(0);
+        setCoinsUsedFinal(0);
+        setShowSuccessBlast(true);
+      } else {
+        Alert.alert('Verification Failed', verifyRes.message || 'Signature check failed');
+      }
+    } catch {
+      setIsConfirming(false);
+      Alert.alert('Payment Verification Failed', 'Could not verify payment with backend.');
+    }
+  };
+
+  const handleProcessRazorpayTest = async () => {
+    if (!razorpayOrder) return;
+
+    if (selectedTestUpi === 'failure@razorpay') {
+      Alert.alert('Razorpay Payment Failed', 'Payment was declined by bank (Simulated failure@razorpay).');
+      setIsRazorpayModalOpen(false);
+      return;
+    }
+
+    const testPaymentId = `pay_${Date.now().toString().slice(-8)}${Math.random().toString(36).substring(2, 6)}`;
+    const testSignature = `sig_${Date.now()}_sha256_valid`;
+
+    await handleRazorpaySuccess(
+      razorpayOrder.razorpayOrderId,
+      testPaymentId,
+      testSignature
+    );
   };
 
   const handleDone = () => {
@@ -831,6 +949,137 @@ export const QRScannerScreen: React.FC<QRScannerScreenProps> = ({
         </View>
       </Modal>
 
+      {/* Razorpay Test Mode Checkout Modal */}
+      <Modal
+        visible={isRazorpayModalOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsRazorpayModalOpen(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalSheet, { paddingBottom: insets.bottom + 20, backgroundColor: '#FFFFFF' }]}>
+            <View style={styles.sheetHandle} />
+
+            {/* Razorpay Header with Test Mode Badge */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{ width: 34, height: 34, borderRadius: 8, backgroundColor: '#0C2340', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name="card" size={20} color="#3395FF" />
+                </View>
+                <View>
+                  <Text style={{ fontSize: 16, fontWeight: '800', color: '#0C2340' }}>Razorpay</Text>
+                  <Text style={{ fontSize: 11, color: '#64748B' }}>Secure Payment Gateway</Text>
+                </View>
+              </View>
+
+              <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: '#F59E0B' }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#B45309' }}>TEST MODE</Text>
+              </View>
+            </View>
+
+            {/* Merchant & Amount Box */}
+            <View style={{ backgroundColor: '#F8FAFC', borderRadius: 12, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: '#E2E8F0', gap: 4 }}>
+              <Text style={{ fontSize: 13, color: '#64748B' }}>Paying to {razorpayOrder?.vendorName || selectedVendor?.name || 'Local Store'}</Text>
+              <Text style={{ fontSize: 28, fontWeight: '900', color: '#0F172A' }}>₹{numAmount.toLocaleString()}</Text>
+              <Text style={{ fontSize: 11, color: '#94A3B8' }}>Order ID: {razorpayOrder?.razorpayOrderId}</Text>
+            </View>
+
+            <Text style={{ fontSize: 12, fontWeight: '700', color: '#334155', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Select Test Payment Method</Text>
+
+            {/* Test Option 1: success@razorpay */}
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                padding: 12,
+                borderRadius: 10,
+                borderWidth: 1.5,
+                borderColor: selectedTestUpi === 'success@razorpay' ? '#10B981' : '#E2E8F0',
+                backgroundColor: selectedTestUpi === 'success@razorpay' ? '#ECFDF5' : '#FFFFFF',
+                marginBottom: 8,
+                gap: 10,
+              }}
+              onPress={() => setSelectedTestUpi('success@razorpay')}
+            >
+              <Ionicons name="phone-portrait-outline" size={20} color="#10B981" />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A' }}>UPI: success@razorpay</Text>
+                <Text style={{ fontSize: 11, color: '#059669' }}>Simulates instant successful UPI payment</Text>
+              </View>
+              {selectedTestUpi === 'success@razorpay' && <Ionicons name="checkmark-circle" size={20} color="#10B981" />}
+            </TouchableOpacity>
+
+            {/* Test Option 2: Test Card */}
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                padding: 12,
+                borderRadius: 10,
+                borderWidth: 1.5,
+                borderColor: selectedTestUpi === 'card' ? '#3B82F6' : '#E2E8F0',
+                backgroundColor: selectedTestUpi === 'card' ? '#EFF6FF' : '#FFFFFF',
+                marginBottom: 8,
+                gap: 10,
+              }}
+              onPress={() => setSelectedTestUpi('card')}
+            >
+              <Ionicons name="card-outline" size={20} color="#3B82F6" />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A' }}>Card: 4111 1111 1111 1111</Text>
+                <Text style={{ fontSize: 11, color: '#2563EB' }}>Test Visa / Mastercard Success</Text>
+              </View>
+              {selectedTestUpi === 'card' && <Ionicons name="checkmark-circle" size={20} color="#3B82F6" />}
+            </TouchableOpacity>
+
+            {/* Test Option 3: failure@razorpay */}
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                padding: 12,
+                borderRadius: 10,
+                borderWidth: 1.5,
+                borderColor: selectedTestUpi === 'failure@razorpay' ? '#EF4444' : '#E2E8F0',
+                backgroundColor: selectedTestUpi === 'failure@razorpay' ? '#FEF2F2' : '#FFFFFF',
+                marginBottom: 16,
+                gap: 10,
+              }}
+              onPress={() => setSelectedTestUpi('failure@razorpay')}
+            >
+              <Ionicons name="alert-circle-outline" size={20} color="#EF4444" />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A' }}>UPI: failure@razorpay</Text>
+                <Text style={{ fontSize: 11, color: '#DC2626' }}>Simulates bank decline / failed payment</Text>
+              </View>
+              {selectedTestUpi === 'failure@razorpay' && <Ionicons name="checkmark-circle" size={20} color="#EF4444" />}
+            </TouchableOpacity>
+
+            {/* Action Buttons */}
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TouchableOpacity
+                style={{ flex: 1, paddingVertical: 14, borderRadius: 10, backgroundColor: '#F1F5F9', alignItems: 'center' }}
+                onPress={() => setIsRazorpayModalOpen(false)}
+              >
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#475569' }}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{ flex: 2, paddingVertical: 14, borderRadius: 10, backgroundColor: '#0C2340', alignItems: 'center' }}
+                onPress={handleProcessRazorpayTest}
+                disabled={isConfirming}
+              >
+                {isConfirming ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#FFFFFF' }}>Pay ₹{numAmount.toLocaleString()} via Razorpay →</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Success Celebration Blast Modal */}
       <Modal visible={showSuccessBlast} transparent animationType="fade">
         <View style={styles.successBackdrop}>
@@ -846,10 +1095,25 @@ export const QRScannerScreen: React.FC<QRScannerScreenProps> = ({
                 ? `Paid ₹${numAmount} from Income Wallet to ${selectedVendor?.name || selectedVendor?.storeName || 'Merchant'}`
                 : paymentMethod === 'CASH'
                 ? `Paid ₹${cashPaidFinal} Cash to ${selectedVendor?.name || selectedVendor?.storeName || 'Merchant'}`
-                : `Paid ₹${numAmount} via UPI to ${selectedVendor?.name || selectedVendor?.storeName || 'Merchant'}`}
+                : `Paid ₹${numAmount} via UPI (Razorpay) to ${selectedVendor?.name || selectedVendor?.storeName || 'Merchant'}`}
             </Text>
 
-            {coinsUsedFinal > 0 && (
+            {paymentMethod === 'UPI' && razorpayPaymentIdFinal !== '' && (
+              <View style={{ backgroundColor: '#F1F5F9', padding: 8, borderRadius: 8, marginVertical: 6, width: '100%', alignItems: 'center' }}>
+                <Text style={{ fontSize: 11, color: '#64748B' }}>Razorpay Payment ID: {razorpayPaymentIdFinal}</Text>
+              </View>
+            )}
+
+            {paymentMethod === 'UPI' && (
+              <View style={[styles.earnedRewardBox, { backgroundColor: '#ECFDF5', borderColor: '#10B981', marginVertical: 8 }]}>
+                <Ionicons name="sparkles" size={18} color="#059669" />
+                <Text style={[styles.earnedRewardText, { color: '#065F46' }]}>
+                  🎁 You earned ₹{earnedCoinsFinal} Shopping Coins!
+                </Text>
+              </View>
+            )}
+
+            {coinsUsedFinal > 0 && paymentMethod === 'COIN' && (
               <View style={styles.earnedRewardBox}>
                 <Ionicons name="sparkles" size={18} color="#D97706" />
                 <Text style={styles.earnedRewardText}>

@@ -19,6 +19,7 @@ class VendorSocketService {
     vendorId: string,
     onNewRequest: (req: CollectionRequest) => void,
     onRequestCancelled?: (requestId: string) => void,
+    onPaymentReceived?: (data: any) => void,
   ) {
     this.currentVendorId = vendorId;
     if (this.socket) {
@@ -46,6 +47,13 @@ class VendorSocketService {
         console.log('[Vendor Socket] Request cancelled:', payload);
         if (onRequestCancelled && payload?.requestId) {
           onRequestCancelled(payload.requestId);
+        }
+      });
+
+      this.socket.on('payment_received', (data: any) => {
+        console.log('[Vendor Socket] Incoming Razorpay UPI payment received:', data);
+        if (onPaymentReceived) {
+          onPaymentReceived(data);
         }
       });
     } catch (e) {
