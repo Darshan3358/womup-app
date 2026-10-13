@@ -1206,19 +1206,6 @@ export const BlinkitProfileScreen: React.FC = () => {
               <Ionicons name="cloud-upload-outline" size={20} color={COLORS.primary} style={{ marginRight: 6 }} />
               <Text style={styles.outlineActionBtnText}>Upload New Prescription</Text>
             </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.88}
-              onPress={() => {
-                setPrescriptionsModalVisible(false);
-                setActiveScreen('Blinkit_Print');
-              }}
-              style={[styles.primaryGradBtn, { marginTop: 10 }]}
-            >
-              <LinearGradient colors={GRADIENTS.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.gradBtnInner}>
-                <Text style={styles.gradBtnText}>Print Documents or Prescriptions (₹3/pg)</Text>
-              </LinearGradient>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>

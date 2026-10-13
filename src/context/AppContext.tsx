@@ -259,7 +259,6 @@ const TAB_SCREENS: ScreenId[] = [
   'Blinkit_Home',
   'Blinkit_OrderAgain',
   'Blinkit_Categories',
-  'Blinkit_Print',
   'C12_Home',
   'C13_Category',
   'C19_Cart',

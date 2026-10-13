@@ -85,7 +85,6 @@ export const RootNavigator: React.FC = () => {
     activeScreen === 'Blinkit_Home' ||
     activeScreen === 'Blinkit_OrderAgain' ||
     activeScreen === 'Blinkit_Categories' ||
-    activeScreen === 'Blinkit_Print' ||
     activeScreen === 'Blinkit_Profile' ||
     activeScreen === 'C12_Home' ||
     activeScreen === 'C13_Category' ||
@@ -106,8 +105,6 @@ export const RootNavigator: React.FC = () => {
       case 'Blinkit_Categories':
       case 'C13_Category':
         return 'Categories';
-      case 'Blinkit_Print':
-        return 'Print';
       case 'Blinkit_Profile':
       case 'C26_Account':
         return 'Profile';
@@ -131,9 +128,6 @@ export const RootNavigator: React.FC = () => {
       case 'Categories':
         setActiveScreen('Blinkit_Categories');
         break;
-      case 'Print':
-        setActiveScreen('Blinkit_Print');
-        break;
       case 'Profile':
         setActiveScreen('Blinkit_Profile');
         break;
@@ -154,7 +148,7 @@ export const RootNavigator: React.FC = () => {
       case 'Blinkit_OrderAgain':
         return <BlinkitOrderAgainScreen />;
       case 'Blinkit_Print':
-        return <BlinkitPrintScreen />;
+        return <BlinkitHomeScreen />;
       case 'Blinkit_Profile':
         return <BlinkitProfileScreen />;
       case 'Blinkit_Money':

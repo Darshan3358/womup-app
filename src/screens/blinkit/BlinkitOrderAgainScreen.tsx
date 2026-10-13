@@ -241,44 +241,9 @@ export const BlinkitOrderAgainScreen: React.FC = () => {
         variant="gradient"
         etaLabel="Delivery in"
         etaTime="9 minutes"
-        searchPlaceholder='Search "past items, prints, milk"'
+        searchPlaceholder='Search "past items, snacks, milk"'
         showCategoryTabs={false}
-      >
-        {/* Integrated Order Type Tabs inside Navy Header (SRS Section 12) */}
-        <View style={styles.orderTypeTabs}>
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => setActiveTab('grocery')}
-            style={[styles.orderTypeTab, activeTab === 'grocery' && styles.orderTypeTabActive]}
-          >
-            <Feather
-              name="shopping-bag"
-              size={15}
-              color={activeTab === 'grocery' ? '#F23D9B' : 'rgba(255, 255, 255, 0.75)'}
-              style={{ marginRight: 6 }}
-            />
-            <Text style={[styles.orderTypeTabText, activeTab === 'grocery' && styles.orderTypeTabTextActive]}>
-              Grocery Orders ({displayOrders.length})
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => setActiveTab('print')}
-            style={[styles.orderTypeTab, activeTab === 'print' && styles.orderTypeTabActive]}
-          >
-            <Feather
-              name="printer"
-              size={15}
-              color={activeTab === 'print' ? '#F23D9B' : 'rgba(255, 255, 255, 0.75)'}
-              style={{ marginRight: 6 }}
-            />
-            <Text style={[styles.orderTypeTabText, activeTab === 'print' && styles.orderTypeTabTextActive]}>
-              Print Orders ({printOrders?.length || 0})
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </BlinkitHeader>
+      />
 
       <ScrollView
         showsVerticalScrollIndicator={false}

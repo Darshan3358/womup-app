@@ -17,7 +17,6 @@ export type BlinkitTabKey =
   | 'Local Shop'
   | 'Order Again'
   | 'Categories'
-  | 'Print'
   | 'Profile'
   | 'App';
 
@@ -38,7 +37,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
 
   const isSmallDevice = width <= 360;
 
-  // 5 clean tabs: Home, Order Again, Print, Profile, App
+  // 5 clean tabs: Home, Order Again, Categories, Profile, App
   const tabs: {
     key: BlinkitTabKey;
     label: string;
@@ -47,7 +46,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
   }[] = [
     { key: 'Home', label: 'Home', icon: 'home' },
     { key: 'Order Again', label: 'Order Again', icon: 'shopping-basket' },
-    { key: 'Print', label: 'Print', icon: 'printer' },
+    { key: 'Categories', label: 'Categories', icon: 'grid' },
     { key: 'Profile', label: 'Profile', icon: 'user' },
     { key: 'Local Shop', label: 'App', isWomupAppButton: true },
   ];
