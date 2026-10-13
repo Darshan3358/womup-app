@@ -32,6 +32,16 @@ export const S08_CreateAccountScreen: React.FC = () => {
   const [fullName, setFullName] = useState(user.fullName || '');
   const [email, setEmail] = useState(user.email || '');
   const [phone, setPhone] = useState(user.phoneNumber || '');
+  const [pincode, setPincode] = useState(user.registrationPincode || '');
+
+  // Registration Timing State
+  const [timingAllowed, setTimingAllowed] = useState(true);
+  const [timingMessage, setTimingMessage] = useState('');
+
+  // Pincode Serviceability State
+  const [pincodeChecking, setPincodeChecking] = useState(false);
+  const [pincodeServiceable, setPincodeServiceable] = useState<boolean | null>(null);
+  const [pincodeStatusText, setPincodeStatusText] = useState('');
 
   // Service City State
   const [cities, setCities] = useState<CityItem[]>([]);
@@ -45,9 +55,19 @@ export const S08_CreateAccountScreen: React.FC = () => {
     email?: string;
     phone?: string;
     city?: string;
+    pincode?: string;
+    timing?: string;
   }>({});
 
   useEffect(() => {
+    // Check registration hours (10:00 PM to 6:00 AM IST)
+    AuthService.checkRegistrationTiming().then((res) => {
+      setTimingAllowed(res.allowed);
+      if (!res.allowed) {
+        setTimingMessage(res.message);
+      }
+    });
+
     // Fetch active cities configured by Admin
     AuthService.getCities().then((fetchedCities) => {
       if (fetchedCities && fetchedCities.length > 0) {
@@ -68,14 +88,49 @@ export const S08_CreateAccountScreen: React.FC = () => {
     });
   }, []);
 
+  // Debounced Pincode Serviceability Check
+  useEffect(() => {
+    const trimmed = pincode.trim();
+    if (trimmed.length === 6) {
+      setPincodeChecking(true);
+      const timer = setTimeout(() => {
+        AuthService.checkPincode(trimmed).then((res) => {
+          setPincodeChecking(false);
+          setPincodeServiceable(res.serviceable);
+          setPincodeStatusText(res.message);
+          if (res.serviceable && res.city) {
+            setSelectedCityName(res.city);
+          }
+        });
+      }, 400);
+      return () => clearTimeout(timer);
+    } else {
+      setPincodeChecking(false);
+      setPincodeServiceable(null);
+      setPincodeStatusText('');
+    }
+  }, [pincode]);
+
   const handleContinue = () => {
-    const newErrors: { name?: string; email?: string; phone?: string; city?: string } = {};
-    if (!fullName.trim()) newErrors.name = 'Please enter your full name';
+    const newErrors: { name?: string; email?: string; phone?: string; city?: string; pincode?: string; timing?: string } = {};
+
+    if (!timingAllowed) {
+      newErrors.timing = timingMessage || 'New registrations are closed between 10:00 PM and 6:00 AM IST.';
+    }
+
+    if (!fullName.trim()) newErrors.name = 'Please enter your full name as per Aadhaar';
     if (!email.trim() || !email.includes('@')) newErrors.email = 'Please enter a valid email address';
 
     const cleanPhone = phone.replace(/\D/g, '');
     if (!cleanPhone || !/^[6-9]\d{9}$/.test(cleanPhone)) {
       newErrors.phone = 'Please enter a valid 10-digit mobile number';
+    }
+
+    const cleanPin = pincode.trim();
+    if (!cleanPin || cleanPin.length !== 6 || !/^\d{6}$/.test(cleanPin)) {
+      newErrors.pincode = 'Please enter a valid 6-digit Pincode';
+    } else if (pincodeServiceable === false) {
+      newErrors.pincode = pincodeStatusText || 'Service is not available in this pincode yet';
     }
 
     if (!selectedCityName || !selectedCityId) {
@@ -90,16 +145,24 @@ export const S08_CreateAccountScreen: React.FC = () => {
     setUser({
       ...user,
       fullName: fullName.trim(),
+      fullNameAsPerAadhaar: fullName.trim(),
       email: email.trim(),
       phoneNumber: cleanPhone,
+      registrationPincode: cleanPin,
+      registrationCity: selectedCityName,
       preferredCityId: selectedCityId || undefined,
       preferredCityName: selectedCityName,
+      shoppingCoins: user.shoppingCoins || 2000,
+      verificationStatus: user.verificationStatus || 'NON_VERIFIED',
     });
 
     setTempRegistration({
       fullName: fullName.trim(),
+      fullNameAsPerAadhaar: fullName.trim(),
       email: email.trim(),
       phone: cleanPhone,
+      pincode: cleanPin,
+      city: selectedCityName,
       preferredCityId: selectedCityId || undefined,
       preferredCityName: selectedCityName,
     });
@@ -136,13 +199,44 @@ export const S08_CreateAccountScreen: React.FC = () => {
           <Text style={styles.title}>Create Account</Text>
           <Text style={styles.subtitle}>Enter your details to complete your Worm Up profile</Text>
 
-          {/* Full Name Input */}
-          <Text style={styles.label}>Full Name</Text>
+          {/* Registration Hours Closed Warning Banner */}
+          {!timingAllowed && (
+            <View style={styles.timingClosedBanner}>
+              <View style={styles.timingClosedHeader}>
+                <Ionicons name="moon" size={20} color="#DC2626" />
+                <Text style={styles.timingClosedTitle}>Registrations Closed (10 PM - 6 AM IST)</Text>
+              </View>
+              <Text style={styles.timingClosedDesc}>
+                {timingMessage || 'New registrations are temporarily closed for the night. Please register after 6:00 AM IST. Existing users can log in anytime.'}
+              </Text>
+            </View>
+          )}
+
+          {/* ₹2,000 Shopping Coins Welcome Bonus Card */}
+          <View style={styles.coinsBonusBanner}>
+            <View style={styles.coinsBonusIconWrap}>
+              <Text style={styles.coinsBonusIcon}>🪙</Text>
+            </View>
+            <View style={styles.coinsBonusTextWrap}>
+              <Text style={styles.coinsBonusTitle}>₹2,000 Shopping Coins Bonus</Text>
+              <Text style={styles.coinsBonusSub}>
+                Instant ₹2,000 shopping bonus credited to your wallet upon joining!
+              </Text>
+            </View>
+          </View>
+
+          {/* Full Name (As per Aadhaar) Input */}
+          <View style={styles.labelRow}>
+            <Text style={styles.label}>
+              Full Name (As per Aadhaar) <Text style={styles.requiredAsterisk}>*</Text>
+            </Text>
+          </View>
+          <Text style={styles.fieldHelper}>Enter your legal name as on your Aadhaar card for verification</Text>
           <View style={[styles.inputContainer, errors.name ? styles.inputError : null]}>
             <Ionicons name="person-outline" size={18} color={COLORS.textMuted} style={styles.inputIcon} />
             <TextInput
               style={styles.input}
-              placeholder="Enter your name"
+              placeholder="e.g. Ramesh Kumar Patel"
               placeholderTextColor={COLORS.secondaryText}
               value={fullName}
               onChangeText={(text) => {
@@ -176,7 +270,9 @@ export const S08_CreateAccountScreen: React.FC = () => {
           {errors.email ? <Text style={styles.errorText}>{errors.email}</Text> : null}
 
           {/* Mobile Number Input */}
-          <Text style={styles.label}>Mobile Number</Text>
+          <Text style={styles.label}>
+            Mobile Number <Text style={styles.requiredAsterisk}>*</Text>
+          </Text>
           <View style={[styles.inputContainer, errors.phone ? styles.inputError : null]}>
             <View style={styles.countryPrefix}>
               <Text style={styles.prefixText}>🇮🇳 +91</Text>
@@ -196,6 +292,67 @@ export const S08_CreateAccountScreen: React.FC = () => {
             />
           </View>
           {errors.phone ? <Text style={styles.errorText}>{errors.phone}</Text> : null}
+
+          {/* Delivery Pincode Input with live service check */}
+          <View style={styles.labelRow}>
+            <Text style={styles.label}>
+              Delivery Pincode <Text style={styles.requiredAsterisk}>*</Text>
+            </Text>
+            {pincodeChecking && (
+              <Text style={styles.pincodeCheckingText}>Checking area...</Text>
+            )}
+          </View>
+          <View
+            style={[
+              styles.inputContainer,
+              errors.pincode ? styles.inputError : null,
+              pincodeServiceable === true ? styles.inputSuccess : null,
+            ]}
+          >
+            <Ionicons
+              name="location-outline"
+              size={18}
+              color={
+                pincodeServiceable === true
+                  ? COLORS.success
+                  : pincodeServiceable === false
+                  ? COLORS.error
+                  : COLORS.textMuted
+              }
+              style={styles.inputIcon}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="6-digit delivery pincode (e.g. 380015)"
+              placeholderTextColor={COLORS.secondaryText}
+              keyboardType="number-pad"
+              maxLength={6}
+              value={pincode}
+              onChangeText={(text) => {
+                const cleaned = text.replace(/\D/g, '');
+                setPincode(cleaned);
+                if (errors.pincode) setErrors({ ...errors, pincode: undefined });
+              }}
+            />
+            {pincodeServiceable === true && (
+              <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
+            )}
+            {pincodeServiceable === false && (
+              <Ionicons name="close-circle" size={20} color={COLORS.error} />
+            )}
+          </View>
+          {errors.pincode ? (
+            <Text style={styles.errorText}>{errors.pincode}</Text>
+          ) : pincodeStatusText ? (
+            <Text
+              style={[
+                styles.pincodeStatusHint,
+                pincodeServiceable ? styles.pincodeSuccessText : styles.pincodeFailText,
+              ]}
+            >
+              {pincodeStatusText}
+            </Text>
+          ) : null}
 
           {/* ── YOUR SERVICE CITY * ── */}
           <View style={styles.citySectionHeaderRow}>
@@ -372,7 +529,94 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     color: COLORS.textMuted,
+    marginBottom: SPACING.md,
+  },
+  timingClosedBanner: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1.5,
+    borderColor: '#F87171',
+    borderRadius: RADIUS.card,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+  },
+  timingClosedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  timingClosedTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#991B1B',
+  },
+  timingClosedDesc: {
+    fontSize: 12,
+    color: '#B91C1C',
+    lineHeight: 17,
+  },
+  coinsBonusBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1.5,
+    borderColor: '#86EFAC',
+    borderRadius: RADIUS.card,
+    padding: SPACING.md,
     marginBottom: SPACING.lg,
+    gap: 12,
+  },
+  coinsBonusIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coinsBonusIcon: {
+    fontSize: 22,
+  },
+  coinsBonusTextWrap: {
+    flex: 1,
+  },
+  coinsBonusTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#15803D',
+  },
+  coinsBonusSub: {
+    fontSize: 12,
+    color: '#166534',
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  fieldHelper: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginBottom: 6,
+    marginLeft: 2,
+  },
+  pincodeCheckingText: {
+    fontSize: 11,
+    color: COLORS.hotPink,
+    fontWeight: '500',
+  },
+  inputSuccess: {
+    borderColor: COLORS.success,
+    backgroundColor: '#F0FDF4',
+  },
+  pincodeStatusHint: {
+    fontSize: 11,
+    marginLeft: 4,
+    marginBottom: SPACING.sm,
+    fontWeight: '500',
+  },
+  pincodeSuccessText: {
+    color: '#15803D',
+  },
+  pincodeFailText: {
+    color: COLORS.error,
   },
   label: {
     fontSize: 13,

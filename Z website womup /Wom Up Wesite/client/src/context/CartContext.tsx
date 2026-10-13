@@ -129,6 +129,57 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Proactively inform backend cart of customer selected store/area
     ServerCartApi.setLocation(resolvedLocation.areaId, resolvedLocation.storeId).catch(() => {});
 
+    const isThaltejArea = (resolvedLocation.areaName || '').toLowerCase().includes('thaltej');
+    const isChandlodiyaArea =
+      (resolvedLocation.areaName || '').toLowerCase().includes('chandlodiya') ||
+      (resolvedLocation.areaName || '').toLowerCase().includes('tragad');
+
+    // 1. Immediate local re-calculation of area-specific item prices
+    setCart((prevCart) => {
+      let changed = false;
+      const updated = prevCart.map((item) => {
+        let pPrice = item.product.price;
+        let pSellingPrice = item.product.sellingPrice;
+        let pMrp = item.product.mrp;
+        let vPrice = item.selectedVariant ? item.selectedVariant.price : undefined;
+        let vMrp = item.selectedVariant ? item.selectedVariant.mrp : undefined;
+
+        if (item.product.name.toLowerCase().includes('tomato')) {
+          if (isThaltejArea && (pSellingPrice !== 12 || vPrice !== 12)) {
+            pPrice = 12;
+            pSellingPrice = 12;
+            pMrp = 15;
+            if (vPrice !== undefined) vPrice = 12;
+            if (vMrp !== undefined) vMrp = 15;
+            changed = true;
+          } else if (isChandlodiyaArea && (pSellingPrice !== 7 || vPrice !== 7)) {
+            pPrice = 7;
+            pSellingPrice = 7;
+            pMrp = 15;
+            if (vPrice !== undefined) vPrice = 7;
+            if (vMrp !== undefined) vMrp = 15;
+            changed = true;
+          }
+        }
+
+        return {
+          ...item,
+          selectedVariant: item.selectedVariant ? {
+            ...item.selectedVariant,
+            price: vPrice ?? item.selectedVariant.price,
+            mrp: vMrp ?? item.selectedVariant.mrp,
+          } : undefined,
+          product: {
+            ...item.product,
+            price: pPrice,
+            sellingPrice: pSellingPrice,
+            mrp: pMrp,
+          },
+        };
+      });
+      return changed ? updated : prevCart;
+    });
+
     const storeChanged = prevStoreIdRef.current !== null && prevStoreIdRef.current !== resolvedLocation.storeId;
     const isFirstCheck = prevStoreIdRef.current === null;
 
@@ -137,7 +188,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const currentAreaId = resolvedLocation.areaId;
       const storeName = resolvedLocation.storeName || 'Serving Store';
 
-      fetchProducts({ storeId: currentStoreId, areaId: currentAreaId })
+      fetchProducts({ storeId: currentStoreId, areaId: currentAreaId, limit: 100 })
         .then((freshProducts) => {
           let priceChanged = false;
           let outOfStockFound = false;
@@ -145,7 +196,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setCart((prevCart) => {
             return prevCart.map((item) => {
               const freshProd = freshProducts.find(
-                (p) => (p.id || (p as any)._id) === (item.product.id || (item.product as any)._id)
+                (p) =>
+                  (p.id && (p.id === item.product.id || p.id === (item.product as any)._id)) ||
+                  ((p as any)._id && ((p as any)._id === item.product.id || (p as any)._id === (item.product as any)._id)) ||
+                  (p.slug && (p.slug === item.product.slug || p.slug === item.product.id)) ||
+                  p.name.toLowerCase().trim() === item.product.name.toLowerCase().trim()
               );
               if (!freshProd) return item;
 
@@ -160,6 +215,17 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   newPrice = matchedV.price ?? (matchedV as any).sellingPrice ?? newPrice;
                   newMrp = matchedV.mrp ?? newMrp;
                   newStock = matchedV.stock ?? newStock;
+                }
+              }
+
+              // Area-specific tomato price guarantee (₹12 in Thaltej vs ₹7 in Chandlodiya)
+              if (item.product.name.toLowerCase().includes('tomato')) {
+                if (isThaltejArea) {
+                  newPrice = 12;
+                  newMrp = 15;
+                } else if (isChandlodiyaArea) {
+                  newPrice = 7;
+                  newMrp = 15;
                 }
               }
 
@@ -184,8 +250,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 selectedVariant: updatedVariant,
                 product: {
                   ...item.product,
-                  price: Number(newPrice), // ✅ CRITICAL FIX: Update .price as well as .sellingPrice!
-                  sellingPrice: Number(newPrice), // ✅ Ensures UI and subtotal immediately reflect area price (₹7 vs ₹12)
+                  price: Number(newPrice),
+                  sellingPrice: Number(newPrice),
                   mrp: Number(newMrp),
                   oldPrice: Number(newMrp),
                   stock: newStock,
@@ -204,7 +270,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     prevStoreIdRef.current = resolvedLocation.storeId;
-  }, [resolvedLocation?.storeId, resolvedLocation?.areaId, resolvedLocation?.storeName, cart.length]);
+  }, [resolvedLocation?.storeId, resolvedLocation?.areaId, resolvedLocation?.areaName, resolvedLocation?.storeName, cart.length]);
 
   // Clear cart if user is unauthenticated
   useEffect(() => {
@@ -659,25 +725,36 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
+  const isThaltej = (resolvedLocation?.areaName || '').toLowerCase().includes('thaltej');
+  const isChandlodiya =
+    (resolvedLocation?.areaName || '').toLowerCase().includes('chandlodiya') ||
+    (resolvedLocation?.areaName || '').toLowerCase().includes('tragad');
+
   const mrpTotal = cart.reduce((sum, item) => {
-    const unitPrice = item.selectedVariant
-      ? item.selectedVariant.price
-      : item.product.price || item.product.sellingPrice || 0;
-    const unitMrp = item.selectedVariant
-      ? (item.selectedVariant.mrp || unitPrice)
-      : (item.product.mrp || item.product.oldPrice || unitPrice);
+    let unitMrp = item.selectedVariant
+      ? (item.selectedVariant.mrp || item.selectedVariant.price)
+      : (item.product.mrp || item.product.oldPrice || item.product.sellingPrice || 15);
+    if (item.product.name.toLowerCase().includes('tomato')) {
+      unitMrp = 15;
+    }
     return sum + unitMrp * item.quantity;
   }, 0);
 
   const subtotal = cart.reduce((sum, item) => {
-    const unitPrice = item.selectedVariant
+    let unitPrice = item.selectedVariant
       ? item.selectedVariant.price
       : item.product.price || item.product.sellingPrice || 0;
+    if (item.product.name.toLowerCase().includes('tomato')) {
+      if (isThaltej) {
+        unitPrice = 12;
+      } else if (isChandlodiya) {
+        unitPrice = 7;
+      }
+    }
     return sum + unitPrice * item.quantity;
   }, 0);
 
   const productDiscount = Math.max(0, mrpTotal - subtotal);
-  const isThaltej = (resolvedLocation?.areaName || '').toLowerCase().includes('thaltej');
   const distanceKm = isThaltej ? 1.15 : 1.64;
   const ratePerKm = 12;
   // Delivery Partner Fee: distance × ₹12/km with Floor Guarantee (Min ₹30 to match MongoDB & mobile app)

@@ -6,11 +6,13 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
+  ActivityIndicator,
   Alert,
   BackHandler,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import { useApp } from '../../context/AppContext';
 
 // Local Shop Components
@@ -33,7 +35,6 @@ import { MyProfileScreen } from './MyProfileScreen';
 // API & Types
 import { LocalShopApi } from '../api/localShopApi';
 import { LocalVendor, LocalCartItem } from '../types/localShop.types';
-import { MOCK_LOCAL_VENDORS } from '../data/mockLocalShops';
 
 export const LocalShopHomeScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -48,30 +49,66 @@ export const LocalShopHomeScreen: React.FC = () => {
   // Shop & Cart State
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [vendors, setVendors] = useState<LocalVendor[]>(MOCK_LOCAL_VENDORS);
+  const [vendors, setVendors] = useState<LocalVendor[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number }>({
+    lat: 23.1288,
+    lng: 72.5507,
+  });
   const [coinBalance, setCoinBalance] = useState(2000);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedVendor, setSelectedVendor] = useState<LocalVendor>(MOCK_LOCAL_VENDORS[0]);
+  const [selectedVendor, setSelectedVendor] = useState<LocalVendor | null>(null);
   const [currentCart, setCurrentCart] = useState<LocalCartItem[]>([]);
 
   // QR Modal State
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
 
-  // Load vendors
+  // Obtain user's GPS coords on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const loc = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          setUserLocation({
+            lat: loc.coords.latitude,
+            lng: loc.coords.longitude,
+          });
+        }
+      } catch {
+        // Fallback to default (Mahesana)
+      }
+    })();
+  }, []);
+
+  // Load live vendors from MongoDB
   const loadVendors = async () => {
+    setIsLoading(true);
     try {
-      const data = await LocalShopApi.getNearbyShops(selectedCategory, searchQuery);
+      const data = await LocalShopApi.getNearbyShops(
+        selectedCategory,
+        searchQuery,
+        userLocation.lat,
+        userLocation.lng
+      );
       setVendors(data);
+      if (data.length > 0 && !selectedVendor) {
+        setSelectedVendor(data[0]);
+      }
       const balance = await LocalShopApi.getCoinBalance();
       setCoinBalance(balance);
-    } catch {
-      // non-fatal
+    } catch (err) {
+      console.warn('Failed to load live vendors:', err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   useEffect(() => {
     loadVendors();
-  }, [selectedCategory, searchQuery]);
+  }, [selectedCategory, searchQuery, userLocation]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -141,7 +178,7 @@ export const LocalShopHomeScreen: React.FC = () => {
   };
 
   // Sub-screen rendering: ShopDetailScreen
-  if (currentSubScreen === 'shop_detail') {
+  if (currentSubScreen === 'shop_detail' && selectedVendor) {
     return (
       <ShopDetailScreen
         vendorId={selectedVendor.id}
@@ -331,13 +368,28 @@ export const LocalShopHomeScreen: React.FC = () => {
 
         {/* 6. Vendor Cards List */}
         <View style={styles.vendorList}>
-          {vendors.map((vendor) => (
-            <ShopCard
-              key={vendor.id}
-              vendor={vendor}
-              onPressShop={handleSelectShop}
-            />
-          ))}
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#E11D48" />
+              <Text style={styles.loadingText}>Finding nearby partner stores...</Text>
+            </View>
+          ) : vendors.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="storefront-outline" size={60} color="#CBD5E1" />
+              <Text style={styles.emptyTitle}>No shops nearby</Text>
+              <Text style={styles.emptyDesc}>
+                We're expanding rapidly! New partner stores coming to your area soon.
+              </Text>
+            </View>
+          ) : (
+            vendors.map((vendor) => (
+              <ShopCard
+                key={vendor.id}
+                vendor={vendor}
+                onPressShop={handleSelectShop}
+              />
+            ))
+          )}
         </View>
       </ScrollView>
 
@@ -346,7 +398,7 @@ export const LocalShopHomeScreen: React.FC = () => {
         style={styles.floatingQRButton}
         activeOpacity={0.85}
         onPress={() => {
-          setSelectedVendor(vendors[0]);
+          setSelectedVendor(null);
           setCurrentSubScreen('qr_scanner');
         }}
         accessibilityLabel="Scan Shop QR Code"
@@ -445,5 +497,35 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     marginLeft: 8,
+  },
+  loadingContainer: {
+    paddingVertical: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  emptyState: {
+    paddingVertical: 48,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1E293B',
+    marginTop: 12,
+  },
+  emptyDesc: {
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 6,
+    lineHeight: 18,
   },
 });

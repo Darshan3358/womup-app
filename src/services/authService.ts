@@ -19,8 +19,12 @@ export const INITIAL_USER: UserProfile = {
   phoneNumber: '',
   email: '',
   referralCode: '',
-  shoppingCoins: 0,
+  shoppingCoins: 2000,
   savedAddresses: [],
+  verificationStatus: 'NON_VERIFIED',
+  pendingIncome: 0,
+  availableIncome: 0,
+  appDownloadIncome: 0,
 };
 
 export const AuthService = {
@@ -67,6 +71,92 @@ export const AuthService = {
     };
   },
 
+  async checkRegistrationTiming(): Promise<{
+    allowed: boolean;
+    currentHourIST: number;
+    currentTimeIST: string;
+    message: string;
+  }> {
+    try {
+      const res = await api.get<any>('/auth/registration-timing');
+      if (res.success && res.data) {
+        return res.data;
+      }
+    } catch (e) {
+      console.warn('Failed to check registration timing:', e);
+    }
+    // Fallback client-side IST calculation
+    const now = new Date();
+    const utcHours = now.getUTCHours();
+    const utcMinutes = now.getUTCMinutes();
+    let istHours = (utcHours + 5 + Math.floor((utcMinutes + 30) / 60)) % 24;
+    const allowed = !(istHours >= 22 || istHours < 6);
+    return {
+      allowed,
+      currentHourIST: istHours,
+      currentTimeIST: `${istHours.toString().padStart(2, '0')}:00 IST`,
+      message: allowed
+        ? 'Registration is open.'
+        : 'New user registrations are closed between 10:00 PM and 6:00 AM IST.',
+    };
+  },
+
+  async checkPincode(pincode: string): Promise<{
+    serviceable: boolean;
+    pincode: string;
+    city?: string;
+    state?: string;
+    areaNames?: string[];
+    message: string;
+  }> {
+    try {
+      const res = await api.get<any>(`/auth/check-pincode?pincode=${encodeURIComponent(pincode.trim())}`);
+      if (res.success && res.data) {
+        return res.data;
+      }
+      return {
+        serviceable: false,
+        pincode,
+        message: res.message || 'Service is not available in this pincode yet.',
+      };
+    } catch (err: any) {
+      return {
+        serviceable: false,
+        pincode,
+        message: err?.message || 'Error checking pincode serviceability',
+      };
+    }
+  },
+
+  async validateSponsor(sponsorCode: string): Promise<{
+    valid: boolean;
+    sponsorCode: string;
+    sponsorName: string;
+    isCompanyRoot?: boolean;
+    message: string;
+  }> {
+    try {
+      const code = sponsorCode.trim();
+      const res = await api.get<any>(`/auth/validate-sponsor?code=${encodeURIComponent(code)}`);
+      if (res.success && res.data) {
+        return res.data;
+      }
+      return {
+        valid: false,
+        sponsorCode: code,
+        sponsorName: '',
+        message: res.message || 'Invalid Sponsor ID',
+      };
+    } catch (err: any) {
+      return {
+        valid: false,
+        sponsorCode,
+        sponsorName: '',
+        message: err?.message || 'Error validating Sponsor ID',
+      };
+    }
+  },
+
   async register(
     verificationId: string,
     name: string,
@@ -74,14 +164,22 @@ export const AuthService = {
     referralCode?: string,
     preferredCityId?: string,
     preferredCityName?: string,
+    pincode?: string,
+    city?: string,
+    fullNameAsPerAadhaar?: string,
+    sponsorCode?: string,
   ): Promise<{ success: boolean; user?: any; token?: string; message?: string }> {
     const res = await api.post<any>('/auth/register', {
       verificationId,
       name,
       phone,
-      referralCode,
+      referralCode: referralCode || sponsorCode,
+      sponsorCode: sponsorCode || referralCode,
       preferredCityId,
       preferredCityName,
+      pincode,
+      city: city || preferredCityName,
+      fullNameAsPerAadhaar,
     });
     if (res.success && res.data) {
       if (res.data.accessToken) {
@@ -102,6 +200,36 @@ export const AuthService = {
       success: false,
       message: res.message || 'Registration failed',
     };
+  },
+
+  async verifyAadhaar(aadhaarNumber: string, fullNameAsPerAadhaar?: string): Promise<{
+    success: boolean;
+    user?: any;
+    message?: string;
+  }> {
+    const res = await api.post<any>('/users/verify-aadhaar', {
+      aadhaarNumber,
+      fullNameAsPerAadhaar,
+    });
+    if (res.success && res.data) {
+      return {
+        success: true,
+        user: res.data.user,
+        message: res.data.message || 'Aadhaar verified successfully',
+      };
+    }
+    return {
+      success: false,
+      message: res.message || 'Aadhaar verification failed',
+    };
+  },
+
+  async getWalletSummary(): Promise<any> {
+    const res = await api.get<any>('/users/wallet-summary');
+    if (res.success && res.data) {
+      return res.data;
+    }
+    return null;
   },
 
   async getCities(): Promise<{ id: string; name: string; code: string; state?: string }[]> {
@@ -149,8 +277,18 @@ export const AuthService = {
             fullName: res.data.name || '',
             phoneNumber: res.data.phone || '',
             email: res.data.email || '',
-            referralCode: res.data.referralCode || '',
-            shoppingCoins: res.data.shoppingCoins || 0,
+            referralCode: res.data.referralCode || res.data.sponsorCode || '',
+            sponsorCode: res.data.sponsorCode || res.data.referralCode || '',
+            isCompanySponsored: res.data.isCompanySponsored || false,
+            shoppingCoins: res.data.shoppingCoins ?? 2000,
+            pendingIncome: res.data.pendingIncome ?? 0,
+            availableIncome: res.data.availableIncome ?? 0,
+            appDownloadIncome: res.data.appDownloadIncome ?? 0,
+            verificationStatus: res.data.verificationStatus || (res.data.aadhaarVerified ? 'VERIFIED' : 'NON_VERIFIED'),
+            aadhaarVerified: res.data.aadhaarVerified || false,
+            fullNameAsPerAadhaar: res.data.fullNameAsPerAadhaar || res.data.name || '',
+            registrationCity: res.data.city || res.data.preferredCityName || '',
+            registrationPincode: res.data.pincode || '',
             savedAddresses: [],
             birthday: res.data.birthday || undefined,
             preferredCityId: res.data.preferredCityId ? res.data.preferredCityId.toString() : undefined,

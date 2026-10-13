@@ -1,0 +1,70 @@
+name: Scheduled Cron Jobs
+
+on:
+  schedule:
+    # Daily: Every day at 12:00 AM IST (18:30 UTC)
+    - cron: '30 18 * * *'
+
+    # Monthly: 1st day of month at 12:00 AM IST (18:30 UTC)
+    - cron: '30 18 1 * *'
+
+  workflow_dispatch:
+    inputs:
+      cron_job:
+        description: 'Select Cron Job'
+        required: true
+        default: 'daily_income'
+        type: choice
+        options:
+          - daily_income
+          - monthly_shopping_coins
+          - run_both
+
+jobs:
+  run-cron:
+    name: Execute Scheduled Wallet & Coin Maintenance
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install Dependencies
+        working-directory: backend
+        run: npm ci || npm install --legacy-peer-deps
+
+      # ---------------------------------------------------------------------
+      # 1. DAILY MIDNIGHT CRON
+      # Rule: Checks pendingIncome and moves amounts where availableFrom <= NOW
+      # ---------------------------------------------------------------------
+      - name: Run Daily Income Rollover
+        if: |
+          github.event_name == 'schedule' ||
+          inputs.cron_job == 'daily_income' ||
+          inputs.cron_job == 'run_both'
+        working-directory: backend
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        run: npm run cron:daily-income
+
+      # ---------------------------------------------------------------------
+      # 2. MONTHLY 1ST CRON
+      # Rule: Credits ₹2,000 Shopping Coins to eligible users on 1st of month.
+      # Idempotency prevents duplicate credits. Never adds to income/wallet.
+      # ---------------------------------------------------------------------
+      - name: Run Monthly Shopping Coins
+        if: |
+          github.event.schedule == '30 18 1 * *' ||
+          inputs.cron_job == 'monthly_shopping_coins' ||
+          inputs.cron_job == 'run_both'
+        working-directory: backend
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        run: npm run cron:monthly-coins

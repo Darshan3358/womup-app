@@ -118,9 +118,16 @@ export const BlinkitHeader: React.FC<BlinkitHeaderProps> = ({
     );
   }
 
-  const areaName = currentAreaName || 'Chandlodiya';
+  const isThaltej =
+    (currentAreaName || '').toLowerCase().includes('thaltej') ||
+    (currentStoreName || '').toLowerCase().includes('thaltej');
+  const areaName = isThaltej ? 'Thaltej' : (currentAreaName || 'Chandlodiya - Tragad');
   const cityName = currentCityName || user?.preferredCityName || 'Ahmedabad';
-  const cleanStoreName = (currentStoreName || 'Wom Up Chandlodiya Dark Store')
+  const cleanStoreName = (
+    isThaltej
+      ? 'Wom Up Thaltej Dark Store'
+      : (currentStoreName || 'Wom Up Chandlodiya - Tragad Dark Store')
+  )
     .replace(/^🟢\s*/, '')
     .trim();
 

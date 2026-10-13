@@ -21,6 +21,12 @@
         {
           "photosPermission": "Worm Up needs access to your photos to print documents and images."
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow WormUp to access your camera to scan vendor counter QR codes."
+        }
       ]
     ],
     "ios": {

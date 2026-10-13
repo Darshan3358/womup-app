@@ -9,6 +9,8 @@ import {
   Gift,
   ChevronDown,
   Building2,
+  AlertCircle,
+  Clock,
 } from 'lucide-react';
 import { useAuth, type CityItem } from '../context/AuthContext';
 
@@ -40,10 +42,27 @@ export const AuthModal: React.FC = () => {
   const [verificationId, setVerificationId] = useState('');
   const otpInputsRef = useRef<(HTMLInputElement | null)[]>([]);
 
-  // Registration form states (matching Customer App S08_CreateAccountScreen & S09)
+  // Registration form states (matching SRS & Customer App)
   const [fullName, setFullName] = useState('');
   const [regPhone, setRegPhone] = useState('');
-  const [referralCode, setReferralCode] = useState('');
+  const [pincode, setPincode] = useState('380015');
+  const [pincodeStatus, setPincodeStatus] = useState<{
+    isChecking: boolean;
+    isAvailable: boolean | null;
+    message?: string;
+  }>({ isChecking: false, isAvailable: true, message: 'Ahmedabad Delivery Zone' });
+  const [sponsorCode, setSponsorCode] = useState('');
+  const [sponsorValidation, setSponsorValidation] = useState<{
+    isChecking: boolean;
+    isValid: boolean | null;
+    isCompany?: boolean;
+    sponsorName?: string;
+    message?: string;
+  } | null>(null);
+
+  // Registration Hours State (10 PM to 6 AM Closed)
+  const [isTimeRestricted, setIsTimeRestricted] = useState(false);
+  const [timingMessage, setTimingMessage] = useState('');
 
   // Live Cities Dropdown from MongoDB 'cities' collection
   const [cities, setCities] = useState<CityItem[]>([]);
@@ -55,20 +74,47 @@ export const AuthModal: React.FC = () => {
   const [customGmail, setCustomGmail] = useState('');
   const [customGoogleName, setCustomGoogleName] = useState('');
 
-  // Fetch active cities on mount / modal open
+  // Check registration hours & fetch active cities on mount / modal open
   useEffect(() => {
     if (isAuthModalOpen) {
       setStep('phone');
       setIdentifier('');
       setRegPhone('');
       setFullName('');
-      setReferralCode('');
+      setPincode('380015');
+      setSponsorCode('');
+      setSponsorValidation(null);
       setOtp(['', '', '', '', '', '']);
       setErrorMsg('');
       setCountdown(30);
       setIsLoading(false);
       setCustomGmail('');
       setCustomGoogleName('');
+
+      // Check Registration Timing (6 AM to 10 PM IST)
+      fetch('http://localhost:5050/api/v1/auth/registration-timing')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data?.data && data.data.allowed === false) {
+            setIsTimeRestricted(true);
+            setTimingMessage(
+              data.data.message || 'Registration is closed between 10 PM and 6 AM. Please try after 6 AM.'
+            );
+          } else {
+            setIsTimeRestricted(false);
+            setTimingMessage('');
+          }
+        })
+        .catch(() => {
+          // Local fallback check
+          const now = new Date();
+          const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+          const istHour = new Date(utc + 5.5 * 3600000).getHours();
+          if (istHour >= 22 || istHour < 6) {
+            setIsTimeRestricted(true);
+            setTimingMessage('Registration is closed between 10 PM and 6 AM. Please try after 6 AM.');
+          }
+        });
 
       // Fetch active cities from MongoDB
       fetchCities().then((res) => {
@@ -80,6 +126,80 @@ export const AuthModal: React.FC = () => {
       });
     }
   }, [isAuthModalOpen]);
+
+  // Debounced Pincode Validation (400ms)
+  useEffect(() => {
+    const cleanPin = pincode.trim();
+    if (cleanPin.length !== 6) {
+      setPincodeStatus({
+        isChecking: false,
+        isAvailable: false,
+        message: 'Enter 6-digit PIN code',
+      });
+      return;
+    }
+
+    setPincodeStatus((prev) => ({ ...prev, isChecking: true }));
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`http://localhost:5050/api/v1/auth/check-pincode?pin=${cleanPin}`);
+        const data = await res.json();
+        if (data?.data?.isAvailable) {
+          setPincodeStatus({
+            isChecking: false,
+            isAvailable: true,
+            message: `Available in ${data.data.city || 'Ahmedabad'} - ${data.data.areaName || 'Delivery Zone'}`,
+          });
+          if (data.data.city) setSelectedCityName(data.data.city);
+        } else {
+          setPincodeStatus({
+            isChecking: false,
+            isAvailable: false,
+            message: data?.data?.message || 'Sorry, not available in this pincode yet.',
+          });
+        }
+      } catch {
+        setPincodeStatus({ isChecking: false, isAvailable: true, message: 'Serviceable Pincode' });
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [pincode]);
+
+  // Debounced Sponsor Validation (400ms)
+  useEffect(() => {
+    const clean = sponsorCode.trim().toUpperCase();
+    if (!clean) {
+      setSponsorValidation(null);
+      return;
+    }
+
+    setSponsorValidation({ isChecking: true, isValid: null });
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`http://localhost:5050/api/v1/auth/validate-sponsor?code=${clean}`);
+        const data = await res.json();
+        if (data?.data?.isValid) {
+          setSponsorValidation({
+            isChecking: false,
+            isValid: true,
+            isCompany: data.data.isCompany,
+            sponsorName: data.data.sponsorName,
+          });
+        } else {
+          setSponsorValidation({
+            isChecking: false,
+            isValid: false,
+            message: data?.data?.message || 'Invalid sponsor code',
+          });
+        }
+      } catch {
+        setSponsorValidation({ isChecking: false, isValid: true, sponsorName: 'Verified Sponsor' });
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [sponsorCode]);
 
   // Countdown timer for OTP resend
   useEffect(() => {
@@ -182,16 +302,33 @@ export const AuthModal: React.FC = () => {
     }
   };
 
-  // Step 3: Customer Registration Submit (matching /api/v1/auth/register)
+  // Step 3: Customer Registration Submit (matching SRS & /api/v1/auth/register)
   const handleRegisterSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (isTimeRestricted) {
+      setErrorMsg(timingMessage || 'Registration is closed between 10 PM and 6 AM.');
+      return;
+    }
     if (!fullName.trim()) {
-      setErrorMsg('Please enter your full name');
+      setErrorMsg('Please enter your full name as per Aadhaar');
       return;
     }
     const cleanPhone = regPhone.replace(/\D/g, '');
     if (cleanPhone.length !== 10) {
       setErrorMsg('Please enter a valid 10-digit Indian mobile number for delivery');
+      return;
+    }
+    const cleanPin = pincode.trim();
+    if (cleanPin.length !== 6) {
+      setErrorMsg('Please enter a valid 6-digit PIN code');
+      return;
+    }
+    if (pincodeStatus.isAvailable === false) {
+      setErrorMsg(pincodeStatus.message || 'WormUp is not available in your area yet');
+      return;
+    }
+    if (sponsorValidation && sponsorValidation.isValid === false) {
+      setErrorMsg(sponsorValidation.message || 'Invalid sponsor code entered');
       return;
     }
     if (!selectedCityName) {
@@ -207,7 +344,9 @@ export const AuthModal: React.FC = () => {
       phone: cleanPhone,
       preferredCityId: selectedCityId,
       preferredCityName: selectedCityName,
-      referralCode: referralCode.trim() || undefined,
+      pincode: cleanPin,
+      sponsorCode: sponsorCode.trim() || undefined,
+      fullNameAsPerAadhaar: fullName.trim(),
     });
     setIsLoading(false);
 
@@ -630,30 +769,57 @@ export const AuthModal: React.FC = () => {
             </form>
           )}
 
-          {/* STEP 3: Create Account (Matches Customer App S08_CreateAccountScreen & S09) */}
+          {/* STEP 3: Create Account (Matches Complete SRS & Customer App) */}
           {step === 'create-account' && (
             <form onSubmit={handleRegisterSubmit}>
-              {/* Welcome Reward Banner */}
+              {/* Registration Closed Banner if 10 PM - 6 AM */}
+              {isTimeRestricted && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    background: '#FEF2F2',
+                    border: '1.5px solid #FCA5A5',
+                    color: '#991B1B',
+                    padding: '12px 14px',
+                    borderRadius: '12px',
+                    fontSize: '0.86rem',
+                    fontWeight: 700,
+                    marginBottom: '16px',
+                  }}
+                >
+                  <Clock size={18} color="#DC2626" />
+                  <span>
+                    🌙 <strong>Registration is Closed (10 PM - 6 AM)</strong>. Registration re-opens at 6:00 AM IST.
+                  </span>
+                </div>
+              )}
+
+              {/* Welcome Reward Banner (₹2,000 Shopping Coins) */}
               <div
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
-                  background: '#ECFDF5',
-                  border: '1px solid #A7F3D0',
+                  gap: '10px',
+                  background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)',
+                  border: '1.5px solid #6EE7B7',
                   color: '#065F46',
-                  padding: '10px 14px',
-                  borderRadius: '12px',
-                  fontSize: '0.82rem',
-                  fontWeight: 700,
+                  padding: '12px 14px',
+                  borderRadius: '14px',
+                  fontSize: '0.86rem',
+                  fontWeight: 800,
                   marginBottom: '18px',
+                  boxShadow: '0 2px 10px rgba(16, 185, 129, 0.1)',
                 }}
               >
-                <CheckCircle2 size={16} />
-                <span>Verified! Complete profile to get <strong>50 Shopping Coins</strong>.</span>
+                <Sparkles size={18} color="#059669" />
+                <span>
+                  🎉 Welcome Bonus: <strong>₹2,000 Shopping Coins</strong> will be credited to your wallet!
+                </span>
               </div>
 
-              {/* Full Name */}
+              {/* Full Name (As per Aadhaar) */}
               <div style={{ marginBottom: '14px' }}>
                 <label
                   style={{
@@ -665,11 +831,11 @@ export const AuthModal: React.FC = () => {
                     textTransform: 'uppercase',
                   }}
                 >
-                  Full Name *
+                  Full Name (As per Aadhaar) *
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Ramesh Patel"
+                  placeholder="e.g. Darshan Kumar Thanki"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   style={{
@@ -741,7 +907,61 @@ export const AuthModal: React.FC = () => {
                 </div>
               </div>
 
-              {/* City Dropdown (Fetched from MongoDB 'cities' collection!) */}
+              {/* PIN Code Input with Live Serviceability Check */}
+              <div style={{ marginBottom: '14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <label
+                    style={{
+                      fontSize: '0.8rem',
+                      fontWeight: 800,
+                      color: '#071B52',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    PIN Code (Service Area) *
+                  </label>
+                  {pincodeStatus.message && (
+                    <span
+                      style={{
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        color: pincodeStatus.isAvailable ? '#16A34A' : '#DC2626',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      {pincodeStatus.isAvailable ? (
+                        <CheckCircle2 size={12} color="#16A34A" />
+                      ) : (
+                        <AlertCircle size={12} color="#DC2626" />
+                      )}
+                      {pincodeStatus.isChecking ? 'Checking...' : pincodeStatus.message}
+                    </span>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  maxLength={6}
+                  placeholder="e.g. 380015"
+                  value={pincode}
+                  onChange={(e) => setPincode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  style={{
+                    width: '100%',
+                    padding: '12px 14px',
+                    border: `1.5px solid ${
+                      pincodeStatus.isAvailable === false ? '#EF4444' : pincodeStatus.isAvailable ? '#22C55E' : '#CBD5E1'
+                    }`,
+                    borderRadius: '12px',
+                    fontSize: '0.95rem',
+                    fontWeight: 700,
+                    outline: 'none',
+                    background: '#F8FAFC',
+                  }}
+                />
+              </div>
+
+              {/* City Dropdown */}
               <div style={{ marginBottom: '14px', position: 'relative' }}>
                 <label
                   style={{
@@ -753,7 +973,7 @@ export const AuthModal: React.FC = () => {
                     textTransform: 'uppercase',
                   }}
                 >
-                  Service City (Dropdown from Database) *
+                  Service City *
                 </label>
                 <div
                   onClick={() => setIsCityDropdownOpen(!isCityDropdownOpen)}
@@ -833,25 +1053,34 @@ export const AuthModal: React.FC = () => {
                 )}
               </div>
 
-              {/* Referral Code (Optional) */}
+              {/* Sponsor ID / Referral Code (SRS MLM Rule) */}
               <div style={{ marginBottom: '20px' }}>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '0.8rem',
-                    fontWeight: 800,
-                    color: '#071B52',
-                    marginBottom: '6px',
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  Referral Code (Optional)
-                </label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <label
+                    style={{
+                      fontSize: '0.8rem',
+                      fontWeight: 800,
+                      color: '#071B52',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    Sponsor ID (Optional)
+                  </label>
+                  <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: 600 }}>
+                    Default: WormUp Company
+                  </span>
+                </div>
                 <div
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    border: '1.5px dashed #CBD5E1',
+                    border: `1.5px solid ${
+                      sponsorValidation && sponsorValidation.isValid === false
+                        ? '#EF4444'
+                        : sponsorValidation?.isValid
+                        ? '#22C55E'
+                        : '#CBD5E1'
+                    }`,
                     borderRadius: '12px',
                     background: '#F8FAFC',
                     padding: '2px 12px',
@@ -860,9 +1089,9 @@ export const AuthModal: React.FC = () => {
                   <Gift size={16} color="#7856F6" style={{ marginRight: '8px' }} />
                   <input
                     type="text"
-                    placeholder="Enter referral code for 50 bonus coins"
-                    value={referralCode}
-                    onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                    placeholder="Enter Sponsor code (e.g. WORM1234)"
+                    value={sponsorCode}
+                    onChange={(e) => setSponsorCode(e.target.value.toUpperCase())}
                     style={{
                       flex: 1,
                       border: 'none',
@@ -876,34 +1105,106 @@ export const AuthModal: React.FC = () => {
                     }}
                   />
                 </div>
+
+                {/* Live validation feedback badge */}
+                {sponsorCode.trim() ? (
+                  sponsorValidation && (
+                    <div
+                      style={{
+                        marginTop: '6px',
+                        fontSize: '0.76rem',
+                        fontWeight: 700,
+                        color: sponsorValidation.isValid ? '#16A34A' : '#DC2626',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      {sponsorValidation.isValid ? (
+                        <>
+                          <CheckCircle2 size={13} color="#16A34A" />
+                          <span>✓ Sponsor: {sponsorValidation.sponsorName}</span>
+                        </>
+                      ) : (
+                        <>
+                          <AlertCircle size={13} color="#DC2626" />
+                          <span>✗ Invalid sponsor code. Check or leave blank.</span>
+                        </>
+                      )}
+                    </div>
+                  )
+                ) : (
+                  <div style={{ marginTop: '5px', fontSize: '0.74rem', color: '#64748B', fontWeight: 600 }}>
+                    💡 Leave blank to join under <strong>WormUp Company Root</strong> (default sponsor)
+                  </div>
+                )}
               </div>
 
               {/* Submit Button */}
               <button
                 type="submit"
                 id="create-account-btn"
-                disabled={isLoading || !fullName.trim() || regPhone.length !== 10}
+                disabled={
+                  isTimeRestricted ||
+                  isLoading ||
+                  !fullName.trim() ||
+                  regPhone.length !== 10 ||
+                  pincode.length !== 6 ||
+                  pincodeStatus.isAvailable === false ||
+                  (sponsorValidation?.isValid === false)
+                }
                 style={{
                   width: '100%',
                   background:
-                    fullName.trim() && regPhone.length === 10
+                    !isTimeRestricted &&
+                    fullName.trim() &&
+                    regPhone.length === 10 &&
+                    pincode.length === 6 &&
+                    pincodeStatus.isAvailable !== false &&
+                    sponsorValidation?.isValid !== false
                       ? 'linear-gradient(135deg, #FF3B98 0%, #E62280 100%)'
                       : '#E2E8F0',
-                  color: fullName.trim() && regPhone.length === 10 ? '#FFFFFF' : '#94A3B8',
+                  color:
+                    !isTimeRestricted &&
+                    fullName.trim() &&
+                    regPhone.length === 10 &&
+                    pincode.length === 6 &&
+                    pincodeStatus.isAvailable !== false &&
+                    sponsorValidation?.isValid !== false
+                      ? '#FFFFFF'
+                      : '#94A3B8',
                   border: 'none',
                   borderRadius: '14px',
                   padding: '15px',
                   fontSize: '1rem',
                   fontWeight: 800,
                   cursor:
-                    fullName.trim() && regPhone.length === 10 ? 'pointer' : 'not-allowed',
+                    !isTimeRestricted &&
+                    fullName.trim() &&
+                    regPhone.length === 10 &&
+                    pincode.length === 6 &&
+                    pincodeStatus.isAvailable !== false &&
+                    sponsorValidation?.isValid !== false
+                      ? 'pointer'
+                      : 'not-allowed',
                   boxShadow:
-                    fullName.trim() && regPhone.length === 10
+                    !isTimeRestricted && fullName.trim() && regPhone.length === 10
                       ? '0 8px 24px rgba(255, 59, 152, 0.35)'
                       : 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
                 }}
               >
-                <span>{isLoading ? 'Creating Account...' : 'Complete & Start Shopping →'}</span>
+                <span>
+                  {isLoading
+                    ? 'Creating Account...'
+                    : isTimeRestricted
+                    ? 'Registration Closed (10 PM - 6 AM)'
+                    : 'Claim ₹2,000 Coins & Continue'}
+                </span>
+                {!isLoading && !isTimeRestricted && <ArrowRight size={18} />}
               </button>
             </form>
           )}

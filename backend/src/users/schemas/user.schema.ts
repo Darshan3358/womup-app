@@ -30,8 +30,84 @@ export class User {
   @Prop({ default: 0 })
   walletBalance: number;
 
-  @Prop({ default: 50 }) // Welcome reward coins
+  @Prop({ default: 2000 }) // Welcome bonus: 2000 Shopping Coins per SRS
   shoppingCoins: number;
+
+  // Registration Address Details
+  @Prop({ trim: true })
+  registrationCity?: string;
+
+  @Prop({ trim: true })
+  registrationPincode?: string;
+
+  @Prop({ trim: true })
+  fullNameAsPerAadhaar?: string;
+
+  // Aadhaar Verification Fields
+  @Prop({ default: false })
+  aadhaarVerified: boolean;
+
+  @Prop({
+    default: 'NON_VERIFIED',
+    enum: ['NON_VERIFIED', 'VERIFIED', 'PENDING', 'BLOCKED'],
+  })
+  verificationStatus: string;
+
+  @Prop({ trim: true })
+  aadhaarNumber?: string;
+
+  @Prop()
+  verifiedAt?: Date;
+
+  // Income Fields (MLM / Referral & App Download)
+  @Prop({ default: 0 })
+  appDownloadIncome: number;
+
+  @Prop({ default: 0 })
+  pendingIncome: number; // Income earned today, usable tomorrow midnight
+
+  @Prop({ default: 0 })
+  availableIncome: number; // Income usable for shopping today
+
+  @Prop()
+  lastIncomeCreditedAt?: Date;
+
+  @Prop()
+  lastMonthlyCoinCredit?: Date; // For idempotency: prevents duplicate monthly ₹2000 Shopping Coin credits
+
+  // Sponsor & Referral Fields
+  @Prop({ type: Types.ObjectId, ref: 'User', index: true })
+  sponsorId?: Types.ObjectId;
+
+  @Prop({ trim: true, uppercase: true })
+  sponsorCode?: string;
+
+  @Prop({ default: false })
+  isCompanySponsored: boolean;
+
+  @Prop({ default: false })
+  isCompanyAccount: boolean;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  parentId?: Types.ObjectId;
+
+  @Prop({ default: 1 })
+  level: number;
+
+  @Prop({ default: 0 })
+  leftChildCount: number;
+
+  @Prop({ default: 0 })
+  rightChildCount: number;
+
+  @Prop({ type: [{ type: Types.ObjectId, ref: 'User' }], default: [] })
+  directReferrals: Types.ObjectId[];
+
+  @Prop({ default: 0 })
+  referredUsersCount: number;
+
+  @Prop({ default: 0 })
+  verifiedReferralsCount: number;
 
   @Prop({ unique: true, sparse: true, uppercase: true })
   referralCode?: string;
@@ -71,3 +147,6 @@ export class User {
 export const UserSchema = SchemaFactory.createForClass(User);
 // Compound index: unique phone (only when set, not null)
 UserSchema.index({ phone: 1 }, { unique: true, sparse: true });
+UserSchema.index({ sponsorId: 1 });
+UserSchema.index({ sponsorCode: 1 });
+UserSchema.index({ verificationStatus: 1 });

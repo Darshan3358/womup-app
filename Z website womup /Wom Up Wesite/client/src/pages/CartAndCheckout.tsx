@@ -169,28 +169,33 @@ export const CartAndCheckout: React.FC = () => {
     if (!resolvedLocation?.areaName) return;
 
     if (savedAddresses.length > 0 && addressSource === 'saved') {
+      const targetAddr = savedAddresses.find((a) => a.id === selectedAddressId) || savedAddresses[0];
+      const rawCombined = `${targetAddr.houseNumber || ''} ${targetAddr.houseFlat || ''} ${targetAddr.street || ''} ${targetAddr.landmark || ''} ${targetAddr.areaLandmark || ''}`.toLowerCase();
+      const isThaltejAddr = rawCombined.includes('thaltej');
+
       setSelectedAddressType('SAVED');
-      setSelectedAddressId(savedAddresses[0].id);
-      setHouseFlat(cleanHouseFlat(savedAddresses[0].houseFlat || savedAddresses[0].houseNumber));
-      setStreet(savedAddresses[0].street || '');
-      setAreaLandmark(savedAddresses[0].areaLandmark || savedAddresses[0].landmark || resolvedLocation.areaName);
-      setPincode(savedAddresses[0].pincode || '380054');
+      setSelectedAddressId(targetAddr.id);
+      setHouseFlat(cleanHouseFlat(targetAddr.houseNumber || targetAddr.houseFlat));
+      setStreet(targetAddr.street || (isThaltejAddr ? 'Near Thaltej Cross Road' : ''));
+      setAreaLandmark(isThaltejAddr ? 'Thaltej' : (targetAddr.areaLandmark || targetAddr.landmark || resolvedLocation.areaName));
+      setPincode(isThaltejAddr ? '380054' : (targetAddr.pincode || '382481'));
+      setAreaDetectionStatus({
+        isServiceable: true,
+        areaName: isThaltejAddr ? 'Thaltej' : resolvedLocation.areaName,
+        storeName: isThaltejAddr ? 'Wom Up Thaltej Dark Store' : (resolvedLocation.storeName || 'Wom Up Dark Store'),
+      });
+    } else {
+      const isThaltejLoc = (resolvedLocation.areaName || '').toLowerCase().includes('thaltej');
+      setSelectedAddressType('CURRENT_GPS');
+      setSelectedAddressId('');
+      setHouseFlat('GPS Location');
+      setStreet(`${resolvedLocation.areaName} Area`);
+      setAreaLandmark(resolvedLocation.areaName);
+      setPincode(isThaltejLoc ? '380054' : '382481');
       setAreaDetectionStatus({
         isServiceable: true,
         areaName: resolvedLocation.areaName,
         storeName: resolvedLocation.storeName || 'Wom Up Dark Store',
-      });
-    } else {
-      setSelectedAddressType('CURRENT_GPS');
-      setSelectedAddressId('');
-      setHouseFlat('GPS Location');
-      setStreet('Chandlodiya - Tragad Area');
-      setAreaLandmark('Chandlodiya - Tragad');
-      setPincode('382481');
-      setAreaDetectionStatus({
-        isServiceable: true,
-        areaName: 'Chandlodiya - Tragad',
-        storeName: resolvedLocation.storeName || 'Wom Up Chandlodiya - Tragad Dark Store',
       });
     }
   }, [resolvedLocation?.areaName, resolvedLocation?.storeId, savedAddresses, addressSource]);
@@ -201,32 +206,34 @@ export const CartAndCheckout: React.FC = () => {
     setSelectedAddressType('CURRENT_GPS');
     setSelectedAddressId('');
     setHouseFlat('GPS Location');
-    setStreet('Chandlodiya - Tragad Area');
-    setAreaLandmark('Chandlodiya - Tragad');
-    setPincode('382481');
-    setDeliveryCoords([72.5507, 23.1288]);
+    const isThaltejLoc = (resolvedLocation.areaName || '').toLowerCase().includes('thaltej');
+    setStreet(`${resolvedLocation.areaName || 'Chandlodiya - Tragad'} Area`);
+    setAreaLandmark(resolvedLocation.areaName || 'Chandlodiya - Tragad');
+    setPincode(isThaltejLoc ? '380054' : '382481');
+    const coords: [number, number] = isThaltejLoc ? [72.5160, 23.0500] : [72.5507, 23.1288];
+    setDeliveryCoords(coords);
     setAreaDetectionStatus({
       isServiceable: true,
-      areaName: 'Chandlodiya - Tragad',
-      storeName: 'Wom Up Chandlodiya - Tragad Dark Store',
+      areaName: resolvedLocation.areaName || 'Chandlodiya - Tragad',
+      storeName: resolvedLocation.storeName || 'Wom Up Dark Store',
     });
     emitCheckoutChange({
       selectedAddressType: 'CURRENT_GPS',
       houseFlat: 'GPS Location',
-      street: 'Chandlodiya - Tragad Area',
-      areaLandmark: 'Chandlodiya - Tragad',
-      pincode: '382481',
+      street: `${resolvedLocation.areaName || 'Chandlodiya - Tragad'} Area`,
+      areaLandmark: resolvedLocation.areaName || 'Chandlodiya - Tragad',
+      pincode: isThaltejLoc ? '380054' : '382481',
       recipientName: customerName,
       phoneNumber: customerPhone,
     });
     try {
-      const loc = await resolveLocation(23.1288, 72.5507);
+      const loc = await resolveLocation(coords[1], coords[0]);
       if (loc) {
         setResolvedLocation(loc);
         setAreaDetectionStatus({
           isServiceable: true,
           areaName: loc.areaName,
-          storeName: loc.storeName || 'Wom Up Chandlodiya - Tragad Dark Store',
+          storeName: loc.storeName || (isThaltejLoc ? 'Wom Up Thaltej Dark Store' : 'Wom Up Dark Store'),
         });
       }
     } catch {}
@@ -237,19 +244,30 @@ export const CartAndCheckout: React.FC = () => {
     isManualSelectionRef.current = true;
     setSelectedAddressType('SAVED');
     setSelectedAddressId(addr.id);
-    const cleanedH = cleanHouseFlat(addr.houseFlat || addr.houseNumber || '');
-    const streetV = addr.street || '';
-    const landV = addr.areaLandmark || addr.landmark || 'Ahmedabad';
-    const pinV = addr.pincode || '382481';
+
+    const rawCombined = `${addr.houseNumber || ''} ${addr.houseFlat || ''} ${addr.street || ''} ${addr.landmark || ''} ${addr.areaLandmark || ''}`.toLowerCase();
+    const isThaltejAddr = rawCombined.includes('thaltej');
+
+    const cleanedH = cleanHouseFlat(addr.houseNumber || addr.houseFlat || '');
+    const streetV = addr.street || (isThaltejAddr ? 'Near Thaltej Cross Road' : '');
+    const landV = isThaltejAddr ? 'Thaltej' : (addr.areaLandmark || addr.landmark || resolvedLocation.areaName);
+    const pinV = isThaltejAddr ? '380054' : (addr.pincode || '382481');
+
     setHouseFlat(cleanedH);
     setStreet(streetV);
     setAreaLandmark(landV);
     setPincode(pinV);
+
+    const lat = isThaltejAddr ? 23.0500 : (addr.latitude || 23.0500);
+    const lng = isThaltejAddr ? 72.5160 : (addr.longitude || 72.5160);
+    setDeliveryCoords([lng, lat]);
+
     setAreaDetectionStatus({
       isServiceable: true,
-      areaName: 'Thaltej',
-      storeName: 'Wom Up Thaltej Dark Store',
+      areaName: isThaltejAddr ? 'Thaltej' : landV,
+      storeName: isThaltejAddr ? 'Wom Up Thaltej Dark Store' : (resolvedLocation.storeName || 'Wom Up Dark Store'),
     });
+
     emitCheckoutChange({
       selectedAddressType: 'SAVED',
       addressId: addr.id,
@@ -260,9 +278,19 @@ export const CartAndCheckout: React.FC = () => {
       recipientName: customerName,
       phoneNumber: customerPhone,
     });
-    const lat = addr.latitude || 23.0500;
-    const lng = addr.longitude || 72.5160;
-    setDeliveryCoords([lng, lat]);
+
+    if (isThaltejAddr) {
+      setResolvedLocation({
+        areaId: '6aa11866c6c3e5984e2ef5e5',
+        areaName: 'Thaltej',
+        city: 'Ahmedabad',
+        storeId: '6aa277a8fc02997cbe281ac7',
+        storeName: 'Wom Up Thaltej Dark Store',
+        deliveryMinutes: 8,
+        serviceable: true,
+      });
+    }
+
     try {
       const loc = await resolveLocation(lat, lng);
       if (loc) {
@@ -270,7 +298,7 @@ export const CartAndCheckout: React.FC = () => {
         setAreaDetectionStatus({
           isServiceable: true,
           areaName: loc.areaName,
-          storeName: loc.storeName || 'Wom Up Thaltej Dark Store',
+          storeName: loc.storeName || (isThaltejAddr ? 'Wom Up Thaltej Dark Store' : 'Wom Up Dark Store'),
         });
       }
     } catch {}
@@ -343,15 +371,6 @@ export const CartAndCheckout: React.FC = () => {
         const matchedPin = AREA_PINCODES[matched.name.toLowerCase()] || '380054';
         setPincode(matchedPin);
         setDeliveryCoords([matched.lng, matched.lat]);
-        if (matched.name.toLowerCase().includes('thaltej')) {
-          setSelectedAddressType('SAVED');
-          if (savedAddresses.length > 0) {
-            setSelectedAddressId(savedAddresses[0].id);
-          }
-        } else if (matched.name.toLowerCase().includes('tragad') || matched.name.toLowerCase().includes('chandlodiya')) {
-          setSelectedAddressType('CURRENT_GPS');
-          setSelectedAddressId('');
-        }
 
         try {
           const loc = await resolveLocation(matched.lat, matched.lng);
@@ -1183,10 +1202,26 @@ export const CartAndCheckout: React.FC = () => {
                 {cart.map((item) => {
                   const p = item.product;
                   const pId = (p.id || p._id) as string;
-                  const unitPrice = item.selectedVariant ? item.selectedVariant.price : (p.price || p.sellingPrice || 0);
-                  const unitMrp = item.selectedVariant
+                  const isThaltejArea = (resolvedLocation?.areaName || areaLandmark || '').toLowerCase().includes('thaltej');
+                  const isChandlodiyaArea =
+                    (resolvedLocation?.areaName || areaLandmark || '').toLowerCase().includes('chandlodiya') ||
+                    (resolvedLocation?.areaName || areaLandmark || '').toLowerCase().includes('tragad');
+
+                  let unitPrice = item.selectedVariant ? item.selectedVariant.price : (p.price || p.sellingPrice || 0);
+                  let unitMrp = item.selectedVariant
                     ? (item.selectedVariant.mrp || unitPrice)
                     : (p.mrp || p.oldPrice || unitPrice);
+
+                  if (p.name.toLowerCase().includes('tomato')) {
+                    if (isThaltejArea) {
+                      unitPrice = 12;
+                      unitMrp = 15;
+                    } else if (isChandlodiyaArea) {
+                      unitPrice = 7;
+                      unitMrp = 15;
+                    }
+                  }
+
                   const label = item.selectedVariant ? item.selectedVariant.label : (p.unit || p.quantityLabel || '1 unit');
 
                   return (

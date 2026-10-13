@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "Womup Vendor",
+    "slug": "womup-vendor",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splashstorescreen.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#05062A"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#05062A"
+      },
+      "package": "com.womup.vendor"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}

@@ -20,6 +20,7 @@ export type AdminTab =
   | 'Dashboard'
   | 'Orders'
   | 'Stores'
+  | 'Vendors'
   | 'Inventory'
   | 'Categories'
   | 'Customers'

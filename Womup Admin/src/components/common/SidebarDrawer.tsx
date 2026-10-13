@@ -260,6 +260,23 @@ export const SidebarDrawer: React.FC = () => {
               <ChevronRight size={16} color={COLORS.secondaryText} />
             </TouchableOpacity>
 
+            {/* 8b. Local Store Vendors (Offline Partners & Shopping Coins %) */}
+            <TouchableOpacity
+              style={[
+                styles.menuItem,
+                activeTab === 'Vendors' && subView === 'none' && styles.menuItemActive,
+              ]}
+              onPress={() => handleNavigateTab('Vendors')}
+            >
+              <View style={[styles.iconContainer, activeTab === 'Vendors' && subView === 'none' && styles.iconActive]}>
+                <Coins size={18} color={activeTab === 'Vendors' && subView === 'none' ? COLORS.white : '#D97706'} />
+              </View>
+              <Text style={[styles.menuLabel, activeTab === 'Vendors' && subView === 'none' && styles.menuLabelActive]}>
+                Local Store Vendors
+              </Text>
+              <ChevronRight size={16} color={COLORS.secondaryText} />
+            </TouchableOpacity>
+
             {/* 9. Cities & Operational Areas (1 Store per Area) */}
             <TouchableOpacity
               style={[

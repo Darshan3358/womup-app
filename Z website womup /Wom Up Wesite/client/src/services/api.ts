@@ -1011,7 +1011,17 @@ export const AddressApi = {
           const street = item.street || item.areaLandmark || '';
           const landmark = item.landmark || '';
 
-          // Build readable address like "Chandlodiya, Chandlodiya, Chandlodiya"
+          const combinedText = `${house} ${street} ${landmark}`.toLowerCase();
+          const isThaltej = combinedText.includes('thaltej');
+
+          let resolvedLat = typeof lat === 'number' ? lat : (isThaltej ? 23.0500 : 23.1289);
+          let resolvedLng = typeof lng === 'number' ? lng : (isThaltej ? 72.5160 : 72.5507);
+          if (isThaltej && (!lat || lat > 23.10)) {
+            resolvedLat = 23.0500;
+            resolvedLng = 72.5160;
+          }
+
+          // Build readable address
           const addressParts = [house, street, landmark, item.city].filter(Boolean);
           const fullAddressString = addressParts.join(', ');
 
@@ -1025,14 +1035,15 @@ export const AddressApi = {
             houseNumber: house,
             street,
             landmark,
-            areaLandmark: landmark || street,
-            houseFlat: fullAddressString || `${house}, ${street}`,
+            areaLandmark: isThaltej ? 'Thaltej' : (landmark || street || 'Chandlodiya - Tragad'),
+            houseFlat: house || fullAddressString || `${house}, ${street}`,
+            fullAddress: fullAddressString,
             city: item.city || 'Ahmedabad',
             state: item.state || 'Gujarat',
-            pincode: item.pincode || '',
+            pincode: isThaltej ? '380054' : (item.pincode || '382481'),
             isDefault: Boolean(item.isDefault),
-            latitude: typeof lat === 'number' ? lat : 23.1289,
-            longitude: typeof lng === 'number' ? lng : 72.5507,
+            latitude: resolvedLat,
+            longitude: resolvedLng,
             location: item.location,
           };
         });

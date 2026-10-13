@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Modal,
   TextInput,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,6 +16,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, GRADIENTS } from '../../theme/colors';
 import { TYPOGRAPHY } from '../../theme/typography';
 import { useApp } from '../../context/AppContext';
+import { AuthService } from '../../services/authService';
+import { StorageService } from '../../services/storageService';
 import {
   Blinkit3DWallet,
   SingleTapIllustration,
@@ -25,12 +28,82 @@ import {
 
 export const BlinkitMoneyScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const { walletBalance, addWalletBalance, goBack } = useApp();
+  const { user, setUser, walletBalance, addWalletBalance, goBack } = useApp();
 
   const [isAddMoneyModalVisible, setAddMoneyModalVisible] = useState(false);
   const [amountInput, setAmountInput] = useState('500');
 
+  // Aadhaar Verification State
+  const [isAadhaarModalVisible, setAadhaarModalVisible] = useState(false);
+  const [aadhaarInput, setAadhaarInput] = useState('');
+  const [aadhaarNameInput, setAadhaarNameInput] = useState(user.fullNameAsPerAadhaar || user.fullName || '');
+  const [verifyingAadhaar, setVerifyingAadhaar] = useState(false);
+  const [aadhaarError, setAadhaarError] = useState('');
+  const [aadhaarSuccessMsg, setAadhaarSuccessMsg] = useState('');
+
   const presetAmounts = [100, 200, 500, 1000];
+
+  // Refresh profile & wallet balances from backend on mount
+  useEffect(() => {
+    let isMounted = true;
+    AuthService.getProfile().then((profile) => {
+      if (profile && isMounted) {
+        setUser((prev) => ({
+          ...prev,
+          ...profile,
+          shoppingCoins: profile.shoppingCoins ?? prev.shoppingCoins ?? 2000,
+          verificationStatus: profile.verificationStatus || (profile.aadhaarVerified ? 'VERIFIED' : 'NON_VERIFIED'),
+          aadhaarVerified: profile.aadhaarVerified,
+          pendingIncome: profile.pendingIncome ?? 0,
+          availableIncome: profile.availableIncome ?? 0,
+          appDownloadIncome: profile.appDownloadIncome ?? 0,
+        }));
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleVerifyAadhaarSubmit = async () => {
+    const rawAadhaar = aadhaarInput.replace(/\s+/g, '');
+    if (!/^\d{12}$/.test(rawAadhaar)) {
+      setAadhaarError('Please enter a valid 12-digit Aadhaar number');
+      return;
+    }
+    if (!aadhaarNameInput.trim()) {
+      setAadhaarError('Please enter full name as per Aadhaar');
+      return;
+    }
+    setVerifyingAadhaar(true);
+    setAadhaarError('');
+    try {
+      const res = await AuthService.verifyAadhaar(rawAadhaar, aadhaarNameInput.trim());
+      if (res.success) {
+        const updated = {
+          ...user,
+          verificationStatus: 'VERIFIED',
+          aadhaarVerified: true,
+          fullNameAsPerAadhaar: aadhaarNameInput.trim(),
+          pendingIncome: res.user?.pendingIncome ?? user.pendingIncome,
+          availableIncome: res.user?.availableIncome ?? user.availableIncome,
+        };
+        setUser(updated);
+        StorageService.saveItem(StorageService.KEYS.USER, updated);
+        setAadhaarSuccessMsg('Aadhaar verified successfully! Full benefits unlocked.');
+        setTimeout(() => {
+          setAadhaarModalVisible(false);
+          setAadhaarSuccessMsg('');
+        }, 1200);
+      } else {
+        setAadhaarError(res.message || 'Verification failed. Please check details.');
+      }
+    } catch (err: any) {
+      setAadhaarError(err?.message || 'Verification error occurred.');
+    } finally {
+      setVerifyingAadhaar(false);
+    }
+  };
 
   const handleAddMoneySubmit = () => {
     const parsed = parseInt(amountInput, 10);
@@ -85,10 +158,123 @@ export const BlinkitMoneyScreen: React.FC = () => {
 
           {/* Hero Section: 3D Luxury Wallet & Worm Up Typography */}
           <View style={styles.heroSection}>
-            <Blinkit3DWallet size={125} />
+            <Blinkit3DWallet size={120} />
 
             <Text style={styles.brandTitle}>WORM UP</Text>
-            <Text style={styles.walletTitle}>WALLET</Text>
+            <Text style={styles.walletTitle}>WALLET & BALANCES</Text>
+          </View>
+
+          {/* ══════════════════════════════════════════════════════════════
+              SRS 4-BALANCE SYSTEM: Shopping Coins, Today's Income,
+              Available Income, and Aadhaar Verification Status
+             ══════════════════════════════════════════════════════════════ */}
+          <View style={styles.balancesSection}>
+            <Text style={styles.balancesSectionTitle}>Account Balances</Text>
+
+            {/* 1. Shopping Coins Card */}
+            <View style={styles.balanceCardDark}>
+              <View style={styles.balanceCardTop}>
+                <View style={styles.badgeRow}>
+                  <Text style={styles.balanceBadgeDark}>SHOPPING COINS</Text>
+                  <View style={styles.bonusTag}>
+                    <Text style={styles.bonusTagText}>WELCOME BONUS</Text>
+                  </View>
+                </View>
+                <Text style={styles.balanceIcon}>🪙</Text>
+              </View>
+              <Text style={styles.balanceValueDark}>{user.shoppingCoins ?? 2000}</Text>
+              <Text style={styles.balanceSubDark}>
+                Worth ₹{user.shoppingCoins ?? 2000} • 1 Coin = ₹1 Discount on grocery orders
+              </Text>
+            </View>
+
+            {/* Row of 2 Cards: Today's Income & Available Income */}
+            <View style={styles.twoCardsRow}>
+              {/* 2. Today's Pending Income */}
+              <View style={[styles.balanceCardHalf, styles.pendingCard]}>
+                <View style={styles.balanceCardTop}>
+                  <Text style={styles.balanceBadgePending}>TODAY'S INCOME</Text>
+                  <Text style={styles.balanceIconSmall}>⏳</Text>
+                </View>
+                <Text style={styles.balanceValuePending}>₹{user.pendingIncome ?? 0}</Text>
+                <Text style={styles.balanceSubPending}>
+                  From downline • Auto-promoted at 00:00 midnight
+                </Text>
+              </View>
+
+              {/* 3. Available Income */}
+              <View style={[styles.balanceCardHalf, styles.availableCard]}>
+                <View style={styles.balanceCardTop}>
+                  <Text style={styles.balanceBadgeAvailable}>AVAILABLE INCOME</Text>
+                  <Text style={styles.balanceIconSmall}>💰</Text>
+                </View>
+                <Text style={styles.balanceValueAvailable}>₹{user.availableIncome ?? 0}</Text>
+                <Text style={styles.balanceSubAvailable}>
+                  Unlocked • Ready to spend on grocery orders
+                </Text>
+              </View>
+            </View>
+
+            {/* 4. Aadhaar Verification Status Card */}
+            {(() => {
+              const isVerified = user.verificationStatus === 'VERIFIED' || user.aadhaarVerified;
+              return (
+                <View
+                  style={[
+                    styles.verificationCard,
+                    isVerified ? styles.verificationCardVerified : styles.verificationCardUnverified,
+                  ]}
+                >
+                  <View style={styles.verificationCardHeader}>
+                    <View style={styles.verificationBadgeWrap}>
+                      <Ionicons
+                        name={isVerified ? 'shield-checkmark' : 'shield-outline'}
+                        size={20}
+                        color={isVerified ? '#15803D' : '#D97706'}
+                      />
+                      <Text
+                        style={[
+                          styles.verificationStatusText,
+                          isVerified ? styles.textVerified : styles.textUnverified,
+                        ]}
+                      >
+                        {isVerified ? 'VERIFIED ACCOUNT' : 'NON-VERIFIED MEMBER'}
+                      </Text>
+                    </View>
+                    <Text
+                      style={[
+                        styles.verificationActionLabel,
+                        isVerified ? styles.labelVerified : styles.labelActionRequired,
+                      ]}
+                    >
+                      {isVerified ? 'UIDAI VALIDATED' : 'ACTION REQUIRED'}
+                    </Text>
+                  </View>
+
+                  <Text style={styles.verificationDesc}>
+                    {isVerified
+                      ? `Aadhaar verified as ${user.fullNameAsPerAadhaar || user.fullName}. All downline commissions and income usage features are fully unlocked.`
+                      : 'Non-verified members cannot use income balance or earn downline download commissions. Verify Aadhaar to unlock!'}
+                  </Text>
+
+                  {!isVerified && (
+                    <TouchableOpacity
+                      activeOpacity={0.85}
+                      onPress={() => {
+                        setAadhaarInput('');
+                        setAadhaarNameInput(user.fullNameAsPerAadhaar || user.fullName || '');
+                        setAadhaarError('');
+                        setAadhaarModalVisible(true);
+                      }}
+                      style={styles.verifyNowBtn}
+                    >
+                      <Text style={styles.verifyNowBtnText}>Verify Aadhaar Now</Text>
+                      <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            })()}
           </View>
 
           {/* Three Separate Feature Cards with Soft Lavender/Pink Borders */}
@@ -245,6 +431,131 @@ export const BlinkitMoneyScreen: React.FC = () => {
                 style={styles.modalConfirmGradient}
               >
                 <Text style={styles.modalConfirmText}>Proceed to Add ₹{amountInput || 0}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Aadhaar Verification Modal */}
+      <Modal
+        visible={isAadhaarModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setAadhaarModalVisible(false)}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => setAadhaarModalVisible(false)}
+          style={styles.modalBackdrop}
+        >
+          <View
+            style={styles.aadhaarModalCard}
+            onStartShouldSetResponder={() => true}
+          >
+            <View style={styles.aadhaarModalHeader}>
+              <View style={styles.aadhaarShieldIcon}>
+                <Ionicons name="shield-checkmark" size={24} color="#15803D" />
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={styles.aadhaarModalHeading}>Aadhaar Verification</Text>
+                <Text style={styles.aadhaarModalSub}>
+                  Unlock downline income & full wallet access
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setAadhaarModalVisible(false)}
+                style={styles.modalCloseBtn}
+              >
+                <Ionicons name="close" size={20} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Error & Success Alerts */}
+            {aadhaarError ? (
+              <View style={styles.aadhaarErrorBox}>
+                <Ionicons name="alert-circle" size={16} color="#DC2626" />
+                <Text style={styles.aadhaarErrorText}>{aadhaarError}</Text>
+              </View>
+            ) : null}
+
+            {aadhaarSuccessMsg ? (
+              <View style={styles.aadhaarSuccessBox}>
+                <Ionicons name="checkmark-circle" size={16} color="#15803D" />
+                <Text style={styles.aadhaarSuccessText}>{aadhaarSuccessMsg}</Text>
+              </View>
+            ) : null}
+
+            {/* Full Name as per Aadhaar Input */}
+            <View style={styles.aadhaarInputGroup}>
+              <Text style={styles.aadhaarLabel}>Full Name (As per Aadhaar)</Text>
+              <View style={styles.aadhaarInputContainer}>
+                <Ionicons name="person-outline" size={18} color={COLORS.textMuted} style={{ marginRight: 10 }} />
+                <TextInput
+                  style={styles.aadhaarInput}
+                  placeholder="Legal name on Aadhaar"
+                  placeholderTextColor={COLORS.secondaryText}
+                  value={aadhaarNameInput}
+                  onChangeText={(t) => {
+                    setAadhaarNameInput(t);
+                    if (aadhaarError) setAadhaarError('');
+                  }}
+                />
+              </View>
+            </View>
+
+            {/* 12-Digit Aadhaar Input */}
+            <View style={styles.aadhaarInputGroup}>
+              <Text style={styles.aadhaarLabel}>12-Digit Aadhaar Number</Text>
+              <View style={styles.aadhaarInputContainer}>
+                <Ionicons name="card-outline" size={18} color={COLORS.textMuted} style={{ marginRight: 10 }} />
+                <TextInput
+                  style={styles.aadhaarInput}
+                  placeholder="XXXX XXXX XXXX"
+                  placeholderTextColor={COLORS.secondaryText}
+                  keyboardType="numeric"
+                  maxLength={14}
+                  value={aadhaarInput}
+                  onChangeText={(t) => {
+                    const cleaned = t.replace(/\D/g, '').slice(0, 12);
+                    // Format with spaces
+                    const formatted = cleaned.match(/.{1,4}/g)?.join(' ') || cleaned;
+                    setAadhaarInput(formatted);
+                    if (aadhaarError) setAadhaarError('');
+                  }}
+                />
+              </View>
+            </View>
+
+            {/* Security Guarantee Note */}
+            <View style={styles.aadhaarSecurityNote}>
+              <Ionicons name="lock-closed" size={14} color="#047857" />
+              <Text style={styles.aadhaarSecurityText}>
+                UIDAI Compliant. We do not store biometric data. Information is encrypted end-to-end.
+              </Text>
+            </View>
+
+            {/* Submit Verification Button */}
+            <TouchableOpacity
+              activeOpacity={0.85}
+              disabled={verifyingAadhaar}
+              onPress={handleVerifyAadhaarSubmit}
+              style={styles.verifySubmitBtn}
+            >
+              <LinearGradient
+                colors={['#10B981', '#059669']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.verifySubmitGradient}
+              >
+                {verifyingAadhaar ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-done" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <Text style={styles.verifySubmitText}>Verify & Unlock Income</Text>
+                  </>
+                )}
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -507,6 +818,345 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   modalConfirmText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
+  },
+
+  // ══════════════════════════════════════════════════════════════
+  // SRS 4-BALANCE SECTION STYLES
+  // ══════════════════════════════════════════════════════════════
+  balancesSection: {
+    paddingHorizontal: 16,
+    marginBottom: 20,
+  },
+  balancesSectionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.navy,
+    marginBottom: 12,
+    letterSpacing: 0.2,
+  },
+  balanceCardDark: {
+    backgroundColor: '#071B52',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 12,
+    shadowColor: '#071B52',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  balanceCardTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  balanceBadgeDark: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#93C5FD',
+    letterSpacing: 0.5,
+  },
+  bonusTag: {
+    backgroundColor: '#1E3A8A',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  bonusTagText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#FCD34D',
+  },
+  balanceIcon: {
+    fontSize: 22,
+  },
+  balanceValueDark: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    marginVertical: 4,
+  },
+  balanceSubDark: {
+    fontSize: 12,
+    color: '#FCD34D',
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  twoCardsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  balanceCardHalf: {
+    flex: 1,
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1.5,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  pendingCard: {
+    borderColor: '#FDE68A',
+    backgroundColor: '#FFFDF5',
+  },
+  balanceBadgePending: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#D97706',
+  },
+  balanceIconSmall: {
+    fontSize: 16,
+  },
+  balanceValuePending: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#B45309',
+    marginVertical: 4,
+  },
+  balanceSubPending: {
+    fontSize: 10,
+    color: '#78350F',
+    fontWeight: '500',
+    lineHeight: 14,
+  },
+  availableCard: {
+    borderColor: '#A7F3D0',
+    backgroundColor: '#F0FDF4',
+  },
+  balanceBadgeAvailable: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#059669',
+  },
+  balanceValueAvailable: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#047857',
+    marginVertical: 4,
+  },
+  balanceSubAvailable: {
+    fontSize: 10,
+    color: '#065F46',
+    fontWeight: '500',
+    lineHeight: 14,
+  },
+  verificationCard: {
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1.5,
+  },
+  verificationCardVerified: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#6EE7B7',
+  },
+  verificationCardUnverified: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#FCD34D',
+  },
+  verificationCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  verificationBadgeWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  verificationStatusText: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  textVerified: {
+    color: '#15803D',
+  },
+  textUnverified: {
+    color: '#B45309',
+  },
+  verificationActionLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  labelVerified: {
+    backgroundColor: '#DCFCE7',
+    color: '#15803D',
+  },
+  labelActionRequired: {
+    backgroundColor: '#FEF3C7',
+    color: '#B45309',
+  },
+  verificationDesc: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    lineHeight: 17,
+    marginBottom: 12,
+  },
+  verifyNowBtn: {
+    backgroundColor: '#D97706',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  verifyNowBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+
+  // ══════════════════════════════════════════════════════════════
+  // AADHAAR MODAL STYLES
+  // ══════════════════════════════════════════════════════════════
+  aadhaarModalCard: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 24,
+    paddingBottom: 38,
+  },
+  aadhaarModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  aadhaarShieldIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aadhaarModalHeading: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: COLORS.navy,
+  },
+  aadhaarModalSub: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aadhaarErrorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#F87171',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 14,
+    gap: 8,
+  },
+  aadhaarErrorText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#DC2626',
+    fontWeight: '500',
+  },
+  aadhaarSuccessBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#86EFAC',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 14,
+    gap: 8,
+  },
+  aadhaarSuccessText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#15803D',
+    fontWeight: '600',
+  },
+  aadhaarInputGroup: {
+    marginBottom: 14,
+  },
+  aadhaarLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.navy,
+    marginBottom: 6,
+  },
+  aadhaarInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    height: 48,
+    paddingHorizontal: 14,
+  },
+  aadhaarInput: {
+    flex: 1,
+    fontSize: 15,
+    color: COLORS.textPrimary,
+    fontWeight: '600',
+  },
+  aadhaarSecurityNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    borderRadius: 10,
+    padding: 10,
+    marginVertical: 12,
+    gap: 8,
+  },
+  aadhaarSecurityText: {
+    flex: 1,
+    fontSize: 11,
+    color: '#065F46',
+    lineHeight: 15,
+  },
+  verifySubmitBtn: {
+    borderRadius: 14,
+    marginTop: 4,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  verifySubmitGradient: {
+    borderRadius: 14,
+    paddingVertical: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  verifySubmitText: {
     fontSize: 16,
     fontWeight: '800',
     color: '#FFFFFF',

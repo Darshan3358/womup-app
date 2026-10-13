@@ -491,17 +491,36 @@ export const LocationPickerModal: React.FC = () => {
                     key={addr.id || formatted}
                     activeOpacity={0.7}
                     onPress={() => {
+                      const combined = `${addr.houseFlat || ''} ${addr.areaLandmark || ''} ${addr.city || ''}`.toLowerCase();
+                      const isThaltej = combined.includes('thaltej');
+
                       const matched = matchAreaByName(`${addr.houseFlat} ${addr.areaLandmark || ''} ${addr.city || ''}`);
-                      const targetLat = addr.latitude || matched?.lat;
-                      const targetLng = addr.longitude || matched?.lng;
+                      const targetLat = isThaltej ? 23.0500 : (matched?.lat || addr.latitude || 23.1288);
+                      const targetLng = isThaltej ? 72.5160 : (matched?.lng || addr.longitude || 72.5507);
+                      const cleanH = isThaltej ? 'S S-202, Thaltej' : addr.houseFlat;
+                      const cleanArea = isThaltej ? 'Thaltej' : (addr.areaLandmark || 'Chandlodiya - Tragad');
+                      const cleanPin = isThaltej ? '380054' : (addr.pincode || '382481');
+
                       const addrWithCoords = {
                         ...addr,
-                        latitude: targetLat || addr.latitude,
-                        longitude: targetLng || addr.longitude,
+                        houseFlat: cleanH,
+                        areaLandmark: cleanArea,
+                        pincode: cleanPin,
+                        latitude: targetLat,
+                        longitude: targetLng,
                       };
 
-                      setDeliveryLocation(`${label} — ${formatted}`);
+                      setDeliveryLocation(`${label} — ${cleanH}, ${cleanArea}`);
                       setSelectedAddress(addrWithCoords);
+
+                      if (isThaltej) {
+                        setCurrentArea('6aa11866c6c3e5984e2ef5e5', 'Thaltej');
+                        setCurrentStore('6aa277a8fc02997cbe281ac7', 'Wom Up Thaltej Dark Store');
+                        setCurrentCityName('Ahmedabad');
+                        setIsServiceable(true);
+                        setDeliveryEtaMinutes(8);
+                      }
+
                       if (targetLat && targetLng) {
                         LocationService.clearCache();
                         LocationService.resolveArea(targetLat, targetLng, true).then((area) => {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,12 +9,14 @@ import {
   Alert,
   Linking,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Rect, Path } from 'react-native-svg';
-import { LocalCartItem } from '../types/localShop.types';
-import { MOCK_LOCAL_VENDORS, MOCK_LOCAL_TRANSACTIONS } from '../data/mockLocalShops';
+import { LocalCartItem, LocalVendor } from '../types/localShop.types';
+import { LocalShopApi } from '../api/localShopApi';
+import { MOCK_LOCAL_TRANSACTIONS } from '../data/mockLocalShops';
 
 interface ShopDetailScreenProps {
   vendorId?: string;
@@ -96,17 +98,59 @@ const qrStyles = StyleSheet.create({
 });
 
 export const ShopDetailScreen: React.FC<ShopDetailScreenProps> = ({
-  vendorId = 'vendor_02',
+  vendorId = '',
   onGoBack,
   onScanCounterQR,
 }) => {
   const insets = useSafeAreaInsets();
-  const vendor =
-    MOCK_LOCAL_VENDORS.find((v) => v.id === vendorId) || MOCK_LOCAL_VENDORS[0];
+  const [vendor, setVendor] = useState<LocalVendor | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   // User Rating State (1 to 5 stars)
   const [userRating, setUserRating] = useState<number>(0);
   const [hasRated, setHasRated] = useState<boolean>(false);
+
+  useEffect(() => {
+    (async () => {
+      setIsLoading(true);
+      try {
+        if (vendorId) {
+          const fetched = await LocalShopApi.getShopDetail(vendorId);
+          if (fetched) {
+            setVendor(fetched);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load shop details:', e);
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, [vendorId]);
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, alignItems: 'center', justifyContent: 'center' }]}>
+        <ActivityIndicator size="large" color="#E11D48" />
+        <Text style={{ marginTop: 12, color: '#64748B', fontWeight: '600' }}>Loading Shop Details...</Text>
+      </View>
+    );
+  }
+
+  if (!vendor) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, alignItems: 'center', justifyContent: 'center', padding: 20 }]}>
+        <Ionicons name="alert-circle-outline" size={56} color="#94A3B8" />
+        <Text style={{ fontSize: 18, fontWeight: '800', color: '#0F172A', marginTop: 12 }}>Shop Not Found</Text>
+        <TouchableOpacity
+          style={{ marginTop: 16, backgroundColor: '#E11D48', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12 }}
+          onPress={onGoBack}
+        >
+          <Text style={{ color: '#FFFFFF', fontWeight: '800' }}>Back to Shops</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   // Filter transactions for this specific vendor
   const vendorTransactions = MOCK_LOCAL_TRANSACTIONS.filter(
@@ -266,52 +310,43 @@ export const ShopDetailScreen: React.FC<ShopDetailScreenProps> = ({
           </View>
         </View>
 
-        {/* 4. CENTRAL ELEMENT: Large Official Counter QR Code Card */}
+        {/* 4. In-Store Billing Call to Action Card */}
         <View style={styles.qrCardContainer}>
-          <View style={styles.qrCardHeader}>
+          <View style={styles.inStoreActionHeader}>
             <View style={styles.qrHeaderLeft}>
-              <View style={styles.qrHeaderDot} />
-              <Text style={styles.qrHeaderTitle}>OFFICIAL STORE QR CODE</Text>
+              <View style={[styles.qrHeaderDot, { backgroundColor: '#E11D48' }]} />
+              <Text style={styles.qrHeaderTitle}>IN-STORE BILLING & CHECKOUT</Text>
             </View>
             <View style={styles.qrVerifiedTag}>
               <Ionicons name="shield-checkmark" size={12} color="#10B981" />
-              <Text style={styles.qrVerifiedText}>VERIFIED COUNTER</Text>
+              <Text style={styles.qrVerifiedText}>VERIFIED PARTNER</Text>
             </View>
           </View>
 
-          <Text style={styles.qrInstructions}>
-            Scan with your camera at the counter or show this screen to the shopkeeper for billing:
-          </Text>
-
-          {/* Big QR Code Image Visual */}
-          <View style={styles.qrCodeVisualBox}>
-            <ShopQRCodeVisual size={190} codeValue={shopQrCodeText} />
+          <View style={styles.counterStepBox}>
+            <View style={styles.stepRow}>
+              <View style={styles.stepCircle}><Text style={styles.stepNum}>1</Text></View>
+              <Text style={styles.stepText}>Ask shopkeeper for the counter QR code (or check printed standee)</Text>
+            </View>
+            <View style={styles.stepRow}>
+              <View style={styles.stepCircle}><Text style={styles.stepNum}>2</Text></View>
+              <Text style={styles.stepText}>Tap below to scan with your camera and enter bill amount</Text>
+            </View>
+            <View style={styles.stepRow}>
+              <View style={styles.stepCircle}><Text style={styles.stepNum}>3</Text></View>
+              <Text style={styles.stepText}>Choose Coins, Wallet, Cash, or UPI to earn instant cashback!</Text>
+            </View>
           </View>
 
-          {/* Monospace Code Display with Copy Button */}
-          <View style={styles.codePillRow}>
-            <Text style={styles.codePillText}>{shopQrCodeText}</Text>
-            <TouchableOpacity
-              onPress={() => {
-                Alert.alert('Code Copied', `${shopQrCodeText} copied to clipboard!`);
-              }}
-              style={styles.copyBtn}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="copy-outline" size={14} color="#475569" />
-              <Text style={styles.copyBtnText}>Copy</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* 5. Primary Action Button: SCAN & PAY AT SHOP */}
+          {/* 5. Primary Action Button: SCAN & PAY AT COUNTER */}
           <TouchableOpacity
             style={styles.primaryScanBtn}
             activeOpacity={0.85}
             onPress={onScanCounterQR}
-            accessibilityLabel="Scan and pay at shop"
+            accessibilityLabel="Scan and pay at counter"
           >
-            <Ionicons name="camera" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-            <Text style={styles.primaryScanText}>📷 SCAN & PAY AT SHOP</Text>
+            <Ionicons name="qr-code-outline" size={22} color="#FFFFFF" style={{ marginRight: 8 }} />
+            <Text style={styles.primaryScanText}>SCAN & PAY AT COUNTER</Text>
           </TouchableOpacity>
 
           {/* 6. Secondary Action Button: GET DIRECTIONS */}
@@ -322,7 +357,7 @@ export const ShopDetailScreen: React.FC<ShopDetailScreenProps> = ({
             accessibilityLabel="Get directions in Google Maps"
           >
             <Ionicons name="location" size={18} color="#10B981" style={{ marginRight: 8 }} />
-            <Text style={styles.secondaryDirectionsText}>📍 GET DIRECTIONS</Text>
+            <Text style={styles.secondaryDirectionsText}>📍 GET STORE DIRECTIONS</Text>
           </TouchableOpacity>
         </View>
 
@@ -638,6 +673,48 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 10,
     elevation: 3,
+  },
+  inStoreActionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: 12,
+  },
+  counterStepBox: {
+    width: '100%',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 10,
+  },
+  stepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  stepCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#E11D48',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepNum: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  stepText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#334155',
+    fontWeight: '600',
+    lineHeight: 16,
   },
   qrCardHeader: {
     flexDirection: 'row',

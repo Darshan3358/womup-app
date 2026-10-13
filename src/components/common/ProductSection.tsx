@@ -41,7 +41,7 @@ export const ProductSection: React.FC<ProductSectionProps> = ({
   viewAllText = 'View All',
 }) => {
   const { width } = useWindowDimensions();
-  const { getBlinkitQty, updateBlinkitQty, isInWishlist, toggleWishlist } = useApp();
+  const { getBlinkitQty, updateBlinkitQty, isInWishlist, toggleWishlist, currentAreaName } = useApp();
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
 
   const isSmall = width < 500;
@@ -165,9 +165,23 @@ export const ProductSection: React.FC<ProductSectionProps> = ({
           const activeVariant =
             itemVariants.find((v) => v.id === selectedVariantId) || defaultVariant;
 
-          const currentSellingPrice = activeVariant ? activeVariant.price : item.sellingPrice;
-          const currentMrp = activeVariant ? activeVariant.mrp : item.mrp;
-          const currentPackSize = activeVariant ? activeVariant.label : item.packSize;
+          let currentSellingPrice = activeVariant ? activeVariant.price : item.sellingPrice;
+          let currentMrp = activeVariant ? activeVariant.mrp : item.mrp;
+          let currentPackSize = activeVariant ? activeVariant.label : item.packSize;
+
+          if (item.name.toLowerCase().includes('tomato')) {
+            const isThaltej = (currentAreaName || '').toLowerCase().includes('thaltej');
+            const isChandlodiya =
+              (currentAreaName || '').toLowerCase().includes('chandlodiya') ||
+              (currentAreaName || '').toLowerCase().includes('tragad');
+            if (isThaltej) {
+              currentSellingPrice = 12;
+              currentMrp = 15;
+            } else if (isChandlodiya) {
+              currentSellingPrice = 7;
+              currentMrp = 15;
+            }
+          }
           const discountPercent =
             currentMrp > currentSellingPrice
               ? Math.round(((currentMrp - currentSellingPrice) / currentMrp) * 100)

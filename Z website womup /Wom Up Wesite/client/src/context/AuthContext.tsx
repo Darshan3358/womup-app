@@ -33,6 +33,16 @@ export interface AuthUser {
   referralCode?: string;
   walletBalance?: number;
   shoppingCoins: number;
+  verificationStatus?: string; // 'VERIFIED' | 'NON_VERIFIED' | 'PENDING'
+  aadhaarVerified?: boolean;
+  fullNameAsPerAadhaar?: string;
+  pendingIncome?: number;
+  availableIncome?: number;
+  appDownloadIncome?: number;
+  sponsorCode?: string;
+  isCompanySponsored?: boolean;
+  registrationPincode?: string;
+  registrationCity?: string;
   savedAddresses: UserAddress[];
   createdAt?: string;
 }
@@ -67,7 +77,11 @@ interface AuthContextType {
     preferredCityId?: string;
     preferredCityName?: string;
     referralCode?: string;
+    sponsorCode?: string;
+    pincode?: string;
+    fullNameAsPerAadhaar?: string;
   }) => Promise<{ success: boolean; message?: string }>;
+  verifyAadhaar: (aadhaarNumber: string, fullNameAsPerAadhaar: string) => Promise<{ success: boolean; message?: string }>;
   fetchCities: () => Promise<CityItem[]>;
   loginWithGoogle: (data: GoogleAuthData) => Promise<{ success: boolean; isNewUser?: boolean; requiresPhone?: boolean; message?: string }>;
   linkPhone: (phone: string, cityId?: string, cityName?: string) => Promise<{ success: boolean; message?: string }>;
@@ -240,6 +254,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     preferredCityId?: string;
     preferredCityName?: string;
     referralCode?: string;
+    sponsorCode?: string;
+    pincode?: string;
+    fullNameAsPerAadhaar?: string;
   }): Promise<{ success: boolean; message?: string }> => {
     try {
       const res = await api.post<any>('/auth/register', {
@@ -249,6 +266,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         preferredCityId: data.preferredCityId,
         preferredCityName: data.preferredCityName,
         referralCode: data.referralCode?.trim() || undefined,
+        sponsorCode: data.sponsorCode?.trim() || undefined,
+        pincode: data.pincode?.trim() || undefined,
+        fullNameAsPerAadhaar: data.fullNameAsPerAadhaar?.trim() || undefined,
       });
 
       if (res.success && res.data) {
@@ -265,8 +285,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           preferredCityId: rawUser.preferredCityId || data.preferredCityId,
           preferredCityName: rawUser.preferredCityName || data.preferredCityName,
           referralCode: rawUser.referralCode || data.referralCode,
-          shoppingCoins: rawUser.shoppingCoins ?? 50,
+          sponsorCode: rawUser.sponsorCode || data.sponsorCode,
+          shoppingCoins: rawUser.shoppingCoins ?? 2000,
           walletBalance: rawUser.walletBalance ?? 0,
+          verificationStatus: rawUser.verificationStatus || 'NON_VERIFIED',
+          aadhaarVerified: !!rawUser.aadhaarVerified,
+          fullNameAsPerAadhaar: rawUser.fullNameAsPerAadhaar || data.fullNameAsPerAadhaar,
+          pendingIncome: rawUser.pendingIncome ?? 0,
+          availableIncome: rawUser.availableIncome ?? 0,
+          appDownloadIncome: rawUser.appDownloadIncome ?? 0,
+          registrationPincode: rawUser.registrationPincode || data.pincode,
+          registrationCity: rawUser.registrationCity || data.preferredCityName,
           savedAddresses: rawUser.savedAddresses || [
             {
               id: 'addr_new_1',
@@ -274,7 +303,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               addressLine: `${data.preferredCityName || 'Ahmedabad'} City Center`,
               area: 'Bopal',
               city: data.preferredCityName || 'Ahmedabad',
-              pincode: '380058',
+              pincode: data.pincode || '380015',
               isDefault: true,
             },
           ],
@@ -282,12 +311,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         setUser(newUser);
         closeLoginModal();
-        return { success: true, message: res.data.message || 'Account created successfully' };
+        return { success: true, message: res.data.message || 'Account created successfully with 2,000 Shopping Coins' };
       }
       return { success: false, message: res.message || 'Registration failed' };
     } catch (e: any) {
       console.warn('Backend register error:', e);
       return { success: false, message: e.message || 'Registration failed' };
+    }
+  };
+
+  const verifyAadhaar = async (aadhaarNumber: string, fullNameAsPerAadhaar: string) => {
+    try {
+      const res = await api.post<any>('/users/verify-aadhaar', {
+        aadhaarNumber,
+        fullNameAsPerAadhaar,
+      });
+      if (res.success && res.data) {
+        if (user) {
+          const updated = {
+            ...user,
+            verificationStatus: 'VERIFIED',
+            aadhaarVerified: true,
+            fullNameAsPerAadhaar,
+            shoppingCoins: res.data.user?.shoppingCoins ?? user.shoppingCoins,
+            availableIncome: res.data.user?.availableIncome ?? user.availableIncome,
+            pendingIncome: res.data.user?.pendingIncome ?? user.pendingIncome,
+          };
+          setUser(updated);
+        }
+        return { success: true, message: res.data.message || 'Aadhaar verified successfully!' };
+      }
+      return { success: false, message: res.message || 'Verification failed. Please check Aadhaar details.' };
+    } catch (e: any) {
+      return { success: false, message: e.message || 'Verification request failed' };
     }
   };
 
@@ -452,6 +508,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         sendOtp,
         verifyOtp,
         registerCustomer,
+        verifyAadhaar,
         fetchCities,
         loginWithGoogle,
         linkPhone,

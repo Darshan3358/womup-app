@@ -279,3 +279,57 @@ export interface MarketingCampaign {
   startDate?: string;
   endDate?: string;
 }
+
+export interface VendorAdminItem {
+  id: string;
+  _id?: string;
+  vendorCode: string;
+  storeName: string;
+  ownerName: string;
+  ownerPhone: string;
+  categoryId?: string;
+  categoryName: string;
+  address: string;
+  city: string;
+  cityId?: string;
+  pincode: string;
+  coordinates?: {
+    type: 'Point';
+    coordinates: [number, number];
+  };
+  shoppingCoinPercent: number;
+  minCoinPercent?: number;
+  maxCoinPercent?: number;
+  platformCommissionPercent?: number;
+  openingTime?: string;
+  closingTime?: string;
+  isOpenNow?: boolean;
+  imageUrl?: string;
+  bannerUrl?: string;
+  rating?: number;
+  totalReviews?: number;
+  totalTransactions?: number;
+  monthlyRevenue?: number;
+  upiId?: string;
+  qrCodeUrl?: string;
+  isActive: boolean;
+  isVerified?: boolean;
+  bankAccount?: {
+    accountNumber?: string;
+    ifscCode?: string;
+    bankName?: string;
+  };
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface VendorCategoryItem {
+  id: string;
+  _id?: string;
+  name: string;
+  slug: string;
+  icon?: string;
+  bgColor?: string;
+  sortOrder?: number;
+  isActive?: boolean;
+}

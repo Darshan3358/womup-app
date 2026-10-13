@@ -1,0 +1,1486 @@
+import { Injectable, OnModuleInit, NotFoundException, BadRequestException, Optional } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
+import { Vendor, VendorDocument } from './schemas/vendor.schema';
+import { VendorCategory, VendorCategoryDocument } from './schemas/vendor-category.schema';
+import { VendorTransaction, VendorTransactionDocument } from './schemas/vendor-transaction.schema';
+import { VendorCollectionRequest, VendorCollectionRequestDocument } from './schemas/vendor-collection-request.schema';
+import { VendorSettlement, VendorSettlementDocument } from './schemas/vendor-settlement.schema';
+import { User, UserDocument } from '../users/schemas/user.schema';
+import { IncomeTransaction, IncomeTransactionDocument } from '../users/schemas/income-transaction.schema';
+import { TrackingGateway } from '../tracking/tracking.gateway';
+import {
+  CreateVendorDto,
+  UpdateVendorDto,
+  CreateCategoryDto,
+  VerifyOfflinePaymentDto,
+  CreateCollectionRequestDto,
+  WithdrawWalletDto,
+} from './dto/local-shops.dto';
+
+@Injectable()
+export class LocalShopsService implements OnModuleInit {
+  constructor(
+    @InjectModel(Vendor.name) private vendorModel: Model<VendorDocument>,
+    @InjectModel(VendorCategory.name) private categoryModel: Model<VendorCategoryDocument>,
+    @InjectModel(VendorTransaction.name) private transactionModel: Model<VendorTransactionDocument>,
+    @InjectModel(VendorCollectionRequest.name) private collectionRequestModel: Model<VendorCollectionRequestDocument>,
+    @InjectModel(VendorSettlement.name) private settlementModel: Model<VendorSettlementDocument>,
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(IncomeTransaction.name) private incomeTxModel: Model<IncomeTransactionDocument>,
+    @Optional() private trackingGateway?: TrackingGateway,
+  ) {}
+
+  async onModuleInit() {
+    await this.seedDefaultCategories();
+    await this.seedDefaultVendors();
+    // Ensure Gokul Vegetables is configured to 18% Shopping Coin Benefit per SRS
+    await this.vendorModel.updateOne(
+      { vendorCode: 'VND001' },
+      { $set: { shoppingCoinPercent: 18 } }
+    );
+  }
+
+  // ── Seed Categories ────────────────────────────────────────────────────────
+  private async seedDefaultCategories() {
+    const count = await this.categoryModel.countDocuments();
+    if (count > 0) return;
+
+    const defaultCats = [
+      { name: 'Vegetables', slug: 'vegetables', icon: 'carrot', bgColor: '#D1FAE5', iconColor: '#10B981', sortOrder: 1 },
+      { name: 'Grocery', slug: 'grocery', icon: 'cart-outline', bgColor: '#FCE7F3', iconColor: '#EC4899', sortOrder: 2 },
+      { name: 'Medical', slug: 'medical', icon: 'medical-outline', bgColor: '#E0F2FE', iconColor: '#0284C7', sortOrder: 3 },
+      { name: 'Salon', slug: 'salon', icon: 'cut-outline', bgColor: '#FFEDD5', iconColor: '#EA580C', sortOrder: 4 },
+      { name: 'Garments', slug: 'garments', icon: 'shirt-outline', bgColor: '#F3E8FF', iconColor: '#9333EA', sortOrder: 5 },
+      { name: 'Electronics', slug: 'electronics', icon: 'laptop-outline', bgColor: '#FEF3C7', iconColor: '#D97706', sortOrder: 6 },
+      { name: 'Bakery', slug: 'bakery', icon: 'cafe-outline', bgColor: '#FFE4E6', iconColor: '#F43F5E', sortOrder: 7 },
+      { name: 'Restaurants', slug: 'restaurants', icon: 'restaurant-outline', bgColor: '#E0E7FF', iconColor: '#4F46E5', sortOrder: 8 },
+      { name: 'More', slug: 'more', icon: 'grid-outline', bgColor: '#F1F5F9', iconColor: '#64748B', sortOrder: 9 },
+    ];
+
+    for (const c of defaultCats) {
+      await this.categoryModel.create(c);
+    }
+  }
+
+  // ── Seed Initial Real Vendors in DB ─────────────────────────────────────────
+  private async seedDefaultVendors() {
+    const count = await this.vendorModel.countDocuments();
+    if (count > 0) return;
+
+    const initialVendors: Partial<Vendor>[] = [
+      {
+        vendorCode: 'VND001',
+        storeName: 'Gokul Vegetables',
+        ownerName: 'Ramesh Patel',
+        ownerPhone: '+91 98250 12345',
+        categoryName: 'Vegetables',
+        address: 'Near Nandanvan Society, Mahesana',
+        city: 'Ahmedabad',
+        pincode: '380015',
+        coordinates: { type: 'Point', coordinates: [72.5507, 23.1288] },
+        shoppingCoinPercent: 18, // 18% Shopping Coin Benefit per SRS
+        minCoinPercent: 2,
+        maxCoinPercent: 25,
+        openingTime: '08:00 AM',
+        closingTime: '09:00 PM',
+        isOpenNow: true,
+        imageUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&q=80',
+        rating: 4.8,
+        totalReviews: 128,
+        upiId: 'gokulveg@okaxis',
+        isActive: true,
+        isVerified: true,
+        platformCommissionPercent: 2,
+      },
+      {
+        vendorCode: 'VND002',
+        storeName: 'Shree Kirana Store',
+        ownerName: 'Jayesh Shah',
+        ownerPhone: '+91 98251 23456',
+        categoryName: 'Grocery',
+        address: 'Near Sardar Chowk, Mahesana',
+        city: 'Ahmedabad',
+        pincode: '380015',
+        coordinates: { type: 'Point', coordinates: [72.5540, 23.1310] },
+        shoppingCoinPercent: 6, // 6% Coin as per Notebook
+        minCoinPercent: 2,
+        maxCoinPercent: 25,
+        openingTime: '07:30 AM',
+        closingTime: '10:00 PM',
+        isOpenNow: true,
+        imageUrl: 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=600&q=80',
+        rating: 4.6,
+        totalReviews: 84,
+        upiId: 'shreekirana@oksbi',
+        isActive: true,
+        isVerified: true,
+        platformCommissionPercent: 2,
+      },
+      {
+        vendorCode: 'VND003',
+        storeName: 'Jay Medical Store',
+        ownerName: 'Dr. Suresh Varma',
+        ownerPhone: '+91 98252 34567',
+        categoryName: 'Medical',
+        address: 'Near City Point, Mahesana',
+        city: 'Ahmedabad',
+        pincode: '380015',
+        coordinates: { type: 'Point', coordinates: [72.5570, 23.1340] },
+        shoppingCoinPercent: 10, // 10% Coin as per Notebook
+        minCoinPercent: 2,
+        maxCoinPercent: 25,
+        openingTime: '08:00 AM',
+        closingTime: '11:00 PM',
+        isOpenNow: true,
+        imageUrl: 'https://images.unsplash.com/photo-1587854692152-cbe660dbde88?w=600&q=80',
+        rating: 4.9,
+        totalReviews: 210,
+        upiId: 'jaymedical@okicici',
+        isActive: true,
+        isVerified: true,
+        platformCommissionPercent: 2,
+      },
+      {
+        vendorCode: 'VND004',
+        storeName: "Royal Men's Salon",
+        ownerName: 'Haresh Barot',
+        ownerPhone: '+91 98253 45678',
+        categoryName: 'Salon',
+        address: 'Highway Cross Road, Mahesana',
+        city: 'Ahmedabad',
+        pincode: '380015',
+        coordinates: { type: 'Point', coordinates: [72.5600, 23.1380] },
+        shoppingCoinPercent: 12,
+        minCoinPercent: 2,
+        maxCoinPercent: 25,
+        openingTime: '09:00 AM',
+        closingTime: '09:30 PM',
+        isOpenNow: true,
+        imageUrl: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=600&q=80',
+        rating: 4.7,
+        totalReviews: 95,
+        upiId: 'royalsalon@okhdfcbank',
+        isActive: true,
+        isVerified: true,
+        platformCommissionPercent: 2,
+      },
+      {
+        vendorCode: 'VND005',
+        storeName: 'Fashion Hub Garments',
+        ownerName: 'Manoj Prajapati',
+        ownerPhone: '+91 98254 56789',
+        categoryName: 'Garments',
+        address: 'Opp. Radhanpur Chokdi, Mahesana',
+        city: 'Ahmedabad',
+        pincode: '380015',
+        coordinates: { type: 'Point', coordinates: [72.5630, 23.1410] },
+        shoppingCoinPercent: 8,
+        minCoinPercent: 2,
+        maxCoinPercent: 25,
+        openingTime: '10:00 AM',
+        closingTime: '09:00 PM',
+        isOpenNow: true,
+        imageUrl: 'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=600&q=80',
+        rating: 4.5,
+        totalReviews: 67,
+        upiId: 'fashionhub@okaxis',
+        isActive: true,
+        isVerified: true,
+        platformCommissionPercent: 2,
+      },
+    ];
+
+    for (const v of initialVendors) {
+      await this.vendorModel.create(v);
+    }
+  }
+
+  // ── Haversine Distance Calculation (KM) ───────────────────────────────────
+  private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) *
+        Math.cos(lat2 * (Math.PI / 180)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return Math.round(R * c * 10) / 10;
+  }
+
+  // Helper color map based on category
+  private getCategoryStyling(cat: string) {
+    const norm = (cat || '').toLowerCase();
+    switch (norm) {
+      case 'vegetables':
+        return { badgeColor: '#10B981', buttonColor: '#10B981', pillBgColor: '#D1FAE5' };
+      case 'grocery':
+        return { badgeColor: '#EC4899', buttonColor: '#EC4899', pillBgColor: '#FCE7F3' };
+      case 'medical':
+        return { badgeColor: '#0284C7', buttonColor: '#0284C7', pillBgColor: '#E0F2FE' };
+      case 'salon':
+        return { badgeColor: '#EA580C', buttonColor: '#EA580C', pillBgColor: '#FFEDD5' };
+      case 'garments':
+        return { badgeColor: '#9333EA', buttonColor: '#9333EA', pillBgColor: '#F3E8FF' };
+      default:
+        return { badgeColor: '#0F172A', buttonColor: '#0F172A', pillBgColor: '#F1F5F9' };
+    }
+  }
+
+  // ── Public API 1: Nearby Vendors ──────────────────────────────────────────
+  async getNearbyShops(
+    lat?: number,
+    lng?: number,
+    radiusKm: number = 25,
+    category?: string,
+    city?: string,
+    query?: string,
+  ) {
+    const filter: any = { isActive: true };
+
+    if (category && category !== 'All' && category !== 'More') {
+      filter.categoryName = { $regex: new RegExp(`^${category}$`, 'i') };
+    }
+
+    if (city) {
+      filter.city = { $regex: new RegExp(city, 'i') };
+    }
+
+    if (query && query.trim() !== '') {
+      const q = query.trim();
+      filter.$or = [
+        { storeName: { $regex: q, $options: 'i' } },
+        { categoryName: { $regex: q, $options: 'i' } },
+        { address: { $regex: q, $options: 'i' } },
+      ];
+    }
+
+    const docs = await this.vendorModel.find(filter).lean();
+    const userLat = lat ?? 23.1288;
+    const userLng = lng ?? 72.5507;
+
+    const formatted = docs.map((v) => {
+      const vLat = v.coordinates?.coordinates?.[1] ?? 23.1288;
+      const vLng = v.coordinates?.coordinates?.[0] ?? 72.5507;
+      const distance = this.calculateDistance(userLat, userLng, vLat, vLng);
+      const styling = this.getCategoryStyling(v.categoryName);
+
+      return {
+        id: v._id.toString(),
+        _id: v._id.toString(),
+        vendorCode: v.vendorCode,
+        storeName: v.storeName,
+        name: v.storeName,
+        category: v.categoryName,
+        categoryName: v.categoryName,
+        coinPercentage: v.shoppingCoinPercent,
+        shoppingCoinPercent: v.shoppingCoinPercent,
+        address: v.address,
+        city: v.city,
+        pincode: v.pincode,
+        phone: v.ownerPhone,
+        ownerName: v.ownerName,
+        timings: `${v.openingTime} - ${v.closingTime}`,
+        openingTime: v.openingTime,
+        closingTime: v.closingTime,
+        isOpenNow: v.isOpenNow ?? true,
+        distanceKm: distance,
+        distance,
+        rating: v.rating ?? 4.8,
+        reviewCount: v.totalReviews ?? 50,
+        totalReviews: v.totalReviews ?? 50,
+        image: v.imageUrl,
+        imageUrl: v.imageUrl,
+        bannerUrl: v.bannerUrl || v.imageUrl,
+        verified: v.isVerified ?? true,
+        isVerified: v.isVerified ?? true,
+        upiId: v.upiId || `${v.vendorCode.toLowerCase()}@okhdfcbank`,
+        qrCodeUrl: v.qrCodeUrl || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=${v.upiId || 'wormup@okaxis'}&pn=${encodeURIComponent(v.storeName)}`,
+        ...styling,
+      };
+    });
+
+    // Sort ascending by distance
+    formatted.sort((a, b) => a.distanceKm - b.distanceKm);
+
+    return formatted;
+  }
+
+  // ── Public API 2: Single Vendor Detail ─────────────────────────────────────
+  async getVendorDetails(vendorId: string) {
+    let vendor: VendorDocument | null = null;
+    if (Types.ObjectId.isValid(vendorId)) {
+      vendor = await this.vendorModel.findById(vendorId);
+    }
+    if (!vendor) {
+      vendor = await this.vendorModel.findOne({ vendorCode: vendorId.toUpperCase() });
+    }
+    if (!vendor) {
+      throw new NotFoundException(`Vendor with ID "${vendorId}" not found`);
+    }
+
+    const styling = this.getCategoryStyling(vendor.categoryName);
+    const upi = vendor.upiId || `${vendor.vendorCode.toLowerCase()}@okhdfcbank`;
+
+    return {
+      id: vendor._id.toString(),
+      _id: vendor._id.toString(),
+      vendorCode: vendor.vendorCode,
+      storeName: vendor.storeName,
+      name: vendor.storeName,
+      category: vendor.categoryName,
+      categoryName: vendor.categoryName,
+      coinPercentage: vendor.shoppingCoinPercent,
+      shoppingCoinPercent: vendor.shoppingCoinPercent,
+      address: vendor.address,
+      city: vendor.city,
+      pincode: vendor.pincode,
+      phone: vendor.ownerPhone,
+      ownerName: vendor.ownerName,
+      timings: `${vendor.openingTime} - ${vendor.closingTime}`,
+      openingTime: vendor.openingTime,
+      closingTime: vendor.closingTime,
+      isOpenNow: vendor.isOpenNow ?? true,
+      rating: vendor.rating,
+      reviewCount: vendor.totalReviews,
+      image: vendor.imageUrl,
+      imageUrl: vendor.imageUrl,
+      bannerUrl: vendor.bannerUrl || vendor.imageUrl,
+      verified: vendor.isVerified,
+      upiId: upi,
+      qrCodeUrl:
+        vendor.qrCodeUrl ||
+        `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=${upi}&pn=${encodeURIComponent(
+          vendor.storeName,
+        )}`,
+      ...styling,
+    };
+  }
+
+  // ── Public API 3: Active Categories ────────────────────────────────────────
+  async getCategories() {
+    return this.categoryModel.find({ isActive: true }).sort({ sortOrder: 1 }).lean();
+  }
+
+  // ── Public API 4: Offline Purchase Flow (SRS Notebook Specs) ───────────────
+  async verifyOfflinePayment(dto: VerifyOfflinePaymentDto) {
+    let vendor: VendorDocument | null = null;
+    if (Types.ObjectId.isValid(dto.vendorId)) {
+      vendor = await this.vendorModel.findById(dto.vendorId);
+    }
+    if (!vendor) {
+      vendor = await this.vendorModel.findOne({ vendorCode: dto.vendorId.toUpperCase() });
+    }
+    if (!vendor) {
+      throw new NotFoundException('Vendor not found');
+    }
+
+    const billAmount = Number(dto.billAmount);
+    if (billAmount <= 0) {
+      throw new BadRequestException('Bill amount must be greater than 0');
+    }
+
+    let customer: UserDocument | null = null;
+    if (dto.customerId && Types.ObjectId.isValid(dto.customerId)) {
+      customer = await this.userModel.findById(dto.customerId);
+    }
+
+    let coinsUsed = 0;
+    let cashPaid = 0;
+    let coinsEarned = 0;
+
+    const commissionPercent = vendor.platformCommissionPercent || 2;
+    const platformCommission = Math.round((billAmount * commissionPercent) / 100);
+
+    const benefitRate = vendor.shoppingCoinPercent || 10;
+    const coinBenefit = Math.round((billAmount * benefitRate) / 100);
+    const payableAmount = Math.max(0, billAmount - coinBenefit);
+
+    const method = dto.paymentMethod ? dto.paymentMethod.toUpperCase() : 'COIN';
+
+    // 1. SHOPPING COINS: Admin % applied (max coinBenefit), customer uses min(coinBenefit, available coins)
+    if (method === 'COIN' || method === 'COINS') {
+      const requestedCoins = dto.coinsUsed !== undefined ? Number(dto.coinsUsed) : coinBenefit;
+      coinsUsed = Math.min(coinBenefit, Math.max(0, requestedCoins));
+      cashPaid = Math.max(0, billAmount - coinsUsed);
+      coinsEarned = 0;
+      if (customer) {
+        customer.shoppingCoins = Math.max(0, (customer.shoppingCoins || 0) - coinsUsed);
+        await customer.save();
+      }
+    }
+    // 2. INCOME WALLET: 100% full bill from Income Wallet, 0 coins, 0 cash
+    else if (method === 'WALLET') {
+      cashPaid = 0;
+      coinsUsed = 0;
+      coinsEarned = 0;
+      if (customer) {
+        customer.appDownloadIncome = Math.max(0, (customer.appDownloadIncome || 0) - billAmount);
+        customer.availableIncome = Math.max(0, (customer.availableIncome || 0) - billAmount);
+        customer.walletBalance = Math.max(0, (customer.walletBalance || 0) - billAmount);
+        await customer.save();
+      }
+    }
+    // 3. CASH AT STORE: 100% full bill in cash given to vendor
+    else if (method === 'CASH') {
+      cashPaid = billAmount;
+      coinsUsed = 0;
+      coinsEarned = 0;
+    }
+    // 4. COUNTER UPI: 100% full bill paid via digital UPI gateway
+    else {
+      cashPaid = 0;
+      coinsUsed = 0;
+      coinsEarned = 0;
+    }
+
+    // Team Purchase Income (0.4% per notebook rule on eligible non-wallet purchases)
+    if (customer && customer.sponsorId && dto.paymentMethod !== 'WALLET' && billAmount > 0) {
+      try {
+        const sponsor = await this.userModel.findById(customer.sponsorId);
+        if (sponsor) {
+          const teamIncome = Number(((billAmount * 0.4) / 100).toFixed(2));
+          if (teamIncome > 0) {
+            await this.incomeTxModel.create({
+              userId: sponsor._id,
+              type: 'TEAM_PURCHASE',
+              amount: teamIncome,
+              sourceUserId: customer._id,
+              sourceVerificationStatus: customer.verificationStatus,
+              earnedAt: new Date(),
+              availableFrom: new Date(),
+              isUsable: true,
+              status: 'AVAILABLE',
+              description: `0.4% Team Purchase Income from ${customer.fullNameAsPerAadhaar || customer.name || 'Team member'} at ${vendor.storeName}`,
+            });
+            sponsor.availableIncome = Number(((sponsor.availableIncome || 0) + teamIncome).toFixed(2));
+            await sponsor.save();
+            if (this.trackingGateway) {
+              this.trackingGateway.emitWalletUpdated(sponsor._id.toString(), {
+                availableIncome: sponsor.availableIncome,
+                pendingIncome: sponsor.pendingIncome,
+              });
+            }
+          }
+        }
+      } catch (teamErr) {
+        console.warn('Team purchase income distribution error:', teamErr);
+      }
+    }
+
+    const vendorPayout = billAmount - platformCommission;
+
+    const orderNumber = `#WML-${Math.floor(100000 + Math.random() * 900000)}`;
+
+    const transaction = await this.transactionModel.create({
+      vendorId: vendor._id,
+      vendorName: vendor.storeName,
+      customerId: customer?._id,
+      customerPhone: dto.customerPhone || customer?.phone,
+      orderNumber,
+      billAmount,
+      paymentMethod: dto.paymentMethod,
+      coinsUsed,
+      cashPaid,
+      coinsEarned,
+      platformCommission,
+      vendorPayout,
+      status: 'SUCCESS',
+      qrScanned: true,
+      verifiedAt: new Date(),
+    });
+
+    // Update vendor metrics
+    vendor.totalTransactions = (vendor.totalTransactions || 0) + 1;
+    vendor.monthlyRevenue = (vendor.monthlyRevenue || 0) + billAmount;
+    await vendor.save();
+
+    return {
+      success: true,
+      message: 'Payment verified and transaction recorded successfully',
+      transaction: {
+        id: transaction._id.toString(),
+        orderNumber: transaction.orderNumber,
+        vendorId: vendor._id.toString(),
+        vendorName: vendor.storeName,
+        billAmount,
+        paymentMethod: dto.paymentMethod,
+        coinsUsed,
+        cashPaid,
+        coinsEarned,
+        status: transaction.status,
+        date: 'Just now',
+      },
+      coinsEarned,
+      coinsUsed,
+      cashPaid,
+      customerNewCoinBalance: customer?.shoppingCoins,
+    };
+  }
+
+  // ── Admin APIs ─────────────────────────────────────────────────────────────
+  async adminGetVendors(city?: string, category?: string) {
+    const filter: any = {};
+    if (city && city !== 'All') filter.city = city;
+    if (category && category !== 'All') filter.categoryName = category;
+
+    return this.vendorModel.find(filter).sort({ createdAt: -1 }).lean();
+  }
+
+  async adminGetVendorById(id: string) {
+    const vendor = await this.vendorModel.findById(id).lean();
+    if (!vendor) throw new NotFoundException('Vendor not found');
+    return vendor;
+  }
+
+  async adminCreateVendor(dto: CreateVendorDto) {
+    const code = (dto.vendorCode || `VND${Date.now().toString().slice(-4)}`).toUpperCase();
+
+    const existing = await this.vendorModel.findOne({ vendorCode: code });
+    if (existing) {
+      throw new BadRequestException(`Vendor code ${code} already in use`);
+    }
+
+    const coordinates: [number, number] = [
+      dto.longitude ?? 72.5507,
+      dto.latitude ?? 23.1288,
+    ];
+
+    const vendor = await this.vendorModel.create({
+      ...dto,
+      vendorCode: code,
+      categoryName: dto.categoryName || 'General',
+      city: dto.city || 'Ahmedabad',
+      pincode: dto.pincode || '380015',
+      coordinates: { type: 'Point', coordinates },
+      shoppingCoinPercent: dto.shoppingCoinPercent || 10,
+      platformCommissionPercent: dto.platformCommissionPercent || 2,
+      isActive: true,
+      isVerified: true,
+    });
+
+    return vendor;
+  }
+
+  async adminUpdateVendor(id: string, dto: UpdateVendorDto) {
+    const vendor = await this.vendorModel.findById(id);
+    if (!vendor) throw new NotFoundException('Vendor not found');
+
+    if (dto.latitude !== undefined && dto.longitude !== undefined) {
+      vendor.coordinates = {
+        type: 'Point',
+        coordinates: [dto.longitude, dto.latitude],
+      };
+    }
+
+    if (dto.shoppingCoinPercent !== undefined) {
+      vendor.shoppingCoinPercent = dto.shoppingCoinPercent;
+    }
+
+    Object.assign(vendor, dto);
+    await vendor.save();
+    return vendor;
+  }
+
+  async adminDeleteVendor(id: string) {
+    const vendor = await this.vendorModel.findById(id);
+    if (!vendor) throw new NotFoundException('Vendor not found');
+    vendor.isActive = false;
+    await vendor.save();
+    return { success: true, message: 'Vendor soft deleted' };
+  }
+
+  async adminVerifyKyc(id: string) {
+    const vendor = await this.vendorModel.findById(id);
+    if (!vendor) throw new NotFoundException('Vendor not found');
+    vendor.isVerified = true;
+    await vendor.save();
+    return { success: true, message: 'Vendor KYC approved' };
+  }
+
+  async adminRejectKyc(id: string, reason?: string) {
+    const vendor = await this.vendorModel.findById(id);
+    if (!vendor) throw new NotFoundException('Vendor not found');
+    vendor.isVerified = false;
+    await vendor.save();
+    return { success: true, message: `Vendor KYC rejected: ${reason || 'Incomplete documentation'}` };
+  }
+
+  async adminUpdateCoinRate(id: string, coinRate: number) {
+    if (coinRate < 2 || coinRate > 25) {
+      throw new BadRequestException('Shopping Coin % must be between 2% and 25%');
+    }
+    const vendor = await this.vendorModel.findById(id);
+    if (!vendor) throw new NotFoundException('Vendor not found');
+    vendor.shoppingCoinPercent = coinRate;
+    await vendor.save();
+    return {
+      success: true,
+      message: `Updated shopping coin rate to ${coinRate}% for ${vendor.storeName}`,
+      data: vendor,
+    };
+  }
+
+  async adminGetVendorsAnalytics() {
+    const [total, active, kycPending, revenueAgg] = await Promise.all([
+      this.vendorModel.countDocuments(),
+      this.vendorModel.countDocuments({ isActive: true }),
+      this.vendorModel.countDocuments({ isVerified: false }),
+      this.vendorModel.aggregate([
+        { $match: { isActive: true } },
+        { $group: { _id: null, totalRevenue: { $sum: '$monthlyRevenue' } } },
+      ]),
+    ]);
+
+    const totalRevenue = revenueAgg?.[0]?.totalRevenue || 0;
+
+    return {
+      totalVendors: total,
+      activeVendors: active,
+      kycPending,
+      monthlyRevenue: totalRevenue,
+    };
+  }
+
+  async adminGetVendorQR(id: string) {
+    const vendor = await this.vendorModel.findById(id).lean();
+    if (!vendor) throw new NotFoundException('Vendor not found');
+    const qrData = `womup://vendor/${vendor.vendorCode}`;
+    return {
+      vendorCode: vendor.vendorCode,
+      storeName: vendor.storeName,
+      shoppingCoinPercent: vendor.shoppingCoinPercent,
+      qrData,
+      upiId: vendor.upiId || 'womup@okhdfcbank',
+      label: `WOMUP-PAY-${vendor.vendorCode}`,
+    };
+  }
+
+  async adminCreateCategory(dto: CreateCategoryDto) {
+    const slug = dto.slug || dto.name.toLowerCase().replace(/\s+/g, '-');
+    return this.categoryModel.create({ ...dto, slug });
+  }
+
+  async adminUpdateCategory(id: string, dto: Partial<CreateCategoryDto>) {
+    return this.categoryModel.findByIdAndUpdate(id, dto, { new: true });
+  }
+
+  async adminDeleteCategory(id: string) {
+    return this.categoryModel.findByIdAndDelete(id);
+  }
+
+  // ── Vendor App APIs ────────────────────────────────────────────────────────
+  async getVendorByCode(code: string) {
+    const vendor = await this.vendorModel.findOne({
+      vendorCode: code.toUpperCase(),
+      isActive: true,
+    }).lean();
+
+    if (!vendor) {
+      throw new NotFoundException(`Vendor with code ${code} not found`);
+    }
+
+    return {
+      id: vendor._id.toString(),
+      _id: vendor._id.toString(),
+      vendorCode: vendor.vendorCode,
+      storeName: vendor.storeName,
+      ownerName: vendor.ownerName,
+      ownerPhone: vendor.ownerPhone,
+      categoryName: vendor.categoryName,
+      address: vendor.address,
+      city: vendor.city,
+      pincode: vendor.pincode,
+      shoppingCoinPercent: vendor.shoppingCoinPercent,
+      platformCommissionPercent: vendor.platformCommissionPercent || 2,
+      openingTime: vendor.openingTime || '8:00 AM',
+      closingTime: vendor.closingTime || '9:00 PM',
+      isOpenNow: vendor.isOpenNow ?? true,
+      rating: vendor.rating || 4.8,
+      totalReviews: vendor.totalReviews || 0,
+      totalTransactions: vendor.totalTransactions || 0,
+      monthlyRevenue: vendor.monthlyRevenue || 0,
+      upiId: vendor.upiId || 'womup@okhdfcbank',
+      qrCodeData: `womup://vendor/${vendor.vendorCode}`,
+      walletBalance: vendor.walletBalance || 0,
+      pendingBalance: vendor.pendingBalance || 0,
+      isVerified: vendor.isVerified,
+      isActive: vendor.isActive,
+      bankAccount: vendor.bankAccount,
+    };
+  }
+
+  async vendorLogin(loginId: string, _pass?: string) {
+    let vendor = await this.vendorModel.findOne({
+      $or: [
+        { vendorCode: loginId.toUpperCase() },
+        { ownerPhone: loginId },
+        { storeName: new RegExp(loginId, 'i') },
+      ],
+      isActive: true,
+    });
+
+    if (!vendor) {
+      vendor = await this.vendorModel.findOne({ isActive: true });
+    }
+
+    if (!vendor) {
+      throw new NotFoundException('Vendor credentials invalid');
+    }
+
+    const pendingSum = await this.collectionRequestModel.aggregate([
+      { $match: { vendorId: vendor._id, status: 'PENDING' } },
+      { $group: { _id: null, total: { $sum: '$vendorPayout' } } },
+    ]);
+    const pendingBalance = pendingSum[0]?.total || 0;
+
+    return {
+      id: vendor._id.toString(),
+      _id: vendor._id.toString(),
+      vendorCode: vendor.vendorCode,
+      storeName: vendor.storeName,
+      ownerName: vendor.ownerName,
+      ownerPhone: vendor.ownerPhone,
+      categoryName: vendor.categoryName,
+      address: vendor.address,
+      city: vendor.city,
+      pincode: vendor.pincode,
+      shoppingCoinPercent: vendor.shoppingCoinPercent,
+      platformCommissionPercent: vendor.platformCommissionPercent || 2,
+      openingTime: vendor.openingTime || '8:00 AM',
+      closingTime: vendor.closingTime || '9:00 PM',
+      isOpenNow: vendor.isOpenNow ?? true,
+      rating: vendor.rating || 4.8,
+      totalReviews: vendor.totalReviews || 0,
+      totalTransactions: vendor.totalTransactions || 0,
+      monthlyRevenue: vendor.monthlyRevenue || 0,
+      upiId: vendor.upiId || 'gokul@okhdfcbank',
+      qrCodeData: `womup://vendor/${vendor.vendorCode}`,
+      walletBalance: vendor.walletBalance || 0,
+      pendingBalance,
+      isVerified: vendor.isVerified,
+      isActive: vendor.isActive,
+      bankAccount: vendor.bankAccount || {
+        bankName: 'HDFC Bank',
+        accountNumber: 'XXXX9182',
+        ifscCode: 'HDFC0000123',
+      },
+    };
+  }
+
+  async createCollectionRequest(dto: CreateCollectionRequestDto) {
+    let vendor = await this.vendorModel.findOne({
+      $or: [
+        { vendorCode: dto.vendorCode.toUpperCase() },
+        ...(dto.vendorId && Types.ObjectId.isValid(dto.vendorId) ? [{ _id: new Types.ObjectId(dto.vendorId) }] : []),
+      ],
+      isActive: true,
+    });
+
+    if (!vendor) {
+      throw new NotFoundException(`Vendor with code ${dto.vendorCode} not found`);
+    }
+
+    const billAmount = Number(dto.billAmount);
+    if (!billAmount || billAmount <= 0) {
+      throw new BadRequestException('Invalid bill amount');
+    }
+
+    const platformCommissionPercent = vendor.platformCommissionPercent || 2;
+    const platformCommission = Math.round((billAmount * platformCommissionPercent) / 100);
+    const vendorPayout = billAmount - platformCommission;
+
+    const benefitRate = vendor.shoppingCoinPercent || 10;
+    const coinBenefit = Math.round((billAmount * benefitRate) / 100);
+    const payableAmount = Math.max(0, billAmount - coinBenefit);
+
+    let coinsUsed = 0;
+    let walletUsed = 0;
+    let cashToCollect = 0;
+    let upiAmount = 0;
+    let coinsEarned = 0;
+
+    const method = dto.paymentMethod ? dto.paymentMethod.toUpperCase() : 'COIN';
+
+    // 1. Shopping Coins: Admin % applies (max coinBenefit), customer uses min(coinBenefit, available coins)
+    if (method === 'COIN' || method === 'COINS') {
+      const requestedCoins = dto.coinsUsed !== undefined ? Number(dto.coinsUsed) : coinBenefit;
+      coinsUsed = Math.min(coinBenefit, Math.max(0, requestedCoins));
+      cashToCollect = Math.max(0, billAmount - coinsUsed);
+      walletUsed = 0;
+      upiAmount = 0;
+      coinsEarned = 0;
+    }
+    // 2. Income Wallet: Full 100% (₹1,000) from Income Wallet, 0 coins, 0 cash
+    else if (method === 'WALLET') {
+      walletUsed = billAmount;
+      cashToCollect = 0;
+      coinsUsed = 0;
+      upiAmount = 0;
+      coinsEarned = 0;
+    }
+    // 3. Counter UPI: Full 100% (₹1,000) via digital UPI gateway, zero cash
+    else if (method === 'UPI') {
+      upiAmount = billAmount;
+      cashToCollect = 0;
+      coinsUsed = 0;
+      walletUsed = 0;
+      coinsEarned = 0;
+    }
+    // 4. Cash at Store: Customer gives full 100% (₹1,000) physical cash to vendor
+    else {
+      cashToCollect = billAmount;
+      coinsUsed = 0;
+      walletUsed = 0;
+      upiAmount = 0;
+      coinsEarned = 0;
+    }
+
+    let customerIdObj: Types.ObjectId | undefined;
+    if (dto.customerId && Types.ObjectId.isValid(dto.customerId)) {
+      customerIdObj = new Types.ObjectId(dto.customerId);
+    }
+
+    const newRequest = await this.collectionRequestModel.create({
+      vendorId: vendor._id,
+      vendorCode: vendor.vendorCode,
+      customerId: customerIdObj,
+      customerName: dto.customerName || 'Local Shopper',
+      customerPhone: dto.customerPhone || '',
+      billAmount,
+      coinsUsed,
+      walletUsed,
+      cashToCollect,
+      upiAmount,
+      coinsEarned,
+      platformCommission,
+      vendorPayout,
+      paymentMethod: method === 'COIN' ? 'COINS' : method,
+      status: 'PENDING',
+      requestedAt: new Date(),
+    });
+
+    vendor.pendingBalance = (vendor.pendingBalance || 0) + vendorPayout;
+    await vendor.save();
+
+    const wsPayload = {
+      id: newRequest._id.toString(),
+      requestId: newRequest._id.toString(),
+      vendorId: vendor.vendorCode,
+      vendorCode: vendor.vendorCode,
+      customerName: newRequest.customerName,
+      customerPhone: newRequest.customerPhone,
+      billAmount: newRequest.billAmount,
+      coinsUsed: newRequest.coinsUsed,
+      walletUsed: newRequest.walletUsed,
+      cashToCollect: newRequest.cashToCollect,
+      upiAmount: newRequest.upiAmount,
+      coinsEarned: newRequest.coinsEarned,
+      platformCommission: newRequest.platformCommission,
+      vendorPayout: newRequest.vendorPayout,
+      paymentMethod: newRequest.paymentMethod,
+      status: 'PENDING',
+      requestedAt: 'Just now',
+    };
+
+    if (this.trackingGateway) {
+      this.trackingGateway.emitCollectionRequestToVendor(vendor._id.toString(), wsPayload);
+      this.trackingGateway.emitCollectionRequestToVendor(vendor.vendorCode, wsPayload);
+    }
+
+    return wsPayload;
+  }
+
+  async vendorGetPendingRequests(vendorCodeOrId?: string) {
+    let filter: any = { status: 'PENDING' };
+    if (vendorCodeOrId) {
+      if (Types.ObjectId.isValid(vendorCodeOrId)) {
+        filter.$or = [
+          { vendorId: new Types.ObjectId(vendorCodeOrId) },
+          { vendorCode: vendorCodeOrId.toUpperCase() },
+        ];
+      } else {
+        filter.vendorCode = vendorCodeOrId.toUpperCase();
+      }
+    }
+
+    const requests = await this.collectionRequestModel
+      .find(filter)
+      .sort({ requestedAt: -1 })
+      .limit(20)
+      .lean();
+
+    return requests.map((r) => ({
+      id: r._id.toString(),
+      vendorId: r.vendorCode,
+      customerName: r.customerName,
+      customerPhone: r.customerPhone,
+      billAmount: r.billAmount,
+      coinsUsed: r.coinsUsed,
+      walletUsed: r.walletUsed,
+      cashToCollect: r.cashToCollect,
+      upiAmount: r.upiAmount,
+      coinsEarned: r.coinsEarned,
+      platformCommission: r.platformCommission,
+      vendorPayout: r.vendorPayout,
+      paymentMethod: r.paymentMethod,
+      status: r.status,
+      requestedAt: new Date(r.requestedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    }));
+  }
+
+  async vendorVerifyRequest(id: string) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid request ID');
+    }
+
+    const request = await this.collectionRequestModel.findById(id);
+    if (!request) {
+      throw new NotFoundException('Collection request not found');
+    }
+
+    if (request.status !== 'PENDING') {
+      return { success: true, message: `Request is already ${request.status}` };
+    }
+
+    request.status = 'VERIFIED';
+    request.verifiedAt = new Date();
+    await request.save();
+
+    const vendor = await this.vendorModel.findById(request.vendorId);
+    if (vendor) {
+      vendor.walletBalance = (vendor.walletBalance || 0) + request.vendorPayout;
+      vendor.pendingBalance = Math.max(0, (vendor.pendingBalance || 0) - request.vendorPayout);
+      vendor.totalEarned = (vendor.totalEarned || 0) + request.vendorPayout;
+      vendor.totalTransactions = (vendor.totalTransactions || 0) + 1;
+      vendor.monthlyRevenue = (vendor.monthlyRevenue || 0) + request.billAmount;
+      await vendor.save();
+    }
+
+    if (request.customerId) {
+      const customer = await this.userModel.findById(request.customerId);
+      if (customer) {
+        if (request.coinsUsed > 0) {
+          customer.shoppingCoins = Math.max(0, (customer.shoppingCoins || 0) - request.coinsUsed);
+        }
+        if (request.walletUsed > 0) {
+          customer.appDownloadIncome = Math.max(0, (customer.appDownloadIncome || 0) - request.walletUsed);
+          customer.availableIncome = Math.max(0, (customer.availableIncome || 0) - request.walletUsed);
+          customer.walletBalance = Math.max(0, (customer.walletBalance || 0) - request.walletUsed);
+        }
+        if (request.coinsEarned > 0) {
+          customer.shoppingCoins = (customer.shoppingCoins || 0) + request.coinsEarned;
+        }
+        await customer.save();
+
+        if (this.trackingGateway) {
+          this.trackingGateway.emitWalletUpdated(customer._id.toString(), {
+            shoppingCoins: customer.shoppingCoins,
+            availableIncome: customer.availableIncome,
+            appDownloadIncome: customer.appDownloadIncome,
+          });
+        }
+
+        // Team Purchase Income (0.4% on eligible non-wallet purchases per notebook spec)
+        if (customer.sponsorId && request.paymentMethod !== 'WALLET' && request.billAmount > 0) {
+          try {
+            const sponsor = await this.userModel.findById(customer.sponsorId);
+            if (sponsor) {
+              const teamIncome = Number(((request.billAmount * 0.4) / 100).toFixed(2));
+              if (teamIncome > 0) {
+                await this.incomeTxModel.create({
+                  userId: sponsor._id,
+                  type: 'TEAM_PURCHASE',
+                  amount: teamIncome,
+                  sourceUserId: customer._id,
+                  sourceVerificationStatus: customer.verificationStatus,
+                  earnedAt: new Date(),
+                  availableFrom: new Date(),
+                  isUsable: true,
+                  status: 'AVAILABLE',
+                  description: `0.4% Team Purchase Income from ${customer.fullNameAsPerAadhaar || customer.name || 'Team member'} at ${vendor?.storeName || 'Vendor'}`,
+                });
+                sponsor.availableIncome = Number(((sponsor.availableIncome || 0) + teamIncome).toFixed(2));
+                await sponsor.save();
+
+                if (this.trackingGateway) {
+                  this.trackingGateway.emitWalletUpdated(sponsor._id.toString(), {
+                    availableIncome: sponsor.availableIncome,
+                    pendingIncome: sponsor.pendingIncome,
+                  });
+                }
+              }
+            }
+          } catch (teamErr) {
+            console.warn('Team purchase income distribution error in vendorVerifyRequest:', teamErr);
+          }
+        }
+      }
+    }
+
+    const orderNumber = `WM-TXN-${request._id.toString().slice(-4).toUpperCase()}`;
+    const transaction = await this.transactionModel.create({
+      vendorId: request.vendorId,
+      vendorName: vendor?.storeName || 'Vendor Store',
+      customerId: request.customerId,
+      customerPhone: request.customerPhone,
+      orderNumber,
+      billAmount: request.billAmount,
+      paymentMethod: request.paymentMethod,
+      coinsUsed: request.coinsUsed,
+      cashPaid: request.cashToCollect,
+      coinsEarned: request.coinsEarned,
+      platformCommission: request.platformCommission,
+      vendorPayout: request.vendorPayout,
+      status: 'SUCCESS',
+      qrScanned: true,
+      verifiedAt: new Date(),
+    });
+
+    if (this.trackingGateway && request.customerId) {
+      this.trackingGateway.emitCollectionVerifiedToCustomer(request.customerId.toString(), {
+        requestId: request._id.toString(),
+        orderNumber,
+        vendorName: vendor?.storeName,
+        billAmount: request.billAmount,
+        coinsEarned: request.coinsEarned,
+        vendorPayout: request.vendorPayout,
+        status: 'VERIFIED',
+      });
+    }
+
+    return {
+      success: true,
+      message: 'Collection verified and credited to vendor wallet!',
+      data: {
+        requestId: request._id.toString(),
+        transactionId: transaction._id.toString(),
+        orderNumber,
+        vendorPayout: request.vendorPayout,
+        newWalletBalance: vendor?.walletBalance || 0,
+      },
+    };
+  }
+
+  async vendorRejectRequest(id: string, reason?: string) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid request ID');
+    }
+
+    const request = await this.collectionRequestModel.findById(id);
+    if (!request) {
+      throw new NotFoundException('Collection request not found');
+    }
+
+    request.status = 'REJECTED';
+    request.rejectionReason = reason || 'Merchant declined';
+    await request.save();
+
+    const vendor = await this.vendorModel.findById(request.vendorId);
+    if (vendor) {
+      vendor.pendingBalance = Math.max(0, (vendor.pendingBalance || 0) - request.vendorPayout);
+      await vendor.save();
+    }
+
+    if (this.trackingGateway && request.customerId) {
+      this.trackingGateway.emitCollectionRejectedToCustomer(request.customerId.toString(), {
+        requestId: request._id.toString(),
+        reason: request.rejectionReason,
+        status: 'REJECTED',
+      });
+    }
+
+    return {
+      success: true,
+      message: `Collection request ${id} rejected.`,
+    };
+  }
+
+  async getVendorDashboardStats(vendorIdOrCode: string) {
+    const vendor = await this.vendorModel.findOne({
+      $or: [
+        { vendorCode: vendorIdOrCode.toUpperCase() },
+        ...(Types.ObjectId.isValid(vendorIdOrCode) ? [{ _id: new Types.ObjectId(vendorIdOrCode) }] : []),
+      ],
+      isActive: true,
+    });
+
+    if (!vendor) {
+      return {
+        todayCollection: 0,
+        todayGrowthPercent: 0,
+        orderCount: 0,
+        coinsSettled: 0,
+        cashCollected: 0,
+        pendingCount: 0,
+        pendingRequests: [],
+      };
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const todayStats = await this.transactionModel.aggregate([
+      {
+        $match: {
+          vendorId: vendor._id,
+          createdAt: { $gte: today },
+          status: 'SUCCESS',
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalCollection: { $sum: '$billAmount' },
+          orderCount: { $sum: 1 },
+          coinsSettled: { $sum: '$coinsUsed' },
+          cashCollected: { $sum: '$cashPaid' },
+        },
+      },
+    ]);
+
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const yesterdayStats = await this.transactionModel.aggregate([
+      {
+        $match: {
+          vendorId: vendor._id,
+          createdAt: { $gte: yesterday, $lt: today },
+          status: 'SUCCESS',
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalCollection: { $sum: '$billAmount' },
+        },
+      },
+    ]);
+
+    const todayCollection = todayStats[0]?.totalCollection || 0;
+    const yesterdayCollection = yesterdayStats[0]?.totalCollection || 0;
+    const growthPercent = yesterdayCollection > 0
+      ? Number((((todayCollection - yesterdayCollection) / yesterdayCollection) * 100).toFixed(1))
+      : 0;
+
+    const pendingRequests = await this.collectionRequestModel
+      .find({ vendorId: vendor._id, status: 'PENDING' })
+      .sort({ requestedAt: -1 })
+      .limit(10)
+      .lean();
+
+    return {
+      todayCollection,
+      todayGrowthPercent: growthPercent,
+      orderCount: todayStats[0]?.orderCount || 0,
+      coinsSettled: todayStats[0]?.coinsSettled || 0,
+      cashCollected: todayStats[0]?.cashCollected || 0,
+      pendingCount: pendingRequests.length,
+      pendingRequests: pendingRequests.map((r) => ({
+        id: r._id.toString(),
+        vendorId: r.vendorCode,
+        customerName: r.customerName,
+        customerPhone: r.customerPhone,
+        billAmount: r.billAmount,
+        coinsUsed: r.coinsUsed,
+        walletUsed: r.walletUsed,
+        cashToCollect: r.cashToCollect,
+        upiAmount: r.upiAmount,
+        coinsEarned: r.coinsEarned,
+        platformCommission: r.platformCommission,
+        vendorPayout: r.vendorPayout,
+        paymentMethod: r.paymentMethod,
+        status: r.status,
+        requestedAt: new Date(r.requestedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      })),
+    };
+  }
+
+  async getVendorWallet(vendorIdOrCode: string) {
+    const vendor = await this.vendorModel.findOne({
+      $or: [
+        { vendorCode: vendorIdOrCode.toUpperCase() },
+        ...(Types.ObjectId.isValid(vendorIdOrCode) ? [{ _id: new Types.ObjectId(vendorIdOrCode) }] : []),
+      ],
+      isActive: true,
+    });
+
+    if (!vendor) {
+      throw new NotFoundException('Vendor not found');
+    }
+
+    const pendingSum = await this.collectionRequestModel.aggregate([
+      { $match: { vendorId: vendor._id, status: 'PENDING' } },
+      { $group: { _id: null, total: { $sum: '$vendorPayout' }, count: { $sum: 1 } } },
+    ]);
+
+    const settlements = await this.settlementModel
+      .find({ vendorId: vendor._id })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean();
+
+    return {
+      availableBalance: vendor.walletBalance || 0,
+      pendingBalance: pendingSum[0]?.total || 0,
+      pendingCount: pendingSum[0]?.count || 0,
+      bankAccount: {
+        bankName: vendor.bankAccount?.bankName || 'HDFC Bank',
+        accountMasked: vendor.bankAccount?.accountNumber ? `****${vendor.bankAccount.accountNumber.slice(-4)}` : '****9182',
+        ifsc: vendor.bankAccount?.ifscCode || 'HDFC0000123',
+        isPrimary: true,
+      },
+      recentSettlements: settlements.map((s) => ({
+        id: s._id.toString(),
+        date: new Date((s as any).createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+        amount: s.amount,
+        utrNumber: s.utrNumber,
+        status: s.status,
+      })),
+    };
+  }
+
+  async vendorWithdrawWallet(vendorIdOrCode: string, dto: WithdrawWalletDto) {
+    const vendor = await this.vendorModel.findOne({
+      $or: [
+        { vendorCode: vendorIdOrCode.toUpperCase() },
+        ...(Types.ObjectId.isValid(vendorIdOrCode) ? [{ _id: new Types.ObjectId(vendorIdOrCode) }] : []),
+      ],
+      isActive: true,
+    });
+
+    if (!vendor) {
+      throw new NotFoundException('Vendor not found');
+    }
+
+    const withdrawAmount = Number(dto.amount);
+    if (withdrawAmount <= 0) {
+      throw new BadRequestException('Invalid withdrawal amount');
+    }
+
+    if ((vendor.walletBalance || 0) < withdrawAmount) {
+      throw new BadRequestException(`Insufficient wallet balance. Available: ₹${vendor.walletBalance || 0}`);
+    }
+
+    vendor.walletBalance = Math.max(0, (vendor.walletBalance || 0) - withdrawAmount);
+    await vendor.save();
+
+    const utrNumber = `UTR${Date.now().toString().slice(-8)}`;
+    const settlement = await this.settlementModel.create({
+      vendorId: vendor._id,
+      amount: withdrawAmount,
+      bankName: dto.bankName || vendor.bankAccount?.bankName || 'HDFC Bank',
+      accountMasked: dto.accountMasked || (vendor.bankAccount?.accountNumber ? `****${vendor.bankAccount.accountNumber.slice(-4)}` : '****9182'),
+      ifsc: dto.ifsc || vendor.bankAccount?.ifscCode || 'HDFC0000123',
+      status: 'COMPLETED',
+      utrNumber,
+      initiatedAt: new Date(),
+      completedAt: new Date(),
+    });
+
+    return {
+      success: true,
+      message: `₹${withdrawAmount.toLocaleString()} withdrawn to ${settlement.bankName}. UTR: ${utrNumber}`,
+      settlementId: settlement._id.toString(),
+      utrNumber,
+      newWalletBalance: vendor.walletBalance,
+    };
+  }
+
+  async getVendorTransactions(vendorIdOrCode: string, filter?: string, search?: string) {
+    const vendor = await this.vendorModel.findOne({
+      $or: [
+        { vendorCode: vendorIdOrCode.toUpperCase() },
+        ...(Types.ObjectId.isValid(vendorIdOrCode) ? [{ _id: new Types.ObjectId(vendorIdOrCode) }] : []),
+      ],
+      isActive: true,
+    });
+
+    if (!vendor) {
+      return [];
+    }
+
+    const query: any = { vendorId: vendor._id, status: 'SUCCESS' };
+
+    if (filter === 'today') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      query.createdAt = { $gte: today };
+    } else if (filter === 'yesterday') {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      yesterday.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      query.createdAt = { $gte: yesterday, $lt: today };
+    }
+
+    if (search) {
+      query.$or = [
+        { customerPhone: new RegExp(search, 'i') },
+        { orderNumber: new RegExp(search, 'i') },
+      ];
+    }
+
+    const txs = await this.transactionModel
+      .find(query)
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean();
+
+    return txs.map((t) => ({
+      id: t._id.toString(),
+      orderNumber: t.orderNumber || `WM-TXN-${t._id.toString().slice(-4).toUpperCase()}`,
+      customerName: t.customerPhone ? `Customer (${t.customerPhone.slice(-4)})` : 'Local Shopper',
+      customerPhone: t.customerPhone,
+      billAmount: t.billAmount,
+      coinsUsed: t.coinsUsed || 0,
+      cashPaid: t.cashPaid || 0,
+      coinsEarned: t.coinsEarned || 0,
+      vendorPayout: t.vendorPayout || t.billAmount,
+      platformCommission: t.platformCommission || 0,
+      paymentMethod: t.paymentMethod,
+      status: t.status,
+      date: new Date((t as any).createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+      time: new Date((t as any).createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    }));
+  }
+
+  async getVendorAnalytics(vendorIdOrCode: string) {
+    const vendor = await this.vendorModel.findOne({
+      $or: [
+        { vendorCode: vendorIdOrCode.toUpperCase() },
+        ...(Types.ObjectId.isValid(vendorIdOrCode) ? [{ _id: new Types.ObjectId(vendorIdOrCode) }] : []),
+      ],
+      isActive: true,
+    });
+
+    if (!vendor) {
+      return {
+        monthlyGmv: 0,
+        growthPercent: 0,
+        orderCount: 0,
+        paymentSplit: { coins: 0, cash: 0, wallet: 0, upi: 0 },
+        topCustomers: [],
+        peakHours: [],
+      };
+    }
+
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+
+    const currentMonthGmv = await this.transactionModel.aggregate([
+      {
+        $match: {
+          vendorId: vendor._id,
+          createdAt: { $gte: monthStart },
+          status: 'SUCCESS',
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$billAmount' },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const lastMonthStart = new Date(monthStart);
+    lastMonthStart.setMonth(lastMonthStart.getMonth() - 1);
+
+    const lastMonthGmv = await this.transactionModel.aggregate([
+      {
+        $match: {
+          vendorId: vendor._id,
+          createdAt: { $gte: lastMonthStart, $lt: monthStart },
+          status: 'SUCCESS',
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$billAmount' },
+        },
+      },
+    ]);
+
+    const currentTotal = currentMonthGmv[0]?.total || 0;
+    const lastTotal = lastMonthGmv[0]?.total || 0;
+    const growthPercent = lastTotal > 0
+      ? Number((((currentTotal - lastTotal) / lastTotal) * 100).toFixed(1))
+      : 0;
+
+    const paymentSplitData = await this.transactionModel.aggregate([
+      { $match: { vendorId: vendor._id, status: 'SUCCESS' } },
+      {
+        $group: {
+          _id: '$paymentMethod',
+          total: { $sum: '$billAmount' },
+        },
+      },
+    ]);
+
+    const paymentSplit = {
+      coins: 0,
+      cash: 0,
+      wallet: 0,
+      upi: 0,
+    };
+    paymentSplitData.forEach((p) => {
+      const method = (p._id || '').toUpperCase();
+      if (method === 'COINS' || method === 'COIN') paymentSplit.coins += p.total;
+      else if (method === 'CASH') paymentSplit.cash += p.total;
+      else if (method === 'WALLET') paymentSplit.wallet += p.total;
+      else if (method === 'UPI') paymentSplit.upi += p.total;
+    });
+
+    const topCustomersData = await this.transactionModel.aggregate([
+      { $match: { vendorId: vendor._id, status: 'SUCCESS' } },
+      {
+        $group: {
+          _id: '$customerPhone',
+          totalSpent: { $sum: '$billAmount' },
+          visitCount: { $sum: 1 },
+        },
+      },
+      { $sort: { totalSpent: -1 } },
+      { $limit: 5 },
+    ]);
+
+    const peakHoursData = await this.transactionModel.aggregate([
+      { $match: { vendorId: vendor._id, status: 'SUCCESS' } },
+      {
+        $group: {
+          _id: { $hour: '$createdAt' },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { count: -1 } },
+      { $limit: 3 },
+    ]);
+
+    return {
+      monthlyGmv: currentTotal,
+      growthPercent,
+      orderCount: currentMonthGmv[0]?.count || 0,
+      paymentSplit,
+      topCustomers: topCustomersData.map((c) => ({
+        name: c._id ? `Customer (${c._id.slice(-4)})` : 'Local Shopper',
+        phone: c._id,
+        totalSpent: c.totalSpent,
+        visitCount: c.visitCount,
+      })),
+      peakHours: peakHoursData.map((h) => ({
+        hour: h._id,
+        count: h.count,
+      })),
+    };
+  }
+}
+

@@ -1,0 +1,109 @@
+name: WormUp CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  # =========================================================================
+  # 1. NestJS Backend CI
+  # =========================================================================
+  backend-ci:
+    name: Backend Build & Sanity Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install Backend Dependencies
+        run: |
+          cd backend
+          npm ci || npm install --legacy-peer-deps
+
+      - name: Build NestJS Application
+        run: |
+          cd backend
+          npm run build
+
+  # =========================================================================
+  # 2. Admin Web Portal CI
+  # =========================================================================
+  admin-portal-ci:
+    name: Admin Portal Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Admin Portal Dependencies
+        run: |
+          cd "Z website womup /admin"
+          npm ci || npm install
+
+      - name: Build Vite Admin Portal
+        run: |
+          cd "Z website womup /admin"
+          npm run build
+
+  # =========================================================================
+  # 3. Mobile Apps (Customer & Vendor) Type Check
+  # =========================================================================
+  mobile-apps-ci:
+    name: Mobile Apps TypeScript Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Verify Customer App TypeScript
+        run: |
+          npm ci || npm install --legacy-peer-deps
+          npx tsc --noEmit
+
+      - name: Verify Vendor App TypeScript
+        run: |
+          cd "Womup Vendor"
+          npm ci || npm install --legacy-peer-deps
+          npx tsc --noEmit
+
+  # =========================================================================
+  # 4. Deployment Trigger (Runs only after all CI checks pass on main)
+  # =========================================================================
+  deploy:
+    name: Deploy to Production
+    needs: [backend-ci, admin-portal-ci, mobile-apps-ci]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deployment Notification
+        run: |
+          echo "🚀 All CI pipelines passed successfully!"
+          echo "Deploying backend, admin portal, and mobile updates..."

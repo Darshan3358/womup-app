@@ -118,10 +118,35 @@ export class RegisterDto {
   @Matches(/^[6-9]\d{9}$/, { message: 'Please enter a valid 10-digit Indian mobile number' })
   phone?: string;
 
-  @ApiProperty({ example: 'WORM50', required: false })
+  @ApiProperty({ example: 'WORM50', required: false, description: 'Sponsor / referral code' })
   @IsString()
   @IsOptional()
   referralCode?: string;
+
+  @ApiProperty({ example: 'WORM1234', required: false, description: 'Sponsor Code (MLM Tree)' })
+  @IsString()
+  @IsOptional()
+  sponsorCode?: string;
+
+  @ApiProperty({ example: '380015', required: false, description: 'Service PIN code' })
+  @IsString()
+  @IsOptional()
+  pincode?: string;
+
+  @ApiProperty({ example: 'Ahmedabad', required: false, description: 'City name' })
+  @IsString()
+  @IsOptional()
+  city?: string;
+
+  @ApiProperty({ example: 'Darshan Kumar Thanki', required: false, description: 'Full name as per Aadhaar' })
+  @IsString()
+  @IsOptional()
+  fullNameAsPerAadhaar?: string;
+
+  @ApiProperty({ example: '123456789012', required: false, description: '12-digit Aadhaar number' })
+  @IsString()
+  @IsOptional()
+  aadhaarNumber?: string;
 
   @ApiProperty({ example: '65f...cityId', required: false })
   @IsString()
@@ -132,6 +157,19 @@ export class RegisterDto {
   @IsString()
   @IsOptional()
   preferredCityName?: string;
+}
+
+export class VerifyAadhaarDto {
+  @ApiProperty({ example: '123456789012', description: '12-digit Aadhaar Number' })
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^\d{12}$/, { message: 'Aadhaar number must be exactly 12 digits' })
+  aadhaarNumber: string;
+
+  @ApiProperty({ example: 'Darshan Kumar Thanki', description: 'Full name as per Aadhaar card' })
+  @IsString()
+  @IsNotEmpty()
+  fullNameAsPerAadhaar: string;
 }
 
 export class RefreshTokenDto {

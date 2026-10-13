@@ -17,6 +17,7 @@ import { PayoutRatesPage } from './pages/PayoutRatesPage';
 import { WalletsPage } from './pages/WalletsPage';
 import { MarketingPage } from './pages/MarketingPage';
 import { AuditLogsPage } from './pages/AuditLogsPage';
+import { VendorsPage } from './pages/VendorsPage';
 
 // Modals
 import { AddStoreModal } from './components/modals/AddStoreModal';
@@ -31,6 +32,8 @@ const AdminPortalContent: React.FC = () => {
     switch (activeTab) {
       case 'Dashboard':
         return <DashboardPage />;
+      case 'Vendors':
+        return <VendorsPage />;
       case 'Stores':
         return <StoresPage />;
       case 'Orders':

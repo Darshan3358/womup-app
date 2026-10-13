@@ -21,6 +21,9 @@ import { DeliveryPartner, DeliveryPartnerDocument } from '../delivery/schemas/de
 import { EmailService } from './email.service';
 import { Role } from '../common/enums/role.enum';
 import { City, CityDocument } from '../areas/schemas/city.schema';
+import { Area, AreaDocument } from '../areas/schemas/area.schema';
+import { ApprovedPincode, ApprovedPincodeDocument } from '../areas/schemas/approved-pincode.schema';
+import { IncomeTransaction, IncomeTransactionDocument } from '../users/schemas/income-transaction.schema';
 
 @Injectable()
 export class AuthService {
@@ -38,6 +41,12 @@ export class AuthService {
     private partnerModel: Model<DeliveryPartnerDocument>,
     @InjectModel(City.name)
     private cityModel: Model<CityDocument>,
+    @InjectModel(Area.name)
+    private areaModel: Model<AreaDocument>,
+    @InjectModel(ApprovedPincode.name)
+    private approvedPincodeModel: Model<ApprovedPincodeDocument>,
+    @InjectModel(IncomeTransaction.name)
+    private incomeTxModel: Model<IncomeTransactionDocument>,
     private jwtService: JwtService,
     private configService: ConfigService,
     private emailService: EmailService,
@@ -454,8 +463,190 @@ export class AuthService {
     };
   }
 
+  // ── SRS Business Logic Helpers ─────────────────────────────────────
+  isRegistrationAllowed(): { allowed: boolean; currentHour: number; message?: string } {
+    // Use Indian Standard Time (IST: UTC + 5:30)
+    const now = new Date();
+    const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+    const istDate = new Date(utc + 5.5 * 3600000);
+    const hour = istDate.getHours();
+
+    // 10 PM to 6 AM CLOSED (hour >= 22 or hour < 6)
+    if (hour >= 22 || hour < 6) {
+      return {
+        allowed: false,
+        currentHour: hour,
+        message: 'Registration is closed between 10 PM and 6 AM. Please try after 6 AM.',
+      };
+    }
+    return { allowed: true, currentHour: hour };
+  }
+
+  async checkPincode(pin: string) {
+    const cleanPin = (pin || '').trim();
+    if (!cleanPin || cleanPin.length !== 6) {
+      return { isAvailable: false, message: 'Please enter a valid 6-digit PIN code' };
+    }
+
+    // 1. Check in approved_pincodes
+    const approved = await this.approvedPincodeModel.findOne({
+      pincode: cleanPin,
+      isRegistrationAllowed: true,
+    });
+
+    if (approved) {
+      return {
+        isAvailable: true,
+        serviceable: true,
+        pincode: approved.pincode,
+        city: approved.cityName,
+        areaName: approved.areaName || 'Ahmedabad Delivery Zone',
+        message: `Service available in ${approved.cityName}`,
+      };
+    }
+
+    // 2. Check Area collection
+    const areaMatch = await this.areaModel.findOne({
+      pincodes: cleanPin,
+      isActive: true,
+    });
+    if (areaMatch) {
+      return {
+        isAvailable: true,
+        serviceable: true,
+        pincode: cleanPin,
+        city: areaMatch.city || 'Ahmedabad',
+        areaName: areaMatch.name,
+        message: `Service available in ${areaMatch.name}, ${areaMatch.city || 'Ahmedabad'}`,
+      };
+    }
+
+    // 3. Fallback approved launch pincodes
+    const defaultApprovedPins = [
+      '380015', '380054', '382481', '380009', '380058', '380061',
+      '380001', '380006', '380051', '380052', '380059', '382424', '382480',
+    ];
+
+    if (defaultApprovedPins.includes(cleanPin)) {
+      await this.approvedPincodeModel.findOneAndUpdate(
+        { pincode: cleanPin },
+        {
+          pincode: cleanPin,
+          cityName: 'Ahmedabad',
+          isRegistrationAllowed: true,
+          isDeliveryAllowed: true,
+          areaName: 'Ahmedabad City',
+        },
+        { upsert: true },
+      );
+      return {
+        isAvailable: true,
+        serviceable: true,
+        pincode: cleanPin,
+        city: 'Ahmedabad',
+        areaName: 'Ahmedabad City',
+        message: 'Service is available in Ahmedabad',
+      };
+    }
+
+    return {
+      isAvailable: false,
+      serviceable: false,
+      pincode: cleanPin,
+      message: `Sorry, WormUp is not available in pincode ${cleanPin} yet. We'll notify you when we launch!`,
+    };
+  }
+
+  async getOrCreateCompanyRoot(): Promise<UserDocument> {
+    let company = await this.userModel.findOne({
+      $or: [{ isCompanyAccount: true }, { referralCode: 'WORMUP001' }],
+    });
+
+    if (!company) {
+      company = await this.userModel.create({
+        name: 'WormUp Company Root',
+        phone: '+910000000000',
+        email: 'root@wormup.com',
+        role: Role.ADMIN,
+        referralCode: 'WORMUP001',
+        sponsorCode: 'WORMUP001',
+        isCompanyAccount: true,
+        isCompanySponsored: false,
+        verificationStatus: 'VERIFIED',
+        aadhaarVerified: true,
+        isActive: true,
+        level: 0,
+        directReferrals: [],
+        shoppingCoins: 0,
+        walletBalance: 0,
+        appDownloadIncome: 0,
+        availableIncome: 0,
+        pendingIncome: 0,
+      });
+    }
+
+    return company;
+  }
+
+  async validateSponsor(sponsorCode?: string) {
+    const code = (sponsorCode || '').trim().toUpperCase();
+    if (!code || code === 'WORMUP001' || code === 'WORMUP') {
+      const company = await this.getOrCreateCompanyRoot();
+      return {
+        isValid: true,
+        valid: true,
+        isCompany: true,
+        isCompanyRoot: true,
+        sponsorName: 'WormUp Company Root',
+        referralCode: company.referralCode,
+        sponsorCode: company.referralCode,
+        message: 'Company default sponsor will be assigned',
+      };
+    }
+
+    const sponsor = await this.userModel.findOne({
+      referralCode: code,
+      isActive: true,
+    });
+
+    if (!sponsor) {
+      return {
+        isValid: false,
+        valid: false,
+        message: `Invalid Sponsor ID "${sponsorCode}". Please check and try again.`,
+      };
+    }
+
+    if (sponsor.verificationStatus === 'BLOCKED') {
+      return {
+        isValid: false,
+        valid: false,
+        message: 'This sponsor account is inactive or blocked.',
+      };
+    }
+
+    return {
+      isValid: true,
+      valid: true,
+      isCompany: false,
+      isCompanyRoot: false,
+      sponsorName: sponsor.name,
+      sponsorLevel: sponsor.level || 1,
+      referralCode: sponsor.referralCode,
+      sponsorCode: sponsor.referralCode,
+      message: `Valid Sponsor: ${sponsor.name}`,
+    };
+  }
+  // ───────────────────────────────────────────────────────────────────
+
   async register(dto: RegisterDto) {
-    const { verificationId, name, phone, referralCode, preferredCityId } = dto;
+    // 1. Check Registration Hours (10 PM - 6 AM CLOSED)
+    const timing = this.isRegistrationAllowed();
+    if (!timing.allowed) {
+      throw new BadRequestException(timing.message);
+    }
+
+    const { verificationId, name, phone, preferredCityId, pincode } = dto;
     const otpRecord = await this.otpModel.findOne({ verificationId });
 
     if (!otpRecord || !otpRecord.isVerified) {
@@ -464,9 +655,17 @@ export class AuthService {
 
     const email = otpRecord.phone; // stored as phone field
 
-    // Validate preferredCityId if provided
+    // 2. Validate PIN Code if provided
+    if (pincode) {
+      const pinCheck = await this.checkPincode(pincode);
+      if (!pinCheck.isAvailable) {
+        throw new BadRequestException(pinCheck.message);
+      }
+    }
+
+    // 3. Validate preferredCityId if provided
     let validCityObjectId: Types.ObjectId | undefined = undefined;
-    let preferredCityName = dto.preferredCityName?.trim();
+    let preferredCityName = dto.preferredCityName?.trim() || dto.city?.trim() || 'Ahmedabad';
 
     if (preferredCityId) {
       if (!Types.ObjectId.isValid(preferredCityId)) {
@@ -492,6 +691,9 @@ export class AuthService {
         emailExists.preferredCityId = validCityObjectId;
         emailExists.preferredCityName = preferredCityName;
       }
+      if (pincode) {
+        emailExists.registrationPincode = pincode;
+      }
       emailExists.isEmailVerified = true;
       await emailExists.save();
       const tokens = await this.generateTokens(emailExists);
@@ -506,6 +708,9 @@ export class AuthService {
           preferredCityName: emailExists.preferredCityName,
           walletBalance: emailExists.walletBalance,
           shoppingCoins: emailExists.shoppingCoins,
+          verificationStatus: emailExists.verificationStatus,
+          aadhaarVerified: emailExists.aadhaarVerified,
+          sponsorCode: emailExists.sponsorCode,
           role: emailExists.role,
         },
         ...tokens,
@@ -523,6 +728,9 @@ export class AuthService {
           phoneExists.preferredCityId = validCityObjectId;
           phoneExists.preferredCityName = preferredCityName;
         }
+        if (pincode) {
+          phoneExists.registrationPincode = pincode;
+        }
         await phoneExists.save();
         const tokens = await this.generateTokens(phoneExists);
         return {
@@ -536,6 +744,9 @@ export class AuthService {
             preferredCityName: phoneExists.preferredCityName,
             walletBalance: phoneExists.walletBalance,
             shoppingCoins: phoneExists.shoppingCoins,
+            verificationStatus: phoneExists.verificationStatus,
+            aadhaarVerified: phoneExists.aadhaarVerified,
+            sponsorCode: phoneExists.sponsorCode,
             role: phoneExists.role,
           },
           ...tokens,
@@ -544,44 +755,93 @@ export class AuthService {
     }
     // ───────────────────────────────────────────────────────────────
 
-    let referredByUser: UserDocument | null = null;
-    if (referralCode) {
-      referredByUser = await this.userModel.findOne({
-        referralCode: referralCode.toUpperCase(),
+    // 4. Resolve Sponsor ID
+    const rawSponsor = (dto.sponsorCode || dto.referralCode || '').trim();
+    let sponsor: UserDocument;
+    let isCompanySponsored = false;
+
+    if (rawSponsor && rawSponsor.toUpperCase() !== 'WORMUP001' && rawSponsor.toUpperCase() !== 'WORMUP') {
+      const found = await this.userModel.findOne({
+        referralCode: rawSponsor.toUpperCase(),
+        isActive: true,
       });
+
+      if (!found) {
+        throw new BadRequestException(
+          `Invalid Sponsor ID "${rawSponsor}". Please check and try again.`,
+        );
+      }
+
+      if (found.verificationStatus === 'BLOCKED') {
+        throw new BadRequestException('This sponsor account is blocked.');
+      }
+
+      sponsor = found;
+      isCompanySponsored = false;
+    } else {
+      // Auto-assign Company Root (Default Sponsor)
+      sponsor = await this.getOrCreateCompanyRoot();
+      isCompanySponsored = true;
     }
 
+    // 5. Generate User's own unique referral code
     const generatedRefCode = `WORM${Math.floor(1000 + Math.random() * 9000)}`;
 
+    // 6. Create User with 2000 Shopping Coins per SRS
     const user = await this.userModel.create({
       name,
       email,
-      phone: phone || `email_${crypto.randomBytes(4).toString('hex')}`, // placeholder if no phone
+      phone: phone || `email_${crypto.randomBytes(4).toString('hex')}`,
       preferredCityId: validCityObjectId,
       preferredCityName,
+      registrationCity: preferredCityName,
+      registrationPincode: pincode,
+      fullNameAsPerAadhaar: dto.fullNameAsPerAadhaar || name,
       referralCode: generatedRefCode,
-      referredBy: referredByUser ? referredByUser._id : undefined,
+      sponsorId: sponsor._id,
+      sponsorCode: sponsor.referralCode,
+      isCompanySponsored,
+      parentId: sponsor._id,
+      level: (sponsor.level || 0) + 1,
+      referredBy: isCompanySponsored ? undefined : sponsor._id,
+      verificationStatus: 'NON_VERIFIED',
+      aadhaarVerified: false,
       isPhoneVerified: false,
       isEmailVerified: true,
       walletBalance: 0,
-      shoppingCoins: referredByUser ? 100 : 50,
+      shoppingCoins: 2000, // SRS: 2,000 Shopping Coins default for all new users
+      appDownloadIncome: 0,
+      pendingIncome: 0,
+      availableIncome: 0,
+      directReferrals: [],
+      leftChildCount: 0,
+      rightChildCount: 0,
     });
 
-    // Welcome bonus coins record
+    // 7. Add new user to sponsor's downline & update counters
+    await this.userModel.findByIdAndUpdate(sponsor._id, {
+      $push: { directReferrals: user._id },
+      $inc: {
+        referredUsersCount: 1,
+        leftChildCount: 1,
+      },
+    });
+
+    // 8. Credit 2000 Shopping Coins welcome bonus transaction
     await this.coinTxModel.create({
       userId: user._id,
-      type: 'BONUS',
-      coins: user.shoppingCoins,
+      type: 'EARN',
+      coins: 2000,
       balanceBefore: 0,
-      balanceAfter: user.shoppingCoins,
-      referenceType: 'REFERRAL',
-      description: referredByUser ? 'Welcome + Referral Bonus Coins' : 'Welcome Reward Coins',
+      balanceAfter: 2000,
+      referenceType: 'SIGNUP_BONUS',
+      description: 'Welcome bonus - 2000 Shopping Coins',
     });
 
     const tokens = await this.generateTokens(user);
 
     return {
-      message: 'Account created successfully',
+      message: 'Account created successfully with 2,000 Shopping Coins',
       user: {
         id: user._id.toString(),
         name: user.name,
@@ -589,8 +849,14 @@ export class AuthService {
         email: user.email,
         preferredCityId: user.preferredCityId?.toString(),
         preferredCityName: user.preferredCityName,
+        registrationCity: user.registrationCity,
+        registrationPincode: user.registrationPincode,
         walletBalance: user.walletBalance,
         shoppingCoins: user.shoppingCoins,
+        verificationStatus: user.verificationStatus,
+        aadhaarVerified: user.aadhaarVerified,
+        sponsorCode: user.sponsorCode,
+        isCompanySponsored: user.isCompanySponsored,
         referralCode: user.referralCode,
         role: user.role,
       },

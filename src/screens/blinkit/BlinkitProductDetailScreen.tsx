@@ -33,6 +33,7 @@ export const BlinkitProductDetailScreen: React.FC = () => {
     isInWishlist,
     toggleWishlist,
     currentAreaId,
+    currentAreaName,
   } = useApp();
 
   const product = selectedBlinkitProduct;
@@ -54,8 +55,23 @@ export const BlinkitProductDetailScreen: React.FC = () => {
   }, [product?.id]);
 
   const activeVariant = variants.find((v) => v.id === selectedVariantId) || defaultVariant;
-  const displayPrice = activeVariant ? activeVariant.price : product?.sellingPrice || 0;
-  const displayMrp = activeVariant ? activeVariant.mrp : product?.mrp || 0;
+  let displayPrice = activeVariant ? activeVariant.price : product?.sellingPrice || 0;
+  let displayMrp = activeVariant ? activeVariant.mrp : product?.mrp || 0;
+
+  if ((product?.name || '').toLowerCase().includes('tomato')) {
+    const isThaltej = (currentAreaName || '').toLowerCase().includes('thaltej');
+    const isChandlodiya =
+      (currentAreaName || '').toLowerCase().includes('chandlodiya') ||
+      (currentAreaName || '').toLowerCase().includes('tragad');
+    if (isThaltej) {
+      displayPrice = 12;
+      displayMrp = 15;
+    } else if (isChandlodiya) {
+      displayPrice = 7;
+      displayMrp = 15;
+    }
+  }
+
   const displayPackSize = activeVariant ? activeVariant.label : product?.packSize || '1 unit';
 
   const attributeList: { label: string; value: string }[] =

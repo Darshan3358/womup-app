@@ -44,7 +44,7 @@ export const Account: React.FC = () => {
   const { userCoins, orders, refreshOrders } = useCart();
   const { accountActiveTab, setAccountActiveTab, resolvedLocation, navigateTo } = useNavigation();
   const { totalWishlistItems } = useWishlist();
-  const { user, isAuthenticated, openLoginModal, logout } = useAuth();
+  const { user, isAuthenticated, openLoginModal, logout, verifyAadhaar } = useAuth();
   const [selectedOrderForTracking, setSelectedOrderForTracking] = useState<Order | null>(null);
 
   const displayName = typeof user?.name === 'string' ? user.name : typeof (user as any)?.fullName === 'string' ? (user as any).fullName : 'Customer';
@@ -97,6 +97,14 @@ export const Account: React.FC = () => {
   const [isVerifyingUpi, setIsVerifyingUpi] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  // Aadhaar Verification Modal States (SRS Flow)
+  const [isAadhaarModalOpen, setIsAadhaarModalOpen] = useState(false);
+  const [aadhaarInput, setAadhaarInput] = useState('');
+  const [aadhaarNameInput, setAadhaarNameInput] = useState(user?.fullNameAsPerAadhaar || displayName || '');
+  const [isVerifyingAadhaar, setIsVerifyingAadhaar] = useState(false);
+  const [aadhaarError, setAadhaarError] = useState<string | null>(null);
+  const [aadhaarSuccess, setAadhaarSuccess] = useState<string | null>(null);
 
   // Sync live settings across all 6 features
   useEffect(() => {
@@ -631,22 +639,6 @@ export const Account: React.FC = () => {
               </div>
             )}
 
-            {/* TAB: WALLET */}
-            {accountActiveTab === 'wallet' && (
-              <div style={{ background: '#FFFFFF', borderRadius: '20px', border: '1px solid #E6EAF2', padding: '32px' }}>
-                <h2 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#071B52', marginBottom: '16px' }}>
-                  WormUp Shopping Coins
-                </h2>
-                <div style={{ background: 'linear-gradient(135deg, #071B52 0%, #102B68 100%)', borderRadius: '18px', padding: '24px', color: '#fff', marginBottom: '24px' }}>
-                  <div style={{ fontSize: '0.8rem', color: '#FF5BAA', fontWeight: 700, textTransform: 'uppercase' }}>Available Balance</div>
-                  <div style={{ fontSize: '2.4rem', fontWeight: 900, margin: '8px 0' }}>🪙 {effectiveCoins} Coins</div>
-                  <div style={{ fontSize: '0.88rem', color: 'rgba(255,255,255,0.8)' }}>
-                    Worth ₹{effectiveCoins}. Redeemable at 1 Coin = ₹1 on future grocery orders!
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* TAB: ADDRESSES */}
             {accountActiveTab === 'addresses' && (
               <div style={{ background: '#FFFFFF', borderRadius: '20px', border: '1px solid #E6EAF2', padding: '32px' }}>
@@ -1026,20 +1018,179 @@ export const Account: React.FC = () => {
               </div>
             )}
 
-            {/* TAB: WALLET & COINS */}
+            {/* TAB: WALLET & COINS (SRS 4-Balance System) */}
             {accountActiveTab === 'wallet' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                {/* Total Balance Card */}
-                <div style={{ background: 'linear-gradient(135deg, #071B52 0%, #1E3A8A 100%)', borderRadius: '20px', padding: '28px', color: '#FFFFFF', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>Total Coins Balance</div>
-                    <div style={{ fontSize: '2.5rem', fontWeight: 900, marginTop: '4px' }}>🪙 {effectiveCoins} Coins</div>
-                    <div style={{ fontSize: '0.85rem', color: '#FCD34D', marginTop: '6px', fontWeight: 700 }}>1 Coin = ₹1 Direct Cash Discount at Checkout</div>
+                {/* 4 Balances Grid (SRS Specification) */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+                  {/* 1. Shopping Coins */}
+                  <div
+                    style={{
+                      background: 'linear-gradient(135deg, #071B52 0%, #1A365D 100%)',
+                      borderRadius: '20px',
+                      padding: '22px',
+                      color: '#FFFFFF',
+                      boxShadow: '0 8px 24px rgba(7, 27, 82, 0.12)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '0.82rem', color: '#93C5FD', fontWeight: 700, textTransform: 'uppercase' }}>
+                          Shopping Coins
+                        </span>
+                        <span style={{ fontSize: '1.2rem' }}>🪙</span>
+                      </div>
+                      <div style={{ fontSize: '2.1rem', fontWeight: 900 }}>
+                        {user?.shoppingCoins ?? effectiveCoins ?? 2000}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: '#FCD34D', marginTop: '10px', fontWeight: 700 }}>
+                      Worth ₹{user?.shoppingCoins ?? effectiveCoins ?? 2000} • 1 Coin = ₹1 Discount
+                    </div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)' }}>Reward Tier</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#93C5FD' }}>{rewards?.tier || 'Bronze'} Member</div>
-                    <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', marginTop: '4px' }}>Streak: {rewards?.scratchStreak || 1} Days 🔥</div>
+
+                  {/* 2. Today's Income (Pending) */}
+                  <div
+                    style={{
+                      background: '#FFFFFF',
+                      border: '1.5px solid #FDE68A',
+                      borderRadius: '20px',
+                      padding: '22px',
+                      color: '#071B52',
+                      boxShadow: '0 8px 24px rgba(245, 158, 11, 0.08)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '0.82rem', color: '#D97706', fontWeight: 800, textTransform: 'uppercase' }}>
+                          Today's Income
+                        </span>
+                        <span style={{ fontSize: '1.2rem' }}>⏳</span>
+                      </div>
+                      <div style={{ fontSize: '2.1rem', fontWeight: 900, color: '#B45309' }}>
+                        ₹{user?.pendingIncome ?? 0}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: '#78350F', marginTop: '10px', fontWeight: 600 }}>
+                      From downline • Usable tomorrow midnight
+                    </div>
+                  </div>
+
+                  {/* 3. Available Income */}
+                  <div
+                    style={{
+                      background: '#FFFFFF',
+                      border: '1.5px solid #A7F3D0',
+                      borderRadius: '20px',
+                      padding: '22px',
+                      color: '#071B52',
+                      boxShadow: '0 8px 24px rgba(16, 185, 129, 0.08)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '0.82rem', color: '#059669', fontWeight: 800, textTransform: 'uppercase' }}>
+                          Available Income
+                        </span>
+                        <span style={{ fontSize: '1.2rem' }}>✅</span>
+                      </div>
+                      <div style={{ fontSize: '2.1rem', fontWeight: 900, color: '#047857' }}>
+                        ₹{user?.availableIncome ?? 0}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: '#065F46', marginTop: '10px', fontWeight: 600 }}>
+                      Ready to spend on grocery orders!
+                    </div>
+                  </div>
+
+                  {/* 4. Verification Status Card */}
+                  <div
+                    style={{
+                      background: user?.verificationStatus === 'VERIFIED' ? '#ECFDF5' : '#FFFBEB',
+                      border: `1.5px solid ${user?.verificationStatus === 'VERIFIED' ? '#6EE7B7' : '#FCD34D'}`,
+                      borderRadius: '20px',
+                      padding: '22px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span
+                          style={{
+                            fontSize: '0.82rem',
+                            fontWeight: 800,
+                            color: user?.verificationStatus === 'VERIFIED' ? '#065F46' : '#92400E',
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          Verification Status
+                        </span>
+                        <span>{user?.verificationStatus === 'VERIFIED' ? '🛡️' : '⚠️'}</span>
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '1.25rem',
+                          fontWeight: 900,
+                          color: user?.verificationStatus === 'VERIFIED' ? '#047857' : '#B45309',
+                        }}
+                      >
+                        {user?.verificationStatus === 'VERIFIED' ? '✅ Verified' : '🔴 Non-Verified'}
+                      </div>
+                      <p
+                        style={{
+                          fontSize: '0.76rem',
+                          color: user?.verificationStatus === 'VERIFIED' ? '#065F46' : '#78350F',
+                          margin: '6px 0 0',
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        {user?.verificationStatus === 'VERIFIED'
+                          ? `Aadhaar verified as ${user?.fullNameAsPerAadhaar || displayName}`
+                          : 'Verify Aadhaar to unlock referral & app download income benefits'}
+                      </p>
+                    </div>
+
+                    {user?.verificationStatus !== 'VERIFIED' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAadhaarInput('');
+                          setAadhaarNameInput(user?.fullNameAsPerAadhaar || displayName || '');
+                          setAadhaarError(null);
+                          setAadhaarSuccess(null);
+                          setIsAadhaarModalOpen(true);
+                        }}
+                        style={{
+                          marginTop: '12px',
+                          background: 'linear-gradient(135deg, #FF3B98 0%, #E62280 100%)',
+                          color: '#FFFFFF',
+                          border: 'none',
+                          borderRadius: '10px',
+                          padding: '8px 14px',
+                          fontSize: '0.82rem',
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          boxShadow: '0 4px 12px rgba(255,59,152,0.25)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                        }}
+                      >
+                        <span>Verify Aadhaar Now →</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -1491,13 +1642,206 @@ export const Account: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+      {/* Aadhaar Verification Modal (SRS Specification) */}
+      {isAadhaarModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(7, 27, 82, 0.65)',
+            backdropFilter: 'blur(6px)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+          }}
+          onClick={() => setIsAadhaarModalOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF',
+              borderRadius: '24px',
+              padding: '32px',
+              maxWidth: '480px',
+              width: '100%',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.3)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#DCFCE7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>
+                  🛡️
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#071B52', margin: 0 }}>
+                    Aadhaar Verification
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748B' }}>
+                    Unlock referral rewards & app download income
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAadhaarModalOpen(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: '#94A3B8' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {aadhaarSuccess ? (
+              <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                <div style={{ fontSize: '3rem', marginBottom: '12px' }}>✅</div>
+                <h4 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#15803D', margin: '0 0 6px' }}>
+                  Aadhaar Verified Successfully!
+                </h4>
+                <p style={{ color: '#64748B', fontSize: '0.85rem' }}>{aadhaarSuccess}</p>
+                <button
+                  type="button"
+                  onClick={() => setIsAadhaarModalOpen(false)}
+                  style={{
+                    marginTop: '16px',
+                    backgroundColor: '#15803D',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '10px 24px',
+                    borderRadius: '10px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Close & View Wallet
+                </button>
+              </div>
+            ) : (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const cleanAadhaar = aadhaarInput.replace(/\D/g, '');
+                  if (cleanAadhaar.length !== 12) {
+                    setAadhaarError('Please enter a valid 12-digit Aadhaar number');
+                    return;
+                  }
+                  if (!aadhaarNameInput.trim()) {
+                    setAadhaarError('Please enter full name exactly as per Aadhaar card');
+                    return;
+                  }
+                  setIsVerifyingAadhaar(true);
+                  setAadhaarError(null);
+                  try {
+                    const res = await verifyAadhaar(cleanAadhaar, aadhaarNameInput.trim());
+                    setIsVerifyingAadhaar(false);
+                    if (res.success) {
+                      setAadhaarSuccess(res.message || 'Your account is now verified! Referral benefits unlocked.');
+                    } else {
+                      setAadhaarError(res.message || 'Verification failed. Please check details.');
+                    }
+                  } catch (err: any) {
+                    setIsVerifyingAadhaar(false);
+                    setAadhaarError(err.message || 'Verification request failed');
+                  }
+                }}
+                style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+              >
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: '#071B52', marginBottom: '6px', textTransform: 'uppercase' }}>
+                    Full Name (As Per Aadhaar) *
+                  </label>
+                  <input
+                    type="text"
+                    value={aadhaarNameInput}
+                    onChange={(e) => setAadhaarNameInput(e.target.value)}
+                    placeholder="e.g. Darshan Kumar Thanki"
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      borderRadius: '12px',
+                      border: '1.5px solid #CBD5E1',
+                      fontSize: '0.95rem',
+                      fontWeight: 600,
+                      outline: 'none',
+                    }}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: '#071B52', marginBottom: '6px', textTransform: 'uppercase' }}>
+                    12-Digit Aadhaar Number *
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={12}
+                    value={aadhaarInput}
+                    onChange={(e) => setAadhaarInput(e.target.value.replace(/\D/g, '').slice(0, 12))}
+                    placeholder="XXXX XXXX XXXX"
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      borderRadius: '12px',
+                      border: '1.5px solid #CBD5E1',
+                      fontSize: '1rem',
+                      letterSpacing: '2px',
+                      fontWeight: 700,
+                      outline: 'none',
+                    }}
+                    required
+                  />
+                  <div style={{ fontSize: '0.74rem', color: '#64748B', marginTop: '4px' }}>
+                    🔒 256-bit encrypted validation according to UIDAI compliance
+                  </div>
+                </div>
+
+                {aadhaarError && (
+                  <div style={{ padding: '10px 14px', borderRadius: '10px', background: '#FEF2F2', border: '1px solid #FCA5A5', color: '#DC2626', fontSize: '0.82rem', fontWeight: 700 }}>
+                    {aadhaarError}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isVerifyingAadhaar || aadhaarInput.replace(/\D/g, '').length !== 12 || !aadhaarNameInput.trim()}
+                  style={{
+                    background:
+                      aadhaarInput.replace(/\D/g, '').length === 12 && aadhaarNameInput.trim()
+                        ? 'linear-gradient(135deg, #16A34A 0%, #15803D 100%)'
+                        : '#E2E8F0',
+                    color:
+                      aadhaarInput.replace(/\D/g, '').length === 12 && aadhaarNameInput.trim()
+                        ? '#FFFFFF'
+                        : '#94A3B8',
+                    border: 'none',
+                    borderRadius: '14px',
+                    padding: '14px',
+                    fontWeight: 800,
+                    fontSize: '0.96rem',
+                    cursor:
+                      aadhaarInput.replace(/\D/g, '').length === 12 && aadhaarNameInput.trim()
+                        ? 'pointer'
+                        : 'not-allowed',
+                    boxShadow:
+                      aadhaarInput.replace(/\D/g, '').length === 12 && aadhaarNameInput.trim()
+                        ? '0 6px 20px rgba(22, 163, 74, 0.3)'
+                        : 'none',
+                  }}
+                >
+                  {isVerifyingAadhaar ? 'Verifying with Government Records...' : 'Verify & Unlock Benefits'}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Live Order Tracking Modal */}
       <OrderTrackingModal
         order={selectedOrderForTracking}
         onClose={() => setSelectedOrderForTracking(null)}
       />
+      </div>
     </div>
   );
 };

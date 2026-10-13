@@ -25,6 +25,8 @@ import {
   PlatformWalletData,
   WalletTransactionItem,
   WalletsSummaryData,
+  VendorAdminItem,
+  VendorCategoryItem,
 } from '../types/admin';
 
 const getApiBaseUrl = () => {
@@ -38,6 +40,18 @@ const getApiBaseUrl = () => {
 };
 
 const API_BASE_URL = getApiBaseUrl();
+
+const getNestApiBaseUrl = () => {
+  if (typeof window !== 'undefined' && window.location) {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') {
+      return 'http://localhost:5050/api/v1';
+    }
+  }
+  return 'https://womup-app.onrender.com/api/v1';
+};
+
+const NEST_API_BASE_URL = getNestApiBaseUrl();
 
 
 export interface LiveDbData {
@@ -1514,6 +1528,165 @@ export const ApiService = {
       return await res.json();
     } catch (err: any) {
       return { success: false, error: err.message || 'Failed settling rider payout' };
+    }
+  },
+
+  // 43. LOCAL VENDORS - GET ALL VENDORS (ADMIN)
+  async getVendors(params?: {
+    city?: string;
+    category?: string;
+    query?: string;
+  }): Promise<{ success: boolean; data?: VendorAdminItem[]; error?: string }> {
+    try {
+      const q = new URLSearchParams();
+      if (params?.city && params.city !== 'All Cities' && params.city !== 'ALL') {
+        q.append('city', params.city);
+      }
+      if (params?.category && params.category !== 'All Categories' && params.category !== 'ALL') {
+        q.append('category', params.category);
+      }
+      if (params?.query && params.query.trim()) {
+        q.append('query', params.query.trim());
+      }
+      const url = `${NEST_API_BASE_URL}/admin/vendors${q.toString() ? `?${q.toString()}` : ''}`;
+      const res = await fetch(url);
+      const json = await res.json();
+      return json;
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed fetching vendors' };
+    }
+  },
+
+  // 44. LOCAL VENDORS - CREATE NEW VENDOR (ADMIN)
+  async createVendor(
+    payload: Partial<VendorAdminItem>
+  ): Promise<{ success: boolean; data?: VendorAdminItem; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${NEST_API_BASE_URL}/admin/vendors`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed creating vendor' };
+    }
+  },
+
+  // 45. LOCAL VENDORS - UPDATE VENDOR (ADMIN, INCL. SHOPPING COIN %)
+  async updateVendor(
+    id: string,
+    payload: Partial<VendorAdminItem>
+  ): Promise<{ success: boolean; data?: VendorAdminItem; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${NEST_API_BASE_URL}/admin/vendors/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed updating vendor' };
+    }
+  },
+
+  // 46. LOCAL VENDORS - DELETE / DEACTIVATE VENDOR (ADMIN)
+  async deleteVendor(
+    id: string
+  ): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${NEST_API_BASE_URL}/admin/vendors/${id}`, {
+        method: 'DELETE',
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed deleting vendor' };
+    }
+  },
+
+  // 47. LOCAL VENDORS - VERIFY KYC (ADMIN)
+  async verifyVendorKyc(
+    id: string
+  ): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${NEST_API_BASE_URL}/admin/vendors/${id}/verify-kyc`, {
+        method: 'POST',
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed verifying vendor KYC' };
+    }
+  },
+
+  // 48. LOCAL VENDORS - GET CATEGORIES (ADMIN)
+  async getVendorCategories(): Promise<{ success: boolean; data?: VendorCategoryItem[]; error?: string }> {
+    try {
+      const res = await fetch(`${NEST_API_BASE_URL}/admin/vendor-categories`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed fetching vendor categories' };
+    }
+  },
+
+  // 49. LOCAL VENDORS - UPDATE COIN RATE SPECIFIC (ADMIN)
+  async updateVendorCoinRate(
+    id: string,
+    shoppingCoinPercent: number
+  ): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${NEST_API_BASE_URL}/admin/vendors/${id}/coin-rate`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shoppingCoinPercent }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed updating coin rate' };
+    }
+  },
+
+  // 50. LOCAL VENDORS - GET ANALYTICS SUMMARY (ADMIN)
+  async getVendorsAnalytics(): Promise<{
+    success: boolean;
+    data?: { totalVendors: number; activeVendors: number; kycPending: number; monthlyRevenue: number };
+    error?: string;
+  }> {
+    try {
+      const res = await fetch(`${NEST_API_BASE_URL}/admin/vendors/analytics`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed fetching vendor analytics' };
+    }
+  },
+
+  // 51. LOCAL VENDORS - GET QR DATA (ADMIN)
+  async getVendorQR(id: string): Promise<{
+    success: boolean;
+    data?: { vendorCode: string; storeName: string; shoppingCoinPercent: number; qrData: string; upiId: string; label: string };
+    error?: string;
+  }> {
+    try {
+      const res = await fetch(`${NEST_API_BASE_URL}/admin/vendors/${id}/qr`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed fetching vendor QR data' };
+    }
+  },
+
+  // 52. LOCAL VENDORS - REJECT KYC (ADMIN)
+  async rejectVendorKyc(
+    id: string,
+    reason?: string
+  ): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${NEST_API_BASE_URL}/admin/vendors/${id}/reject-kyc`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed rejecting vendor KYC' };
     }
   },
 };

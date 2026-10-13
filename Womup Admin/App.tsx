@@ -17,6 +17,7 @@ import { OrdersScreen } from './src/screens/OrdersScreen';
 import { StaffScreen } from './src/screens/StaffScreen';
 import { MarketingScreen } from './src/screens/MarketingScreen';
 import { StoresManagementScreen } from './src/screens/StoresManagementScreen';
+import { VendorsManagementScreen } from './src/screens/VendorsManagementScreen';
 import { LocationManagementScreen } from './src/screens/LocationManagementScreen';
 import { CategoryManagementScreen } from './src/screens/CategoryManagementScreen';
 import { PayoutRatesScreen } from './src/screens/PayoutRatesScreen';
@@ -76,6 +77,8 @@ const MainApp: React.FC = () => {
         return <MarketingScreen />;
       case 'Stores':
         return <StoresManagementScreen />;
+      case 'Vendors':
+        return <VendorsManagementScreen />;
       case 'Locations':
         return <LocationManagementScreen />;
       case 'Categories':

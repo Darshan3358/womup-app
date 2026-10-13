@@ -19,6 +19,22 @@ export class UsersController {
     return this.usersService.getProfile(user.id);
   }
 
+  @Get('wallet-summary')
+  @ApiOperation({ summary: 'Get 4 wallet balances: Shopping Coins, Today Income, Available Income, and Verification Status' })
+  async getWalletSummary(@CurrentUser() user: any) {
+    const summary = await this.usersService.getWalletSummary(user.id);
+    return { success: true, data: summary };
+  }
+
+  @Post('verify-aadhaar')
+  @ApiOperation({ summary: 'Verify user Aadhaar number & full name, unlocking income and crediting referrer' })
+  async verifyAadhaar(
+    @CurrentUser() user: any,
+    @Body() body: { aadhaarNumber: string; fullNameAsPerAadhaar: string },
+  ) {
+    return this.usersService.verifyAadhaar(user.id, body);
+  }
+
   @Patch('me')
   @ApiOperation({ summary: 'Update customer profile information or privacy toggles' })
   async updateMyProfile(

@@ -23,6 +23,7 @@ import { StoreModule } from './store/store.module';
 import { HomeModule } from './home/home.module';
 import { SettingsModule } from './settings/settings.module';
 import { ReviewsModule } from './reviews/reviews.module';
+import { LocalShopsModule } from './local-shops/local-shops.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { ReviewsModule } from './reviews/reviews.module';
     HomeModule,
     SettingsModule,
     ReviewsModule,
+    LocalShopsModule,
   ],
   controllers: [AppController],
 })

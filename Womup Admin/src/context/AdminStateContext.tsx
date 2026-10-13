@@ -31,6 +31,7 @@ export type ActiveTab =
   | 'Staff'
   | 'Marketing'
   | 'Stores'
+  | 'Vendors'
   | 'Locations'
   | 'Categories'
   | 'PayoutRates'

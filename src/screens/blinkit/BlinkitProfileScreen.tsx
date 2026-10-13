@@ -101,6 +101,15 @@ export const BlinkitProfileScreen: React.FC = () => {
               setUser((prev) => ({ ...prev, shoppingCoins: rw.shoppingCoins }));
             }
           }
+          const freshProfile = await AuthService.getProfile();
+          if (freshProfile && isMounted) {
+            setUser((prev) => ({
+              ...prev,
+              ...freshProfile,
+              shoppingCoins: freshProfile.shoppingCoins ?? prev.shoppingCoins ?? 2000,
+              verificationStatus: freshProfile.verificationStatus || (freshProfile.aadhaarVerified ? 'VERIFIED' : 'NON_VERIFIED'),
+            }));
+          }
         }
       } catch (err) {
         console.warn('[BlinkitProfileScreen] Live data sync error:', err);
@@ -628,6 +637,50 @@ export const BlinkitProfileScreen: React.FC = () => {
             <Text style={styles.phoneNumberText}>
               {user.phoneNumber ? `+91 ${user.phoneNumber}` : '+91 98765 43210'}
             </Text>
+
+            {/* SRS Verification Status & Sponsor Pill */}
+            <View style={styles.profileBadgeRow}>
+              <View
+                style={[
+                  styles.verificationPill,
+                  (user.verificationStatus === 'VERIFIED' || user.aadhaarVerified)
+                    ? styles.pillVerified
+                    : styles.pillUnverified,
+                ]}
+              >
+                <Ionicons
+                  name={
+                    user.verificationStatus === 'VERIFIED' || user.aadhaarVerified
+                      ? 'shield-checkmark'
+                      : 'shield-outline'
+                  }
+                  size={12}
+                  color={
+                    user.verificationStatus === 'VERIFIED' || user.aadhaarVerified
+                      ? '#15803D'
+                      : '#D97706'
+                  }
+                />
+                <Text
+                  style={[
+                    styles.pillText,
+                    user.verificationStatus === 'VERIFIED' || user.aadhaarVerified
+                      ? styles.pillTextVerified
+                      : styles.pillTextUnverified,
+                  ]}
+                >
+                  {user.verificationStatus === 'VERIFIED' || user.aadhaarVerified
+                    ? 'Aadhaar Verified'
+                    : 'Non-Verified Member'}
+                </Text>
+              </View>
+
+              {user.sponsorCode ? (
+                <View style={styles.sponsorPill}>
+                  <Text style={styles.sponsorPillText}>Sponsor: {user.sponsorCode}</Text>
+                </View>
+              ) : null}
+            </View>
           </View>
         </LinearGradient>
 
@@ -669,7 +722,7 @@ export const BlinkitProfileScreen: React.FC = () => {
             >
               <AppIcon name="wallet" size={24} color={COLORS.primary} />
               <Text style={styles.quickActionLabel}>Worm Up Money</Text>
-              <Text style={styles.quickActionSubLabel}>₹{walletBalance}</Text>
+              <Text style={styles.quickActionSubLabel}>🪙 {user.shoppingCoins ?? 2000} Coins</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -1840,6 +1893,49 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     opacity: 0.85,
     marginTop: 2,
+  },
+  profileBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
+  verificationPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 20,
+  },
+  pillVerified: {
+    backgroundColor: '#DCFCE7',
+  },
+  pillUnverified: {
+    backgroundColor: '#FEF3C7',
+  },
+  pillText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  pillTextVerified: {
+    color: '#15803D',
+  },
+  pillTextUnverified: {
+    color: '#B45309',
+  },
+  sponsorPill: {
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  sponsorPillText: {
+    fontSize: 11,
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
   bodyContent: {
     paddingHorizontal: 16,

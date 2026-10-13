@@ -20,11 +20,43 @@ export const S09_ReferralCodeScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { setActiveScreen, user, setUser, goBack, authVerificationId, tempRegistration } = useApp();
   const [code, setCode] = useState('');
-  const [applied, setApplied] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const performRegistration = async (refCode?: string) => {
+  // Live Sponsor Validation State
+  const [validatingSponsor, setValidatingSponsor] = useState(false);
+  const [sponsorValid, setSponsorValid] = useState<boolean | null>(null);
+  const [sponsorName, setSponsorName] = useState<string>('');
+  const [sponsorStatusText, setSponsorStatusText] = useState<string>('');
+
+  React.useEffect(() => {
+    const trimmed = code.trim();
+    if (trimmed.length >= 3) {
+      setValidatingSponsor(true);
+      const timer = setTimeout(() => {
+        AuthService.validateSponsor(trimmed).then((res) => {
+          setValidatingSponsor(false);
+          setSponsorValid(res.valid);
+          if (res.valid) {
+            setSponsorName(res.sponsorName);
+            setSponsorStatusText(res.isCompanyRoot ? 'WormUp Company Root' : `Valid Sponsor: ${res.sponsorName}`);
+            setErrorMessage('');
+          } else {
+            setSponsorName('');
+            setSponsorStatusText(res.message || 'Invalid Sponsor ID');
+          }
+        });
+      }, 400);
+      return () => clearTimeout(timer);
+    } else {
+      setValidatingSponsor(false);
+      setSponsorValid(null);
+      setSponsorName('');
+      setSponsorStatusText('');
+    }
+  }, [code]);
+
+  const performRegistration = async (sponsorCodeToUse?: string) => {
     setLoading(true);
     setErrorMessage('');
     if (authVerificationId) {
@@ -32,21 +64,35 @@ export const S09_ReferralCodeScreen: React.FC = () => {
         authVerificationId,
         tempRegistration.fullName || user.fullName || 'Customer',
         tempRegistration.phone || user.phoneNumber || undefined,
-        refCode,
+        sponsorCodeToUse,
         tempRegistration.preferredCityId || user.preferredCityId,
         tempRegistration.preferredCityName || user.preferredCityName,
+        tempRegistration.pincode || user.registrationPincode,
+        tempRegistration.city || tempRegistration.preferredCityName || user.preferredCityName,
+        tempRegistration.fullNameAsPerAadhaar || user.fullNameAsPerAadhaar,
+        sponsorCodeToUse,
       );
       if (res.success) {
         if (res.user) {
           const updatedUser = {
             ...user,
             fullName: res.user.name || user.fullName,
+            fullNameAsPerAadhaar: res.user.fullNameAsPerAadhaar || user.fullNameAsPerAadhaar || user.fullName,
             email: res.user.email || user.email,
             phoneNumber: res.user.phone || user.phoneNumber,
             preferredCityId: res.user.preferredCityId || tempRegistration.preferredCityId || user.preferredCityId,
             preferredCityName: res.user.preferredCityName || tempRegistration.preferredCityName || user.preferredCityName,
-            referralCode: res.user.referralCode || refCode,
-            shoppingCoins: res.user.shoppingCoins || user.shoppingCoins + (refCode ? 100 : 50),
+            registrationCity: res.user.city || tempRegistration.city || user.preferredCityName,
+            registrationPincode: res.user.pincode || tempRegistration.pincode,
+            referralCode: res.user.referralCode || res.user.sponsorCode || sponsorCodeToUse,
+            sponsorCode: res.user.sponsorCode || sponsorCodeToUse || 'WORMUP001',
+            isCompanySponsored: res.user.isCompanySponsored ?? (!sponsorCodeToUse),
+            shoppingCoins: res.user.shoppingCoins ?? 2000,
+            pendingIncome: res.user.pendingIncome ?? 0,
+            availableIncome: res.user.availableIncome ?? 0,
+            appDownloadIncome: res.user.appDownloadIncome ?? 0,
+            verificationStatus: res.user.verificationStatus || 'NON_VERIFIED',
+            aadhaarVerified: res.user.aadhaarVerified || false,
           };
           setUser(updatedUser);
           StorageService.saveItem(StorageService.KEYS.USER, updatedUser);
@@ -67,10 +113,11 @@ export const S09_ReferralCodeScreen: React.FC = () => {
   const handleApply = async () => {
     const trimmed = code.trim();
     if (trimmed) {
-      setApplied(true);
-      setTimeout(() => {
-        performRegistration(trimmed);
-      }, 400);
+      if (sponsorValid === false) {
+        setErrorMessage('Please enter a valid Sponsor ID or leave blank for default.');
+        return;
+      }
+      performRegistration(trimmed);
     } else {
       performRegistration();
     }
@@ -95,31 +142,67 @@ export const S09_ReferralCodeScreen: React.FC = () => {
           <Ionicons name="gift-outline" size={40} color={COLORS.hotPink} />
         </View>
 
-        <Text style={styles.title}>Referral Code (Optional)</Text>
+        <Text style={styles.title}>Sponsor / Referral ID</Text>
         <Text style={styles.subtitle}>
-          Enter referral code and get exciting Shopping Coin rewards instantly in your wallet
+          Enter your Sponsor ID if you were invited, or leave blank to join directly under WormUp.
         </Text>
 
-        <View style={styles.inputContainer}>
-          <Ionicons name="pricetag-outline" size={20} color={COLORS.textMuted} style={styles.icon} />
+        {/* ₹2,000 Shopping Coins Welcome Callout */}
+        <View style={styles.rewardBanner}>
+          <Text style={styles.rewardText}>🪙 ₹2,000 Shopping Coins Welcome Bonus will be credited!</Text>
+        </View>
+
+        <View
+          style={[
+            styles.inputContainer,
+            sponsorValid === true ? styles.inputSuccess : null,
+            sponsorValid === false ? styles.inputError : null,
+          ]}
+        >
+          <Ionicons name="people-outline" size={20} color={COLORS.textMuted} style={styles.icon} />
           <TextInput
             style={styles.input}
-            placeholder="Enter referral code"
+            placeholder="Sponsor ID (e.g. WORMUP001)"
             placeholderTextColor={COLORS.secondaryText}
             autoCapitalize="characters"
             value={code}
-            onChangeText={setCode}
+            onChangeText={(text) => {
+              setCode(text);
+              if (errorMessage) setErrorMessage('');
+            }}
           />
-          {applied && (
+          {validatingSponsor && (
+            <Text style={styles.checkingText}>Checking...</Text>
+          )}
+          {sponsorValid === true && !validatingSponsor && (
             <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
+          )}
+          {sponsorValid === false && !validatingSponsor && (
+            <Ionicons name="close-circle" size={20} color={COLORS.error} />
           )}
         </View>
 
-        {applied && (
-          <View style={styles.rewardBanner}>
-            <Text style={styles.rewardText}>🎉 500 Shopping Coins added to your account!</Text>
+        {/* Live validation feedback */}
+        {sponsorStatusText ? (
+          <View style={styles.statusFeedbackRow}>
+            <Ionicons
+              name={sponsorValid ? 'checkmark-circle-outline' : 'alert-circle-outline'}
+              size={15}
+              color={sponsorValid ? COLORS.success : COLORS.error}
+            />
+            <Text style={[styles.statusFeedbackText, sponsorValid ? styles.textSuccess : styles.textError]}>
+              {sponsorStatusText}
+            </Text>
           </View>
-        )}
+        ) : null}
+
+        {/* Default Sponsor Note */}
+        <View style={styles.defaultSponsorNote}>
+          <Ionicons name="information-circle-outline" size={16} color={COLORS.navy} />
+          <Text style={styles.defaultSponsorNoteText}>
+            💡 If left blank, you will automatically join under <Text style={{ fontWeight: '700' }}>WormUp Company</Text> (Default Root Sponsor: WORMUP001).
+          </Text>
+        </View>
 
         {errorMessage ? (
           <View style={styles.errorBanner}>
@@ -129,7 +212,7 @@ export const S09_ReferralCodeScreen: React.FC = () => {
         ) : null}
 
         <GradientButton
-          title={loading ? 'Processing...' : applied ? 'Applied ✓' : 'Apply Code'}
+          title={loading ? 'Creating Account...' : code.trim() ? 'Continue with Sponsor' : 'Join with Company Sponsor'}
           onPress={handleApply}
           style={styles.button}
         />
@@ -140,7 +223,7 @@ export const S09_ReferralCodeScreen: React.FC = () => {
           disabled={loading}
           style={styles.skipButton}
         >
-          <Text style={styles.skipText}>{loading ? 'Please wait...' : 'Skip'}</Text>
+          <Text style={styles.skipText}>{loading ? 'Please wait...' : 'Skip (Join WormUp Directly)'}</Text>
         </TouchableOpacity>
       </View>
 
@@ -253,5 +336,56 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: COLORS.textMuted,
+  },
+  inputSuccess: {
+    borderColor: COLORS.success,
+    backgroundColor: '#F0FDF4',
+  },
+  inputError: {
+    borderColor: COLORS.error,
+    backgroundColor: '#FEF2F2',
+  },
+  checkingText: {
+    fontSize: 12,
+    color: COLORS.hotPink,
+    fontWeight: '600',
+    marginRight: 6,
+  },
+  statusFeedbackRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    width: '100%',
+    marginTop: -8,
+    marginBottom: SPACING.sm,
+    paddingHorizontal: 4,
+  },
+  statusFeedbackText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  textSuccess: {
+    color: '#15803D',
+  },
+  textError: {
+    color: COLORS.error,
+  },
+  defaultSponsorNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: RADIUS.card,
+    padding: SPACING.sm + 2,
+    marginBottom: SPACING.lg,
+    width: '100%',
+    gap: 8,
+  },
+  defaultSponsorNoteText: {
+    flex: 1,
+    fontSize: 12,
+    color: COLORS.textMuted,
+    lineHeight: 17,
   },
 });

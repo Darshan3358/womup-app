@@ -27,45 +27,54 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   onPaymentSuccess,
 }) => {
   const [billAmount, setBillAmount] = useState('500');
+  const [paymentMethod, setPaymentMethod] = useState<'COIN' | 'WALLET' | 'CASH' | 'UPI'>('COIN');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [coinBalance, setCoinBalance] = useState(1500);
   const [paymentSuccessData, setPaymentSuccessData] = useState<{
     coins: number;
     amount: number;
   } | null>(null);
 
   const selectedVendor = vendor || {
-    id: 'vendor_01',
+    id: 'VND001',
     name: 'Gokul Vegetables',
+    storeName: 'Gokul Vegetables',
     coinPercentage: 15,
+    shoppingCoinPercent: 15,
     address: 'Near Nandanvan Society, Mahesana',
   };
 
-  const calculatedCoins = Math.round(
-    ((Number(billAmount) || 0) * (selectedVendor.coinPercentage || 10)) / 100
-  );
+  const vendorPercent = (selectedVendor as any).shoppingCoinPercent || selectedVendor.coinPercentage || 10;
+  const numAmount = Number(billAmount) || 0;
+  const calculatedCoins = Math.round((numAmount * vendorPercent) / 100);
+
+  // Flow 1 calculation (Coin deduction up to 75% of bill)
+  const maxCoinsToUse = Math.round(numAmount * 0.75);
+  const coinsDeducted = Math.min(coinBalance, maxCoinsToUse);
+  const cashRemaining = Math.max(0, numAmount - coinsDeducted);
 
   const handlePayNow = async () => {
-    const amt = Number(billAmount);
-    if (!amt || amt <= 0) return;
+    if (!numAmount || numAmount <= 0) return;
 
     setIsProcessing(true);
     try {
       const res = await LocalShopApi.payVendorQR({
         vendorId: selectedVendor.id,
-        amount: amt,
-        paymentMethod: 'UPI',
+        amount: numAmount,
+        paymentMethod,
+        coinsUsed: paymentMethod === 'COIN' ? coinsDeducted : 0,
       });
 
       setIsProcessing(false);
       setPaymentSuccessData({
         coins: res.coinsEarned,
-        amount: amt,
+        amount: numAmount,
       });
 
       setTimeout(() => {
         setPaymentSuccessData(null);
         setBillAmount('500');
-        onPaymentSuccess(res.coinsEarned, amt);
+        onPaymentSuccess(res.coinsEarned, numAmount);
         onClose();
       }, 2200);
     } catch {
@@ -136,17 +145,78 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
                   />
                 </View>
 
-                {/* Instant Coin Earning Projection */}
-                <View style={styles.coinPerkRow}>
-                  <Ionicons name="sparkles" size={16} color="#DB2777" />
-                  <Text style={styles.coinPerkText}>
-                    You will earn{' '}
-                    <Text style={{ fontWeight: '800', color: '#DB2777' }}>
-                      {calculatedCoins} Shopping Coins ({selectedVendor.coinPercentage}%)
-                    </Text>{' '}
-                    instantly!
-                  </Text>
+                {/* Payment Method Selector */}
+                <View style={styles.methodSelectorRow}>
+                  <TouchableOpacity
+                    style={[styles.methodTab, paymentMethod === 'COIN' && styles.methodTabActive]}
+                    onPress={() => setPaymentMethod('COIN')}
+                  >
+                    <Ionicons name="sparkles" size={14} color={paymentMethod === 'COIN' ? '#FFFFFF' : '#D97706'} />
+                    <Text style={[styles.methodTabText, paymentMethod === 'COIN' && styles.methodTabTextActive]}>
+                      Coins
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.methodTab, paymentMethod === 'WALLET' && styles.methodTabActive]}
+                    onPress={() => setPaymentMethod('WALLET')}
+                  >
+                    <Ionicons name="wallet-outline" size={14} color={paymentMethod === 'WALLET' ? '#FFFFFF' : '#475569'} />
+                    <Text style={[styles.methodTabText, paymentMethod === 'WALLET' && styles.methodTabTextActive]}>
+                      Wallet
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.methodTab, paymentMethod === 'CASH' && styles.methodTabActive]}
+                    onPress={() => setPaymentMethod('CASH')}
+                  >
+                    <Ionicons name="cash-outline" size={14} color={paymentMethod === 'CASH' ? '#FFFFFF' : '#475569'} />
+                    <Text style={[styles.methodTabText, paymentMethod === 'CASH' && styles.methodTabTextActive]}>
+                      Cash
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.methodTab, paymentMethod === 'UPI' && styles.methodTabActive]}
+                    onPress={() => setPaymentMethod('UPI')}
+                  >
+                    <Ionicons name="qr-code-outline" size={14} color={paymentMethod === 'UPI' ? '#FFFFFF' : '#475569'} />
+                    <Text style={[styles.methodTabText, paymentMethod === 'UPI' && styles.methodTabTextActive]}>
+                      UPI
+                    </Text>
+                  </TouchableOpacity>
                 </View>
+
+                {/* Calculation Info */}
+                {paymentMethod === 'COIN' && (
+                  <View style={styles.breakdownBox}>
+                    <Text style={styles.breakdownText}>
+                      🪙 Pay ₹{cashRemaining} cash + {coinsDeducted} coins (Max 75% bill)
+                    </Text>
+                  </View>
+                )}
+
+                {paymentMethod === 'WALLET' && (
+                  <View style={styles.breakdownBox}>
+                    <Text style={styles.breakdownText}>
+                      💼 Full ₹{numAmount} from App Download Wallet Fund (No coins earned)
+                    </Text>
+                  </View>
+                )}
+
+                {(paymentMethod === 'CASH' || paymentMethod === 'UPI') && (
+                  <View style={styles.coinPerkRow}>
+                    <Ionicons name="sparkles" size={16} color="#DB2777" />
+                    <Text style={styles.coinPerkText}>
+                      You will earn{' '}
+                      <Text style={{ fontWeight: '800', color: '#DB2777' }}>
+                        {calculatedCoins} Shopping Coins ({vendorPercent}%)
+                      </Text>{' '}
+                      instantly!
+                    </Text>
+                  </View>
+                )}
               </View>
 
               {/* Pay Button */}
@@ -161,7 +231,11 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
                 ) : (
                   <>
                     <Ionicons name="flash" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                    <Text style={styles.payBtnText}>Pay ₹{billAmount || 0} via UPI & Earn Coins</Text>
+                    <Text style={styles.payBtnText}>
+                      {paymentMethod === 'COIN'
+                        ? `Pay ₹${cashRemaining} Cash + ${coinsDeducted} Coins`
+                        : `Pay ₹${billAmount || 0} via ${paymentMethod}`}
+                    </Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -352,5 +426,49 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     color: '#92400E',
+  },
+  methodSelectorRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginVertical: 10,
+    gap: 4,
+  },
+  methodTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 4,
+  },
+  methodTabActive: {
+    backgroundColor: '#E11D48',
+    borderColor: '#E11D48',
+  },
+  methodTabText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  methodTabTextActive: {
+    color: '#FFFFFF',
+  },
+  breakdownBox: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 6,
+  },
+  breakdownText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0F172A',
+    textAlign: 'center',
   },
 });

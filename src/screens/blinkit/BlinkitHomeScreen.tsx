@@ -40,6 +40,7 @@ export const BlinkitHomeScreen: React.FC = () => {
     navigateToProductListing,
     currentAreaId,
     currentStoreId,
+    currentAreaName,
     currentStoreName,
     isServiceable,
     deliveryEtaMinutes,
@@ -87,7 +88,7 @@ export const BlinkitHomeScreen: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [currentAreaId, currentStoreId]);
+  }, [currentAreaId, currentStoreId, currentAreaName]);
 
   const handleOpenProductDetail = (prod: BlinkitProduct) => {
     setSelectedBlinkitProduct(prod);

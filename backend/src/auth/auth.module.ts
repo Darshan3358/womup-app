@@ -14,6 +14,9 @@ import { CoinTransaction, CoinTransactionSchema } from '../coins/schemas/coin-tr
 import { DeliveryPartner, DeliveryPartnerSchema } from '../delivery/schemas/delivery-partner.schema';
 import { Store, StoreSchema } from '../stores/schemas/store.schema';
 import { City, CitySchema } from '../areas/schemas/city.schema';
+import { Area, AreaSchema } from '../areas/schemas/area.schema';
+import { ApprovedPincode, ApprovedPincodeSchema } from '../areas/schemas/approved-pincode.schema';
+import { IncomeTransaction, IncomeTransactionSchema } from '../users/schemas/income-transaction.schema';
 
 @Module({
   imports: [
@@ -28,6 +31,9 @@ import { City, CitySchema } from '../areas/schemas/city.schema';
       { name: DeliveryPartner.name, schema: DeliveryPartnerSchema },
       { name: Store.name, schema: StoreSchema },
       { name: City.name, schema: CitySchema },
+      { name: Area.name, schema: AreaSchema },
+      { name: ApprovedPincode.name, schema: ApprovedPincodeSchema },
+      { name: IncomeTransaction.name, schema: IncomeTransactionSchema },
     ]),
   ],
   controllers: [AuthController],

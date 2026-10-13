@@ -16,6 +16,7 @@ import {
   ChevronRight,
   Database,
   Radio,
+  QrCode,
 } from 'lucide-react';
 import { useAdmin, AdminTab } from '../../context/AdminContext';
 
@@ -56,6 +57,13 @@ export const Sidebar: React.FC = () => {
           icon: Store,
           badge: activeStoresCount,
           badgeColor: '#10B981',
+        },
+        {
+          id: 'Vendors',
+          label: 'Local Store Vendors',
+          icon: QrCode,
+          badge: 'Active',
+          badgeColor: '#F59E0B',
         },
         {
           id: 'Staff',

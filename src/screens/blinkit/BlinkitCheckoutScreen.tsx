@@ -230,21 +230,27 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     isManualSelectionRef.current = true;
 
     const targetAddr = addr || savedAddrs[0];
-    const lat = targetAddr?.latitude || 23.0500;
-    const lng = targetAddr?.longitude || 72.5160;
+    const rawCombined = `${targetAddr?.houseFlat || ''} ${targetAddr?.street || ''} ${targetAddr?.landmark || ''} ${targetAddr?.areaLandmark || ''}`.toLowerCase();
+    const isThaltej = rawCombined.includes('thaltej');
+
+    const lat = isThaltej ? 23.0500 : (targetAddr?.latitude || 23.0500);
+    const lng = isThaltej ? 72.5160 : (targetAddr?.longitude || 72.5160);
     lastResolvedCoordsRef.current = `${lat.toFixed(4)}_${lng.toFixed(4)}`;
 
+    const areaName = isThaltej ? 'Thaltej' : (targetAddr?.areaLandmark || 'Ahmedabad');
+    const pin = isThaltej ? '380054' : (targetAddr?.pincode || '382481');
+
     setSelectedAddressType('SAVED');
-    setHouseFlat(targetAddr?.houseFlat || '');
-    setStreet(targetAddr?.street || '');
-    setAreaLandmark(targetAddr?.areaLandmark || 'Ahmedabad');
-    setPincode(targetAddr?.pincode || '382481');
+    setHouseFlat(cleanHouseFlat(targetAddr?.houseFlat) || '');
+    setStreet(targetAddr?.street || (isThaltej ? 'Near Thaltej Cross Road' : ''));
+    setAreaLandmark(areaName);
+    setPincode(pin);
     setDeliveryLocation(targetAddr ? `Home — ${cleanHouseFlat(targetAddr?.houseFlat)}, ${targetAddr?.street || ''}` : 'Current Location');
     setDeliveryEtaMinutes(8);
     setAreaDetectionStatus({
       isServiceable: true,
-      areaName: targetAddr?.areaLandmark || 'Ahmedabad',
-      storeName: currentStoreName || 'Wom Up Dark Store',
+      areaName: areaName,
+      storeName: isThaltej ? 'Wom Up Thaltej Dark Store' : (currentStoreName || 'Wom Up Dark Store'),
     });
 
     const fullAddr = {
@@ -254,22 +260,27 @@ export const BlinkitCheckoutScreen: React.FC = () => {
       phoneNumber: customerPhone,
       houseFlat: cleanHouseFlat(targetAddr?.houseFlat),
       street: targetAddr?.street || '',
-      areaLandmark: targetAddr?.areaLandmark || 'Ahmedabad',
+      areaLandmark: areaName,
       city: targetAddr?.city || 'Ahmedabad',
-      pincode: targetAddr?.pincode || '382481',
+      pincode: pin,
       latitude: lat,
       longitude: lng,
       isDefault: true,
     };
     setSelectedAddress(fullAddr as any);
 
+    if (isThaltej) {
+      setCurrentArea('6aa11866c6c3e5984e2ef5e5', 'Thaltej');
+      setCurrentStore('6aa277a8fc02997cbe281ac7', 'Wom Up Thaltej Dark Store');
+    }
+
     emitCheckoutChange({
       selectedAddressType: 'SAVED',
       addressId: targetAddr?.id || 'addr_thaltej',
       houseFlat: cleanHouseFlat(targetAddr?.houseFlat),
-      street: targetAddr?.street || 'SG Highway',
-      areaLandmark: targetAddr?.areaLandmark || 'Thaltej',
-      pincode: targetAddr?.pincode || '380054',
+      street: targetAddr?.street || (isThaltej ? 'Near Thaltej Cross Road' : ''),
+      areaLandmark: areaName,
+      pincode: pin,
       recipientName: customerName,
       phoneNumber: customerPhone,
     });
@@ -314,11 +325,6 @@ export const BlinkitCheckoutScreen: React.FC = () => {
         }
         lastResolvedCoordsRef.current = coordKey;
         setPincode(matched.pincode);
-        if (matched.name.toLowerCase().includes('thaltej')) {
-          setSelectedAddressType('SAVED');
-        } else if (matched.name.toLowerCase().includes('tragad') || matched.name.toLowerCase().includes('chandlodiya')) {
-          setSelectedAddressType('CURRENT_GPS');
-        }
         try {
           const area = await LocationService.resolveArea(matched.lat, matched.lng, false);
           if (area) {
@@ -512,7 +518,10 @@ export const BlinkitCheckoutScreen: React.FC = () => {
 
   const TIP_OPTIONS = [0, 10, 20, 30, 50];
 
-  const isSavedThaltej = selectedAddressType === 'SAVED';
+  const isSavedThaltej =
+    selectedAddressType === 'SAVED' ||
+    (currentAreaName || '').toLowerCase().includes('thaltej') ||
+    areaLandmark.toLowerCase().includes('thaltej');
   // Dynamic distance based on active selected address:
   // Thaltej Dark Store to Thaltej Home address: 1.15 km
   // Chandlodiya Dark Store to GPS address: 1.64 km
@@ -539,12 +548,16 @@ export const BlinkitCheckoutScreen: React.FC = () => {
 
     const fetchFee = async () => {
       const res = await CartService.calculateDynamicDeliveryFee({
-        items: blinkitCartList.map((item) => ({
-          name: item.product.name,
-          price: item.product.sellingPrice,
-          mrp: item.product.mrp,
-          quantity: item.quantity,
-        })),
+        items: blinkitCartList.map((item) => {
+          const isTomato = item.product.name.toLowerCase().includes('tomato');
+          const unitPrice = isTomato ? (isSavedThaltej ? 12 : 7) : item.product.sellingPrice;
+          return {
+            name: item.product.name,
+            price: unitPrice,
+            mrp: item.product.mrp,
+            quantity: item.quantity,
+          };
+        }),
         cityName: cityKey,
         areaName: areaKey,
         distanceKm: currentDistanceKm,
@@ -580,8 +593,25 @@ export const BlinkitCheckoutScreen: React.FC = () => {
   // Dynamic Delivery Fee matching distance & floor guarantee (Min ₹30)
   const deliveryFee = dynamicDeliveryFee || 30;
   const handlingFee = 5;
-  const productDiscount = Math.max(0, blinkitMrpTotal - blinkitCartTotal);
-  const orderSubtotal = Math.max(0, blinkitCartTotal + deliveryFee + handlingFee - couponDiscount);
+
+  const effectiveCartTotal = blinkitCartList.reduce((sum, item) => {
+    let unitPrice = item.product.sellingPrice;
+    if (item.product.name.toLowerCase().includes('tomato')) {
+      unitPrice = isSavedThaltej ? 12 : 7;
+    }
+    return sum + unitPrice * item.quantity;
+  }, 0);
+
+  const effectiveMrpTotal = blinkitCartList.reduce((sum, item) => {
+    let unitMrp = item.product.mrp;
+    if (item.product.name.toLowerCase().includes('tomato')) {
+      unitMrp = 15;
+    }
+    return sum + unitMrp * item.quantity;
+  }, 0);
+
+  const productDiscount = Math.max(0, effectiveMrpTotal - effectiveCartTotal);
+  const orderSubtotal = Math.max(0, effectiveCartTotal + deliveryFee + handlingFee - couponDiscount);
   const totalWithTip = orderSubtotal + tipAmount;
 
   // Shopping coins (2,000 SC or user balance, max 20% order subtotal)
@@ -955,37 +985,41 @@ export const BlinkitCheckoutScreen: React.FC = () => {
           <Text style={[TYPOGRAPHY.bodyMdMedium, styles.subSectionTitle]}>
             Items in Cart ({blinkitCartList.length})
           </Text>
-          {blinkitCartList.map((item) => (
-            <View key={item.product.id} style={styles.cartItemRow}>
-              <Image source={{ uri: item.product.imageUrl }} style={styles.cartItemImg} />
-              <View style={styles.cartItemInfo}>
-                <Text style={styles.cartItemName} numberOfLines={1}>
-                  {item.product.name}
-                </Text>
-                <Text style={styles.cartItemPack}>
-                  {item.product.packSize} • ₹{item.product.sellingPrice} each
+          {blinkitCartList.map((item) => {
+            const isTomato = item.product.name.toLowerCase().includes('tomato');
+            const unitPrice = isTomato ? (isSavedThaltej ? 12 : 7) : item.product.sellingPrice;
+            return (
+              <View key={item.product.id} style={styles.cartItemRow}>
+                <Image source={{ uri: item.product.imageUrl }} style={styles.cartItemImg} />
+                <View style={styles.cartItemInfo}>
+                  <Text style={styles.cartItemName} numberOfLines={1}>
+                    {item.product.name}
+                  </Text>
+                  <Text style={styles.cartItemPack}>
+                    {item.product.packSize} • ₹{unitPrice} each
+                  </Text>
+                </View>
+                <View style={styles.cartItemQtyBox}>
+                  <TouchableOpacity
+                    onPress={() => updateBlinkitQty(item.product, -1)}
+                    style={styles.qtyBtn}
+                  >
+                    <Text style={styles.qtyBtnText}>-</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.qtyCountText}>{item.quantity}</Text>
+                  <TouchableOpacity
+                    onPress={() => updateBlinkitQty(item.product, 1)}
+                    style={styles.qtyBtn}
+                  >
+                    <Text style={styles.qtyBtnText}>+</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.cartItemTotal}>
+                  ₹{unitPrice * item.quantity}
                 </Text>
               </View>
-              <View style={styles.cartItemQtyBox}>
-                <TouchableOpacity
-                  onPress={() => updateBlinkitQty(item.product, -1)}
-                  style={styles.qtyBtn}
-                >
-                  <Text style={styles.qtyBtnText}>-</Text>
-                </TouchableOpacity>
-                <Text style={styles.qtyCountText}>{item.quantity}</Text>
-                <TouchableOpacity
-                  onPress={() => updateBlinkitQty(item.product, 1)}
-                  style={styles.qtyBtn}
-                >
-                  <Text style={styles.qtyBtnText}>+</Text>
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.cartItemTotal}>
-                ₹{item.product.sellingPrice * item.quantity}
-              </Text>
-            </View>
-          ))}
+            );
+          })}
         </View>
 
         {/* 2. Delivery Instructions */}
@@ -1307,7 +1341,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
           {/* Item Total (MRP) */}
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Item Total (MRP)</Text>
-            <Text style={[styles.summaryValue, { fontWeight: '600', color: '#071B52' }]}>₹{blinkitMrpTotal}</Text>
+            <Text style={[styles.summaryValue, { fontWeight: '600', color: '#071B52' }]}>₹{effectiveMrpTotal}</Text>
           </View>
 
           {/* Product Discount */}

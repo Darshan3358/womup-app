@@ -154,6 +154,16 @@ export interface UserProfile {
   birthday?: string; // "07 August 2005" — persisted in MongoDB via PATCH /users/me
   preferredCityId?: string;
   preferredCityName?: string;
+  registrationCity?: string;
+  registrationPincode?: string;
+  fullNameAsPerAadhaar?: string;
+  verificationStatus?: 'NON_VERIFIED' | 'VERIFIED' | 'PENDING' | string;
+  aadhaarVerified?: boolean;
+  pendingIncome?: number;
+  availableIncome?: number;
+  appDownloadIncome?: number;
+  sponsorCode?: string;
+  isCompanySponsored?: boolean;
 }
 
 

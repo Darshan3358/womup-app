@@ -134,6 +134,36 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
   }
 
+  // Real-time synchronization for Local Shop Vendors
+  @SubscribeMessage('join_vendor')
+  handleJoinVendor(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: any,
+  ) {
+    const rawId = typeof payload === 'string' ? payload : (payload?.vendorId || payload?.vendorCode || payload?.id);
+    if (rawId) {
+      const vendorId = String(rawId);
+      client.join(`vendor_${vendorId}`);
+      this.logger.log(`Client ${client.id} joined vendor room: vendor_${vendorId}`);
+      return { event: 'joined', vendorId };
+    }
+    return { event: 'error', message: 'Missing vendorId' };
+  }
+
+  @SubscribeMessage('leave_vendor')
+  handleLeaveVendor(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: any,
+  ) {
+    const rawId = typeof payload === 'string' ? payload : (payload?.vendorId || payload?.vendorCode || payload?.id);
+    if (rawId) {
+      const vendorId = String(rawId);
+      client.leave(`vendor_${vendorId}`);
+      return { event: 'left', vendorId };
+    }
+  }
+
+
   // Cross-device synchronization for Active Delivery Area & Store (Web <-> Mobile App)
   @SubscribeMessage('location_changed')
   @SubscribeMessage('set_location')
@@ -645,8 +675,17 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
   }
 
-  // Cross-device synchronization for Shopping Coins & Wallet
-  emitWalletUpdated(userId: string, walletData: { shoppingCoins?: number; walletBalance?: number }) {
+  // Cross-device synchronization for Shopping Coins, Income & Wallet
+  emitWalletUpdated(userId: string, walletData: {
+    shoppingCoins?: number;
+    walletBalance?: number;
+    pendingIncome?: number;
+    availableIncome?: number;
+    appDownloadIncome?: number;
+    verificationStatus?: string;
+    aadhaarVerified?: boolean;
+    [key: string]: any;
+  }) {
     if (this.server && userId) {
       const payload = {
         userId: userId.toString(),
@@ -655,7 +694,7 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
       };
       this.server.to(`user_${userId}`).emit('wallet_updated', payload);
       this.server.to(`user_${userId}`).emit('coins_updated', payload);
-      this.logger.log(`[WebSocket] Emitted wallet_updated to room user_${userId}: SC=${walletData.shoppingCoins} WB=${walletData.walletBalance}`);
+      this.logger.log(`[WebSocket] Emitted wallet_updated to room user_${userId}`);
     }
   }
 
@@ -746,5 +785,35 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
       this.logger.log(`[WebSocket] Emitted review_prompt_requested to user_${customerId} for order ${payload.orderNumber}`);
     }
   }
+
+  // Cross-device synchronization for Local Shop Vendor Collection Requests
+  emitCollectionRequestToVendor(vendorId: string, payload: any) {
+    if (this.server && vendorId) {
+      this.server.to(`vendor_${vendorId}`).emit('collection_request_received', payload);
+      this.logger.log(`[WebSocket] Emitted collection_request_received to room vendor_${vendorId}`);
+    }
+  }
+
+  emitCollectionRequestCancelled(vendorId: string, payload: any) {
+    if (this.server && vendorId) {
+      this.server.to(`vendor_${vendorId}`).emit('collection_request_cancelled', payload);
+      this.logger.log(`[WebSocket] Emitted collection_request_cancelled to room vendor_${vendorId}`);
+    }
+  }
+
+  emitCollectionVerifiedToCustomer(customerId: string, payload: any) {
+    if (this.server && customerId) {
+      this.server.to(`user_${customerId}`).emit('collection_verified', payload);
+      this.logger.log(`[WebSocket] Emitted collection_verified to room user_${customerId}`);
+    }
+  }
+
+  emitCollectionRejectedToCustomer(customerId: string, payload: any) {
+    if (this.server && customerId) {
+      this.server.to(`user_${customerId}`).emit('collection_rejected', payload);
+      this.logger.log(`[WebSocket] Emitted collection_rejected to room user_${customerId}`);
+    }
+  }
 }
+
 

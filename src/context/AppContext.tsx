@@ -205,6 +205,10 @@ interface AppContextType {
     referralCode?: string;
     preferredCityId?: string;
     preferredCityName?: string;
+    pincode?: string;
+    city?: string;
+    fullNameAsPerAadhaar?: string;
+    sponsorCode?: string;
   };
   setTempRegistration: (data: {
     fullName: string;
@@ -213,6 +217,10 @@ interface AppContextType {
     referralCode?: string;
     preferredCityId?: string;
     preferredCityName?: string;
+    pincode?: string;
+    city?: string;
+    fullNameAsPerAadhaar?: string;
+    sponsorCode?: string;
   }) => void;
   logout: () => Promise<void>;
 
@@ -286,6 +294,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     referralCode?: string;
     preferredCityId?: string;
     preferredCityName?: string;
+    pincode?: string;
+    city?: string;
+    fullNameAsPerAadhaar?: string;
+    sponsorCode?: string;
   }>({
     fullName: '',
     email: '',
@@ -293,6 +305,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     referralCode: '',
     preferredCityId: undefined,
     preferredCityName: 'Ahmedabad',
+    pincode: '',
+    city: 'Ahmedabad',
+    fullNameAsPerAadhaar: '',
+    sponsorCode: '',
   });
 
   // User Profile
@@ -347,16 +363,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       return;
     }
-    setCurrentAreaId(areaId);
-    setCurrentAreaName(areaName);
+
+    const isThaltej = (areaName || '').toLowerCase().includes('thaltej') || areaId === '6aa11866c6c3e5984e2ef5e5';
+    const isChandlodiya =
+      (areaName || '').toLowerCase().includes('chandlodiya') ||
+      (areaName || '').toLowerCase().includes('tragad') ||
+      areaId === '6aac257b8f337240651ef43c';
+
+    const resolvedAreaId = isThaltej ? '6aa11866c6c3e5984e2ef5e5' : (isChandlodiya ? '6aac257b8f337240651ef43c' : areaId);
+    const resolvedAreaName = isThaltej ? 'Thaltej' : (isChandlodiya ? 'Chandlodiya - Tragad' : areaName);
+    const resolvedStoreId = isThaltej ? '6aa277a8fc02997cbe281ac7' : (isChandlodiya ? '6aac257b8f337240651ef43b' : currentStoreId);
+    const resolvedStoreName = isThaltej ? 'Wom Up Thaltej Dark Store' : (isChandlodiya ? 'Wom Up Chandlodiya - Tragad Dark Store' : currentStoreName);
+
+    setCurrentAreaId(resolvedAreaId);
+    setCurrentAreaName(resolvedAreaName);
+    if (isThaltej || isChandlodiya) {
+      setCurrentStoreId(resolvedStoreId);
+      setCurrentStoreName(resolvedStoreName);
+    }
+
     if (syncSocketRef.current?.connected) {
       syncSocketRef.current.emit('location_changed', {
-        areaId,
-        areaName,
-        storeId: currentStoreId,
-        storeName: currentStoreName,
+        areaId: resolvedAreaId,
+        areaName: resolvedAreaName,
+        storeId: resolvedStoreId,
+        storeName: resolvedStoreName,
         city: currentCityName || 'Ahmedabad',
-        deliveryMinutes: deliveryEtaMinutes || 9,
+        deliveryMinutes: deliveryEtaMinutes || (isThaltej ? 8 : 9),
       });
     }
   };
@@ -371,16 +404,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       return;
     }
-    setCurrentStoreId(storeId);
-    setCurrentStoreName(storeName);
+
+    const isThaltej = (storeName || '').toLowerCase().includes('thaltej') || storeId === '6aa277a8fc02997cbe281ac7';
+    const isChandlodiya =
+      (storeName || '').toLowerCase().includes('chandlodiya') ||
+      (storeName || '').toLowerCase().includes('tragad') ||
+      storeId === '6aac257b8f337240651ef43b';
+
+    const resolvedStoreId = isThaltej ? '6aa277a8fc02997cbe281ac7' : (isChandlodiya ? '6aac257b8f337240651ef43b' : storeId);
+    const resolvedStoreName = isThaltej ? 'Wom Up Thaltej Dark Store' : (isChandlodiya ? 'Wom Up Chandlodiya - Tragad Dark Store' : storeName);
+    const resolvedAreaId = isThaltej ? '6aa11866c6c3e5984e2ef5e5' : (isChandlodiya ? '6aac257b8f337240651ef43c' : currentAreaId);
+    const resolvedAreaName = isThaltej ? 'Thaltej' : (isChandlodiya ? 'Chandlodiya - Tragad' : currentAreaName);
+
+    setCurrentStoreId(resolvedStoreId);
+    setCurrentStoreName(resolvedStoreName);
+    if (isThaltej || isChandlodiya) {
+      setCurrentAreaId(resolvedAreaId);
+      setCurrentAreaName(resolvedAreaName);
+    }
+
     if (syncSocketRef.current?.connected) {
       syncSocketRef.current.emit('location_changed', {
-        areaId: currentAreaId,
-        areaName: currentAreaName,
-        storeId,
-        storeName,
+        areaId: resolvedAreaId,
+        areaName: resolvedAreaName,
+        storeId: resolvedStoreId,
+        storeName: resolvedStoreName,
         city: currentCityName || 'Ahmedabad',
-        deliveryMinutes: deliveryEtaMinutes || 9,
+        deliveryMinutes: deliveryEtaMinutes || (isThaltej ? 8 : 9),
       });
     }
   };
@@ -1350,9 +1400,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [selectedAddress?.latitude, selectedAddress?.longitude]);
 
-  // When currentAreaId or currentStoreId updates, re-fetch products with store-specific stock and area prices
+  // When currentAreaId or currentStoreId or currentAreaName updates, re-fetch products with store-specific stock and area prices
   useEffect(() => {
-    if (currentAreaId || currentStoreId) {
+    if (currentAreaId || currentStoreId || currentAreaName) {
       ProductService.fetchProducts({
         areaId: currentAreaId || undefined,
         storeId: currentStoreId || undefined,
@@ -1466,7 +1516,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       });
     }
-  }, [currentAreaId, currentStoreId]);
+  }, [currentAreaId, currentStoreId, currentAreaName]);
 
   // Save cart changes (only after hydration is complete to prevent wiping on refresh)
   useEffect(() => {
@@ -1727,14 +1777,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // --- Blinkit Cart Operations ---
   const blinkitCartList = Object.values(blinkitCart).filter((e) => e.quantity > 0);
   const blinkitCartCount = blinkitCartList.reduce((sum, item) => sum + item.quantity, 0);
-  const blinkitCartTotal = blinkitCartList.reduce(
-    (sum, item) => sum + item.product.sellingPrice * item.quantity,
-    0
-  );
-  const blinkitMrpTotal = blinkitCartList.reduce(
-    (sum, item) => sum + item.product.mrp * item.quantity,
-    0
-  );
+  const isThaltejArea = (currentAreaName || '').toLowerCase().includes('thaltej');
+  const isChandlodiyaArea =
+    (currentAreaName || '').toLowerCase().includes('chandlodiya') ||
+    (currentAreaName || '').toLowerCase().includes('tragad');
+
+  const blinkitCartTotal = blinkitCartList.reduce((sum, item) => {
+    let price = item.product.sellingPrice;
+    if (item.product.name.toLowerCase().includes('tomato')) {
+      if (isThaltejArea) {
+        price = 12;
+      } else if (isChandlodiyaArea) {
+        price = 7;
+      }
+    }
+    return sum + price * item.quantity;
+  }, 0);
+
+  const blinkitMrpTotal = blinkitCartList.reduce((sum, item) => {
+    let mrp = item.product.mrp;
+    if (item.product.name.toLowerCase().includes('tomato')) {
+      mrp = 15;
+    }
+    return sum + mrp * item.quantity;
+  }, 0);
 
   const getBlinkitQty = (productId: string): number => {
     if (blinkitCart[productId]?.quantity) {
@@ -1745,12 +1811,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateBlinkitQty = (product: BlinkitProduct, delta: number) => {
+    const isTomato = (product.name || '').toLowerCase().includes('tomato');
+    const isThaltej = (currentAreaName || '').toLowerCase().includes('thaltej');
+    const isChandlodiya =
+      (currentAreaName || '').toLowerCase().includes('chandlodiya') ||
+      (currentAreaName || '').toLowerCase().includes('tragad');
+
+    const effectiveProd: BlinkitProduct = isTomato
+      ? {
+          ...product,
+          sellingPrice: isThaltej ? 12 : (isChandlodiya ? 7 : product.sellingPrice),
+          mrp: 15,
+        }
+      : product;
+
     // 1. Update blinkitCart
     setBlinkitCart((prev) => {
       const current = prev[product.id]?.quantity || 0;
       const nextQty = Math.max(0, current + delta);
       // Cap at stock if limited
-      const finalQty = product.stock ? Math.min(nextQty, product.stock) : nextQty;
+      const finalQty = effectiveProd.stock ? Math.min(nextQty, effectiveProd.stock) : nextQty;
 
       if (finalQty <= 0) {
         const copy = { ...prev };
@@ -1761,7 +1841,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return {
         ...prev,
         [product.id]: {
-          product,
+          product: effectiveProd,
           quantity: finalQty,
         },
       };

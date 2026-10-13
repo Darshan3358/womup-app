@@ -1,19 +1,22 @@
 export interface LocalVendor {
   id: string;
   name: string;
-  category: 'Vegetables' | 'Grocery' | 'Medical' | 'Salon' | 'Garments' | 'More';
+  storeName?: string;
+  category: string;
   coinPercentage: number;
-  badgeColor: string;
-  buttonColor: string;
-  pillBgColor: string;
-  verified: boolean;
+  shoppingCoinPercent?: number;
+  badgeColor?: string;
+  buttonColor?: string;
+  pillBgColor?: string;
+  verified?: boolean;
   address: string;
-  phone: string;
-  timings: string;
+  phone?: string;
+  timings?: string;
   distanceKm: number;
   rating: number;
-  reviewCount: number;
+  reviewCount?: number;
   image: string;
+  imageUrl?: string;
   products?: LocalProduct[];
 }
 
@@ -44,7 +47,7 @@ export interface LocalTransaction {
   vendorCategory: string;
   amount: number;
   coinsEarned: number;
-  paymentMethod: 'UPI' | 'WALLET' | 'CARD' | 'CASH';
+  paymentMethod: 'UPI' | 'WALLET' | 'CARD' | 'CASH' | 'COIN';
   status: 'SUCCESS' | 'PENDING' | 'FAILED';
   date: string;
   createdAt?: string;

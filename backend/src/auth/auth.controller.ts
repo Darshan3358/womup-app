@@ -1,5 +1,5 @@
-import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Controller, Post, Get, Query, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { SendOtpDto, VerifyOtpDto, RegisterDto, RegisterRiderDto, RefreshTokenDto, GoogleAuthDto, LinkPhoneDto } from './dto/auth.dto';
 
@@ -7,6 +7,27 @@ import { SendOtpDto, VerifyOtpDto, RegisterDto, RegisterRiderDto, RefreshTokenDt
 @Controller('api/v1/auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Get('registration-timing')
+  @ApiOperation({ summary: 'Check if registration is open (6 AM to 10 PM IST)' })
+  async getRegistrationTiming() {
+    return this.authService.isRegistrationAllowed();
+  }
+
+  @Get('check-pincode')
+  @ApiOperation({ summary: 'Validate if pincode is serviceable and approved for registration' })
+  @ApiQuery({ name: 'pin', required: false, example: '380015' })
+  @ApiQuery({ name: 'pincode', required: false, example: '380015' })
+  async checkPincode(@Query('pin') pin?: string, @Query('pincode') pincode?: string) {
+    return this.authService.checkPincode(pin || pincode || '');
+  }
+
+  @Get('validate-sponsor')
+  @ApiOperation({ summary: 'Validate sponsor code or default to Company Root' })
+  @ApiQuery({ name: 'code', required: false, example: 'WORM1234' })
+  async validateSponsor(@Query('code') code?: string) {
+    return this.authService.validateSponsor(code);
+  }
 
   @Post('google')
   @HttpCode(HttpStatus.OK)
