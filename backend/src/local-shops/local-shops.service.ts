@@ -599,16 +599,37 @@ export class LocalShopsService implements OnModuleInit {
     const vendor = await this.vendorModel.findById(id);
     if (!vendor) throw new NotFoundException('Vendor not found');
     vendor.isVerified = true;
+    vendor.vendorStatus = 2; // Active
+    vendor.vendorRejectReason = '';
     await vendor.save();
-    return { success: true, message: 'Vendor KYC approved' };
+    return { success: true, message: 'Vendor KYC approved and status set to Active', vendorStatus: 2 };
   }
 
   async adminRejectKyc(id: string, reason?: string) {
     const vendor = await this.vendorModel.findById(id);
     if (!vendor) throw new NotFoundException('Vendor not found');
     vendor.isVerified = false;
+    vendor.vendorStatus = 3; // Reject
+    vendor.vendorRejectReason = reason || 'Documentation incomplete';
     await vendor.save();
-    return { success: true, message: `Vendor KYC rejected: ${reason || 'Incomplete documentation'}` };
+    return { success: true, message: `Vendor KYC rejected: ${vendor.vendorRejectReason}`, vendorStatus: 3 };
+  }
+
+  async adminBlockVendor(id: string, isBlocked: number, reason?: string) {
+    const vendor = await this.vendorModel.findById(id);
+    if (!vendor) throw new NotFoundException('Vendor not found');
+    vendor.isBlocked = isBlocked;
+    if (reason) vendor.blockReason = reason;
+    await vendor.save();
+    return { success: true, message: `Vendor ${isBlocked ? 'Blocked' : 'Unblocked'} successfully`, isBlocked };
+  }
+
+  async adminSuspendVendor(id: string, isSuspended: number) {
+    const vendor = await this.vendorModel.findById(id);
+    if (!vendor) throw new NotFoundException('Vendor not found');
+    vendor.isSuspended = isSuspended;
+    await vendor.save();
+    return { success: true, message: `Vendor ${isSuspended ? 'Suspended' : 'Unsuspended'} successfully`, isSuspended };
   }
 
   async adminUpdateCoinRate(id: string, coinRate: number) {
@@ -765,6 +786,35 @@ export class LocalShopsService implements OnModuleInit {
       pendingBalance,
       isVerified: vendor.isVerified,
       isActive: vendor.isActive,
+      vendorStatus: vendor.vendorStatus ?? (vendor.isVerified ? 2 : 1),
+      vendorRejectReason: vendor.vendorRejectReason || '',
+      isBlocked: vendor.isBlocked ?? 0,
+      isSuspended: vendor.isSuspended ?? 0,
+      blockReason: vendor.blockReason || '',
+      vendorFirmName: vendor.vendorFirmName || vendor.storeName,
+      vendorOwnerName: vendor.vendorOwnerName || vendor.ownerName,
+      vendorBalance: vendor.vendorBalance ?? vendor.walletBalance ?? 0,
+      vendorAdminBalance: vendor.vendorAdminBalance ?? pendingBalance,
+      vendorPayableToAdmin: vendor.vendorPayableToAdmin ?? 0,
+      cancelledChequeImage: vendor.cancelledChequeImage || '',
+      vendorAadharFrontImage: vendor.vendorAadharFrontImage || vendor.kycDocuments?.aadhaarUrl || '',
+      vendorAadharBackImage: vendor.vendorAadharBackImage || '',
+      gstCertificateImage: vendor.gstCertificateImage || vendor.kycDocuments?.gstUrl || '',
+      tradeLicenseImage: vendor.tradeLicenseImage || vendor.kycDocuments?.shopLicenseUrl || '',
+      panCardImage: vendor.panCardImage || vendor.kycDocuments?.panUrl || '',
+      businessCardImage: vendor.businessCardImage || '',
+      shopPhotoImage: vendor.shopPhotoImage || vendor.imageUrl || '',
+      ownerPhotoImage: vendor.ownerPhotoImage || '',
+      talukaId: vendor.talukaId || '',
+      districtId: vendor.districtId || '',
+      stateId: vendor.stateId || '',
+      countryId: vendor.countryId || 'IN',
+      businessPincode: vendor.businessPincode || vendor.pincode,
+      bankName: vendor.bankName || vendor.bankAccount?.bankName || 'HDFC Bank',
+      bankBranch: vendor.bankBranch || '',
+      accountHolderName: vendor.accountHolderName || vendor.ownerName,
+      accountNumber: vendor.accountNumber || vendor.bankAccount?.accountNumber || 'XXXX9182',
+      ifscCode: vendor.ifscCode || vendor.bankAccount?.ifscCode || 'HDFC0000123',
       bankAccount: vendor.bankAccount || {
         bankName: 'HDFC Bank',
         accountNumber: 'XXXX9182',

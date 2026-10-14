@@ -162,6 +162,27 @@ export class LocalShopsController {
     return { success: true, ...result };
   }
 
+  @Post('admin/vendors/:id/block')
+  @ApiOperation({ summary: 'Block or unblock vendor account' })
+  async adminBlockVendor(
+    @Param('id') id: string,
+    @Body('isBlocked') isBlocked: number,
+    @Body('reason') reason?: string,
+  ) {
+    const result = await this.localShopsService.adminBlockVendor(id, Number(isBlocked), reason);
+    return result;
+  }
+
+  @Post('admin/vendors/:id/suspend')
+  @ApiOperation({ summary: 'Suspend or unsuspend vendor account' })
+  async adminSuspendVendor(
+    @Param('id') id: string,
+    @Body('isSuspended') isSuspended: number,
+  ) {
+    const result = await this.localShopsService.adminSuspendVendor(id, Number(isSuspended));
+    return result;
+  }
+
   @Patch('admin/vendors/:id/coin-rate')
   @ApiOperation({ summary: 'Update vendor Shopping Coin % (2% - 25%)' })
   async adminUpdateCoinRate(

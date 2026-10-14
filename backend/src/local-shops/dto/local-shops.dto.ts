@@ -101,6 +101,193 @@ export class CreateVendorDto {
     ifscCode?: string;
     bankName?: string;
   };
+
+  // ── tbl_vendor SQL Fields ──
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  vendorFirmName?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  vendorOwnerName?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  businessType?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  vendorGstNo?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  vendorMobile?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  vendorAlternateMobile?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  vendorEmail?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  vendorAadharNo?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  businessAddress?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  businessLandmark?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  businessCategoryId?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  talukaId?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  districtId?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  stateId?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  countryId?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  businessPincode?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  bankName?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  bankBranch?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  accountHolderName?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  accountNumber?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  ifscCode?: string;
+
+  // KYC Images
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  cancelledChequeImage?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  vendorAadharFrontImage?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  vendorAadharBackImage?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  gstCertificateImage?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  tradeLicenseImage?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  panCardImage?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  businessCardImage?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  shopPhotoImage?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  ownerPhotoImage?: string;
+
+  @ApiPropertyOptional()
+  @IsNumber()
+  @IsOptional()
+  vendorPersantage?: number;
+
+  @ApiPropertyOptional()
+  @IsNumber()
+  @IsOptional()
+  vendorCustomerPersantage?: number;
+
+  @ApiPropertyOptional()
+  @IsNumber()
+  @IsOptional()
+  vendorStatus?: number;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  vendorRejectReason?: string;
+
+  @ApiPropertyOptional()
+  @IsNumber()
+  @IsOptional()
+  isBlocked?: number;
+
+  @ApiPropertyOptional()
+  @IsNumber()
+  @IsOptional()
+  isSuspended?: number;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  vendorPassword?: string;
 }
 
 export class UpdateVendorDto extends CreateVendorDto {

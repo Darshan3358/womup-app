@@ -9,6 +9,7 @@ import { TeamPurchaseIncome, TeamPurchaseIncomeSchema } from './schemas/team-pur
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { WishlistController } from './wishlist.controller';
+import { AdminCustomersController } from './admin-customers.controller';
 import { TrackingModule } from '../tracking/tracking.module';
 
 @Module({
@@ -23,7 +24,7 @@ import { TrackingModule } from '../tracking/tracking.module';
     ]),
     TrackingModule,
   ],
-  controllers: [UsersController, WishlistController],
+  controllers: [UsersController, WishlistController, AdminCustomersController],
   providers: [UsersService],
   exports: [UsersService],
 })

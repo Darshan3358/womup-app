@@ -161,6 +161,144 @@ export class User {
 
   @Prop({ default: true })
   isActive: boolean;
+
+  // ── tbl_customer Full SQL Schema Alignment ──
+  @Prop({ default: '' })
+  customerCodeNumber?: string;
+
+  @Prop({ default: '' })
+  customerCode?: string;
+
+  @Prop({ default: '' })
+  customerReferralBy?: string;
+
+  @Prop({ default: '' })
+  surname?: string;
+
+  @Prop({ default: '' })
+  firstName?: string;
+
+  @Prop({ default: '' })
+  fatherHusbandName?: string;
+
+  @Prop({ default: '' })
+  gender?: string;
+
+  @Prop({ default: '' })
+  birthDate?: string;
+
+  @Prop({ default: '' })
+  address?: string;
+
+  @Prop({ default: '' })
+  landmark?: string;
+
+  @Prop({ default: '' })
+  village?: string;
+
+  @Prop({ default: '' })
+  customerPincode?: string;
+
+  // Location Hierarchy
+  @Prop({ default: '' })
+  talukaId?: string;
+
+  @Prop({ default: '' })
+  districtId?: string;
+
+  @Prop({ default: '' })
+  cityId?: string;
+
+  @Prop({ default: '' })
+  stateId?: string;
+
+  @Prop({ default: 'IN' })
+  countryId?: string;
+
+  // Bank Details
+  @Prop({ default: '' })
+  bankName?: string;
+
+  @Prop({ default: '' })
+  accountHolderName?: string;
+
+  @Prop({ default: '' })
+  accountNumber?: string;
+
+  @Prop({ default: '' })
+  ifscCode?: string;
+
+  @Prop({ default: '' })
+  branchName?: string;
+
+  @Prop({ default: '' })
+  upiId?: string;
+
+  // KYC Document Images & Status
+  @Prop({ default: '' })
+  aadharFrontImage?: string;
+
+  @Prop({ default: '' })
+  aadharBackImage?: string;
+
+  @Prop({ default: 2 }) // 1 = yes, 2 = no
+  customerIsVerify: number;
+
+  @Prop({ default: 1 }) // 1 pending, 2 confirm, 3 rejectd
+  customerKycStatus: number;
+
+  @Prop({ default: '' })
+  kycRejectReason?: string;
+
+  // Sponsor Details
+  @Prop({ default: '' })
+  sponsorName?: string;
+
+  @Prop({ default: Date.now })
+  joiningDate?: Date;
+
+  @Prop({ default: '' })
+  customerOtp?: string;
+
+  @Prop()
+  lastLogin?: Date;
+
+  @Prop({ default: '' })
+  androidToken?: string;
+
+  @Prop({ default: '' })
+  iosToken?: string;
+
+  @Prop({ default: '' })
+  addedBy?: string;
+
+  // Security, Block & Suspended Flags
+  @Prop({ default: 1 }) // 1 yes, 2 no
+  customerPaymentStatus: number;
+
+  @Prop({ default: false })
+  isLogin: boolean;
+
+  @Prop({ default: 0 }) // 0=No, 1=Yes
+  isBlocked: number;
+
+  @Prop({ default: 0 }) // 0=No, 1=Yes
+  isSuspended: number;
+
+  @Prop({ default: '' })
+  blockReason?: string;
+
+  @Prop({ default: '1.0.0' })
+  appVersion?: string;
+
+  @Prop({ default: '' })
+  customerPin?: string;
+
+  @Prop({ default: 1 }) // 0 = not credited this month, 1 = credited
+  monthlyCreditStatus: number;
+
+  @Prop({ default: '' })
+  passwordHash?: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
@@ -169,3 +307,6 @@ UserSchema.index({ phone: 1 }, { unique: true, sparse: true });
 UserSchema.index({ sponsorId: 1 });
 UserSchema.index({ sponsorCode: 1 });
 UserSchema.index({ verificationStatus: 1 });
+UserSchema.index({ isBlocked: 1 });
+UserSchema.index({ isSuspended: 1 });
+UserSchema.index({ customerKycStatus: 1 });

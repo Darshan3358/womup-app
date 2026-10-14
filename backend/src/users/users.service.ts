@@ -93,15 +93,22 @@ export class UsersService {
     }
 
     const updateOps: any = { $set: {} };
-    if (updateData.name !== undefined) updateOps.$set.name = updateData.name;
-    if (updateData.email !== undefined) updateOps.$set.email = updateData.email;
-    if (updateData.avatar !== undefined) updateOps.$set.avatar = updateData.avatar;
-    if (updateData.hideSensitiveItems !== undefined) updateOps.$set.hideSensitiveItems = updateData.hideSensitiveItems;
-    if (updateData.preferredCityId !== undefined) updateOps.$set.preferredCityId = updateData.preferredCityId;
-    if (updateData.preferredCityName !== undefined) updateOps.$set.preferredCityName = updateData.preferredCityName;
+
+    for (const [key, val] of Object.entries(updateData)) {
+      if (val !== undefined) {
+        updateOps.$set[key] = val;
+      }
+    }
+
+    if (updateData.firstName || updateData.surname) {
+      const fName = updateData.firstName || currentUser.firstName || '';
+      const sName = updateData.surname || currentUser.surname || '';
+      if (!updateData.name && (fName || sName)) {
+        updateOps.$set.name = `${fName} ${sName}`.trim();
+      }
+    }
 
     if (updateData.birthday) {
-      updateOps.$set.birthday = updateData.birthday;
       // Award 50 bonus shopping coins on first-time birthday save
       if (!currentUser.birthday) {
         updateOps.$inc = { shoppingCoins: 50 };
@@ -640,4 +647,217 @@ export class UsersService {
       results,
     };
   }
+
+  // ── Admin Customer & KYC Management Methods ──
+  async adminGetCustomers(query?: { search?: string; kycStatus?: number; isBlocked?: number; page?: number; limit?: number }) {
+    const filter: any = {};
+    if (query?.search) {
+      const regex = new RegExp(query.search, 'i');
+      filter.$or = [
+        { name: regex },
+        { phone: regex },
+        { email: regex },
+        { referralCode: regex },
+        { customerCode: regex },
+        { customerCodeNumber: regex },
+        { aadhaarNumber: regex },
+      ];
+    }
+    if (query?.kycStatus !== undefined && !isNaN(query.kycStatus)) {
+      filter.customerKycStatus = Number(query.kycStatus);
+    }
+    if (query?.isBlocked !== undefined && !isNaN(query.isBlocked)) {
+      filter.isBlocked = Number(query.isBlocked);
+    }
+
+    const page = Math.max(1, Number(query?.page || 1));
+    const limit = Math.min(100, Math.max(1, Number(query?.limit || 20)));
+    const skip = (page - 1) * limit;
+
+    const [customers, total] = await Promise.all([
+      this.userModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean().exec(),
+      this.userModel.countDocuments(filter).exec(),
+    ]);
+
+    return {
+      success: true,
+      data: customers,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async adminGetCustomerById(id: string): Promise<any> {
+    const customer: any = await this.userModel.findById(id).lean().exec();
+    if (!customer) throw new NotFoundException('Customer not found');
+
+    // Get sponsor info
+    let sponsor = null;
+    if (customer.sponsorId) {
+      sponsor = await this.userModel.findById(customer.sponsorId).select('name phone referralCode customerCode').lean().exec();
+    }
+
+    // Get downline counts
+    const downlineLevels = await this.get7LevelDownline(customer._id);
+    const teamSize = downlineLevels.reduce((acc, lvl) => acc + lvl.length, 0);
+
+    return {
+      success: true,
+      data: {
+        ...customer,
+        sponsor,
+        downlineSummary: {
+          totalTeamSize: teamSize,
+          level1Count: downlineLevels[0]?.length || 0,
+          level2Count: downlineLevels[1]?.length || 0,
+          level3Count: downlineLevels[2]?.length || 0,
+          level4Count: downlineLevels[3]?.length || 0,
+          level5Count: downlineLevels[4]?.length || 0,
+          level6Count: downlineLevels[5]?.length || 0,
+          level7Count: downlineLevels[6]?.length || 0,
+        },
+      },
+    };
+  }
+
+  async adminApproveCustomerKyc(id: string) {
+    const customer = await this.userModel.findById(id);
+    if (!customer) throw new NotFoundException('Customer not found');
+
+    customer.customerKycStatus = 2; // Confirmed
+    customer.customerIsVerify = 1; // Yes
+    customer.aadhaarVerified = true;
+    customer.verificationStatus = 'VERIFIED';
+    customer.kycRejectReason = '';
+    customer.verifiedAt = new Date();
+    await customer.save();
+
+    this.trackingGateway.emitWalletUpdated(customer._id.toString(), {
+      verificationStatus: 'VERIFIED',
+      aadhaarVerified: true,
+    });
+
+    return {
+      success: true,
+      message: 'Customer KYC approved successfully',
+      data: customer,
+    };
+  }
+
+  async adminRejectCustomerKyc(id: string, reason?: string) {
+    const customer = await this.userModel.findById(id);
+    if (!customer) throw new NotFoundException('Customer not found');
+
+    customer.customerKycStatus = 3; // Rejected
+    customer.customerIsVerify = 2; // No
+    customer.aadhaarVerified = false;
+    customer.verificationStatus = 'NON_VERIFIED';
+    customer.kycRejectReason = reason || 'Documents could not be verified';
+    await customer.save();
+
+    this.trackingGateway.emitWalletUpdated(customer._id.toString(), {
+      verificationStatus: 'NON_VERIFIED',
+      aadhaarVerified: false,
+    });
+
+    return {
+      success: true,
+      message: `Customer KYC rejected: ${customer.kycRejectReason}`,
+      data: customer,
+    };
+  }
+
+  async adminBlockCustomer(id: string, isBlocked: number, reason?: string) {
+    const customer = await this.userModel.findById(id);
+    if (!customer) throw new NotFoundException('Customer not found');
+
+    customer.isBlocked = Number(isBlocked);
+    if (reason) customer.blockReason = reason;
+    await customer.save();
+
+    return {
+      success: true,
+      message: `Customer ${isBlocked ? 'Blocked' : 'Unblocked'} successfully`,
+      isBlocked: customer.isBlocked,
+    };
+  }
+
+  async adminSuspendCustomer(id: string, isSuspended: number) {
+    const customer = await this.userModel.findById(id);
+    if (!customer) throw new NotFoundException('Customer not found');
+
+    customer.isSuspended = Number(isSuspended);
+    await customer.save();
+
+    return {
+      success: true,
+      message: `Customer ${isSuspended ? 'Suspended' : 'Unsuspended'} successfully`,
+      isSuspended: customer.isSuspended,
+    };
+  }
+
+  async adminUpdateCustomerPaymentStatus(id: string, status: number) {
+    const customer = await this.userModel.findById(id);
+    if (!customer) throw new NotFoundException('Customer not found');
+
+    customer.customerPaymentStatus = Number(status);
+    await customer.save();
+
+    return {
+      success: true,
+      message: `Customer payment status set to ${status === 1 ? 'Enabled' : 'Disabled'}`,
+      customerPaymentStatus: customer.customerPaymentStatus,
+    };
+  }
+
+  async adminCreditCustomerCoins(id: string, coins = 2000) {
+    const customer = await this.userModel.findById(id);
+    if (!customer) throw new NotFoundException('Customer not found');
+
+    customer.shoppingCoins = (customer.shoppingCoins || 0) + coins;
+    customer.lastMonthlyCoinCredit = new Date();
+    customer.monthlyCreditStatus = 1;
+    await customer.save();
+
+    return {
+      success: true,
+      message: `Credited ${coins} Shopping Coins to ${customer.name}`,
+      shoppingCoins: customer.shoppingCoins,
+    };
+  }
+
+  async adminGetSponsorTree(id: string) {
+    const customer = await this.userModel.findById(id).lean().exec();
+    if (!customer) throw new NotFoundException('Customer not found');
+
+    const downlineLevels = await this.get7LevelDownline(customer._id);
+    return {
+      success: true,
+      customer: {
+        id: customer._id,
+        name: customer.name,
+        referralCode: customer.referralCode,
+        sponsorCode: customer.sponsorCode,
+        sponsorName: customer.sponsorName,
+      },
+      levels: downlineLevels.map((lvl, idx) => ({
+        level: idx + 1,
+        count: lvl.length,
+        members: lvl.map((m) => ({
+          id: m._id,
+          name: m.name,
+          phone: m.phone,
+          referralCode: m.referralCode,
+          monthlyPurchaseValue: m.monthlyPurchaseValue || 0,
+          isActiveMember: (m.monthlyPurchaseValue || 0) >= 2000,
+          verificationStatus: m.verificationStatus,
+        })),
+      })),
+    };
+  }
 }
+
