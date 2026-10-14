@@ -87,26 +87,35 @@ export const CustomerProfileScreen: React.FC = () => {
             <Text style={styles.phoneText}>{selectedCustomer.phone}</Text>
           </View>
 
-          <View
-            style={[
-              styles.statusPill,
-              { backgroundColor: isBlocked ? '#FCECEE' : '#E8F8F0' },
-            ]}
-          >
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8, flexWrap: 'wrap' }}>
             <View
               style={[
-                styles.statusDot,
-                { backgroundColor: isBlocked ? COLORS.error : COLORS.success },
-              ]}
-            />
-            <Text
-              style={[
-                styles.statusText,
-                { color: isBlocked ? COLORS.error : COLORS.success },
+                styles.statusPill,
+                { backgroundColor: isBlocked ? '#FCECEE' : '#E8F8F0' },
               ]}
             >
-              {selectedCustomer.status}
-            </Text>
+              <View
+                style={[
+                  styles.statusDot,
+                  { backgroundColor: isBlocked ? COLORS.error : COLORS.success },
+                ]}
+              />
+              <Text
+                style={[
+                  styles.statusText,
+                  { color: isBlocked ? COLORS.error : COLORS.success },
+                ]}
+              >
+                {selectedCustomer.status}
+              </Text>
+            </View>
+
+            {selectedCustomer.referralCode ? (
+              <View style={styles.refPill}>
+                <Text style={styles.refPillLabel}>REF: </Text>
+                <Text style={styles.refPillCode}>{selectedCustomer.referralCode}</Text>
+              </View>
+            ) : null}
           </View>
         </View>
       </View>
@@ -347,6 +356,54 @@ export const CustomerProfileScreen: React.FC = () => {
               <Text style={styles.metricLabel}>Shopping Coins</Text>
               <Text style={[styles.metricValue, { color: COLORS.hotPink }]}>
                 {selectedCustomer.shoppingCoinBalance} SC
+              </Text>
+            </View>
+          </View>
+
+          {/* MLM Level & Direct Referral Income Structure */}
+          <Text style={[styles.cardTitle, { marginTop: SPACING.md }]}>Level & Direct Income</Text>
+          <View style={styles.metricsRow}>
+            <View style={[styles.metricBox, { backgroundColor: '#EDE9FE' }]}>
+              <Text style={styles.metricLabel}>Tree Level</Text>
+              <Text style={[styles.metricValue, { color: '#6D28D9' }]}>
+                Level {selectedCustomer.level ?? 1}
+              </Text>
+            </View>
+            <View style={[styles.metricBox, { backgroundColor: '#ECFDF5' }]}>
+              <Text style={styles.metricLabel}>Direct Referrals</Text>
+              <Text style={[styles.metricValue, { color: '#059669' }]}>
+                {selectedCustomer.referredUsersCount ?? 0} ({selectedCustomer.verifiedReferralsCount ?? 0} Verified)
+              </Text>
+            </View>
+          </View>
+
+          {/* Referral Code & Sponsor ID Row */}
+          <View style={[styles.metricsRow, { marginTop: 8 }]}>
+            <View style={[styles.metricBox, { backgroundColor: '#FDF4FF', borderWidth: 1, borderColor: '#F0ABFC' }]}>
+              <Text style={[styles.metricLabel, { color: '#A21CAF', fontWeight: '700' }]}>User Referral Code</Text>
+              <Text style={[styles.metricValue, { color: '#86198F', fontSize: 15, fontWeight: '900' }]}>
+                {selectedCustomer.referralCode || 'WORM5871'}
+              </Text>
+            </View>
+            <View style={[styles.metricBox, { backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE' }]}>
+              <Text style={[styles.metricLabel, { color: '#1D4ED8', fontWeight: '700' }]}>Sponsor ID (Upline)</Text>
+              <Text style={[styles.metricValue, { color: '#1E40AF', fontSize: 15, fontWeight: '900' }]}>
+                {selectedCustomer.sponsorCode || 'WORMUP001'}
+              </Text>
+            </View>
+          </View>
+
+          <View style={[styles.metricsRow, { marginTop: 8 }]}>
+            <View style={[styles.metricBox, { backgroundColor: '#FEF3C7' }]}>
+              <Text style={styles.metricLabel}>Direct App Income</Text>
+              <Text style={[styles.metricValue, { color: '#B45309' }]}>
+                ₹{selectedCustomer.appDownloadIncome ?? 0}
+              </Text>
+            </View>
+            <View style={[styles.metricBox, { backgroundColor: '#F3F4F6' }]}>
+              <Text style={styles.metricLabel}>Pending Income</Text>
+              <Text style={[styles.metricValue, { color: '#4B5563' }]}>
+                ₹{selectedCustomer.pendingIncome ?? 0}
               </Text>
             </View>
           </View>
@@ -752,5 +809,26 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontWeight: '700',
     fontSize: 14,
+  },
+  refPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 98, 175, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 98, 175, 0.35)',
+  },
+  refPillLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: COLORS.hotPink,
+  },
+  refPillCode: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: COLORS.purple,
+    letterSpacing: 0.5,
   },
 });

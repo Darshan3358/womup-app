@@ -285,7 +285,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [history, setHistory] = useState<ScreenId[]>(['C01_Splash']);
 
   // Onboarding & Auth State
-  const [authVerificationId, setAuthVerificationId] = useState<string | null>(null);
+  const [authVerificationId, setAuthVerificationIdState] = useState<string | null>(null);
+  const setAuthVerificationId = useCallback((id: string | null) => {
+    setAuthVerificationIdState(id);
+    if (id) {
+      StorageService.saveItem(StorageService.KEYS.AUTH_VERIFICATION_ID, id);
+    } else {
+      StorageService.removeItem(StorageService.KEYS.AUTH_VERIFICATION_ID);
+    }
+  }, []);
   const [tempRegistration, setTempRegistration] = useState<{
     fullName: string;
     email: string;
@@ -1005,6 +1013,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           null
         );
         if (savedUser) setUser(savedUser);
+
+        const savedVerificationId = await StorageService.getItem<string | null>(
+          StorageService.KEYS.AUTH_VERIFICATION_ID,
+          null
+        );
+        if (savedVerificationId) setAuthVerificationId(savedVerificationId);
 
         if (token) {
           api.setToken(token);
@@ -1783,7 +1797,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const blinkitCartTotal = blinkitCartList.reduce((sum, item) => {
     let price = item.product.sellingPrice;
-    if (item.product.name.toLowerCase().includes('tomato')) {
+    if (
+      item.product.name.toLowerCase().includes('tomato') &&
+      (!item.product.packSize || item.product.packSize === '250 g')
+    ) {
       if (isThaltejArea) {
         price = 12;
       } else if (isChandlodiyaArea) {
@@ -1795,7 +1812,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const blinkitMrpTotal = blinkitCartList.reduce((sum, item) => {
     let mrp = item.product.mrp;
-    if (item.product.name.toLowerCase().includes('tomato')) {
+    if (
+      item.product.name.toLowerCase().includes('tomato') &&
+      (!item.product.packSize || item.product.packSize === '250 g')
+    ) {
       mrp = 15;
     }
     return sum + mrp * item.quantity;
@@ -1816,13 +1836,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       (currentAreaName || '').toLowerCase().includes('chandlodiya') ||
       (currentAreaName || '').toLowerCase().includes('tragad');
 
-    const effectiveProd: BlinkitProduct = isTomato
-      ? {
-          ...product,
-          sellingPrice: isThaltej ? 12 : (isChandlodiya ? 7 : product.sellingPrice),
-          mrp: 15,
-        }
-      : product;
+    const effectiveProd: BlinkitProduct =
+      isTomato && (!product.packSize || product.packSize === '250 g')
+        ? {
+            ...product,
+            sellingPrice: isThaltej ? 12 : (isChandlodiya ? 7 : product.sellingPrice),
+            mrp: 15,
+          }
+        : product;
 
     // 1. Update blinkitCart
     setBlinkitCart((prev) => {

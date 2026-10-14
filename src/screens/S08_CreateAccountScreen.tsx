@@ -10,6 +10,8 @@ import {
   ScrollView,
   Modal,
   FlatList,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +20,7 @@ import { SPACING, RADIUS } from '../theme/spacing';
 import { GradientButton } from '../components/common/GradientButton';
 import { useApp } from '../context/AppContext';
 import { AuthService } from '../services/authService';
+import { StorageService } from '../services/storageService';
 
 interface CityItem {
   id: string;
@@ -28,11 +31,27 @@ interface CityItem {
 
 export const S08_CreateAccountScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const { setActiveScreen, user, setUser, goBack, setTempRegistration } = useApp();
+  const {
+    setActiveScreen,
+    user,
+    setUser,
+    goBack,
+    setTempRegistration,
+    authVerificationId,
+    tempRegistration,
+  } = useApp();
   const [fullName, setFullName] = useState(user.fullName || '');
   const [email, setEmail] = useState(user.email || '');
   const [phone, setPhone] = useState(user.phoneNumber || '');
   const [pincode, setPincode] = useState(user.registrationPincode || '');
+
+  // Sponsor ID State (Optional with live validation)
+  const [sponsorCode, setSponsorCode] = useState(user.sponsorCode || tempRegistration?.sponsorCode || '');
+  const [sponsorChecking, setSponsorChecking] = useState(false);
+  const [sponsorValid, setSponsorValid] = useState<boolean | null>(null);
+  const [sponsorName, setSponsorName] = useState<string>('');
+  const [sponsorStatusText, setSponsorStatusText] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Registration Timing State
   const [timingAllowed, setTimingAllowed] = useState(true);
@@ -54,6 +73,7 @@ export const S08_CreateAccountScreen: React.FC = () => {
     name?: string;
     email?: string;
     phone?: string;
+    sponsor?: string;
     city?: string;
     pincode?: string;
     timing?: string;
@@ -111,8 +131,47 @@ export const S08_CreateAccountScreen: React.FC = () => {
     }
   }, [pincode]);
 
-  const handleContinue = () => {
-    const newErrors: { name?: string; email?: string; phone?: string; city?: string; pincode?: string; timing?: string } = {};
+  // Debounced Live Sponsor Validation (500ms)
+  useEffect(() => {
+    const trimmed = sponsorCode.trim().toUpperCase();
+    if (trimmed.length >= 4) {
+      setSponsorChecking(true);
+      const timer = setTimeout(() => {
+        AuthService.validateSponsor(trimmed).then((res: any) => {
+          setSponsorChecking(false);
+          const isValid = res.valid ?? res.isValid;
+          setSponsorValid(isValid);
+          if (isValid) {
+            setSponsorName(res.sponsorName || 'WormUp Sponsor');
+            setSponsorStatusText(res.isCompanyRoot ? 'WormUp Company Root' : `Sponsor: ${res.sponsorName}`);
+            if (errors.sponsor) setErrors((prev) => ({ ...prev, sponsor: undefined }));
+          } else {
+            setSponsorName('');
+            setSponsorStatusText(res.message || 'Invalid Sponsor ID. Please check and try again.');
+          }
+        });
+      }, 500);
+      return () => clearTimeout(timer);
+    } else {
+      setSponsorChecking(false);
+      setSponsorValid(null);
+      setSponsorName('');
+      setSponsorStatusText('');
+    }
+  }, [sponsorCode]);
+
+  const handleContinue = async () => {
+    if (isSubmitting) return;
+
+    const newErrors: {
+      name?: string;
+      email?: string;
+      phone?: string;
+      sponsor?: string;
+      city?: string;
+      pincode?: string;
+      timing?: string;
+    } = {};
 
     if (!timingAllowed) {
       newErrors.timing = timingMessage || 'New registrations are closed between 10:00 PM and 6:00 AM IST.';
@@ -124,6 +183,14 @@ export const S08_CreateAccountScreen: React.FC = () => {
     const cleanPhone = phone.replace(/\D/g, '');
     if (!cleanPhone || !/^[6-9]\d{9}$/.test(cleanPhone)) {
       newErrors.phone = 'Please enter a valid 10-digit mobile number';
+    }
+
+    // Sponsor validation check
+    const cleanSponsor = sponsorCode.trim().toUpperCase();
+    if (cleanSponsor) {
+      if (sponsorValid === false) {
+        newErrors.sponsor = sponsorStatusText || 'Invalid Sponsor ID. Please check and try again, or leave blank.';
+      }
     }
 
     const cleanPin = pincode.trim();
@@ -142,6 +209,8 @@ export const S08_CreateAccountScreen: React.FC = () => {
       return;
     }
 
+    const finalSponsor = cleanSponsor || 'WORMUP001';
+
     setUser({
       ...user,
       fullName: fullName.trim(),
@@ -152,6 +221,8 @@ export const S08_CreateAccountScreen: React.FC = () => {
       registrationCity: selectedCityName,
       preferredCityId: selectedCityId || undefined,
       preferredCityName: selectedCityName,
+      sponsorCode: finalSponsor,
+      isCompanySponsored: !cleanSponsor,
       shoppingCoins: user.shoppingCoins || 2000,
       verificationStatus: user.verificationStatus || 'NON_VERIFIED',
     });
@@ -165,9 +236,76 @@ export const S08_CreateAccountScreen: React.FC = () => {
       city: selectedCityName,
       preferredCityId: selectedCityId || undefined,
       preferredCityName: selectedCityName,
+      sponsorCode: finalSponsor,
     });
 
-    setActiveScreen('C09_ReferralCode');
+    // If authVerificationId is present, execute backend registration immediately
+    if (authVerificationId) {
+      setIsSubmitting(true);
+      try {
+        const res = await AuthService.register(
+          authVerificationId,
+          fullName.trim(),
+          cleanPhone,
+          finalSponsor,
+          selectedCityId || undefined,
+          selectedCityName,
+          cleanPin,
+          selectedCityName,
+          fullName.trim(),
+          finalSponsor,
+        );
+        setIsSubmitting(false);
+        if (res.success && res.user) {
+          const updatedUser = {
+            ...user,
+            fullName: res.user.name || fullName.trim(),
+            fullNameAsPerAadhaar: res.user.fullNameAsPerAadhaar || fullName.trim(),
+            email: res.user.email || email.trim(),
+            phoneNumber: res.user.phone || cleanPhone,
+            preferredCityId: res.user.preferredCityId || selectedCityId || undefined,
+            preferredCityName: res.user.preferredCityName || selectedCityName,
+            registrationCity: res.user.city || selectedCityName,
+            registrationPincode: res.user.pincode || cleanPin,
+            referralCode: res.user.referralCode || res.user.sponsorCode || finalSponsor || 'WORMUP001',
+            sponsorCode: res.user.sponsorCode || finalSponsor || 'WORMUP001',
+            isCompanySponsored: res.user.isCompanySponsored ?? (!finalSponsor),
+            shoppingCoins: res.user.shoppingCoins ?? 2000,
+            pendingIncome: res.user.pendingIncome ?? 0,
+            availableIncome: res.user.availableIncome ?? 0,
+            appDownloadIncome: res.user.appDownloadIncome ?? 0,
+            verificationStatus: res.user.verificationStatus || 'NON_VERIFIED',
+            aadhaarVerified: res.user.aadhaarVerified || false,
+          };
+          setUser(updatedUser);
+          StorageService.saveItem(StorageService.KEYS.USER, updatedUser);
+          StorageService.saveItem(StorageService.KEYS.ACTIVE_SCREEN, 'Blinkit_Home');
+          setActiveScreen('C10_LocationPermission');
+          return;
+        } else {
+          Alert.alert(
+            'Registration Notice',
+            res.message || 'Could not complete registration. Please verify your details and try again.'
+          );
+          return;
+        }
+      } catch (e: any) {
+        setIsSubmitting(false);
+        console.warn('Registration error:', e);
+        Alert.alert(
+          'Registration Error',
+          e?.message || 'Could not complete registration. Please check your network and try again.'
+        );
+        return;
+      }
+    } else {
+      Alert.alert(
+        'Email Verification Required',
+        'Please verify your email with OTP before creating your account.',
+        [{ text: 'Verify Email', onPress: () => setActiveScreen('C06_MobileNumber') }]
+      );
+      return;
+    }
   };
 
   const filteredCities = cities.filter(
@@ -293,6 +431,85 @@ export const S08_CreateAccountScreen: React.FC = () => {
           </View>
           {errors.phone ? <Text style={styles.errorText}>{errors.phone}</Text> : null}
 
+          {/* Sponsor ID Input (Optional) */}
+          <View style={styles.labelRow}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.label}>Sponsor ID</Text>
+              <View style={styles.optionalBadge}>
+                <Text style={styles.optionalBadgeText}>Optional</Text>
+              </View>
+            </View>
+            {sponsorChecking && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <ActivityIndicator size="small" color={COLORS.primary} />
+                <Text style={styles.sponsorCheckingText}>Validating...</Text>
+              </View>
+            )}
+          </View>
+          <View
+            style={[
+              styles.inputContainer,
+              errors.sponsor ? styles.inputError : null,
+              sponsorValid === true ? styles.inputSuccess : null,
+              sponsorValid === false ? styles.inputError : null,
+            ]}
+          >
+            <Ionicons
+              name="gift-outline"
+              size={18}
+              color={
+                sponsorValid === true
+                  ? COLORS.success
+                  : sponsorValid === false
+                  ? COLORS.error
+                  : COLORS.textMuted
+              }
+              style={styles.inputIcon}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Enter sponsor code (e.g. WORM1234)"
+              placeholderTextColor={COLORS.secondaryText}
+              autoCapitalize="characters"
+              maxLength={10}
+              value={sponsorCode}
+              onChangeText={(text) => {
+                const upper = text.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                setSponsorCode(upper);
+                if (errors.sponsor) setErrors((prev) => ({ ...prev, sponsor: undefined }));
+              }}
+            />
+            {sponsorValid === true && (
+              <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
+            )}
+            {sponsorValid === false && (
+              <Ionicons name="close-circle" size={20} color={COLORS.error} />
+            )}
+          </View>
+
+          {/* Helper / Status Text for Sponsor */}
+          {errors.sponsor ? (
+            <Text style={styles.errorText}>{errors.sponsor}</Text>
+          ) : sponsorValid === true ? (
+            <View style={styles.sponsorSuccessWrap}>
+              <Ionicons name="checkmark-circle-outline" size={14} color="#059669" />
+              <Text style={styles.sponsorSuccessText}>
+                ✓ {sponsorStatusText || `Sponsor: ${sponsorName}`}
+              </Text>
+            </View>
+          ) : sponsorValid === false ? (
+            <View style={styles.sponsorFailWrap}>
+              <Ionicons name="alert-circle-outline" size={14} color="#DC2626" />
+              <Text style={styles.sponsorFailText}>
+                ✗ {sponsorStatusText || 'Invalid Sponsor ID. Please check and try again.'}
+              </Text>
+            </View>
+          ) : (
+            <Text style={styles.sponsorDefaultHint}>
+              💡 Leave blank to join under Admin Sponsor 
+            </Text>
+          )}
+
           {/* Delivery Pincode Input with live service check */}
           <View style={styles.labelRow}>
             <Text style={styles.label}>
@@ -395,6 +612,8 @@ export const S08_CreateAccountScreen: React.FC = () => {
           <GradientButton
             title="Continue"
             onPress={handleContinue}
+            loading={isSubmitting}
+            disabled={isSubmitting}
             style={styles.button}
           />
         </View>
@@ -897,5 +1116,63 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.textMuted,
     marginTop: 10,
+  },
+  optionalBadge: {
+    backgroundColor: '#F3E8FF',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+  },
+  optionalBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#7E22CE',
+  },
+  sponsorCheckingText: {
+    fontSize: 11,
+    color: COLORS.primary,
+    fontWeight: '500',
+  },
+  sponsorSuccessWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: SPACING.sm,
+  },
+  sponsorSuccessText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#059669',
+  },
+  sponsorFailWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: SPACING.sm,
+  },
+  sponsorFailText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#DC2626',
+  },
+  sponsorDefaultHint: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginBottom: SPACING.sm,
+    marginLeft: 2,
   },
 });

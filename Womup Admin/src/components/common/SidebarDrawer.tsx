@@ -43,6 +43,9 @@ export const SidebarDrawer: React.FC = () => {
     setActiveTab,
     subView,
     setSubView,
+    adminUser,
+    adminSponsorId,
+    logoutAdmin,
   } = useAdminState();
 
   const handleNavigateTab = (tab: ActiveTab) => {
@@ -95,7 +98,7 @@ export const SidebarDrawer: React.FC = () => {
                 </TouchableOpacity>
               </View>
 
-              {/* Admin User Profile Card */}
+              {/* Admin User Profile Card with Master Sponsor ID */}
               <View style={styles.adminProfileCard}>
                 <Image
                   source={require('../../../assets/womup_logo.png')}
@@ -103,11 +106,11 @@ export const SidebarDrawer: React.FC = () => {
                   resizeMode="contain"
                 />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.adminName}>Administrator</Text>
-                  <Text style={styles.adminRole}>Super Administrator</Text>
+                  <Text style={styles.adminName}>{adminUser?.name || 'SuperAdmin'}</Text>
+                  <Text style={styles.adminRole}>Sponsor: {adminSponsorId || 'WORMUP001'}</Text>
                 </View>
                 <View style={styles.statusBadge}>
-                  <Text style={styles.statusBadgeText}>ONLINE</Text>
+                  <Text style={styles.statusBadgeText}>ROOT</Text>
                 </View>
               </View>
             </LinearGradient>
@@ -386,7 +389,13 @@ export const SidebarDrawer: React.FC = () => {
 
             {/* Footer Logout Button */}
             <View style={styles.drawerFooter}>
-              <TouchableOpacity style={styles.logoutBtn} onPress={() => setIsSidebarOpen(false)}>
+              <TouchableOpacity
+                style={styles.logoutBtn}
+                onPress={() => {
+                  logoutAdmin();
+                  setIsSidebarOpen(false);
+                }}
+              >
                 <LogOut size={16} color={COLORS.error} style={{ marginRight: 8 }} />
                 <Text style={styles.logoutText}>Admin Sign Out</Text>
               </TouchableOpacity>

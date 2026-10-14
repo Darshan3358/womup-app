@@ -46,10 +46,29 @@ import { EditProductModal } from './src/screens/modals/EditProductModal';
 import { PriceHistoryModal } from './src/screens/modals/PriceHistoryModal';
 import { EditZonePriceModal } from './src/screens/modals/EditZonePriceModal';
 import { AddZoneModal } from './src/screens/modals/AddZoneModal';
+import { AdminLoginScreen } from './src/screens/AdminLoginScreen';
 
 const MainApp: React.FC = () => {
-  const { activeTab, subView } = useAdminState();
+  const { activeTab, subView, isAdminAuthenticated } = useAdminState();
   const [showSplash, setShowSplash] = useState(true);
+
+  if (showSplash) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.navy} />
+        <SplashScreen onFinish={() => setShowSplash(false)} />
+      </SafeAreaView>
+    );
+  }
+
+  if (!isAdminAuthenticated) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.navy} />
+        <AdminLoginScreen />
+      </SafeAreaView>
+    );
+  }
 
   const renderContent = () => {
     // Render sub-views first if active
@@ -118,9 +137,6 @@ const MainApp: React.FC = () => {
       <PriceHistoryModal />
       <EditZonePriceModal />
       <AddZoneModal />
-
-      {/* Launch Splash Screen */}
-      {showSplash && <SplashScreen onFinish={() => setShowSplash(false)} />}
     </SafeAreaView>
   );
 };

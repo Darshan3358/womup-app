@@ -208,13 +208,20 @@ export const LocalShopHomeScreen: React.FC = () => {
       <QRScannerScreen
         initialVendor={selectedVendor}
         onGoBack={() => setCurrentSubScreen('none')}
-        onPaymentSuccess={(earnedCoins, amount, vendorName) => {
-          setCoinBalance((prev) => prev + earnedCoins);
-          Alert.alert(
-            'Payment Verified! 🎉',
-            `Paid ₹${amount} to ${vendorName}.\n\n+${earnedCoins} Shopping Coins credited to your wallet!`,
-            [{ text: 'View Wallet', onPress: () => setActiveTab('My Coin') }]
-          );
+        onPaymentSuccess={(earnedCoins, amount, vendorName, coinsUsed, newBalance) => {
+          if (typeof newBalance === 'number') {
+            setCoinBalance(newBalance);
+          } else if (coinsUsed && coinsUsed > 0) {
+            setCoinBalance((prev) => Math.max(0, prev - coinsUsed));
+          } else if (earnedCoins && earnedCoins > 0) {
+            setCoinBalance((prev) => prev + earnedCoins);
+          }
+          // Authoritative sync from backend
+          LocalShopApi.getCoinBalance().then((latest) => {
+            if (typeof latest === 'number') setCoinBalance(latest);
+          });
+          setCurrentSubScreen('none');
+          setActiveTab('My Coin');
         }}
       />
     );
@@ -312,8 +319,8 @@ export const LocalShopHomeScreen: React.FC = () => {
       >
         {/* 2. Hero Section: User Welcome & My Shopping Coin (2,000) */}
         <UserCoinHero
-          userName={user?.fullName || 'Manish Shah'}
-          userId="WM100258"
+          userName={user?.fullName || 'Customer'}
+          userId={user?.referralCode || 'WORM5871'}
           coinBalance={coinBalance}
           onPressProfile={() => {
             setActiveTab('My Profile');

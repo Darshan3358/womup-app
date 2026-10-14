@@ -5,7 +5,9 @@ import * as path from 'path';
 // Load environment variables from .env
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/wormup';
+const MONGODB_URI =
+  process.env.MONGODB_URI ||
+  'mongodb+srv://fanqie:fanqie123@cluster0.f8acy45.mongodb.net/wormup';
 
 interface IncomeTransactionDoc {
   _id: mongoose.Types.ObjectId;

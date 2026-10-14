@@ -232,6 +232,29 @@ export const AuthService = {
     return null;
   },
 
+  async withdrawIncome(amount: number, bankDetails?: any): Promise<{ success: boolean; message: string; data?: any }> {
+    const res = await api.post<any>('/users/income/withdraw', { amount, bankDetails });
+    if (res.success) {
+      return {
+        success: true,
+        message: res.message || 'Withdrawal request submitted successfully',
+        data: res.data,
+      };
+    }
+    return {
+      success: false,
+      message: res.message || 'Withdrawal failed',
+    };
+  },
+
+  async getTeamDashboard(): Promise<{ success: boolean; data?: any; message?: string }> {
+    const res = await api.get<any>('/users/team-dashboard');
+    if (res.success && res.data) {
+      return { success: true, data: res.data };
+    }
+    return { success: false, message: res.message || 'Failed to fetch team dashboard' };
+  },
+
   async getCities(): Promise<{ id: string; name: string; code: string; state?: string }[]> {
     try {
       const res = await api.get<any>('/location/cities');

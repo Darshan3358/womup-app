@@ -82,16 +82,24 @@ export class PaymentsService {
       throw new BadRequestException('Invalid bill amount');
     }
 
-    // Find vendor
+    // Find vendor (or fallback to WormUp Express Store for online checkout orders)
     let vendor: VendorDocument | null = null;
-    if (Types.ObjectId.isValid(vendorId)) {
+    if (vendorId && Types.ObjectId.isValid(vendorId)) {
       vendor = await this.vendorModel.findById(vendorId);
     }
-    if (!vendor) {
+    if (!vendor && vendorId) {
       vendor = await this.vendorModel.findOne({ vendorCode: vendorId.toUpperCase() });
     }
     if (!vendor) {
-      throw new NotFoundException('Vendor not found');
+      vendor = await this.vendorModel.findOne();
+    }
+    if (!vendor) {
+      vendor = {
+        _id: new Types.ObjectId(),
+        storeName: 'WormUp Express Store',
+        vendorCode: 'WORMUP01',
+        upiId: 'wormup@okhdfcbank',
+      } as any;
     }
 
     const amountInPaise = Math.round(billAmount * 100);
@@ -209,11 +217,22 @@ export class PaymentsService {
       );
       throw new BadRequestException('Payment verification failed: Invalid signature');
     }
-
     const billAmount = existingOrder.amount / 100;
-    const vendor = await this.vendorModel.findById(existingOrder.vendorId);
+    let vendor: VendorDocument | null = null;
+    if (existingOrder.vendorId && Types.ObjectId.isValid(existingOrder.vendorId)) {
+      vendor = await this.vendorModel.findById(existingOrder.vendorId);
+    }
     if (!vendor) {
-      throw new NotFoundException('Vendor not found for order');
+      vendor = await this.vendorModel.findOne();
+    }
+    if (!vendor) {
+      vendor = {
+        _id: new Types.ObjectId(),
+        storeName: 'WormUp Express Store',
+        vendorCode: 'WORMUP01',
+        shoppingCoinPercent: 18,
+        totalCollections: 0,
+      } as any;
     }
 
     // Platform calculations

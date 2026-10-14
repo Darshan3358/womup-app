@@ -140,6 +140,25 @@ export class User {
   @Prop({ type: [{ type: Types.ObjectId, ref: 'Product' }], default: [] })
   wishlist: Types.ObjectId[];
 
+  // ── 7-Level Team Purchase & Monthly Activity Tracking ──
+  @Prop({ default: 0 })
+  monthlyPurchaseValue: number; // Current month total personal purchase
+
+  @Prop({ default: 0 })
+  monthlyVegetablePurchase: number; // Current month vegetable GMV
+
+  @Prop({ default: 0 })
+  monthlyOtherPurchase: number; // Current month other categories GMV
+
+  @Prop({ default: false })
+  isActiveMember: boolean; // Personal purchase >= ₹2,000
+
+  @Prop({ default: 0 })
+  direct5ActiveCount: number; // Direct referrals currently active (>= ₹2,000)
+
+  @Prop({ default: 0 })
+  teamSize: number; // Total downline count across 7 levels
+
   @Prop({ default: true })
   isActive: boolean;
 }

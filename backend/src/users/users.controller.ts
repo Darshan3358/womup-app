@@ -35,6 +35,29 @@ export class UsersController {
     return this.usersService.verifyAadhaar(user.id, body);
   }
 
+  @Post('income/withdraw')
+  @ApiOperation({ summary: 'Withdraw income wallet balance (Min ₹600, 20% TDS, 80% net)' })
+  async withdrawIncome(
+    @CurrentUser() user: any,
+    @Body() body: { amount: number; bankDetails?: any },
+  ) {
+    return this.usersService.withdrawIncome(user.id, body.amount, body.bankDetails);
+  }
+
+  @Get('team-dashboard')
+  @ApiOperation({ summary: 'Get 7-level team purchase income dashboard and qualification status' })
+  async getTeamDashboard(@CurrentUser() user: any) {
+    const dashboard = await this.usersService.getTeamDashboard(user.id);
+    return { success: true, data: dashboard };
+  }
+
+  @Post('calculate-team-income')
+  @ApiOperation({ summary: 'Trigger month-end 7-level team purchase income calculation engine' })
+  async calculateTeamIncome(@Body('month') month?: string) {
+    const result = await this.usersService.calculateMonthlyTeamPurchaseIncome(month);
+    return result;
+  }
+
   @Patch('me')
   @ApiOperation({ summary: 'Update customer profile information or privacy toggles' })
   async updateMyProfile(

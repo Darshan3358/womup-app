@@ -217,3 +217,15 @@ export class LinkPhoneDto {
   userId?: string;
 }
 
+export class AdminLoginDto {
+  @ApiProperty({ example: 'admin@wormup.com', required: false, description: 'Admin Email or Mobile' })
+  @IsString()
+  @IsOptional()
+  identifier?: string;
+
+  @ApiProperty({ example: 'admin123', required: false, description: 'Admin Password or PIN' })
+  @IsString()
+  @IsOptional()
+  password?: string;
+}
+

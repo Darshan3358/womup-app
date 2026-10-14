@@ -457,11 +457,13 @@ export class LocalShopsService implements OnModuleInit {
               description: `0.4% Team Purchase Income from ${customer.fullNameAsPerAadhaar || customer.name || 'Team member'} at ${vendor.storeName}`,
             });
             sponsor.availableIncome = Number(((sponsor.availableIncome || 0) + teamIncome).toFixed(2));
+            sponsor.walletBalance = Number(((sponsor.walletBalance || 0) + teamIncome).toFixed(2));
             await sponsor.save();
             if (this.trackingGateway) {
               this.trackingGateway.emitWalletUpdated(sponsor._id.toString(), {
                 availableIncome: sponsor.availableIncome,
                 pendingIncome: sponsor.pendingIncome,
+                walletBalance: sponsor.walletBalance,
               });
             }
           }
@@ -828,7 +830,7 @@ export class LocalShopsService implements OnModuleInit {
       cashToCollect = 0;
       coinsUsed = 0;
       walletUsed = 0;
-      coinsEarned = 0;
+      coinsEarned = Math.floor((billAmount * (vendor.shoppingCoinPercent || 10)) / 100);
     }
     // 4. Cash at Store: Customer gives full 100% (₹1,000) physical cash to vendor
     else {
@@ -836,7 +838,7 @@ export class LocalShopsService implements OnModuleInit {
       coinsUsed = 0;
       walletUsed = 0;
       upiAmount = 0;
-      coinsEarned = 0;
+      coinsEarned = Math.floor((billAmount * (vendor.shoppingCoinPercent || 10)) / 100);
     }
 
     let customerIdObj: Types.ObjectId | undefined;
@@ -960,6 +962,7 @@ export class LocalShopsService implements OnModuleInit {
       await vendor.save();
     }
 
+    let customerNewCoins: number | undefined;
     if (request.customerId) {
       const customer = await this.userModel.findById(request.customerId);
       if (customer) {
@@ -974,13 +977,31 @@ export class LocalShopsService implements OnModuleInit {
         if (request.coinsEarned > 0) {
           customer.shoppingCoins = (customer.shoppingCoins || 0) + request.coinsEarned;
         }
+
+        // Record Monthly GMV Activity (only on real purchases, NOT wallet balance spend)
+        if (request.paymentMethod !== 'WALLET' && request.billAmount > 0) {
+          const isVeg = (vendor?.categoryName || '').toLowerCase().includes('veg');
+          customer.monthlyPurchaseValue = Number(((customer.monthlyPurchaseValue || 0) + request.billAmount).toFixed(2));
+          if (isVeg) {
+            customer.monthlyVegetablePurchase = Number(((customer.monthlyVegetablePurchase || 0) + request.billAmount).toFixed(2));
+          } else {
+            customer.monthlyOtherPurchase = Number(((customer.monthlyOtherPurchase || 0) + request.billAmount).toFixed(2));
+          }
+          if (customer.monthlyPurchaseValue >= 2000) {
+            customer.isActiveMember = true;
+          }
+        }
+
         await customer.save();
+        customerNewCoins = customer.shoppingCoins;
 
         if (this.trackingGateway) {
           this.trackingGateway.emitWalletUpdated(customer._id.toString(), {
             shoppingCoins: customer.shoppingCoins,
             availableIncome: customer.availableIncome,
             appDownloadIncome: customer.appDownloadIncome,
+            monthlyPurchaseValue: customer.monthlyPurchaseValue,
+            isActiveMember: customer.isActiveMember,
           });
         }
 
@@ -1004,12 +1025,14 @@ export class LocalShopsService implements OnModuleInit {
                   description: `0.4% Team Purchase Income from ${customer.fullNameAsPerAadhaar || customer.name || 'Team member'} at ${vendor?.storeName || 'Vendor'}`,
                 });
                 sponsor.availableIncome = Number(((sponsor.availableIncome || 0) + teamIncome).toFixed(2));
+                sponsor.walletBalance = Number(((sponsor.walletBalance || 0) + teamIncome).toFixed(2));
                 await sponsor.save();
 
                 if (this.trackingGateway) {
                   this.trackingGateway.emitWalletUpdated(sponsor._id.toString(), {
                     availableIncome: sponsor.availableIncome,
                     pendingIncome: sponsor.pendingIncome,
+                    walletBalance: sponsor.walletBalance,
                   });
                 }
               }
@@ -1040,13 +1063,16 @@ export class LocalShopsService implements OnModuleInit {
       verifiedAt: new Date(),
     });
 
-    if (this.trackingGateway && request.customerId) {
-      this.trackingGateway.emitCollectionVerifiedToCustomer(request.customerId.toString(), {
+    if (this.trackingGateway) {
+      this.trackingGateway.emitCollectionVerifiedToCustomer(request.customerId?.toString() || '', {
         requestId: request._id.toString(),
         orderNumber,
-        vendorName: vendor?.storeName,
+        vendorName: vendor?.storeName || 'Merchant',
         billAmount: request.billAmount,
+        coinsUsed: request.coinsUsed,
+        cashPaid: request.cashToCollect,
         coinsEarned: request.coinsEarned,
+        newCoinBalance: customerNewCoins,
         vendorPayout: request.vendorPayout,
         status: 'VERIFIED',
       });
@@ -1061,6 +1087,7 @@ export class LocalShopsService implements OnModuleInit {
         orderNumber,
         vendorPayout: request.vendorPayout,
         newWalletBalance: vendor?.walletBalance || 0,
+        customerNewCoins,
       },
     };
   }
@@ -1085,8 +1112,8 @@ export class LocalShopsService implements OnModuleInit {
       await vendor.save();
     }
 
-    if (this.trackingGateway && request.customerId) {
-      this.trackingGateway.emitCollectionRejectedToCustomer(request.customerId.toString(), {
+    if (this.trackingGateway) {
+      this.trackingGateway.emitCollectionRejectedToCustomer(request.customerId?.toString() || '', {
         requestId: request._id.toString(),
         reason: request.rejectionReason,
         status: 'REJECTED',
@@ -1097,6 +1124,68 @@ export class LocalShopsService implements OnModuleInit {
       success: true,
       message: `Collection request ${id} rejected.`,
     };
+  }
+
+  async getCollectionRequestById(id: string) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid request ID');
+    }
+    const request = await this.collectionRequestModel.findById(id).lean();
+    if (!request) {
+      throw new NotFoundException('Collection request not found');
+    }
+    const vendor = await this.vendorModel.findById(request.vendorId).lean();
+    let newCoinBalance: number | undefined;
+    if (request.customerId) {
+      const customer = await this.userModel.findById(request.customerId).lean();
+      newCoinBalance = customer?.shoppingCoins;
+    }
+    return {
+      id: request._id.toString(),
+      requestId: request._id.toString(),
+      status: request.status,
+      vendorName: vendor?.storeName || 'Merchant',
+      billAmount: request.billAmount,
+      coinsUsed: request.coinsUsed,
+      cashToCollect: request.cashToCollect,
+      coinsEarned: request.coinsEarned,
+      newCoinBalance,
+      rejectionReason: (request as any).rejectionReason,
+      verifiedAt: request.verifiedAt,
+      requestedAt: request.requestedAt,
+    };
+  }
+
+  async cancelCollectionRequest(id: string) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('Invalid request ID');
+    }
+    const request = await this.collectionRequestModel.findById(id);
+    if (!request) {
+      throw new NotFoundException('Collection request not found');
+    }
+    if (request.status !== 'PENDING') {
+      return { success: false, message: `Cannot cancel request in ${request.status} status` };
+    }
+    request.status = 'CANCELLED';
+    await request.save();
+
+    const vendor = await this.vendorModel.findById(request.vendorId);
+    if (vendor) {
+      vendor.pendingBalance = Math.max(0, (vendor.pendingBalance || 0) - request.vendorPayout);
+      await vendor.save();
+    }
+
+    if (this.trackingGateway && vendor) {
+      this.trackingGateway.emitCollectionRequestCancelled(vendor._id.toString(), {
+        requestId: request._id.toString(),
+      });
+      this.trackingGateway.emitCollectionRequestCancelled(vendor.vendorCode, {
+        requestId: request._id.toString(),
+      });
+    }
+
+    return { success: true, message: 'Collection request cancelled successfully' };
   }
 
   async getVendorDashboardStats(vendorIdOrCode: string) {

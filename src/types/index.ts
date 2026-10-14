@@ -164,6 +164,10 @@ export interface UserProfile {
   appDownloadIncome?: number;
   sponsorCode?: string;
   isCompanySponsored?: boolean;
+  monthlyPurchaseValue?: number;
+  isActiveMember?: boolean;
+  direct5ActiveCount?: number;
+  teamSize?: number;
 }
 
 

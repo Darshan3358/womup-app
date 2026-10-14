@@ -169,7 +169,7 @@ export const ProductSection: React.FC<ProductSectionProps> = ({
           let currentMrp = activeVariant ? activeVariant.mrp : item.mrp;
           let currentPackSize = activeVariant ? activeVariant.label : item.packSize;
 
-          if (item.name.toLowerCase().includes('tomato')) {
+          if (!activeVariant && item.name.toLowerCase().includes('tomato')) {
             const isThaltej = (currentAreaName || '').toLowerCase().includes('thaltej');
             const isChandlodiya =
               (currentAreaName || '').toLowerCase().includes('chandlodiya') ||

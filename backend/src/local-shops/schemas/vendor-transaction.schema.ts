@@ -23,7 +23,7 @@ export class VendorTransaction {
   @Prop({ required: true })
   billAmount: number;
 
-  @Prop({ required: true, enum: ['COIN', 'WALLET', 'CASH', 'UPI'] })
+  @Prop({ required: true, enum: ['COIN', 'COINS', 'WALLET', 'CASH', 'UPI'] })
   paymentMethod: string;
 
   @Prop({ default: 0 })

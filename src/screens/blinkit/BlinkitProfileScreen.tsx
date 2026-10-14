@@ -821,7 +821,7 @@ export const BlinkitProfileScreen: React.FC = () => {
             {
               icon: 'share-2',
               label: 'Share the app',
-              badge: 'Earn ₹50',
+              badge: 'Earn ₹20',
               onPress: handleShareApp,
             },
             {

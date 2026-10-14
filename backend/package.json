@@ -15,7 +15,8 @@
     "seed": "ts-node src/seed/seed.ts",
     "cron:daily-income": "ts-node src/scripts/cron-runner.ts daily",
     "cron:monthly-coins": "ts-node src/scripts/cron-runner.ts monthly",
-    "cron:all": "ts-node src/scripts/cron-runner.ts all"
+    "cron:all": "ts-node src/scripts/cron-runner.ts all",
+    "clean:users-orders": "ts-node src/scripts/clean-users-orders-riders.ts"
   },
   "dependencies": {
     "@nestjs/cli": "^10.4.9",
@@ -53,10 +54,10 @@
     "ts-loader": "^9.5.1",
     "tsconfig-paths": "^4.2.0",
     "twilio": "^6.1.0",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "ts-node": "^10.9.2"
   },
   "devDependencies": {
-    "source-map-support": "^0.5.21",
-    "ts-node": "^10.9.2"
+    "source-map-support": "^0.5.21"
   }
 }

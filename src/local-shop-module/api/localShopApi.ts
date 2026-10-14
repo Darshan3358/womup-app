@@ -125,6 +125,26 @@ export const LocalShopApi = {
     });
   },
 
+  // 3d. Check Status of Counter Collection Request
+  async getCollectionRequestStatus(requestId: string): Promise<{ success: boolean; data?: any; message?: string }> {
+    try {
+      const res = await api.get<any>(`/local-shops/collection-requests/${requestId}`);
+      return res;
+    } catch (e: any) {
+      return { success: false, message: e.message || 'Failed to check status' };
+    }
+  },
+
+  // 3e. Cancel Counter Collection Request
+  async cancelCollectionRequest(requestId: string): Promise<{ success: boolean; message?: string }> {
+    try {
+      const res = await api.post<any>(`/local-shops/collection-requests/${requestId}/cancel`, {});
+      return res;
+    } catch (e: any) {
+      return { success: false, message: e.message || 'Failed to cancel request' };
+    }
+  },
+
 
   // 4. Process Offline In-Store Payment (SRS Notebook Flows)
   async payVendorQR(payload: {

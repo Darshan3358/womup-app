@@ -78,6 +78,13 @@ interface AdminStateContextType {
   setIsSidebarOpen: (open: boolean) => void;
   toggleSidebar: () => void;
 
+  // Admin Auth & Master Sponsor ID
+  isAdminAuthenticated: boolean;
+  adminUser: any | null;
+  adminSponsorId: string;
+  loginAdmin: (identifier?: string, password?: string) => Promise<{ success: boolean; error?: string }>;
+  logoutAdmin: () => void;
+
   // Data Collections
   cities: CityItem[];
   selectedCity: CityItem | null;
@@ -228,6 +235,60 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
 
   const toggleSidebar = () => setIsSidebarOpen((prev) => !prev);
+
+  // Admin Auth & Master Sponsor ID state
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return localStorage.getItem('womup_admin_auth') === 'true';
+    }
+    return false;
+  });
+
+  const [adminUser, setAdminUser] = useState<any>(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const saved = localStorage.getItem('womup_admin_user');
+        return saved ? JSON.parse(saved) : null;
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  });
+
+  const [adminSponsorId, setAdminSponsorId] = useState<string>('WORMUP001');
+
+  const loginAdmin = async (identifier?: string, password?: string) => {
+    const res = await ApiService.adminLogin(identifier, password);
+    if (res.success) {
+      setIsAdminAuthenticated(true);
+      setAdminUser(res.user);
+      setAdminSponsorId(res.sponsorId || 'WORMUP001');
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem('womup_admin_auth', 'true');
+        localStorage.setItem('womup_admin_user', JSON.stringify(res.user));
+        if (res.accessToken) {
+          localStorage.setItem('womup_admin_token', res.accessToken);
+        }
+      }
+      return { success: true };
+    } else {
+      return { success: false, error: res.error || 'Admin login failed' };
+    }
+  };
+
+  const logoutAdmin = () => {
+    setIsAdminAuthenticated(false);
+    setAdminUser(null);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.removeItem('womup_admin_auth');
+      localStorage.removeItem('womup_admin_user');
+      localStorage.removeItem('womup_admin_token');
+      try {
+        window.location.reload();
+      } catch (e) {}
+    }
+  };
 
   const [syncStatus, setSyncStatus] = useState<string>('Live MongoDB Connected');
   const [cities, setCities] = useState<CityItem[]>([]);
@@ -1365,6 +1426,11 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         cancelAndRefundOrder,
         createOrUpdateCampaign,
         addShoppingCoinAdjustment,
+        isAdminAuthenticated,
+        adminUser,
+        adminSponsorId,
+        loginAdmin,
+        logoutAdmin,
       }}
     >
       {children}

@@ -4,6 +4,7 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
+  Pressable,
   StyleSheet,
   Modal,
   TextInput,
@@ -41,6 +42,19 @@ export const BlinkitMoneyScreen: React.FC = () => {
   const [aadhaarError, setAadhaarError] = useState('');
   const [aadhaarSuccessMsg, setAadhaarSuccessMsg] = useState('');
 
+  // ── Withdrawal Modal State ──
+  const [isWithdrawModalVisible, setWithdrawModalVisible] = useState(false);
+  const [withdrawAmountInput, setWithdrawAmountInput] = useState('600');
+  const [withdrawBankInput, setWithdrawBankInput] = useState('');
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [withdrawError, setWithdrawError] = useState('');
+  const [withdrawSuccessMsg, setWithdrawSuccessMsg] = useState('');
+
+  // ── Team Dashboard Modal State ──
+  const [isTeamModalVisible, setTeamModalVisible] = useState(false);
+  const [teamDashboardData, setTeamDashboardData] = useState<any>(null);
+  const [isLoadingTeam, setIsLoadingTeam] = useState(false);
+
   const presetAmounts = [100, 200, 500, 1000];
 
   // Refresh profile & wallet balances from backend on mount
@@ -57,13 +71,85 @@ export const BlinkitMoneyScreen: React.FC = () => {
           pendingIncome: profile.pendingIncome ?? 0,
           availableIncome: profile.availableIncome ?? 0,
           appDownloadIncome: profile.appDownloadIncome ?? 0,
+          monthlyPurchaseValue: (profile as any).monthlyPurchaseValue ?? prev.monthlyPurchaseValue ?? 0,
+          isActiveMember: (profile as any).isActiveMember ?? prev.isActiveMember ?? false,
+          direct5ActiveCount: (profile as any).direct5ActiveCount ?? prev.direct5ActiveCount ?? 0,
+          teamSize: (profile as any).teamSize ?? prev.teamSize ?? 0,
         }));
       }
     });
+
+    // Also fetch team dashboard in background to ensure qualification stats are 100% fresh
+    AuthService.getTeamDashboard().then((res) => {
+      if (res?.success && res.data && isMounted) {
+        setTeamDashboardData(res.data);
+        setUser((prev) => ({
+          ...prev,
+          teamSize: res.data.teamSummary?.totalTeamSize ?? prev.teamSize,
+          direct5ActiveCount: res.data.personalStatus?.direct5ActiveCount ?? prev.direct5ActiveCount,
+          monthlyPurchaseValue: res.data.personalStatus?.monthlyPurchaseValue ?? prev.monthlyPurchaseValue,
+        }));
+      }
+    }).catch(() => {});
+
     return () => {
       isMounted = false;
     };
   }, []);
+
+  const handleOpenTeamDashboard = async () => {
+    setIsLoadingTeam(true);
+    setTeamModalVisible(true);
+    try {
+      const res = await AuthService.getTeamDashboard();
+      if (res.success && res.data) {
+        setTeamDashboardData(res.data);
+        setUser((prev) => ({
+          ...prev,
+          teamSize: res.data.teamSummary?.totalTeamSize ?? prev.teamSize,
+          direct5ActiveCount: res.data.personalStatus?.direct5ActiveCount ?? prev.direct5ActiveCount,
+          monthlyPurchaseValue: res.data.personalStatus?.monthlyPurchaseValue ?? prev.monthlyPurchaseValue,
+        }));
+      }
+    } catch (e) {
+      console.warn('Failed to load team dashboard:', e);
+    } finally {
+      setIsLoadingTeam(false);
+    }
+  };
+
+  const handleWithdrawSubmit = async () => {
+    const amt = parseFloat(withdrawAmountInput);
+    if (isNaN(amt) || amt < 600) {
+      setWithdrawError('Minimum withdrawal amount is ₹600 as per policy.');
+      return;
+    }
+    const available = user.availableIncome ?? 0;
+    if (amt > available) {
+      setWithdrawError(`Insufficient available balance. You have ₹${available}.`);
+      return;
+    }
+    setIsWithdrawing(true);
+    setWithdrawError('');
+    try {
+      const res = await AuthService.withdrawIncome(amt, { destination: withdrawBankInput });
+      if (res.success) {
+        const remaining = res.data?.availableIncome ?? (available - amt);
+        setUser((prev) => ({ ...prev, availableIncome: remaining }));
+        setWithdrawSuccessMsg(res.message);
+        setTimeout(() => {
+          setWithdrawModalVisible(false);
+          setWithdrawSuccessMsg('');
+        }, 1800);
+      } else {
+        setWithdrawError(res.message || 'Withdrawal request failed.');
+      }
+    } catch (err: any) {
+      setWithdrawError(err?.message || 'Withdrawal request failed.');
+    } finally {
+      setIsWithdrawing(false);
+    }
+  };
 
   const handleVerifyAadhaarSubmit = async () => {
     const rawAadhaar = aadhaarInput.replace(/\s+/g, '');
@@ -210,9 +296,73 @@ export const BlinkitMoneyScreen: React.FC = () => {
                 </View>
                 <Text style={styles.balanceValueAvailable}>₹{user.availableIncome ?? 0}</Text>
                 <Text style={styles.balanceSubAvailable}>
-                  Unlocked • Ready to spend on grocery orders
+                  Unlocked • Ready to spend or withdraw
                 </Text>
+                <TouchableOpacity
+                  style={styles.withdrawSmallBtn}
+                  onPress={() => {
+                    setWithdrawAmountInput('600');
+                    setWithdrawError('');
+                    setWithdrawSuccessMsg('');
+                    setWithdrawModalVisible(true);
+                  }} 
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="arrow-up-circle-outline" size={13} color="#065F46" />
+                  <Text style={styles.withdrawSmallBtnText}>Withdraw</Text>
+                </TouchableOpacity>
               </View>
+            </View>
+
+            {/* 4. Real Income & 7-Level Team Status Card */}
+            <View style={styles.teamStatusCard}>
+              <View style={styles.teamCardHeader}>
+                <View style={styles.teamBadgeRow}>
+                  <Text style={styles.teamCardBadge}>REAL INCOME QUALIFICATION</Text>
+                  <Text style={styles.teamCardIcon}>👥</Text>
+                </View>
+                <Text style={styles.teamCardTitle}>7-Level Team Performance</Text>
+              </View>
+
+              <View style={styles.teamStatsGrid}>
+                <View style={styles.teamStatItem}>
+                  <Text style={styles.teamStatLabel}>Personal Active</Text>
+                  <Text style={[styles.teamStatVal, { color: (teamDashboardData?.personalStatus?.monthlyPurchaseValue ?? user.monthlyPurchaseValue ?? 0) >= 2000 ? '#059669' : '#DC2626' }]}>
+                    {(teamDashboardData?.personalStatus?.monthlyPurchaseValue ?? user.monthlyPurchaseValue ?? 0) >= 2000 ? '✅ Active' : '❌ Need ₹2k'}
+                  </Text>
+                  <Text style={styles.teamStatSub}>
+                    ₹{(teamDashboardData?.personalStatus?.monthlyPurchaseValue ?? user.monthlyPurchaseValue ?? 0).toFixed(0)} / ₹2,000
+                  </Text>
+                </View>
+
+                <View style={styles.teamStatItem}>
+                  <Text style={styles.teamStatLabel}>Direct 5 Active</Text>
+                  <Text style={[styles.teamStatVal, { color: (teamDashboardData?.personalStatus?.direct5ActiveCount ?? user.direct5ActiveCount ?? 0) >= 5 ? '#059669' : '#DC2626' }]}>
+                    {(teamDashboardData?.personalStatus?.direct5ActiveCount ?? user.direct5ActiveCount ?? 0) >= 5
+                      ? '✅ 5/5'
+                      : `❌ ${teamDashboardData?.personalStatus?.direct5ActiveCount ?? user.direct5ActiveCount ?? 0}/5`}
+                  </Text>
+                  <Text style={styles.teamStatSub}>5 Direct ≥ ₹2k</Text>
+                </View>
+
+                <View style={styles.teamStatItem}>
+                  <Text style={styles.teamStatLabel}>7-Level Team</Text>
+                  <Text style={[styles.teamStatVal, { color: '#4F46E5', fontWeight: '900' }]}>
+                    {teamDashboardData?.teamSummary?.totalTeamSize ?? user.teamSize ?? 0}
+                  </Text>
+                  <Text style={styles.teamStatSub}>Members</Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.teamDashboardBtn}
+                onPress={handleOpenTeamDashboard}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="stats-chart" size={16} color="#FFFFFF" />
+                <Text style={styles.teamDashboardBtnText}>View 7-Level Team Dashboard</Text>
+                <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
+              </TouchableOpacity>
             </View>
 
             {/* 4. Aadhaar Verification Status Card */}
@@ -275,6 +425,30 @@ export const BlinkitMoneyScreen: React.FC = () => {
                 </View>
               );
             })()}
+
+            {/* 5. Customer's Own Referral Code Card */}
+            <View style={styles.referralCodeCard}>
+              <View style={styles.referralLeftCol}>
+                <Text style={styles.referralHeaderLabel}>MY REFERRAL CODE</Text>
+                <Text style={styles.referralCodeBig}>{user.referralCode || 'WORM5871'}</Text>
+                <Text style={styles.referralHelpText}>
+                  Share with friends to earn ₹20 Direct App Download Income
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.referralCopyBtn}
+                onPress={() => {
+                  Alert.alert(
+                    'Referral Code Copied!',
+                    `Your referral code ${user.referralCode || 'WORM5871'} has been copied!`
+                  );
+                }}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="copy-outline" size={16} color="#FFFFFF" />
+                <Text style={styles.referralCopyBtnText}>Copy</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Three Separate Feature Cards with Soft Lavender/Pink Borders */}
@@ -372,11 +546,11 @@ export const BlinkitMoneyScreen: React.FC = () => {
         animationType="slide"
         onRequestClose={() => setAddMoneyModalVisible(false)}
       >
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={() => setAddMoneyModalVisible(false)}
-          style={styles.modalBackdrop}
-        >
+        <View style={styles.modalBackdrop}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setAddMoneyModalVisible(false)}
+          />
           <View style={styles.modalCard}>
             <Text style={[TYPOGRAPHY.headingMd, styles.modalHeading]}>Add Money to Wallet</Text>
             <Text style={[TYPOGRAPHY.bodySm, styles.modalSub]}>
@@ -434,7 +608,7 @@ export const BlinkitMoneyScreen: React.FC = () => {
               </LinearGradient>
             </TouchableOpacity>
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* Aadhaar Verification Modal */}
@@ -444,15 +618,12 @@ export const BlinkitMoneyScreen: React.FC = () => {
         animationType="slide"
         onRequestClose={() => setAadhaarModalVisible(false)}
       >
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={() => setAadhaarModalVisible(false)}
-          style={styles.modalBackdrop}
-        >
-          <View
-            style={styles.aadhaarModalCard}
-            onStartShouldSetResponder={() => true}
-          >
+        <View style={styles.modalBackdrop}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setAadhaarModalVisible(false)}
+          />
+          <View style={styles.aadhaarModalCard}>
             <View style={styles.aadhaarModalHeader}>
               <View style={styles.aadhaarShieldIcon}>
                 <Ionicons name="shield-checkmark" size={24} color="#15803D" />
@@ -559,7 +730,378 @@ export const BlinkitMoneyScreen: React.FC = () => {
               </LinearGradient>
             </TouchableOpacity>
           </View>
-        </TouchableOpacity>
+        </View>
+      </Modal>
+
+      {/* ── Withdrawal Modal (Min ₹600, 20% TDS, 80% Net Payout) ── */}
+      <Modal
+        visible={isWithdrawModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setWithdrawModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setWithdrawModalVisible(false)} />
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeaderRow}>
+              <View>
+                <Text style={[TYPOGRAPHY.headingMd, styles.modalHeading]}>Withdraw Income</Text>
+                <Text style={styles.withdrawSub}>
+                  Available: ₹{user.availableIncome ?? 0} • Minimum ₹600
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setWithdrawModalVisible(false)}>
+                <Ionicons name="close-circle" size={24} color="#94A3B8" />
+              </TouchableOpacity>
+            </View>
+
+            {withdrawError ? (
+              <View style={styles.withdrawErrorBox}>
+                <Ionicons name="alert-circle" size={16} color="#DC2626" />
+                <Text style={styles.withdrawErrorText}>{withdrawError}</Text>
+              </View>
+            ) : null}
+
+            {withdrawSuccessMsg ? (
+              <View style={styles.withdrawSuccessBox}>
+                <Ionicons name="checkmark-circle" size={16} color="#059669" />
+                <Text style={styles.withdrawSuccessText}>{withdrawSuccessMsg}</Text>
+              </View>
+            ) : null}
+
+            {/* Amount Input */}
+            <View style={styles.amountInputRow}>
+              <Text style={styles.currencyPrefix}>₹</Text>
+              <TextInput
+                style={styles.amountInput}
+                keyboardType="numeric"
+                value={withdrawAmountInput}
+                onChangeText={(t) => {
+                  setWithdrawAmountInput(t);
+                  if (withdrawError) setWithdrawError('');
+                }}
+              />
+            </View>
+
+            {/* Live TDS Deduction Calculation Box */}
+            {(() => {
+              const amt = parseFloat(withdrawAmountInput) || 0;
+              const tds = Number((amt * 0.20).toFixed(2));
+              const net = Number((amt - tds).toFixed(2));
+              return (
+                <View style={styles.tdsCalculationBox}>
+                  <View style={styles.tdsRow}>
+                    <Text style={styles.tdsLabel}>Withdrawal Amount</Text>
+                    <Text style={styles.tdsValue}>₹{amt.toLocaleString('en-IN')}</Text>
+                  </View>
+                  <View style={styles.tdsRow}>
+                    <Text style={[styles.tdsLabel, { color: '#DC2626' }]}>TDS Deduction (20%)</Text>
+                    <Text style={[styles.tdsValue, { color: '#DC2626' }]}>−₹{tds.toLocaleString('en-IN')}</Text>
+                  </View>
+                  <View style={styles.tdsDivider} />
+                  <View style={styles.tdsRow}>
+                    <Text style={[styles.tdsLabel, { fontWeight: '800', color: '#065F46' }]}>Net Received (80%)</Text>
+                    <Text style={[styles.tdsValue, { fontWeight: '900', color: '#065F46', fontSize: 16 }]}>₹{net.toLocaleString('en-IN')}</Text>
+                  </View>
+                </View>
+              );
+            })()}
+
+            {/* Bank/UPI Input */}
+            <View style={styles.bankInputGroup}>
+              <Text style={styles.bankLabel}>UPI ID or Bank Account Details</Text>
+              <TextInput
+                style={styles.bankInput}
+                placeholder="e.g. mobile@upi or Account No + IFSC"
+                placeholderTextColor="#94A3B8"
+                value={withdrawBankInput}
+                onChangeText={setWithdrawBankInput}
+              />
+            </View>
+
+            {/* Submit Button */}
+            <TouchableOpacity
+              activeOpacity={0.85}
+              disabled={isWithdrawing}
+              onPress={handleWithdrawSubmit}
+              style={styles.withdrawSubmitBtn}
+            >
+              <LinearGradient
+                colors={['#059669', '#047857']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.withdrawSubmitGradient}
+              >
+                {isWithdrawing ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="shield-checkmark" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <Text style={styles.withdrawSubmitText}>Confirm & Transfer to Bank</Text>
+                  </>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── 7-Level Team Performance Dashboard Modal ── */}
+      <Modal
+        visible={isTeamModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setTeamModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setTeamModalVisible(false)} />
+          <View style={[styles.modalCard, { maxHeight: '88%' }]}>
+            <View style={styles.modalHeaderRow}>
+              <View>
+                <Text style={[TYPOGRAPHY.headingMd, styles.modalHeading]}>Team Performance</Text>
+                <Text style={styles.teamModalSub}>7-Level Downline & Real Income GMV</Text>
+              </View>
+              <TouchableOpacity onPress={() => setTeamModalVisible(false)}>
+                <Ionicons name="close-circle" size={24} color="#94A3B8" />
+              </TouchableOpacity>
+            </View>
+
+            {isLoadingTeam ? (
+              <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                <ActivityIndicator size="large" color="#6366F1" />
+                <Text style={{ marginTop: 12, color: '#64748B', fontSize: 13 }}>Calculating 7-level GMV & qualifications...</Text>
+              </View>
+            ) : (() => {
+              const personalStatus = teamDashboardData?.personalStatus;
+              const teamSummary = teamDashboardData?.teamSummary;
+              const isEligible = Boolean(personalStatus?.isEligibleForTeamIncome);
+              const personalSpend = Number(personalStatus?.monthlyPurchaseValue ?? user.monthlyPurchaseValue ?? 0);
+              const isPersonalActive = Boolean(personalStatus?.isPersonalActive);
+              const direct5Active = Number(personalStatus?.direct5ActiveCount ?? user.direct5ActiveCount ?? 0);
+              const isDirectsActive = direct5Active >= 5;
+              const potentialIncome = Number(teamSummary?.totalPotentialIncome ?? 0);
+              const earnedIncome = isEligible ? potentialIncome : 0;
+
+              return (
+              <ScrollView showsVerticalScrollIndicator={false} style={{ marginTop: 8 }}>
+                {/* 🚨 Eligibility Status Banner */}
+                {!isEligible ? (
+                  <View style={styles.ineligibleWarningCard}>
+                    <View style={styles.ineligibleHeaderRow}>
+                      <Ionicons name="warning" size={20} color="#DC2626" />
+                      <Text style={styles.ineligibleTitle}>⚠️ NOT ELIGIBLE FOR TEAM INCOME</Text>
+                    </View>
+                    <Text style={styles.ineligibleSubtitle}>
+                      Notebook Rule: Income is ONLY earned when Personal Active (≥ ₹2k) AND 5 Direct Active (≥ ₹2k) are both met every month.
+                    </Text>
+
+                    <View style={styles.ineligibleChecklist}>
+                      <View style={styles.ineligibleCheckItem}>
+                        <Ionicons
+                          name={isPersonalActive ? 'checkmark-circle' : 'close-circle'}
+                          size={18}
+                          color={isPersonalActive ? '#059669' : '#DC2626'}
+                        />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.ineligibleCheckLabel}>
+                            Personal Purchase ≥ ₹2,000 {isPersonalActive ? '✅' : '❌'}
+                          </Text>
+                          <Text style={styles.ineligibleCheckValue}>
+                            Your spend: ₹{personalSpend.toFixed(2)} (Need ₹{Math.max(0, 2000 - personalSpend).toFixed(2)} more)
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.ineligibleCheckItem}>
+                        <Ionicons
+                          name={isDirectsActive ? 'checkmark-circle' : 'close-circle'}
+                          size={18}
+                          color={isDirectsActive ? '#059669' : '#DC2626'}
+                        />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.ineligibleCheckLabel}>
+                            5 Direct Referrals Active (≥ ₹2k) {isDirectsActive ? '✅' : '❌'}
+                          </Text>
+                          <Text style={styles.ineligibleCheckValue}>
+                            Current active: {direct5Active} / 5 (Need {Math.max(0, 5 - direct5Active)} more active direct members)
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    <View style={styles.unlockActionBox}>
+                      <Text style={styles.unlockActionHeading}>👉 To Unlock ₹{potentialIncome.toFixed(2)} Income:</Text>
+                      <Text style={styles.unlockActionStep}>1. Purchase groceries/products worth ₹2,000+ this month</Text>
+                      <Text style={styles.unlockActionStep}>2. Ensure 5 direct referrals each purchase ₹2,000+ this month</Text>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={styles.eligibleSuccessCard}>
+                    <View style={styles.ineligibleHeaderRow}>
+                      <Ionicons name="checkmark-circle" size={20} color="#059669" />
+                      <Text style={[styles.ineligibleTitle, { color: '#065F46' }]}>✅ QUALIFIED FOR TEAM INCOME</Text>
+                    </View>
+                    <Text style={[styles.ineligibleSubtitle, { color: '#047857' }]}>
+                      All conditions met (Personal Spend ≥ ₹2,000 and 5 Direct Active members). Full income will be credited at month-end!
+                    </Text>
+                  </View>
+                )}
+
+                {/* Team GMV Summary Cards */}
+                <View style={styles.teamSummaryGrid}>
+                  <View style={[styles.teamSummaryCard, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }]}>
+                    <Text style={[styles.teamSummaryLabel, { color: '#166534' }]}>Vegetable GMV (3%)</Text>
+                    <Text style={[styles.teamSummaryValue, { color: '#14532D' }]}>
+                      ₹{Number(teamSummary?.totalVegetableGMV ?? 0).toFixed(2)}
+                    </Text>
+                    <Text style={[styles.teamSummarySub, { color: '#15803D' }]}>
+                      Income: ₹{Number(teamSummary?.vegetableIncome ?? 0).toFixed(2)}
+                    </Text>
+                  </View>
+
+                  <View style={[styles.teamSummaryCard, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}>
+                    <Text style={[styles.teamSummaryLabel, { color: '#1E40AF' }]}>Other GMV (0.4%)</Text>
+                    <Text style={[styles.teamSummaryValue, { color: '#1E3A8A' }]}>
+                      ₹{Number(teamSummary?.totalOtherGMV ?? 0).toFixed(2)}
+                    </Text>
+                    <Text style={[styles.teamSummarySub, { color: '#2563EB' }]}>
+                      Income: ₹{Number(teamSummary?.otherIncome ?? 0).toFixed(2)}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Income Credited / Locked Status Banner */}
+                <View
+                  style={[
+                    styles.totalIncomeBanner,
+                    !isEligible
+                      ? { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }
+                      : { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' },
+                  ]}
+                >
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                    <View>
+                      <Text
+                        style={[
+                          styles.totalIncomeBannerLabel,
+                          { color: !isEligible ? '#92400E' : '#065F46' },
+                        ]}
+                      >
+                        {!isEligible ? 'Earned Income (Credited)' : 'Total Earned Team Income'}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.totalIncomeBannerValue,
+                          { color: !isEligible ? '#B45309' : '#047857' },
+                        ]}
+                      >
+                        ₹{earnedIncome.toFixed(2)}
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 4,
+                          backgroundColor: !isEligible ? '#FDE68A' : '#D1FAE5',
+                          paddingHorizontal: 8,
+                          paddingVertical: 4,
+                          borderRadius: 8,
+                        }}
+                      >
+                        <Ionicons
+                          name={!isEligible ? 'lock-closed' : 'checkmark-done'}
+                          size={13}
+                          color={!isEligible ? '#92400E' : '#065F46'}
+                        />
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            fontWeight: '800',
+                            color: !isEligible ? '#92400E' : '#065F46',
+                          }}
+                        >
+                          {!isEligible ? 'LOCKED' : 'QUALIFIED'}
+                        </Text>
+                      </View>
+                      {!isEligible && (
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#B45309', marginTop: 4 }}>
+                          Potential: ₹{potentialIncome.toFixed(2)}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                  <Text
+                    style={[
+                      styles.totalIncomeBannerSub,
+                      { color: !isEligible ? '#92400E' : '#059669', textAlign: 'center', marginTop: 6 },
+                    ]}
+                  >
+                    {!isEligible
+                      ? `🔒 ₹${potentialIncome.toFixed(2)} is locked. Will be credited to your pending income once you complete personal ₹2k spend & 5 direct active.`
+                      : 'Calculated at month-end • Promoted to wallet next day midnight (24h lock)'}
+                  </Text>
+                </View>
+
+                {/* 7-Level Detailed Table */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <Text style={styles.levelTableHeading}>7-Level Breakdown</Text>
+                  {!isEligible && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Ionicons name="lock-closed" size={12} color="#D97706" />
+                      <Text style={{ fontSize: 11, color: '#B45309', fontWeight: '700' }}>Locked (Need Qualification)</Text>
+                    </View>
+                  )}
+                </View>
+
+                <View style={styles.levelTable}>
+                  <View style={styles.levelTableHeader}>
+                    <Text style={[styles.levelTableTh, { width: 42 }]}>Level</Text>
+                    <Text style={[styles.levelTableTh, { flex: 1 }]}>Members</Text>
+                    <Text style={[styles.levelTableTh, { flex: 1.2 }]}>Veg GMV</Text>
+                    <Text style={[styles.levelTableTh, { flex: 1.2 }]}>Other GMV</Text>
+                    <Text style={[styles.levelTableTh, { flex: 1.1, textAlign: 'right' }]}>Income</Text>
+                  </View>
+
+                  {(teamDashboardData?.levelBreakdown || [1, 2, 3, 4, 5, 6, 7].map((lvl: number) => ({
+                    level: lvl,
+                    memberCount: 0,
+                    activeMemberCount: 0,
+                    vegetableGMV: 0,
+                    otherGMV: 0,
+                    incomeEarned: 0,
+                  }))).map((row: any) => (
+                    <View key={row.level} style={styles.levelTableRow}>
+                      <Text style={[styles.levelTableTd, { width: 42, fontWeight: '800', color: '#6366F1' }]}>
+                        L{row.level}
+                      </Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.levelTableTd, { fontWeight: '700' }]}>{row.memberCount}</Text>
+                        <Text style={{ fontSize: 9, color: '#64748B' }}>{row.activeMemberCount} active</Text>
+                      </View>
+                      <Text style={[styles.levelTableTd, { flex: 1.2, color: '#166534', fontWeight: '600' }]}>
+                        ₹{Number(row.vegetableGMV).toFixed(2)}
+                      </Text>
+                      <Text style={[styles.levelTableTd, { flex: 1.2, color: '#1E40AF', fontWeight: '600' }]}>
+                        ₹{Number(row.otherGMV).toFixed(2)}
+                      </Text>
+                      <View style={{ flex: 1.1, alignItems: 'flex-end' }}>
+                        <Text style={[styles.levelTableTd, { fontWeight: '800', color: !isEligible ? '#64748B' : '#0F172A' }]}>
+                          ₹{Number(row.incomeEarned).toFixed(2)}
+                        </Text>
+                        {!isEligible && (
+                          <Text style={{ fontSize: 9, color: '#D97706', fontWeight: '700' }}>🔒 Locked</Text>
+                        )}
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              </ScrollView>
+              );
+            })()}
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -1161,6 +1703,461 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#FFFFFF',
     letterSpacing: 0.2,
+  },
+  referralCodeCard: {
+    backgroundColor: '#FAF5FF',
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  referralLeftCol: {
+    flex: 1,
+    marginRight: 12,
+  },
+  referralHeaderLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#9333EA',
+    letterSpacing: 0.8,
+  },
+  referralCodeBig: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#581C87',
+    letterSpacing: 1.5,
+    marginVertical: 2,
+  },
+  referralHelpText: {
+    fontSize: 11,
+    color: '#6B7280',
+    lineHeight: 15,
+  },
+  referralCopyBtn: {
+    backgroundColor: '#7E22CE',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  referralCopyBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  withdrawSmallBtn: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  withdrawSmallBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#065F46',
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+  teamStatusCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 16,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  teamCardHeader: {
+    marginBottom: 12,
+  },
+  teamBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  teamCardBadge: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#4F46E5',
+    letterSpacing: 0.6,
+  },
+  teamCardIcon: {
+    fontSize: 16,
+  },
+  teamCardTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  teamStatsGrid: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 14,
+  },
+  teamStatItem: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  teamStatLabel: {
+    fontSize: 11,
+    color: '#64748B',
+    marginBottom: 4,
+  },
+  teamStatVal: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 2,
+  },
+  teamStatSub: {
+    fontSize: 10,
+    color: '#94A3B8',
+  },
+  teamDashboardBtn: {
+    backgroundColor: '#4F46E5',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  teamDashboardBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  withdrawSub: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  withdrawErrorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 10,
+    padding: 10,
+    marginVertical: 10,
+    gap: 8,
+  },
+  withdrawErrorText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#DC2626',
+    fontWeight: '600',
+  },
+  withdrawSuccessBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: 10,
+    padding: 10,
+    marginVertical: 10,
+    gap: 8,
+  },
+  withdrawSuccessText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#059669',
+    fontWeight: '700',
+  },
+  tdsCalculationBox: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    padding: 14,
+    marginVertical: 12,
+  },
+  tdsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginVertical: 3,
+  },
+  tdsLabel: {
+    fontSize: 13,
+    color: '#475569',
+  },
+  tdsValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  tdsDivider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 8,
+  },
+  bankInputGroup: {
+    marginVertical: 8,
+  },
+  bankLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+    marginBottom: 6,
+  },
+  bankInput: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: '#0F172A',
+  },
+  withdrawSubmitBtn: {
+    borderRadius: 14,
+    marginTop: 10,
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  withdrawSubmitGradient: {
+    borderRadius: 14,
+    paddingVertical: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  withdrawSubmitText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  teamModalSub: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  qualificationBox: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 12,
+  },
+  qualBoxTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#334155',
+    marginBottom: 8,
+    letterSpacing: 0.4,
+  },
+  qualRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginVertical: 3,
+  },
+  qualText: {
+    fontSize: 12,
+    color: '#334155',
+    fontWeight: '600',
+  },
+  teamSummaryGrid: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  teamSummaryCard: {
+    flex: 1,
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+  },
+  teamSummaryLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  teamSummaryValue: {
+    fontSize: 16,
+    fontWeight: '900',
+    marginBottom: 2,
+  },
+  teamSummarySub: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  totalIncomeBanner: {
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    borderRadius: 14,
+    padding: 14,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  totalIncomeBannerLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#4338CA',
+    letterSpacing: 0.5,
+  },
+  totalIncomeBannerValue: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: '#3730A3',
+    marginVertical: 4,
+  },
+  totalIncomeBannerSub: {
+    fontSize: 11,
+    color: '#6366F1',
+  },
+  levelTableHeading: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#334155',
+    marginBottom: 8,
+    letterSpacing: 0.5,
+  },
+  levelTable: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+    marginBottom: 20,
+  },
+  levelTableHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  levelTableTh: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#475569',
+    letterSpacing: 0.4,
+  },
+  levelTableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  levelTableTd: {
+    fontSize: 11,
+    color: '#334155',
+  },
+  ineligibleWarningCard: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1.5,
+    borderColor: '#FECACA',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
+  },
+  eligibleSuccessCard: {
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1.5,
+    borderColor: '#A7F3D0',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
+  },
+  ineligibleHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  ineligibleTitle: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#991B1B',
+    letterSpacing: 0.5,
+  },
+  ineligibleSubtitle: {
+    fontSize: 11,
+    color: '#7F1D1D',
+    lineHeight: 16,
+    marginBottom: 10,
+  },
+  ineligibleChecklist: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+    gap: 8,
+    marginBottom: 10,
+  },
+  ineligibleCheckItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  ineligibleCheckLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  ineligibleCheckValue: {
+    fontSize: 11,
+    color: '#4B5563',
+    marginTop: 1,
+  },
+  unlockActionBox: {
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 10,
+    padding: 10,
+  },
+  unlockActionHeading: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#92400E',
+    marginBottom: 4,
+  },
+  unlockActionStep: {
+    fontSize: 11,
+    color: '#78350F',
+    lineHeight: 16,
   },
 });
 

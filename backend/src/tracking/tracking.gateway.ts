@@ -801,17 +801,42 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
   }
 
+  @SubscribeMessage('join_collection')
+  handleJoinCollection(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: any,
+  ) {
+    const rawId = typeof payload === 'string' ? payload : (payload?.requestId || payload?.id);
+    if (rawId) {
+      const requestId = String(rawId);
+      client.join(`collection_${requestId}`);
+      this.logger.log(`Client ${client.id} joined collection room: collection_${requestId}`);
+      return { event: 'joined', requestId };
+    }
+    return { event: 'error', message: 'Missing requestId' };
+  }
+
   emitCollectionVerifiedToCustomer(customerId: string, payload: any) {
-    if (this.server && customerId) {
-      this.server.to(`user_${customerId}`).emit('collection_verified', payload);
-      this.logger.log(`[WebSocket] Emitted collection_verified to room user_${customerId}`);
+    if (this.server) {
+      if (customerId) {
+        this.server.to(`user_${customerId}`).emit('collection_verified', payload);
+      }
+      if (payload?.requestId) {
+        this.server.to(`collection_${payload.requestId}`).emit('collection_verified', payload);
+      }
+      this.logger.log(`[WebSocket] Emitted collection_verified for request ${payload?.requestId}`);
     }
   }
 
   emitCollectionRejectedToCustomer(customerId: string, payload: any) {
-    if (this.server && customerId) {
-      this.server.to(`user_${customerId}`).emit('collection_rejected', payload);
-      this.logger.log(`[WebSocket] Emitted collection_rejected to room user_${customerId}`);
+    if (this.server) {
+      if (customerId) {
+        this.server.to(`user_${customerId}`).emit('collection_rejected', payload);
+      }
+      if (payload?.requestId) {
+        this.server.to(`collection_${payload.requestId}`).emit('collection_rejected', payload);
+      }
+      this.logger.log(`[WebSocket] Emitted collection_rejected for request ${payload?.requestId}`);
     }
   }
 }

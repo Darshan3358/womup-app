@@ -161,6 +161,14 @@ export const ApiService = {
             shoppingCoinBalance: u.shoppingCoins || 0,
             kycStatus: u.isPhoneVerified ? 'Verified' : 'Pending',
             createdAt: u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recently',
+            level: u.level || 1,
+            sponsorCode: u.sponsorCode || 'WORMUP001',
+            referralCode: u.referralCode || '',
+            referredUsersCount: u.referredUsersCount || (u.directReferrals?.length || 0),
+            verifiedReferralsCount: u.verifiedReferralsCount || 0,
+            appDownloadIncome: u.appDownloadIncome || 0,
+            pendingIncome: u.pendingIncome || 0,
+            availableIncome: u.availableIncome || 0,
           };
         });
 
@@ -1687,6 +1695,38 @@ export const ApiService = {
       return await res.json();
     } catch (err: any) {
       return { success: false, error: err.message || 'Failed rejecting vendor KYC' };
+    }
+  },
+
+  // 53. ADMIN AUTHENTICATION
+  async adminLogin(
+    identifier?: string,
+    password?: string
+  ): Promise<{
+    success: boolean;
+    accessToken?: string;
+    refreshToken?: string;
+    sponsorId?: string;
+    user?: any;
+    error?: string;
+    message?: string;
+  }> {
+    try {
+      const res = await fetch(`${NEST_API_BASE_URL}/auth/admin-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          identifier: identifier || 'admin@wormup.com',
+          password: password || 'admin123',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.message || 'Admin login failed' };
+      }
+      return data;
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error during admin login' };
     }
   },
 };

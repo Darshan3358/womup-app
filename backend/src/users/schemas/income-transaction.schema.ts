@@ -10,7 +10,7 @@ export class IncomeTransaction {
 
   @Prop({
     required: true,
-    enum: ['APP_DOWNLOAD', 'REFERRAL', 'ORDER_CASHBACK', 'SIGNUP_BONUS', 'TEAM_PURCHASE'],
+    enum: ['APP_DOWNLOAD', 'REFERRAL', 'ORDER_CASHBACK', 'SIGNUP_BONUS', 'TEAM_PURCHASE', 'WITHDRAWAL'],
   })
   type: string;
 

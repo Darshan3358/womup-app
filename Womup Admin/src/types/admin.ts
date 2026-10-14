@@ -26,6 +26,14 @@ export interface Customer {
   shoppingCoinBalance: number;
   kycStatus: 'Verified' | 'Pending' | 'Rejected';
   createdAt: string;
+  level?: number;
+  sponsorCode?: string;
+  referralCode?: string;
+  referredUsersCount?: number;
+  verifiedReferralsCount?: number;
+  appDownloadIncome?: number;
+  pendingIncome?: number;
+  availableIncome?: number;
 }
 
 export interface DeliveryPartnerItem {

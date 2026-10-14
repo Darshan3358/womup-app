@@ -20,6 +20,8 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LocalVendor } from '../types/localShop.types';
 import { LocalShopApi } from '../api/localShopApi';
+import { useApp } from '../../context/AppContext';
+import { AwaitingVendorVerificationScreen } from './AwaitingVendorVerificationScreen';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const SCAN_FRAME_SIZE = Math.min(SCREEN_W * 0.72, 280);
@@ -27,7 +29,7 @@ const SCAN_FRAME_SIZE = Math.min(SCREEN_W * 0.72, 280);
 interface QRScannerScreenProps {
   initialVendor?: LocalVendor | null;
   onGoBack: () => void;
-  onPaymentSuccess: (earnedCoins: number, amount: number, vendorName: string) => void;
+  onPaymentSuccess: (earnedCoins: number, amount: number, vendorName: string, coinsUsed?: number, newBalance?: number) => void;
 }
 
 export const QRScannerScreen: React.FC<QRScannerScreenProps> = ({
@@ -36,11 +38,22 @@ export const QRScannerScreen: React.FC<QRScannerScreenProps> = ({
   onPaymentSuccess,
 }) => {
   const insets = useSafeAreaInsets();
+  const { user } = useApp();
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [isVerifyingQR, setIsVerifyingQR] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   const [facing, setFacing] = useState<'back' | 'front'>('back');
+
+  const [pendingCollectionRequest, setPendingCollectionRequest] = useState<{
+    requestId: string;
+    vendorName: string;
+    vendorCode?: string;
+    billAmount: number;
+    coinsUsed: number;
+    cashToCollect: number;
+    paymentMethod: string;
+  } | null>(null);
 
   const [selectedVendor, setSelectedVendor] = useState<LocalVendor | null>(
     initialVendor || null
@@ -71,7 +84,7 @@ export const QRScannerScreen: React.FC<QRScannerScreenProps> = ({
       try {
         const walletData = await LocalShopApi.getCustomerWalletData();
         setCoinBalance(walletData.shoppingCoins);
-        setAppDownloadBalance(walletData.appDownloadIncome);
+        setAppDownloadBalance(walletData.availableIncome ?? walletData.appDownloadIncome ?? 0);
       } catch (e) {
         // non-fatal
       }
@@ -239,35 +252,40 @@ export const QRScannerScreen: React.FC<QRScannerScreenProps> = ({
         const rzpData = orderRes.data;
         setRazorpayOrder(rzpData);
 
-        // If on web and window.Razorpay SDK is loaded, open native Razorpay checkout
-        if (Platform.OS === 'web' && typeof (window as any).Razorpay !== 'undefined') {
-          const options = {
-            key: rzpData.keyId,
-            amount: rzpData.amount,
-            currency: 'INR',
-            name: 'WormUp Store Payment',
-            description: `Payment to ${rzpData.vendorName || 'Vendor'}`,
-            order_id: rzpData.razorpayOrderId,
-            prefill: {
-              name: rzpData.customerName || 'Customer',
-              contact: rzpData.customerPhone || '9876543210',
-              email: rzpData.prefillEmail || 'customer@wormup.in',
-            },
-            theme: { color: '#071B52' },
-            handler: async (resp: any) => {
-              await handleRazorpaySuccess(
-                resp.razorpay_order_id,
-                resp.razorpay_payment_id,
-                resp.razorpay_signature
-              );
-            },
-            modal: {
-              ondismiss: () => setIsConfirming(false),
-            },
-          };
-          const rzp = new (window as any).Razorpay(options);
-          rzp.open();
-          return;
+        // If on web and window.Razorpay SDK is loaded with a real dashboard key (not demo placeholder)
+        const hasRealKey = rzpData.keyId && !rzpData.keyId.includes('demo') && rzpData.keyId.startsWith('rzp_');
+        if (Platform.OS === 'web' && typeof (window as any).Razorpay !== 'undefined' && hasRealKey) {
+          try {
+            const options = {
+              key: rzpData.keyId,
+              amount: rzpData.amount,
+              currency: 'INR',
+              name: 'WormUp Store Payment',
+              description: `Payment to ${rzpData.vendorName || 'Vendor'}`,
+              order_id: rzpData.razorpayOrderId,
+              prefill: {
+                name: rzpData.customerName || 'Customer',
+                contact: rzpData.customerPhone || '9876543210',
+                email: rzpData.prefillEmail || 'customer@wormup.in',
+              },
+              theme: { color: '#071B52' },
+              handler: async (resp: any) => {
+                await handleRazorpaySuccess(
+                  resp.razorpay_order_id,
+                  resp.razorpay_payment_id,
+                  resp.razorpay_signature
+                );
+              },
+              modal: {
+                ondismiss: () => setIsConfirming(false),
+              },
+            };
+            const rzp = new (window as any).Razorpay(options);
+            rzp.open();
+            return;
+          } catch (e) {
+            console.warn('[Razorpay] Web checkout open failed, falling back to in-app modal:', e);
+          }
         }
 
         // Open in-app Razorpay Test Checkout Modal (Mobile & Web)
@@ -289,40 +307,42 @@ export const QRScannerScreen: React.FC<QRScannerScreenProps> = ({
       const actualUpiAmount = 0;
 
       // Submit real-time collection request to vendor terminal
-      try {
-        await LocalShopApi.submitCollectionRequest({
-          vendorCode: (selectedVendor as any).vendorCode || selectedVendor.id || 'VND001',
-          vendorId: selectedVendor.id,
-          amount: numAmount,
-          paymentMethod,
-          coinsUsed: actualCoinsUsed,
-          walletUsed: actualWalletUsed,
-          cashToCollect: actualCashToCollect,
-          upiAmount: actualUpiAmount,
-          coinsEarned: 0,
-          customerName: 'Local Shopper',
-        });
-      } catch (wsErr) {
-        console.warn('Real-time collection notice error:', wsErr);
-      }
-
-      // Finalize payment record
-      await LocalShopApi.payVendorQR({
+      const collectionRes = await LocalShopApi.submitCollectionRequest({
+        vendorCode: (selectedVendor as any).vendorCode || selectedVendor.id || 'VND001',
         vendorId: selectedVendor.id,
         amount: numAmount,
         paymentMethod,
         coinsUsed: actualCoinsUsed,
+        walletUsed: actualWalletUsed,
+        cashToCollect: actualCashToCollect,
+        upiAmount: actualUpiAmount,
+        coinsEarned: paymentMethod === 'CASH' ? Math.floor((numAmount * ((selectedVendor as any).shoppingCoinPercent || 10)) / 100) : 0,
+        customerName: user?.fullNameAsPerAadhaar || user?.fullName || 'Local Shopper',
+        customerPhone: user?.phoneNumber || '',
+        customerId: user?._id || user?.id,
       });
 
       setIsConfirming(false);
       setIsManualModalOpen(false);
-      setEarnedCoinsFinal(actualCoinsUsed);
-      setCashPaidFinal(actualCashToCollect);
-      setCoinsUsedFinal(actualCoinsUsed);
-      setShowSuccessBlast(true);
-    } catch {
+
+      if (collectionRes && collectionRes.success && collectionRes.data) {
+        const reqData = collectionRes.data;
+        const newReqId = reqData.id || reqData.requestId || reqData._id;
+        setPendingCollectionRequest({
+          requestId: newReqId,
+          vendorName: selectedVendor.name || selectedVendor.storeName || 'Merchant',
+          vendorCode: (selectedVendor as any).vendorCode || selectedVendor.id,
+          billAmount: numAmount,
+          coinsUsed: actualCoinsUsed,
+          cashToCollect: actualCashToCollect,
+          paymentMethod,
+        });
+      } else {
+        Alert.alert('Request Failed', collectionRes?.message || 'Could not send collection request to merchant terminal.');
+      }
+    } catch (err: any) {
       setIsConfirming(false);
-      Alert.alert('Payment Failed', 'Could not process payment. Please try again.');
+      Alert.alert('Payment Failed', err?.message || 'Could not process payment. Please try again.');
     }
   };
 
@@ -380,6 +400,35 @@ export const QRScannerScreen: React.FC<QRScannerScreenProps> = ({
     onPaymentSuccess(earnedCoinsFinal, numAmount, selectedVendor?.name || selectedVendor?.storeName || 'Merchant');
     onGoBack();
   };
+
+  // Active Pending Collection Request (Awaiting Merchant Verification at Counter)
+  if (pendingCollectionRequest) {
+    return (
+      <AwaitingVendorVerificationScreen
+        requestId={pendingCollectionRequest.requestId}
+        vendorName={pendingCollectionRequest.vendorName}
+        vendorCode={pendingCollectionRequest.vendorCode}
+        billAmount={pendingCollectionRequest.billAmount}
+        coinsUsed={pendingCollectionRequest.coinsUsed}
+        cashToCollect={pendingCollectionRequest.cashToCollect}
+        paymentMethod={pendingCollectionRequest.paymentMethod}
+        onVerified={(newBalance, coinsUsed, cashPaid) => {
+          setPendingCollectionRequest(null);
+          onPaymentSuccess(
+            0,
+            pendingCollectionRequest.billAmount,
+            pendingCollectionRequest.vendorName,
+            coinsUsed,
+            newBalance
+          );
+          onGoBack();
+        }}
+        onCancelledOrRejected={() => {
+          setPendingCollectionRequest(null);
+        }}
+      />
+    );
+  }
 
   // Permission not granted state (Mobile only)
   if (Platform.OS !== 'web' && permission && !permission.granted) {

@@ -91,6 +91,20 @@ export class LocalShopsController {
     return { success: true, data: result };
   }
 
+  @Get('local-shops/collection-requests/:id')
+  @ApiOperation({ summary: 'Get status of counter collection request' })
+  async getCollectionRequestStatus(@Param('id') id: string) {
+    const result = await this.localShopsService.getCollectionRequestById(id);
+    return { success: true, data: result };
+  }
+
+  @Post('local-shops/collection-requests/:id/cancel')
+  @ApiOperation({ summary: 'Customer cancels pending counter collection request' })
+  async cancelCollectionRequest(@Param('id') id: string) {
+    const result = await this.localShopsService.cancelCollectionRequest(id);
+    return result;
+  }
+
   // ── Admin Endpoints ────────────────────────────────────────────────────────
 
   @Get('admin/vendors')

@@ -1,12 +1,20 @@
 import { Controller, Post, Get, Query, Body, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { SendOtpDto, VerifyOtpDto, RegisterDto, RegisterRiderDto, RefreshTokenDto, GoogleAuthDto, LinkPhoneDto } from './dto/auth.dto';
+import { SendOtpDto, VerifyOtpDto, RegisterDto, RegisterRiderDto, RefreshTokenDto, GoogleAuthDto, LinkPhoneDto, AdminLoginDto } from './dto/auth.dto';
 
 @ApiTags('Authentication')
 @Controller('api/v1/auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Post('admin-login')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Authenticate Admin and return tokens with Master Sponsor ID WORMUP001' })
+  @ApiResponse({ status: 200, description: 'Admin authentication successful' })
+  async adminLogin(@Body() dto: AdminLoginDto) {
+    return this.authService.adminLogin(dto);
+  }
 
   @Get('registration-timing')
   @ApiOperation({ summary: 'Check if registration is open (6 AM to 10 PM IST)' })

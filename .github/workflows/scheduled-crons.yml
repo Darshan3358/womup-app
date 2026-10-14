@@ -51,7 +51,7 @@ jobs:
           inputs.cron_job == 'run_both'
         working-directory: backend
         env:
-          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI || 'mongodb+srv://fanqie:fanqie123@cluster0.f8acy45.mongodb.net/wormup' }}
         run: npm run cron:daily-income
 
       # ---------------------------------------------------------------------
@@ -66,5 +66,5 @@ jobs:
           inputs.cron_job == 'run_both'
         working-directory: backend
         env:
-          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI || 'mongodb+srv://fanqie:fanqie123@cluster0.f8acy45.mongodb.net/wormup' }}
         run: npm run cron:monthly-coins

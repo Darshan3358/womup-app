@@ -47,7 +47,7 @@ export const UserCoinHero: React.FC<UserCoinHeroProps> = ({
                 <Ionicons name="chevron-forward" size={12} color="#FFFFFF" />
               </View>
             </View>
-            <Text style={styles.userIdText}>User ID : {userId}</Text>
+            <Text style={styles.userIdText}>Sponsor ID : {userId}</Text>
           </View>
         </TouchableOpacity>
 

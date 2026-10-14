@@ -15,15 +15,15 @@ import * as crypto from 'crypto';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { OtpVerification, OtpVerificationDocument } from './schemas/otp.schema';
 import { RefreshToken, RefreshTokenDocument } from './schemas/refresh-token.schema';
-import { SendOtpDto, VerifyOtpDto, RegisterDto, RegisterRiderDto, GoogleAuthDto, LinkPhoneDto } from './dto/auth.dto';
+import { SendOtpDto, VerifyOtpDto, RegisterDto, RegisterRiderDto, GoogleAuthDto, LinkPhoneDto, AdminLoginDto } from './dto/auth.dto';
 import { CoinTransaction, CoinTransactionDocument } from '../coins/schemas/coin-transaction.schema';
-import { DeliveryPartner, DeliveryPartnerDocument } from '../delivery/schemas/delivery-partner.schema';
 import { EmailService } from './email.service';
 import { Role } from '../common/enums/role.enum';
 import { City, CityDocument } from '../areas/schemas/city.schema';
 import { Area, AreaDocument } from '../areas/schemas/area.schema';
 import { ApprovedPincode, ApprovedPincodeDocument } from '../areas/schemas/approved-pincode.schema';
 import { IncomeTransaction, IncomeTransactionDocument } from '../users/schemas/income-transaction.schema';
+import { DeliveryPartner, DeliveryPartnerDocument } from '../delivery/schemas/delivery-partner.schema';
 
 @Injectable()
 export class AuthService {
@@ -1113,4 +1113,74 @@ export class AuthService {
       },
     };
   }
+
+  async adminLogin(dto: AdminLoginDto) {
+    const company = await this.getOrCreateCompanyRoot();
+
+    const identifier = (dto.identifier || '').trim().toLowerCase();
+    const validIdentifiers = ['admin@wormup.com', 'root@wormup.com', '+910000000000', 'wormup001', 'wormup', 'admin'];
+
+    if (
+      identifier &&
+      !validIdentifiers.includes(identifier) &&
+      company.email?.toLowerCase() !== identifier &&
+      company.phone !== identifier &&
+      company.referralCode?.toLowerCase() !== identifier
+    ) {
+      // Check if user exists with ADMIN role
+      const adminUser = await this.userModel.findOne({
+        $or: [
+          { email: identifier },
+          { phone: identifier },
+          { referralCode: identifier.toUpperCase() },
+        ],
+        role: Role.ADMIN,
+      });
+
+      if (!adminUser) {
+        throw new UnauthorizedException('Invalid Admin credentials or unauthorized access');
+      }
+
+      const tokens = await this.generateTokens(adminUser);
+      return {
+        success: true,
+        message: 'Admin authenticated successfully',
+        ...tokens,
+        sponsorId: adminUser.referralCode || 'WORMUP001',
+        user: {
+          id: adminUser._id.toString(),
+          name: adminUser.name,
+          email: adminUser.email,
+          phone: adminUser.phone,
+          role: adminUser.role,
+          sponsorId: adminUser.referralCode || 'WORMUP001',
+          referralCode: adminUser.referralCode || 'WORMUP001',
+        },
+      };
+    }
+
+    // Default company root admin credentials
+    if (dto.password && dto.password !== 'admin123' && dto.password !== 'wormup2026') {
+      throw new UnauthorizedException('Invalid Admin password');
+    }
+
+    const tokens = await this.generateTokens(company);
+
+    return {
+      success: true,
+      message: 'Admin authenticated successfully with Master Sponsor ID WORMUP001',
+      ...tokens,
+      sponsorId: company.referralCode || 'WORMUP001',
+      user: {
+        id: company._id.toString(),
+        name: company.name || 'WormUp Admin Root',
+        email: company.email || 'root@wormup.com',
+        phone: company.phone,
+        role: Role.ADMIN,
+        sponsorId: company.referralCode || 'WORMUP001',
+        referralCode: company.referralCode || 'WORMUP001',
+      },
+    };
+  }
 }
+

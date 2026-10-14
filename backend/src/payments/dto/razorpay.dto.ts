@@ -1,9 +1,9 @@
 import { IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 export class CreateRazorpayOrderDto {
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  vendorId: string;
+  vendorId?: string;
 
   @IsNotEmpty()
   @IsNumber()

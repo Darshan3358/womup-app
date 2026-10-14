@@ -58,7 +58,8 @@ export const BlinkitProductDetailScreen: React.FC = () => {
   let displayPrice = activeVariant ? activeVariant.price : product?.sellingPrice || 0;
   let displayMrp = activeVariant ? activeVariant.mrp : product?.mrp || 0;
 
-  if ((product?.name || '').toLowerCase().includes('tomato')) {
+  // Only apply fallback dynamic pricing if product has NO active variants defined
+  if (!activeVariant && (product?.name || '').toLowerCase().includes('tomato')) {
     const isThaltej = (currentAreaName || '').toLowerCase().includes('thaltej');
     const isChandlodiya =
       (currentAreaName || '').toLowerCase().includes('chandlodiya') ||
@@ -266,7 +267,7 @@ export const BlinkitProductDetailScreen: React.FC = () => {
               <Text style={styles.selectPackLabel}>Select Unit / Pack Size:</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.variantScroll}>
                 {variants.map((v) => {
-                  const isSelected = v.id === (activeVariant?.id || v.id);
+                  const isSelected = v.id === activeVariant?.id;
                   return (
                     <TouchableOpacity
                       key={v.id}

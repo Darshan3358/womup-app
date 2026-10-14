@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Bell, ArrowLeft, Layers, Menu } from 'lucide-react-native';
+import { Bell, ArrowLeft, Layers, Menu, LogOut } from 'lucide-react-native';
 import { COLORS, GRADIENTS, RADIUS, SPACING } from '../../theme';
 import { useAdminState } from '../../context/AdminStateContext';
 
@@ -12,7 +12,7 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ title, showBack, onBack }) => {
-  const { activeTab, subView, setSubView, goBackSubView, toggleSidebar } = useAdminState();
+  const { activeTab, subView, setSubView, goBackSubView, toggleSidebar, logoutAdmin } = useAdminState();
 
   const isSubScreen = showBack || subView !== 'none';
 
@@ -47,6 +47,14 @@ export const Header: React.FC<HeaderProps> = ({ title, showBack, onBack }) => {
         </Text>
 
         <View style={styles.actionRow}>
+          <TouchableOpacity
+            style={[styles.iconButton, { backgroundColor: 'rgba(239, 68, 68, 0.18)' }]}
+            onPress={logoutAdmin}
+            accessibilityLabel="Admin Sign Out"
+          >
+            <LogOut color="#EF4444" size={18} />
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.iconButton}
             onPress={() => {}}

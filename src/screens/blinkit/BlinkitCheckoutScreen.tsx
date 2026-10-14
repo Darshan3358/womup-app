@@ -13,16 +13,19 @@ import {
   Image,
   Switch,
   TextInput,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../theme/colors';
 import { TYPOGRAPHY } from '../../theme/typography';
 import { AppIcon } from '../../components/common/AppIcon';
+import { Ionicons } from '@expo/vector-icons';
 import { ShieldCheck, CheckCircle2, MapPin, Compass, Home as HomeIcon, Check, Plus } from 'lucide-react-native';
 import { useApp } from '../../context/AppContext';
 import { CartService } from '../../services/cartService';
 import { LocationService } from '../../services/locationService';
 import { matchAreaByName, AHMEDABAD_AREAS } from '../../data/areas';
+import { LocalShopApi } from '../../local-shop-module/api/localShopApi';
 
 // Resolve full-screen order celebration video asset
 const orderVideoAsset = require('../../../assets/gemini_generated_video_2981966f.mp4');
@@ -36,6 +39,28 @@ const getVideoSource = () => {
     if (resolved?.uri) return resolved.uri;
   } catch (e) { }
   return '/assets/assets/gemini_generated_video_2981966f.mp4';
+};
+
+const loadRazorpayScript = (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') {
+      return resolve(false);
+    }
+    if ((window as any).Razorpay) {
+      return resolve(true);
+    }
+    const existing = document.getElementById('razorpay-checkout-js');
+    if (existing) {
+      return resolve(true);
+    }
+    const script = document.createElement('script');
+    script.id = 'razorpay-checkout-js';
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
 };
 
 export const BlinkitCheckoutScreen: React.FC = () => {
@@ -390,6 +415,18 @@ export const BlinkitCheckoutScreen: React.FC = () => {
   }, [currentAreaName, currentStoreName, addressSource]);
 
   const [selectedPayment, setSelectedPayment] = useState<'upi' | 'card' | 'cod'>('upi');
+  const [razorpayOrder, setRazorpayOrder] = useState<any>(null);
+  const [isRazorpayModalOpen, setIsRazorpayModalOpen] = useState(false);
+  const [selectedTestUpi, setSelectedTestUpi] = useState<'success@razorpay' | 'failure@razorpay' | 'card'>('success@razorpay');
+  const [isRazorpayVerifying, setIsRazorpayVerifying] = useState(false);
+
+  // Preload Razorpay Web SDK if on web
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      loadRazorpayScript();
+    }
+  }, []);
+
   const [useWalletBalance, setUseWalletBalance] = useState<boolean>(false);
   const [useCoins, setUseCoins] = useState<boolean>(appliedCoins > 0);
 
@@ -688,26 +725,150 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     };
   }, []);
 
+  const handleRazorpaySuccess = async (orderId: string, paymentId: string, signature: string) => {
+    setIsRazorpayVerifying(true);
+    try {
+      const verifyRes = await LocalShopApi.verifyRazorpayPayment({
+        razorpayOrderId: orderId,
+        razorpayPaymentId: paymentId,
+        razorpaySignature: signature,
+        vendorId: currentStoreId || 'VND001',
+        billAmount: finalPayable,
+      });
+
+      setIsRazorpayVerifying(false);
+      setIsRazorpayModalOpen(false);
+
+      if (verifyRes.success) {
+        if (useCoins) {
+          setAppliedCoins(coinsDeduction);
+        }
+        await placeOrder(selectedPayment.toUpperCase(), {
+          tip: tipAmount,
+          deliveryFee: deliveryFee,
+          deliveryInstructions: deliveryInstruction,
+          walletDeduction: useWalletBalance ? walletDeduction : 0,
+        });
+        startCelebrationVideo();
+      } else {
+        Alert.alert('Payment Verification Failed', verifyRes.message || 'Signature check failed. Please try again.');
+      }
+    } catch (err: any) {
+      setIsRazorpayVerifying(false);
+      Alert.alert('Payment Verification Failed', err?.message || 'Could not verify payment with backend.');
+    }
+  };
+
+  const handleProcessRazorpayTest = async () => {
+    if (!razorpayOrder) return;
+
+    if (selectedTestUpi === 'failure@razorpay') {
+      Alert.alert('Razorpay Payment Failed', 'Payment was declined by bank (Simulated failure@razorpay).');
+      setIsRazorpayModalOpen(false);
+      return;
+    }
+
+    const testPaymentId = `pay_${Date.now().toString().slice(-8)}${Math.random().toString(36).substring(2, 6)}`;
+    const testSignature = `sig_${Date.now()}_sha256_valid`;
+
+    await handleRazorpaySuccess(
+      razorpayOrder.razorpayOrderId,
+      testPaymentId,
+      testSignature
+    );
+  };
+
   const handlePlaceOrder = async () => {
-    if (isSubmitting) return;
+    if (isSubmitting || isRazorpayVerifying) return;
     const paymentMethod = useWalletBalance && finalPayable === 0 ? 'WOMUP_WALLET' : selectedPayment.toUpperCase();
+
+    // 1. Direct flow for Womup Wallet or Cash On Delivery
+    if (paymentMethod === 'WOMUP_WALLET' || paymentMethod === 'COD') {
+      setIsSubmitting(true);
+      try {
+        if (useCoins) {
+          setAppliedCoins(coinsDeduction);
+        }
+        await placeOrder(paymentMethod, {
+          tip: tipAmount,
+          deliveryFee: deliveryFee,
+          deliveryInstructions: deliveryInstruction,
+          walletDeduction: useWalletBalance ? walletDeduction : 0,
+        });
+        startCelebrationVideo();
+      } catch (error) {
+        console.error('Failed to place order:', error);
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    // 2. Razorpay Flow for UPI or Card
     setIsSubmitting(true);
     try {
-      if (useCoins) {
-        setAppliedCoins(coinsDeduction);
-      }
-      await placeOrder(paymentMethod, {
-        tip: tipAmount,
-        deliveryFee: deliveryFee,
-        deliveryInstructions: deliveryInstruction,
-        walletDeduction: useWalletBalance ? walletDeduction : 0,
-      });
-      // Play full screen video for 5 seconds on order place
-      startCelebrationVideo();
-    } catch (error) {
-      console.error('Failed to place order:', error);
-    } finally {
+      const orderRes = await LocalShopApi.createRazorpayOrder(
+        currentStoreId || 'VND001',
+        finalPayable,
+        {
+          customerName: user?.fullName || 'Customer',
+          customerPhone: user?.phoneNumber || '9876543210',
+          customerEmail: user?.email || 'customer@wormup.in',
+          paymentMethod: selectedPayment.toUpperCase(),
+        }
+      );
+
       setIsSubmitting(false);
+
+      if (!orderRes.success || !orderRes.data) {
+        Alert.alert('Payment Order Failed', orderRes.message || 'Could not initiate Razorpay order.');
+        return;
+      }
+
+      const rzpData = orderRes.data;
+      setRazorpayOrder(rzpData);
+
+      // On Web: Only launch external Razorpay SDK if a valid live/test dashboard key is configured (not demo placeholder)
+      const hasRealKey = rzpData.keyId && !rzpData.keyId.includes('demo') && rzpData.keyId.startsWith('rzp_');
+      if (Platform.OS === 'web' && typeof (window as any).Razorpay !== 'undefined' && hasRealKey) {
+        try {
+          const options = {
+            key: rzpData.keyId,
+            amount: rzpData.amount,
+            currency: 'INR',
+            name: 'WormUp Express Delivery',
+            description: `Order Payment (${blinkitCartCount} items)`,
+            order_id: rzpData.razorpayOrderId,
+            prefill: {
+              name: user?.fullName || rzpData.customerName || 'Customer',
+              contact: user?.phoneNumber || rzpData.customerPhone || '9876543210',
+              email: user?.email || rzpData.prefillEmail || 'customer@wormup.in',
+            },
+            theme: { color: '#071B52' },
+            handler: async (resp: any) => {
+              await handleRazorpaySuccess(
+                resp.razorpay_order_id,
+                resp.razorpay_payment_id,
+                resp.razorpay_signature
+              );
+            },
+            modal: {
+              ondismiss: () => setIsSubmitting(false),
+            },
+          };
+          const rzp = new (window as any).Razorpay(options);
+          rzp.open();
+          return;
+        } catch (e) {
+          console.warn('[Razorpay] Web checkout open failed, falling back to in-app modal:', e);
+        }
+      }
+
+      // Open in-app Razorpay Test Checkout Modal (Mobile & Web Test Mode)
+      setIsRazorpayModalOpen(true);
+    } catch (err: any) {
+      setIsSubmitting(false);
+      Alert.alert('Payment Gateway Error', err?.message || 'Could not initiate Razorpay checkout');
     }
   };
 
@@ -1202,14 +1363,19 @@ export const BlinkitCheckoutScreen: React.FC = () => {
                 style={styles.paymentOptionRow}
               >
                 <View style={styles.paymentOptionLeft}>
-                  <View style={[styles.paymentIconBox, { backgroundColor: COLORS.lightBlueLavender }]}>
-                    <AppIcon name="zap" size={20} color={COLORS.secondary} />
+                  <View style={[styles.paymentIconBox, { backgroundColor: '#EEF2FF' }]}>
+                    <Ionicons name="flash" size={18} color="#4F46E5" />
                   </View>
-                  <View>
-                    <Text style={[TYPOGRAPHY.bodyMdMedium, styles.paymentTitle]}>
-                      UPI (Google Pay, PhonePe, Paytm)
-                    </Text>
-                    <Text style={styles.walletBalText}>Fast & secure 1-tap checkout</Text>
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <Text style={[TYPOGRAPHY.bodyMdMedium, styles.paymentTitle]}>
+                        UPI (Google Pay, PhonePe, Paytm)
+                      </Text>
+                      <View style={{ backgroundColor: '#EEF2FF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#C7D2FE' }}>
+                        <Text style={{ fontSize: 9, fontWeight: '800', color: '#4338CA' }}>RAZORPAY</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.walletBalText}>Fast & secure 1-tap checkout via Razorpay</Text>
                   </View>
                 </View>
                 <View
@@ -1231,14 +1397,19 @@ export const BlinkitCheckoutScreen: React.FC = () => {
                 style={styles.paymentOptionRow}
               >
                 <View style={styles.paymentOptionLeft}>
-                  <View style={[styles.paymentIconBox, { backgroundColor: COLORS.cardBackground }]}>
-                    <AppIcon name="credit-card" size={20} color={COLORS.textPrimary} />
+                  <View style={[styles.paymentIconBox, { backgroundColor: '#F0F9FF' }]}>
+                    <Ionicons name="card-outline" size={18} color="#0284C7" />
                   </View>
-                  <View>
-                    <Text style={[TYPOGRAPHY.bodyMdMedium, styles.paymentTitle]}>
-                      Credit / Debit Card
-                    </Text>
-                    <Text style={styles.walletBalText}>Visa, MasterCard, RuPay</Text>
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <Text style={[TYPOGRAPHY.bodyMdMedium, styles.paymentTitle]}>
+                        Credit / Debit Card
+                      </Text>
+                      <View style={{ backgroundColor: '#F0F9FF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#BAE6FD' }}>
+                        <Text style={{ fontSize: 9, fontWeight: '800', color: '#0369A1' }}>RAZORPAY</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.walletBalText}>Visa, MasterCard, RuPay powered by Razorpay</Text>
                   </View>
                 </View>
                 <View
@@ -1597,6 +1768,164 @@ export const BlinkitCheckoutScreen: React.FC = () => {
             >
               <Text style={styles.successDoneText}>Back to Home</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Razorpay Test Mode Checkout Modal for UPI & Cards */}
+      <Modal
+        visible={isRazorpayModalOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          if (!isRazorpayVerifying) setIsRazorpayModalOpen(false);
+        }}
+      >
+        <View style={styles.rzpModalBackdrop}>
+          <View style={[styles.rzpModalSheet, { paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
+            <View style={styles.rzpSheetHandle} />
+
+            {/* Header with Razorpay Logo & Test Badge */}
+            <View style={styles.rzpHeaderRow}>
+              <View style={styles.rzpHeaderLeft}>
+                <View style={styles.rzpLogoBox}>
+                  <Ionicons name="card" size={20} color="#3395FF" />
+                </View>
+                <View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={styles.rzpBrandText}>Razorpay</Text>
+                    <Ionicons name="shield-checkmark" size={14} color="#10B981" />
+                  </View>
+                  <Text style={styles.rzpSubText}>Fast & Secure 1-Tap Checkout</Text>
+                </View>
+              </View>
+
+              <View style={styles.rzpTestBadge}>
+                <Text style={styles.rzpTestBadgeText}>TEST MODE</Text>
+              </View>
+            </View>
+
+            {/* Order & Amount Box */}
+            <View style={styles.rzpAmountBox}>
+              <Text style={styles.rzpAmountPayingTo}>
+                Paying to WormUp Express ({blinkitCartCount} items)
+              </Text>
+              <Text style={styles.rzpAmountText}>₹{finalPayable}</Text>
+              <Text style={styles.rzpOrderIdText}>
+                Order ID: {razorpayOrder?.razorpayOrderId || 'rzp_order_init'}
+              </Text>
+            </View>
+
+            <Text style={styles.rzpSectionTitle}>Select Test UPI / Payment Method</Text>
+
+            {/* Option 1: success@razorpay */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[
+                styles.rzpOptionCard,
+                selectedTestUpi === 'success@razorpay' && styles.rzpOptionCardSuccess,
+              ]}
+              onPress={() => setSelectedTestUpi('success@razorpay')}
+            >
+              <View style={[styles.rzpOptionIconBox, { backgroundColor: '#ECFDF5' }]}>
+                <Ionicons name="phone-portrait-outline" size={20} color="#10B981" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rzpOptionTitle}>UPI: success@razorpay</Text>
+                <Text style={[styles.rzpOptionSub, { color: '#059669' }]}>
+                  Simulates instant 1-tap UPI payment approval
+                </Text>
+              </View>
+              {selectedTestUpi === 'success@razorpay' ? (
+                <Ionicons name="checkmark-circle" size={22} color="#10B981" />
+              ) : (
+                <View style={styles.rzpRadioCircle} />
+              )}
+            </TouchableOpacity>
+
+            {/* Option 2: Test Card */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[
+                styles.rzpOptionCard,
+                selectedTestUpi === 'card' && styles.rzpOptionCardBlue,
+              ]}
+              onPress={() => setSelectedTestUpi('card')}
+            >
+              <View style={[styles.rzpOptionIconBox, { backgroundColor: '#EFF6FF' }]}>
+                <Ionicons name="card-outline" size={20} color="#3B82F6" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rzpOptionTitle}>Card: 4111 1111 1111 1111</Text>
+                <Text style={[styles.rzpOptionSub, { color: '#2563EB' }]}>
+                  Simulates successful Visa / RuPay transaction
+                </Text>
+              </View>
+              {selectedTestUpi === 'card' ? (
+                <Ionicons name="checkmark-circle" size={22} color="#3B82F6" />
+              ) : (
+                <View style={styles.rzpRadioCircle} />
+              )}
+            </TouchableOpacity>
+
+            {/* Option 3: failure@razorpay */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[
+                styles.rzpOptionCard,
+                selectedTestUpi === 'failure@razorpay' && styles.rzpOptionCardRed,
+              ]}
+              onPress={() => setSelectedTestUpi('failure@razorpay')}
+            >
+              <View style={[styles.rzpOptionIconBox, { backgroundColor: '#FEF2F2' }]}>
+                <Ionicons name="alert-circle-outline" size={20} color="#EF4444" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rzpOptionTitle}>UPI: failure@razorpay</Text>
+                <Text style={[styles.rzpOptionSub, { color: '#DC2626' }]}>
+                  Simulates bank decline / failed payment
+                </Text>
+              </View>
+              {selectedTestUpi === 'failure@razorpay' ? (
+                <Ionicons name="checkmark-circle" size={22} color="#EF4444" />
+              ) : (
+                <View style={styles.rzpRadioCircle} />
+              )}
+            </TouchableOpacity>
+
+            {/* Actions: Cancel & Confirm */}
+            <View style={styles.rzpActionsRow}>
+              <TouchableOpacity
+                style={styles.rzpCancelBtn}
+                onPress={() => setIsRazorpayModalOpen(false)}
+                disabled={isRazorpayVerifying}
+              >
+                <Text style={styles.rzpCancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.rzpPayBtn, isRazorpayVerifying && { opacity: 0.8 }]}
+                onPress={handleProcessRazorpayTest}
+                disabled={isRazorpayVerifying}
+              >
+                {isRazorpayVerifying ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                    <Text style={styles.rzpPayBtnText}>Verifying Payment...</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.rzpPayBtnText}>Pay ₹{finalPayable} via Razorpay</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* Security footer */}
+            <View style={styles.rzpFooterSecurity}>
+              <Ionicons name="lock-closed" size={13} color="#94A3B8" />
+              <Text style={styles.rzpFooterSecurityText}>
+                Secured by Razorpay Payments • 256-bit SSL Encryption
+              </Text>
+            </View>
           </View>
         </View>
       </Modal>
@@ -2329,5 +2658,194 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#047857',
     marginTop: 2,
+  },
+  rzpModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  rzpModalSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+  },
+  rzpSheetHandle: {
+    width: 44,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#CBD5E1',
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  rzpHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  rzpHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  rzpLogoBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#0C2340',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rzpBrandText: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#0C2340',
+  },
+  rzpSubText: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  rzpTestBadge: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  rzpTestBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#B45309',
+    letterSpacing: 0.5,
+  },
+  rzpAmountBox: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+  },
+  rzpAmountPayingTo: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  rzpAmountText: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: '#0F172A',
+    marginVertical: 4,
+  },
+  rzpOrderIdText: {
+    fontSize: 11,
+    color: '#94A3B8',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  rzpSectionTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+    marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  rzpOptionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+    marginBottom: 10,
+    gap: 12,
+  },
+  rzpOptionCardSuccess: {
+    borderColor: '#10B981',
+    backgroundColor: '#ECFDF5',
+  },
+  rzpOptionCardBlue: {
+    borderColor: '#3B82F6',
+    backgroundColor: '#EFF6FF',
+  },
+  rzpOptionCardRed: {
+    borderColor: '#EF4444',
+    backgroundColor: '#FEF2F2',
+  },
+  rzpOptionIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rzpOptionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  rzpOptionSub: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  rzpRadioCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#CBD5E1',
+  },
+  rzpActionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 6,
+  },
+  rzpCancelBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rzpCancelBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  rzpPayBtn: {
+    flex: 2,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#0C2340',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0C2340',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  rzpPayBtnText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  rzpFooterSecurity: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 14,
+  },
+  rzpFooterSecurityText: {
+    fontSize: 11,
+    color: '#94A3B8',
+    fontWeight: '500',
   },
 });
