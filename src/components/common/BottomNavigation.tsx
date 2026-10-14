@@ -45,7 +45,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
     isWomupAppButton?: boolean;
   }[] = [
     { key: 'Home', label: 'Home', icon: 'home' },
-    { key: 'Order Again', label: 'Order Again', icon: 'shopping-basket' },
+    { key: 'Order Again', label: 'Orders', icon: 'shopping-basket' },
     { key: 'Categories', label: 'Categories', icon: 'grid' },
     { key: 'Profile', label: 'Profile', icon: 'user' },
     { key: 'Local Shop', label: 'App', isWomupAppButton: true },
