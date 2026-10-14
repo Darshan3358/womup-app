@@ -14,7 +14,7 @@ import { Store, Lock, KeyRound, ArrowRight, ShieldCheck } from 'lucide-react-nat
 import { COLORS, GRADIENTS } from '../theme';
 import { useVendor } from '../context/VendorAuthContext';
 
-export const LoginScreen: React.FC = () => {
+export const LoginScreen: React.FC<{ onRegisterPress?: () => void }> = ({ onRegisterPress }) => {
   const { login } = useVendor();
   const [loginId, setLoginId] = useState('VND001');
   const [password, setPassword] = useState('admin123');
@@ -98,6 +98,16 @@ export const LoginScreen: React.FC = () => {
               Pre-filled demo credentials: <Text style={{ fontWeight: '800' }}>VND001 (Gokul Vegetables)</Text>
             </Text>
           </View>
+
+          {onRegisterPress && (
+            <TouchableOpacity
+              style={styles.registerLinkBtn}
+              onPress={onRegisterPress}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.registerLinkText}>New Partner? <Text style={styles.registerLinkHighlight}>Register Shop with 4-Step KYC</Text></Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </LinearGradient>
@@ -210,5 +220,20 @@ const styles = StyleSheet.create({
   demoText: {
     fontSize: 11,
     color: '#065F46',
+  },
+  registerLinkBtn: {
+    marginTop: 12,
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  registerLinkText: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  registerLinkHighlight: {
+    color: COLORS.rose,
+    fontWeight: '800',
+    textDecorationLine: 'underline',
   },
 });

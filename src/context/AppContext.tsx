@@ -199,6 +199,8 @@ interface AppContextType {
   authVerificationId: string | null;
   setAuthVerificationId: (id: string | null) => void;
   tempRegistration: {
+    firstName?: string;
+    surname?: string;
     fullName: string;
     email: string;
     phone?: string;
@@ -211,6 +213,8 @@ interface AppContextType {
     sponsorCode?: string;
   };
   setTempRegistration: (data: {
+    firstName?: string;
+    surname?: string;
     fullName: string;
     email: string;
     phone?: string;
@@ -295,6 +299,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, []);
   const [tempRegistration, setTempRegistration] = useState<{
+    firstName?: string;
+    surname?: string;
     fullName: string;
     email: string;
     phone?: string;
@@ -306,6 +312,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     fullNameAsPerAadhaar?: string;
     sponsorCode?: string;
   }>({
+    firstName: '',
+    surname: '',
     fullName: '',
     email: '',
     phone: '',

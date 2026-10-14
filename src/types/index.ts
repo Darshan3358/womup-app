@@ -145,6 +145,8 @@ export interface Order {
 export interface UserProfile {
   id?: string;
   _id?: string;
+  firstName?: string;
+  surname?: string;
   fullName: string;
   phoneNumber: string;
   email: string;
@@ -168,6 +170,14 @@ export interface UserProfile {
   isActiveMember?: boolean;
   direct5ActiveCount?: number;
   teamSize?: number;
+  isBlocked?: number;
+  isSuspended?: number;
+  customerPaymentStatus?: number;
+  customerKycStatus?: number;
+  bankName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  upiId?: string;
 }
 
 

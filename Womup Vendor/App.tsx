@@ -17,17 +17,44 @@ import { TransactionsScreen } from './src/screens/TransactionsScreen';
 import { WalletScreen } from './src/screens/WalletScreen';
 import { AnalyticsScreen } from './src/screens/AnalyticsScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
+import { VendorRegistrationScreen } from './src/screens/VendorRegistrationScreen';
+import { VendorStatusScreen } from './src/screens/VendorStatusScreen';
 
 const MainNavigator: React.FC = () => {
-  const { isLoggedIn, activeTab, isQRModalVisible, setIsQRModalVisible } = useVendor();
+  const { isLoggedIn, activeTab, isQRModalVisible, setIsQRModalVisible, vendor } = useVendor();
   const [showSplash, setShowSplash] = React.useState(true);
+  const [showRegistration, setShowRegistration] = React.useState(false);
 
   if (showSplash) {
     return <SplashScreen onFinish={() => setShowSplash(false)} />;
   }
 
+  if (showRegistration) {
+    return (
+      <VendorRegistrationScreen
+        onCancel={() => setShowRegistration(false)}
+        onSuccess={() => setShowRegistration(false)}
+      />
+    );
+  }
+
   if (!isLoggedIn) {
-    return <LoginScreen />;
+    return <LoginScreen onRegisterPress={() => setShowRegistration(true)} />;
+  }
+
+  // Check vendor status workflow and security flags
+  const isBlocked = vendor?.isBlocked === 1;
+  const isSuspended = vendor?.isSuspended === 1;
+  const isPending = vendor?.vendorStatus === 1 || (!vendor?.isVerified && vendor?.vendorStatus !== 2);
+  const isRejected = vendor?.vendorStatus === 3;
+
+  if (isBlocked || isSuspended || isPending || isRejected) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        <StatusBar barStyle="light-content" backgroundColor={COLORS.navy} />
+        <VendorStatusScreen onResubmit={() => setShowRegistration(true)} />
+      </SafeAreaView>
+    );
   }
 
   const renderActiveScreen = () => {

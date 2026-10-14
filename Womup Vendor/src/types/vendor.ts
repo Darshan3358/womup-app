@@ -27,11 +27,56 @@ export interface VendorProfile {
   monthlyRevenue: number;
   upiId: string;
   qrCodeUrl?: string;
-  qrCodeData?: string;
   walletBalance: number;
   pendingBalance: number;
   isVerified: boolean;
   isActive: boolean;
+
+  // ── tbl_vendor SQL Fields ──
+  vendorStatus?: number; // 1: Pending, 2: Active, 3: Rejected
+  vendorRejectReason?: string;
+  isBlocked?: number;
+  isSuspended?: number;
+  blockReason?: string;
+  vendorFirmName?: string;
+  vendorOwnerName?: string;
+  vendorBalance?: number;
+  vendorAdminBalance?: number;
+  vendorPayableToAdmin?: number;
+  businessType?: string;
+  vendorGstNo?: string;
+  vendorMobile?: string;
+  vendorAlternateMobile?: string;
+  vendorEmail?: string;
+  vendorAadharNo?: string;
+  businessAddress?: string;
+  businessLandmark?: string;
+  businessPincode?: string;
+  talukaId?: string;
+  districtId?: string;
+  stateId?: string;
+  countryId?: string;
+  bankName?: string;
+  bankBranch?: string;
+  accountHolderName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  bankAccount?: {
+    bankName?: string;
+    bankBranch?: string;
+    accountHolderName?: string;
+    accountNumber?: string;
+    ifscCode?: string;
+  };
+  cancelledChequeImage?: string;
+  vendorAadharFrontImage?: string;
+  vendorAadharBackImage?: string;
+  gstCertificateImage?: string;
+  tradeLicenseImage?: string;
+  panCardImage?: string;
+  businessCardImage?: string;
+  shopPhotoImage?: string;
+  ownerPhotoImage?: string;
 }
 
 export interface CollectionRequest {

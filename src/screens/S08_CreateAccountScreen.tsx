@@ -40,6 +40,8 @@ export const S08_CreateAccountScreen: React.FC = () => {
     authVerificationId,
     tempRegistration,
   } = useApp();
+  const [firstName, setFirstName] = useState(user.firstName || (user.fullName ? user.fullName.split(' ')[0] : ''));
+  const [surname, setSurname] = useState(user.surname || (user.fullName ? user.fullName.split(' ').slice(1).join(' ') : ''));
   const [fullName, setFullName] = useState(user.fullName || '');
   const [email, setEmail] = useState(user.email || '');
   const [phone, setPhone] = useState(user.phoneNumber || '');
@@ -71,6 +73,8 @@ export const S08_CreateAccountScreen: React.FC = () => {
 
   const [errors, setErrors] = useState<{
     name?: string;
+    firstName?: string;
+    surname?: string;
     email?: string;
     phone?: string;
     sponsor?: string;
@@ -165,6 +169,8 @@ export const S08_CreateAccountScreen: React.FC = () => {
 
     const newErrors: {
       name?: string;
+      firstName?: string;
+      surname?: string;
       email?: string;
       phone?: string;
       sponsor?: string;
@@ -177,7 +183,10 @@ export const S08_CreateAccountScreen: React.FC = () => {
       newErrors.timing = timingMessage || 'New registrations are closed between 10:00 PM and 6:00 AM IST.';
     }
 
-    if (!fullName.trim()) newErrors.name = 'Please enter your full name as per Aadhaar';
+    if (!firstName.trim()) newErrors.firstName = 'Please enter your first name';
+    if (!surname.trim()) newErrors.surname = 'Please enter your surname';
+    const computedName = `${firstName.trim()} ${surname.trim()}`.trim();
+
     if (!email.trim() || !email.includes('@')) newErrors.email = 'Please enter a valid email address';
 
     const cleanPhone = phone.replace(/\D/g, '');
@@ -213,8 +222,10 @@ export const S08_CreateAccountScreen: React.FC = () => {
 
     setUser({
       ...user,
-      fullName: fullName.trim(),
-      fullNameAsPerAadhaar: fullName.trim(),
+      firstName: firstName.trim(),
+      surname: surname.trim(),
+      fullName: computedName,
+      fullNameAsPerAadhaar: computedName,
       email: email.trim(),
       phoneNumber: cleanPhone,
       registrationPincode: cleanPin,
@@ -228,8 +239,10 @@ export const S08_CreateAccountScreen: React.FC = () => {
     });
 
     setTempRegistration({
-      fullName: fullName.trim(),
-      fullNameAsPerAadhaar: fullName.trim(),
+      firstName: firstName.trim(),
+      surname: surname.trim(),
+      fullName: computedName,
+      fullNameAsPerAadhaar: computedName,
       email: email.trim(),
       phone: cleanPhone,
       pincode: cleanPin,
@@ -363,27 +376,48 @@ export const S08_CreateAccountScreen: React.FC = () => {
             </View>
           </View>
 
-          {/* Full Name (As per Aadhaar) Input */}
+          {/* Split Name Fields: First Name + Surname */}
           <View style={styles.labelRow}>
             <Text style={styles.label}>
-              Full Name (As per Aadhaar) <Text style={styles.requiredAsterisk}>*</Text>
+              First Name <Text style={styles.requiredAsterisk}>*</Text>
             </Text>
           </View>
-          <Text style={styles.fieldHelper}>Enter your legal name as on your Aadhaar card for verification</Text>
-          <View style={[styles.inputContainer, errors.name ? styles.inputError : null]}>
+          <View style={[styles.inputContainer, errors.firstName ? styles.inputError : null]}>
             <Ionicons name="person-outline" size={18} color={COLORS.textMuted} style={styles.inputIcon} />
             <TextInput
               style={styles.input}
-              placeholder="e.g. Ramesh Kumar Patel"
+              placeholder="e.g. Ramesh"
               placeholderTextColor={COLORS.secondaryText}
-              value={fullName}
+              value={firstName}
               onChangeText={(text) => {
-                setFullName(text);
-                if (errors.name) setErrors({ ...errors, name: undefined });
+                setFirstName(text);
+                setFullName(`${text} ${surname}`.trim());
+                if (errors.firstName) setErrors({ ...errors, firstName: undefined });
               }}
             />
           </View>
-          {errors.name ? <Text style={styles.errorText}>{errors.name}</Text> : null}
+          {errors.firstName ? <Text style={styles.errorText}>{errors.firstName}</Text> : null}
+
+          <View style={[styles.labelRow, { marginTop: 12 }]}>
+            <Text style={styles.label}>
+              Surname <Text style={styles.requiredAsterisk}>*</Text>
+            </Text>
+          </View>
+          <View style={[styles.inputContainer, errors.surname ? styles.inputError : null]}>
+            <Ionicons name="person-outline" size={18} color={COLORS.textMuted} style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. Patel"
+              placeholderTextColor={COLORS.secondaryText}
+              value={surname}
+              onChangeText={(text) => {
+                setSurname(text);
+                setFullName(`${firstName} ${text}`.trim());
+                if (errors.surname) setErrors({ ...errors, surname: undefined });
+              }}
+            />
+          </View>
+          {errors.surname ? <Text style={styles.errorText}>{errors.surname}</Text> : null}
 
           {/* Verified Email Input */}
           <View style={styles.labelRow}>
