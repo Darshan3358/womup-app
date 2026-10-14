@@ -148,17 +148,50 @@ export class LocalShopsController {
     return { success: true, ...result };
   }
 
-  @Post('admin/vendors/:id/verify-kyc')
-  @ApiOperation({ summary: 'Approve vendor KYC' })
-  async adminVerifyKyc(@Param('id') id: string) {
-    const result = await this.localShopsService.adminVerifyKyc(id);
+  @Get('admin/vendors/pending')
+  @ApiOperation({ summary: 'Get list of pending vendor registrations awaiting KYC approval' })
+  async adminGetPendingVendors(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+  ): Promise<any> {
+    return this.localShopsService.adminGetPendingVendors({
+      page: page ? Number(page) : 1,
+      limit: limit ? Number(limit) : 20,
+      search,
+    });
+  }
+
+  @Get('admin/vendors/:id/kyc-review')
+  @ApiOperation({ summary: 'Get comprehensive vendor KYC review data (9 docs, owner, location, bank)' })
+  async adminGetVendorKycReview(@Param('id') id: string): Promise<any> {
+    return this.localShopsService.adminGetVendorKycReview(id);
+  }
+
+  @Post(['admin/vendors/:id/verify-kyc', 'admin/vendors/:id/approve'])
+  @ApiOperation({ summary: 'Approve vendor KYC & activate account with QR generation' })
+  async adminVerifyKyc(
+    @Param('id') id: string,
+    @Body('shoppingCoinPercent') shoppingCoinPercent?: number,
+    @Body('platformCommissionPercent') platformCommissionPercent?: number,
+    @Body('adminId') adminId?: string,
+  ) {
+    const result = await this.localShopsService.adminVerifyKyc(id, {
+      shoppingCoinPercent: shoppingCoinPercent !== undefined ? Number(shoppingCoinPercent) : undefined,
+      platformCommissionPercent: platformCommissionPercent !== undefined ? Number(platformCommissionPercent) : undefined,
+      adminId,
+    });
     return { success: true, ...result };
   }
 
-  @Post('admin/vendors/:id/reject-kyc')
-  @ApiOperation({ summary: 'Reject vendor KYC' })
-  async adminRejectKyc(@Param('id') id: string, @Body('reason') reason?: string) {
-    const result = await this.localShopsService.adminRejectKyc(id, reason);
+  @Post(['admin/vendors/:id/reject-kyc', 'admin/vendors/:id/reject'])
+  @ApiOperation({ summary: 'Reject vendor KYC with mandatory reason' })
+  async adminRejectKyc(
+    @Param('id') id: string,
+    @Body('reason') reason?: string,
+    @Body('adminId') adminId?: string,
+  ) {
+    const result = await this.localShopsService.adminRejectKyc(id, reason, adminId);
     return { success: true, ...result };
   }
 

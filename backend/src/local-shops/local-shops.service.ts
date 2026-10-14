@@ -595,24 +595,152 @@ export class LocalShopsService implements OnModuleInit {
     return { success: true, message: 'Vendor soft deleted' };
   }
 
-  async adminVerifyKyc(id: string) {
+  async adminVerifyKyc(
+    id: string,
+    options?: {
+      shoppingCoinPercent?: number;
+      platformCommissionPercent?: number;
+      adminId?: string;
+    },
+  ) {
     const vendor = await this.vendorModel.findById(id);
     if (!vendor) throw new NotFoundException('Vendor not found');
     vendor.isVerified = true;
     vendor.vendorStatus = 2; // Active
     vendor.vendorRejectReason = '';
+    vendor.vendorJoiningDate = new Date();
+    vendor.approvedAt = new Date();
+    if (options?.adminId) vendor.approvedBy = options.adminId;
+
+    if (options?.shoppingCoinPercent !== undefined && options.shoppingCoinPercent > 0) {
+      vendor.shoppingCoinPercent = options.shoppingCoinPercent;
+      vendor.vendorCustomerPersantage = options.shoppingCoinPercent;
+    }
+    if (options?.platformCommissionPercent !== undefined && options.platformCommissionPercent >= 0) {
+      vendor.platformCommissionPercent = options.platformCommissionPercent;
+      vendor.vendorPersantage = options.platformCommissionPercent;
+    }
+
+    const code = vendor.vendorCode || `VND${vendor._id.toString().slice(-6).toUpperCase()}`;
+    vendor.vendorCode = code;
+    vendor.vendorQrLink = `womup://vendor/${code}`;
+    vendor.vendorQrImageLink = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=womup://vendor/${code}`;
     await vendor.save();
-    return { success: true, message: 'Vendor KYC approved and status set to Active', vendorStatus: 2 };
+
+    if (this.trackingGateway) {
+      this.trackingGateway.emitVendorStatusChanged?.(vendor._id.toString(), {
+        vendorStatus: 2,
+        isVerified: true,
+        qrLink: vendor.vendorQrLink,
+        shoppingCoinPercent: vendor.shoppingCoinPercent,
+      });
+    }
+
+    return {
+      success: true,
+      message: 'Vendor KYC approved and status set to Active',
+      data: vendor,
+      vendorStatus: 2,
+    };
   }
 
-  async adminRejectKyc(id: string, reason?: string) {
+  async adminRejectKyc(id: string, reason?: string, adminId?: string) {
     const vendor = await this.vendorModel.findById(id);
     if (!vendor) throw new NotFoundException('Vendor not found');
+    const rejectReason = reason || 'Documentation incomplete';
     vendor.isVerified = false;
     vendor.vendorStatus = 3; // Reject
-    vendor.vendorRejectReason = reason || 'Documentation incomplete';
+    vendor.vendorRejectReason = rejectReason;
+    vendor.rejectedAt = new Date();
+    if (adminId) vendor.rejectedBy = adminId;
     await vendor.save();
-    return { success: true, message: `Vendor KYC rejected: ${vendor.vendorRejectReason}`, vendorStatus: 3 };
+
+    if (this.trackingGateway) {
+      this.trackingGateway.emitVendorStatusChanged?.(vendor._id.toString(), {
+        vendorStatus: 3,
+        isVerified: false,
+        rejectReason,
+      });
+    }
+
+    return {
+      success: true,
+      message: `Vendor KYC rejected: ${rejectReason}`,
+      data: vendor,
+      vendorStatus: 3,
+    };
+  }
+
+  async adminGetPendingVendors(filter?: { page?: number; limit?: number; search?: string }): Promise<any> {
+    const query: any = {
+      isDeleted: { $ne: true },
+      $or: [
+        { vendorStatus: 1 },
+        { vendor_status: 1 },
+        { isVerified: false },
+      ],
+    };
+
+    if (filter?.search) {
+      query.$and = [
+        {
+          $or: [
+            { storeName: { $regex: filter.search, $options: 'i' } },
+            { vendorFirmName: { $regex: filter.search, $options: 'i' } },
+            { vendorOwnerName: { $regex: filter.search, $options: 'i' } },
+            { ownerPhone: { $regex: filter.search, $options: 'i' } },
+            { vendorCode: { $regex: filter.search, $options: 'i' } },
+          ],
+        },
+      ];
+    }
+
+    const page = filter?.page || 1;
+    const limit = filter?.limit || 20;
+    const skip = (page - 1) * limit;
+
+    const [items, total] = await Promise.all([
+      this.vendorModel.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      this.vendorModel.countDocuments(query),
+    ]);
+
+    return {
+      success: true,
+      data: items,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async adminGetVendorKycReview(id: string): Promise<any> {
+    const vendor = (await this.vendorModel.findById(id).lean()) as any;
+    if (!vendor) throw new NotFoundException('Vendor not found');
+
+    const docFields = [
+      vendor.vendor_aadhar_front_image || vendor.aadharFrontImage,
+      vendor.vendor_aadhar_back_image || vendor.aadharBackImage,
+      vendor.pan_card_image || vendor.panCardImage,
+      vendor.gst_certificate_image || vendor.gstCertificateImage,
+      vendor.trade_license_image || vendor.tradeLicenseImage,
+      vendor.cancelled_cheque_image || vendor.cancelledChequeImage,
+      vendor.business_card_image || vendor.businessCardImage,
+      vendor.shop_photo_image || vendor.shopPhotoImage,
+      vendor.owner_photo_image || vendor.ownerPhotoImage,
+    ];
+    const uploadedDocsCount = docFields.filter(Boolean).length;
+
+    return {
+      success: true,
+      data: {
+        ...vendor,
+        uploadedDocsCount,
+        totalDocsCount: 9,
+      },
+    };
   }
 
   async adminBlockVendor(id: string, isBlocked: number, reason?: string) {

@@ -839,6 +839,14 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
       this.logger.log(`[WebSocket] Emitted collection_rejected for request ${payload?.requestId}`);
     }
   }
+
+  emitVendorStatusChanged(vendorId: string, payload: any) {
+    if (this.server && vendorId) {
+      this.server.to(`vendor_${vendorId}`).emit('vendor_status_changed', payload);
+      this.server.emit('admin_vendor_status_changed', { vendorId, ...payload });
+      this.logger.log(`[WebSocket] Emitted vendor_status_changed to vendor_${vendorId}`);
+    }
+  }
 }
 
 

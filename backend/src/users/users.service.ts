@@ -252,73 +252,7 @@ export class UsersService {
     await user.save();
 
     // ── 3-Tier Multi-Level Distribution (App Download Income + Shopping Coin Income) ──
-    const TIERS = [
-      { level: 1, appIncome: 20, coinIncome: 400 },
-      { level: 2, appIncome: 10, coinIncome: 400 },
-      { level: 3, appIncome: 5,  coinIncome: 300 },
-    ];
-
-    let currentSponsorId: Types.ObjectId | undefined = user.referredBy || (user.isCompanySponsored ? undefined : user.sponsorId);
-
-    for (const tier of TIERS) {
-      if (!currentSponsorId) break;
-
-      const sponsor = await this.userModel.findById(currentSponsorId);
-      if (!sponsor || sponsor.isCompanyAccount) break;
-
-      // Business Rule: ONLY VERIFIED members receive App Download Income & Coin Income
-      const isVerifiedSponsor = sponsor.verificationStatus === 'VERIFIED' && sponsor.aadhaarVerified;
-
-      if (isVerifiedSponsor) {
-        // 1. App Download Income (To pendingIncome, locked until midnight/24h)
-        await this.incomeTxModel.create({
-          userId: sponsor._id,
-          type: 'APP_DOWNLOAD',
-          amount: tier.appIncome,
-          sourceUserId: user._id,
-          sourceVerificationStatus: 'VERIFIED',
-          earnedAt: new Date(),
-          availableFrom: this.getNextMidnight(),
-          status: 'PENDING',
-          description: `Level ${tier.level} App Download Income from verified referral: ${user.fullNameAsPerAadhaar}`,
-        });
-
-        sponsor.pendingIncome = (sponsor.pendingIncome || 0) + tier.appIncome;
-        sponsor.appDownloadIncome = (sponsor.appDownloadIncome || 0) + tier.appIncome;
-        if (tier.level === 1) {
-          sponsor.verifiedReferralsCount = (sponsor.verifiedReferralsCount || 0) + 1;
-        }
-
-        // 2. Shopping Coin Income (One-time tier coins credited directly to shoppingCoins)
-        if (tier.coinIncome > 0) {
-          const coinBefore = sponsor.shoppingCoins || 0;
-          sponsor.shoppingCoins = coinBefore + tier.coinIncome;
-
-          await this.coinTxModel.create({
-            userId: sponsor._id,
-            type: 'EARN',
-            coins: tier.coinIncome,
-            balanceBefore: coinBefore,
-            balanceAfter: sponsor.shoppingCoins,
-            referenceType: 'TIER_COIN_INCOME',
-            description: `Level ${tier.level} Referral Shopping Coins Bonus from ${user.fullNameAsPerAadhaar}`,
-          });
-        }
-
-        await sponsor.save();
-
-        this.trackingGateway.emitWalletUpdated(sponsor._id.toString(), {
-          pendingIncome: sponsor.pendingIncome,
-          availableIncome: sponsor.availableIncome,
-          appDownloadIncome: sponsor.appDownloadIncome,
-          shoppingCoins: sponsor.shoppingCoins,
-          verifiedReferralsCount: sponsor.verifiedReferralsCount,
-        });
-      }
-
-      // Move up to the next upline sponsor in the tree
-      currentSponsorId = sponsor.referredBy || (sponsor.isCompanySponsored ? undefined : sponsor.sponsorId);
-    }
+    await this.distributeKycRewards(user);
 
     // Emit live update for this user
     this.trackingGateway.emitWalletUpdated(userId, {
@@ -743,9 +677,160 @@ export class UsersService {
     };
   }
 
+  async distributeKycRewards(user: any) {
+    const TIERS = [
+      { level: 1, appIncome: 20, coinIncome: 400 },
+      { level: 2, appIncome: 10, coinIncome: 400 },
+      { level: 3, appIncome: 5,  coinIncome: 300 },
+    ];
+
+    let currentSponsorId: Types.ObjectId | undefined = user.referredBy || (user.isCompanySponsored ? undefined : user.sponsorId);
+
+    for (const tier of TIERS) {
+      if (!currentSponsorId) break;
+
+      const sponsor = await this.userModel.findById(currentSponsorId);
+      if (!sponsor || sponsor.isCompanyAccount) break;
+
+      // Business Rule: ONLY VERIFIED members receive App Download Income & Coin Income
+      const isVerifiedSponsor = sponsor.verificationStatus === 'VERIFIED' && sponsor.aadhaarVerified;
+
+      if (isVerifiedSponsor) {
+        // 1. App Download Income (To pendingIncome, locked until midnight/24h)
+        await this.incomeTxModel.create({
+          userId: sponsor._id,
+          type: 'APP_DOWNLOAD',
+          amount: tier.appIncome,
+          sourceUserId: user._id,
+          sourceVerificationStatus: 'VERIFIED',
+          earnedAt: new Date(),
+          availableFrom: this.getNextMidnight(),
+          status: 'PENDING',
+          description: `Level ${tier.level} App Download Income from verified referral: ${user.fullNameAsPerAadhaar || user.name}`,
+        });
+
+        sponsor.pendingIncome = (sponsor.pendingIncome || 0) + tier.appIncome;
+        sponsor.appDownloadIncome = (sponsor.appDownloadIncome || 0) + tier.appIncome;
+        if (tier.level === 1) {
+          sponsor.verifiedReferralsCount = (sponsor.verifiedReferralsCount || 0) + 1;
+        }
+
+        // 2. Shopping Coin Income (One-time tier coins credited directly to shoppingCoins)
+        if (tier.coinIncome > 0) {
+          const coinBefore = sponsor.shoppingCoins || 0;
+          sponsor.shoppingCoins = coinBefore + tier.coinIncome;
+
+          await this.coinTxModel.create({
+            userId: sponsor._id,
+            type: 'EARN',
+            coins: tier.coinIncome,
+            balanceBefore: coinBefore,
+            balanceAfter: sponsor.shoppingCoins,
+            referenceType: 'TIER_COIN_INCOME',
+            description: `Level ${tier.level} Referral Shopping Coins Bonus from ${user.fullNameAsPerAadhaar || user.name}`,
+          });
+        }
+
+        await sponsor.save();
+
+        this.trackingGateway.emitWalletUpdated(sponsor._id.toString(), {
+          pendingIncome: sponsor.pendingIncome,
+          availableIncome: sponsor.availableIncome,
+          appDownloadIncome: sponsor.appDownloadIncome,
+          shoppingCoins: sponsor.shoppingCoins,
+          verifiedReferralsCount: sponsor.verifiedReferralsCount,
+        });
+      }
+
+      currentSponsorId = sponsor.referredBy || (sponsor.isCompanySponsored ? undefined : sponsor.sponsorId);
+    }
+  }
+
+  async adminGetPendingCustomerKyc(filter?: { page?: number; limit?: number; search?: string }): Promise<any> {
+    const query: any = {
+      $or: [
+        { customerKycStatus: 1 },
+        { customerIsVerify: 2 },
+        { verificationStatus: 'NON_VERIFIED' },
+      ],
+    };
+
+    if (filter?.search) {
+      query.$and = [
+        {
+          $or: [
+            { name: { $regex: filter.search, $options: 'i' } },
+            { customer_first_name: { $regex: filter.search, $options: 'i' } },
+            { customer_surname: { $regex: filter.search, $options: 'i' } },
+            { phone: { $regex: filter.search, $options: 'i' } },
+            { referralCode: { $regex: filter.search, $options: 'i' } },
+            { customer_code: { $regex: filter.search, $options: 'i' } },
+          ],
+        },
+      ];
+    }
+
+    const page = filter?.page || 1;
+    const limit = filter?.limit || 20;
+    const skip = (page - 1) * limit;
+
+    const [items, total] = await Promise.all([
+      this.userModel.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      this.userModel.countDocuments(query),
+    ]);
+
+    return {
+      success: true,
+      data: items,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async adminGetCustomerKycReview(id: string): Promise<any> {
+    const customer = (await this.userModel.findById(id).lean()) as any;
+    if (!customer) throw new NotFoundException('Customer not found');
+
+    let sponsor: any = null;
+    const sponsorRef = customer.referredBy || customer.sponsorId;
+    if (sponsorRef) {
+      sponsor = await this.userModel.findById(sponsorRef, 'name customer_first_name customer_surname phone referralCode sponsorCode customer_code').lean();
+    }
+
+    const rawAadhaar = customer.aadhaarNumber || customer.customer_aadhar_no || '';
+    const maskedAadhaar = rawAadhaar.length >= 4 
+      ? `XXXX XXXX ${rawAadhaar.slice(-4)}` 
+      : (rawAadhaar ? 'XXXX XXXX XXXX' : 'Not Provided');
+
+    const rawBankAcc = customer.bankAccountNo || customer.account_number || '';
+    const maskedAccount = rawBankAcc.length >= 4
+      ? `XXXX XXXX ${rawBankAcc.slice(-4)}`
+      : (rawBankAcc ? 'XXXX XXXX' : 'Not Provided');
+
+    return {
+      success: true,
+      data: {
+        ...customer,
+        maskedAadhaar,
+        maskedAccount,
+        sponsor,
+        documents: {
+          frontImage: customer.customer_image_aadhar_front || customer.aadharFrontImage || '',
+          backImage: customer.customer_image_aadhar_back || customer.aadharBackImage || '',
+        },
+      },
+    };
+  }
+
   async adminApproveCustomerKyc(id: string) {
     const customer = await this.userModel.findById(id);
     if (!customer) throw new NotFoundException('Customer not found');
+
+    const wasAlreadyVerified = customer.customerKycStatus === 2 && customer.aadhaarVerified;
 
     customer.customerKycStatus = 2; // Confirmed
     customer.customerIsVerify = 1; // Yes
@@ -755,14 +840,19 @@ export class UsersService {
     customer.verifiedAt = new Date();
     await customer.save();
 
+    if (!wasAlreadyVerified) {
+      await this.distributeKycRewards(customer);
+    }
+
     this.trackingGateway.emitWalletUpdated(customer._id.toString(), {
       verificationStatus: 'VERIFIED',
       aadhaarVerified: true,
+      customerKycStatus: 2,
     });
 
     return {
       success: true,
-      message: 'Customer KYC approved successfully',
+      message: 'Customer KYC approved successfully, verification unlocked, and sponsor rewards credited',
       data: customer,
     };
   }
@@ -781,6 +871,7 @@ export class UsersService {
     this.trackingGateway.emitWalletUpdated(customer._id.toString(), {
       verificationStatus: 'NON_VERIFIED',
       aadhaarVerified: false,
+      customerKycStatus: 3,
     });
 
     return {

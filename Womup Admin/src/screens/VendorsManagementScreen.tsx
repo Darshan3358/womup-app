@@ -37,6 +37,7 @@ import {
 import { COLORS, GRADIENTS, RADIUS, SPACING } from '../theme';
 import { ApiService } from '../services/api';
 import { VendorAdminItem, VendorCategoryItem } from '../types/admin';
+import { VendorKycReviewModal } from './modals/VendorKycReviewModal';
 
 export const VendorsManagementScreen: React.FC = () => {
   const [vendors, setVendors] = useState<VendorAdminItem[]>([]);
@@ -83,6 +84,7 @@ export const VendorsManagementScreen: React.FC = () => {
   // Status Filter & QR Modal
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'DISABLED' | 'KYC_PENDING'>('ALL');
   const [qrVendor, setQrVendor] = useState<VendorAdminItem | null>(null);
+  const [reviewVendorId, setReviewVendorId] = useState<string | null>(null);
 
   // Analytics KPI Summary
   const [analytics, setAnalytics] = useState({
@@ -601,16 +603,14 @@ export const VendorsManagementScreen: React.FC = () => {
                       </Text>
                     </TouchableOpacity>
 
-                    {!vendor.isVerified && (
-                      <TouchableOpacity
-                        style={styles.actionBtnOutline}
-                        onPress={() => handleVerifyKyc(vendor)}
-                      >
-                        <Text style={[styles.actionBtnOutlineText, { color: '#2563EB' }]}>
-                          Verify KYC
-                        </Text>
-                      </TouchableOpacity>
-                    )}
+                    <TouchableOpacity
+                      style={styles.actionBtnOutline}
+                      onPress={() => setReviewVendorId((vendor as any)._id || vendor.id)}
+                    >
+                      <Text style={[styles.actionBtnOutlineText, { color: !vendor.isVerified ? '#2563EB' : '#10B981' }]}>
+                        {!vendor.isVerified ? 'Review KYC' : 'View KYC'}
+                      </Text>
+                    </TouchableOpacity>
 
                     <TouchableOpacity
                       style={styles.actionBtnPrimary}
@@ -1068,6 +1068,13 @@ export const VendorsManagementScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+      <VendorKycReviewModal
+        isOpen={!!reviewVendorId}
+        vendorId={reviewVendorId}
+        onClose={() => setReviewVendorId(null)}
+        onApproved={fetchVendorsData}
+        onRejected={fetchVendorsData}
+      />
     </View>
   );
 };

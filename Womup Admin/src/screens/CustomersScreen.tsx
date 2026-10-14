@@ -40,6 +40,7 @@ import { COLORS, RADIUS, SPACING } from '../theme';
 import { useAdminState } from '../context/AdminStateContext';
 import { Customer, DeliveryPartnerItem } from '../types/admin';
 import { ApiService } from '../services/api';
+import { CustomerKycReviewModal } from './modals/CustomerKycReviewModal';
 
 interface RiderEditForm {
   name: string;
@@ -76,6 +77,7 @@ export const CustomersScreen: React.FC = () => {
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const [citySearch, setCitySearch] = useState('');
   const [areaSearch, setAreaSearch] = useState('');
+  const [reviewCustomerId, setReviewCustomerId] = useState<string | null>(null);
 
   // 1. Resolve Active Cities
   const activeCities = cities.filter((c) => c.status === 'Active' || !c.status);
@@ -476,6 +478,15 @@ export const CustomersScreen: React.FC = () => {
                 <View style={styles.rightCol}>
                   <Text style={styles.spendAmount}>₹{c.spend.toLocaleString()}</Text>
                   <Text style={styles.orderCount}>{c.totalOrders} orders</Text>
+                  <TouchableOpacity
+                    style={styles.reviewKycPill}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      setReviewCustomerId((c as any)._id || c.id);
+                    }}
+                  >
+                    <Text style={styles.reviewKycPillText}>Review KYC</Text>
+                  </TouchableOpacity>
                   <ChevronRight size={18} color={COLORS.secondaryText} style={{ marginTop: 4 }} />
                 </View>
               </TouchableOpacity>
@@ -1182,11 +1193,31 @@ export const CustomersScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      <CustomerKycReviewModal
+        isOpen={!!reviewCustomerId}
+        customerId={reviewCustomerId}
+        onClose={() => setReviewCustomerId(null)}
+      />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  reviewKycPill: {
+    backgroundColor: '#064E3B',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: '#059669',
+  },
+  reviewKycPillText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#34D399',
+  },
   filtersBar: {
     flexDirection: 'row',
     gap: 6,

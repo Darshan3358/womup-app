@@ -1729,6 +1729,95 @@ export const ApiService = {
       return { success: false, error: err.message || 'Network error during admin login' };
     }
   },
+
+  // 54. VENDOR KYC REVIEW & APPROVALS
+  async getVendorKycReview(id: string): Promise<any> {
+    try {
+      const res = await fetch(`${NEST_API_BASE_URL}/admin/vendors/${id}/kyc-review`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed fetching vendor KYC review' };
+    }
+  },
+
+  async approveVendorKyc(
+    id: string,
+    options?: { shoppingCoinPercent?: number; platformCommissionPercent?: number }
+  ): Promise<any> {
+    try {
+      const res = await fetch(`${NEST_API_BASE_URL}/admin/vendors/${id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(options || {}),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed approving vendor KYC' };
+    }
+  },
+
+  async getPendingVendors(params?: { search?: string; page?: number; limit?: number }): Promise<any> {
+    try {
+      const q = new URLSearchParams();
+      if (params?.search) q.append('search', params.search);
+      if (params?.page) q.append('page', String(params.page));
+      if (params?.limit) q.append('limit', String(params.limit));
+      const url = `${NEST_API_BASE_URL}/admin/vendors/pending${q.toString() ? `?${q.toString()}` : ''}`;
+      const res = await fetch(url);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed fetching pending vendors' };
+    }
+  },
+
+  // 55. CUSTOMER KYC REVIEW & APPROVALS
+  async getCustomerKycReview(id: string): Promise<any> {
+    try {
+      const res = await fetch(`${NEST_API_BASE_URL}/admin/customers/${id}/kyc-review`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed fetching customer KYC review' };
+    }
+  },
+
+  async approveCustomerKyc(id: string): Promise<any> {
+    try {
+      const res = await fetch(`${NEST_API_BASE_URL}/admin/customers/${id}/approve-kyc`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed approving customer KYC' };
+    }
+  },
+
+  async rejectCustomerKyc(id: string, reason?: string): Promise<any> {
+    try {
+      const res = await fetch(`${NEST_API_BASE_URL}/admin/customers/${id}/reject-kyc`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed rejecting customer KYC' };
+    }
+  },
+
+  async getPendingCustomerKyc(params?: { search?: string; page?: number; limit?: number }): Promise<any> {
+    try {
+      const q = new URLSearchParams();
+      if (params?.search) q.append('search', params.search);
+      if (params?.page) q.append('page', String(params.page));
+      if (params?.limit) q.append('limit', String(params.limit));
+      const url = `${NEST_API_BASE_URL}/admin/customers/kyc/pending${q.toString() ? `?${q.toString()}` : ''}`;
+      const res = await fetch(url);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed fetching pending customer KYC' };
+    }
+  },
 };
 
 

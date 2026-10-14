@@ -310,6 +310,18 @@ export class Vendor {
   @Prop({ default: '' })
   addedBy?: string;
 
+  @Prop()
+  approvedAt?: Date;
+
+  @Prop({ default: '' })
+  approvedBy?: string;
+
+  @Prop()
+  rejectedAt?: Date;
+
+  @Prop({ default: '' })
+  rejectedBy?: string;
+
   // Security Flags: 1 = Blocked, 0 = Active
   @Prop({ default: 0 })
   isSuspended: number;

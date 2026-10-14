@@ -37,19 +37,39 @@ export class AdminCustomersController {
     });
   }
 
+  @Get('kyc/pending')
+  @ApiOperation({ summary: 'List all customers with pending KYC verification' })
+  async getPendingKyc(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+  ): Promise<any> {
+    return this.usersService.adminGetPendingCustomerKyc({
+      page: page ? Number(page) : 1,
+      limit: limit ? Number(limit) : 20,
+      search,
+    });
+  }
+
+  @Get(':id/kyc-review')
+  @ApiOperation({ summary: 'Get customer KYC review details with masked fields and document images' })
+  async getCustomerKycReview(@Param('id') id: string): Promise<any> {
+    return this.usersService.adminGetCustomerKycReview(id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get full customer details, KYC images, bank details, and downline summary' })
   async getCustomerById(@Param('id') id: string): Promise<any> {
     return this.usersService.adminGetCustomerById(id);
   }
 
-  @Post(':id/kyc-approve')
-  @ApiOperation({ summary: 'Approve customer Aadhaar / KYC' })
+  @Post([':id/kyc-approve', ':id/approve-kyc', ':id/approve'])
+  @ApiOperation({ summary: 'Approve customer Aadhaar / KYC and release sponsor download income' })
   async approveKyc(@Param('id') id: string) {
     return this.usersService.adminApproveCustomerKyc(id);
   }
 
-  @Post(':id/kyc-reject')
+  @Post([':id/kyc-reject', ':id/reject-kyc', ':id/reject'])
   @ApiOperation({ summary: 'Reject customer KYC with reason' })
   async rejectKyc(@Param('id') id: string, @Body('reason') reason?: string) {
     return this.usersService.adminRejectCustomerKyc(id, reason);
