@@ -191,7 +191,14 @@ export class UsersService {
   // ── Aadhaar Verification & Referral Income ──────────────────────────
   async verifyAadhaar(
     userId: string,
-    dto: { aadhaarNumber: string; fullNameAsPerAadhaar: string },
+    dto: {
+      aadhaarNumber: string;
+      fullNameAsPerAadhaar: string;
+      customer_image_aadhar_front?: string;
+      customer_image_aadhar_back?: string;
+      aadhaarFrontImage?: string;
+      aadhaarBackImage?: string;
+    },
   ) {
     const user = await this.userModel.findById(userId);
     if (!user) {
@@ -221,6 +228,8 @@ export class UsersService {
           shoppingCoins: user.shoppingCoins,
           availableIncome: user.availableIncome,
           pendingIncome: user.pendingIncome,
+          customer_image_aadhar_front: user.customer_image_aadhar_front,
+          customer_image_aadhar_back: user.customer_image_aadhar_back,
         },
       };
     }
@@ -230,6 +239,16 @@ export class UsersService {
     user.aadhaarNumber = cleanAadhaar;
     user.fullNameAsPerAadhaar = dto.fullNameAsPerAadhaar.trim();
     user.verifiedAt = new Date();
+    if (dto.customer_image_aadhar_front || dto.aadhaarFrontImage) {
+      const front = dto.customer_image_aadhar_front || dto.aadhaarFrontImage;
+      user.customer_image_aadhar_front = front;
+      user.aadharFrontImage = front;
+    }
+    if (dto.customer_image_aadhar_back || dto.aadhaarBackImage) {
+      const back = dto.customer_image_aadhar_back || dto.aadhaarBackImage;
+      user.customer_image_aadhar_back = back;
+      user.aadharBackImage = back;
+    }
     await user.save();
 
     // ── 3-Tier Multi-Level Distribution (App Download Income + Shopping Coin Income) ──

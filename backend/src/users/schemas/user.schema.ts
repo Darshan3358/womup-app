@@ -239,7 +239,13 @@ export class User {
   aadharFrontImage?: string;
 
   @Prop({ default: '' })
+  customer_image_aadhar_front?: string;
+
+  @Prop({ default: '' })
   aadharBackImage?: string;
+
+  @Prop({ default: '' })
+  customer_image_aadhar_back?: string;
 
   @Prop({ default: 2 }) // 1 = yes, 2 = no
   customerIsVerify: number;

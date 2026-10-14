@@ -30,7 +30,14 @@ export class UsersController {
   @ApiOperation({ summary: 'Verify user Aadhaar number & full name, unlocking income and crediting referrer' })
   async verifyAadhaar(
     @CurrentUser() user: any,
-    @Body() body: { aadhaarNumber: string; fullNameAsPerAadhaar: string },
+    @Body() body: {
+      aadhaarNumber: string;
+      fullNameAsPerAadhaar: string;
+      customer_image_aadhar_front?: string;
+      customer_image_aadhar_back?: string;
+      aadhaarFrontImage?: string;
+      aadhaarBackImage?: string;
+    },
   ) {
     return this.usersService.verifyAadhaar(user.id, body);
   }

@@ -26,6 +26,7 @@ import {
   RealTimeRefundsIllustration,
   GiftBoxIllustration,
 } from '../../components/blinkit/BlinkitMoneyIllustrations';
+import { FileUploadField } from '../../components/common/FileUploadField';
 
 export const BlinkitMoneyScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -38,6 +39,8 @@ export const BlinkitMoneyScreen: React.FC = () => {
   const [isAadhaarModalVisible, setAadhaarModalVisible] = useState(false);
   const [aadhaarInput, setAadhaarInput] = useState('');
   const [aadhaarNameInput, setAadhaarNameInput] = useState(user.fullNameAsPerAadhaar || user.fullName || '');
+  const [aadhaarFrontUrl, setAadhaarFrontUrl] = useState('');
+  const [aadhaarBackUrl, setAadhaarBackUrl] = useState('');
   const [verifyingAadhaar, setVerifyingAadhaar] = useState(false);
   const [aadhaarError, setAadhaarError] = useState('');
   const [aadhaarSuccessMsg, setAadhaarSuccessMsg] = useState('');
@@ -164,7 +167,12 @@ export const BlinkitMoneyScreen: React.FC = () => {
     setVerifyingAadhaar(true);
     setAadhaarError('');
     try {
-      const res = await AuthService.verifyAadhaar(rawAadhaar, aadhaarNameInput.trim());
+      const res = await AuthService.verifyAadhaar(
+        rawAadhaar,
+        aadhaarNameInput.trim(),
+        aadhaarFrontUrl,
+        aadhaarBackUrl,
+      );
       if (res.success) {
         const updated = {
           ...user,
@@ -697,6 +705,25 @@ export const BlinkitMoneyScreen: React.FC = () => {
                 />
               </View>
             </View>
+
+            {/* Aadhaar Front & Back Uploads */}
+            <FileUploadField
+              label="Aadhaar Front Image"
+              required={false}
+              value={aadhaarFrontUrl}
+              folder="wormup/kyc/customer"
+              onUploadComplete={(url) => setAadhaarFrontUrl(url)}
+              helperText="Upload front side showing photo & name"
+            />
+
+            <FileUploadField
+              label="Aadhaar Back Image"
+              required={false}
+              value={aadhaarBackUrl}
+              folder="wormup/kyc/customer"
+              onUploadComplete={(url) => setAadhaarBackUrl(url)}
+              helperText="Upload back side showing permanent address"
+            />
 
             {/* Security Guarantee Note */}
             <View style={styles.aadhaarSecurityNote}>

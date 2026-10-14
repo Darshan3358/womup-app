@@ -175,4 +175,32 @@ export class CloudinaryService {
       secure: true,
     });
   }
+
+  /**
+   * Generate signed Cloudinary upload parameters for secure direct client uploads
+   */
+  generateSignature(folder = 'wormup/kyc', publicId?: string) {
+    const timestamp = Math.round(new Date().getTime() / 1000);
+    const cloudName = this.configService.get<string>('CLOUDINARY_CLOUD_NAME') || 'wormup';
+    const apiKey = this.configService.get<string>('CLOUDINARY_API_KEY') || '';
+    const apiSecret = this.configService.get<string>('CLOUDINARY_API_SECRET') || '';
+
+    const paramsToSign: Record<string, any> = {
+      timestamp,
+      folder,
+    };
+    if (publicId) paramsToSign.public_id = publicId;
+
+    const signature = cloudinary.utils.api_sign_request(paramsToSign, apiSecret);
+
+    return {
+      signature,
+      timestamp,
+      apiKey,
+      cloudName,
+      folder,
+      publicId,
+      uploadUrl: `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+    };
+  }
 }

@@ -202,7 +202,12 @@ export const AuthService = {
     };
   },
 
-  async verifyAadhaar(aadhaarNumber: string, fullNameAsPerAadhaar?: string): Promise<{
+  async verifyAadhaar(
+    aadhaarNumber: string,
+    fullNameAsPerAadhaar?: string,
+    frontImage?: string,
+    backImage?: string,
+  ): Promise<{
     success: boolean;
     user?: any;
     message?: string;
@@ -210,6 +215,10 @@ export const AuthService = {
     const res = await api.post<any>('/users/verify-aadhaar', {
       aadhaarNumber,
       fullNameAsPerAadhaar,
+      customer_image_aadhar_front: frontImage,
+      customer_image_aadhar_back: backImage,
+      aadhaarFrontImage: frontImage,
+      aadhaarBackImage: backImage,
     });
     if (res.success && res.data) {
       return {

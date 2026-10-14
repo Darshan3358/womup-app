@@ -25,12 +25,26 @@ import { User, UserDocument } from '../users/schemas/user.schema';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @ApiTags('Cloudinary Media Storage')
-@Controller(['api/v1/media', 'api/v1/upload'])
+@Controller(['api/v1/media', 'api/v1/upload', 'api/v1/uploads'])
 export class CloudinaryController {
   constructor(
     private readonly cloudinaryService: CloudinaryService,
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
   ) {}
+
+  @Post('signature')
+  @ApiOperation({ summary: 'Generate signed parameters for direct Cloudinary upload' })
+  async getUploadSignature(
+    @Body('folder') folder?: string,
+    @Body('publicId') publicId?: string,
+  ) {
+    const signatureData = this.cloudinaryService.generateSignature(folder, publicId);
+    return {
+      success: true,
+      message: 'Upload signature generated successfully',
+      data: signatureData,
+    };
+  }
 
   @Post(['upload', 'image'])
   @UseInterceptors(FileInterceptor('file'))

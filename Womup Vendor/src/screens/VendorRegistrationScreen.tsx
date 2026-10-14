@@ -22,6 +22,7 @@ import {
   Upload,
 } from 'lucide-react-native';
 import { COLORS } from '../theme';
+import { FileUploadField } from '../components/FileUploadField';
 
 interface VendorRegistrationScreenProps {
   onCancel: () => void;
@@ -64,11 +65,11 @@ export const VendorRegistrationScreen: React.FC<VendorRegistrationScreenProps> =
 
   // Step 4: KYC Documents
   const [aadharNo, setAadharNo] = useState('');
-  const [aadharFront, setAadharFront] = useState('https://images.unsplash.com/photo-1542838132-92c53300491e?w=400');
-  const [aadharBack, setAadharBack] = useState('https://images.unsplash.com/photo-1542838132-92c53300491e?w=400');
-  const [panCard, setPanCard] = useState('https://images.unsplash.com/photo-1542838132-92c53300491e?w=400');
-  const [tradeLicense, setTradeLicense] = useState('https://images.unsplash.com/photo-1542838132-92c53300491e?w=400');
-  const [shopPhoto, setShopPhoto] = useState('https://images.unsplash.com/photo-1542838132-92c53300491e?w=400');
+  const [aadharFront, setAadharFront] = useState('');
+  const [aadharBack, setAadharBack] = useState('');
+  const [panCard, setPanCard] = useState('');
+  const [tradeLicense, setTradeLicense] = useState('');
+  const [shopPhoto, setShopPhoto] = useState('');
 
   const handleNextStep = () => {
     if (currentStep === 1) {
@@ -423,49 +424,41 @@ export const VendorRegistrationScreen: React.FC<VendorRegistrationScreenProps> =
               />
             </View>
 
-            <View style={styles.docBox}>
-              <View style={styles.docInfo}>
-                <Camera size={18} color="#60A5FA" />
-                <Text style={styles.docTitle}>Aadhaar Front Image *</Text>
-              </View>
-              <View style={styles.uploadedPill}>
-                <CheckCircle2 size={14} color="#10B981" />
-                <Text style={styles.uploadedText}>Document Ready</Text>
-              </View>
-            </View>
+            <FileUploadField
+              label="Aadhaar Front Image"
+              required
+              value={aadharFront}
+              folder="wormup/kyc/vendor"
+              onUploadComplete={(url) => setAadharFront(url)}
+              helperText="Upload clear photo or scan of front side"
+            />
 
-            <View style={styles.docBox}>
-              <View style={styles.docInfo}>
-                <Camera size={18} color="#60A5FA" />
-                <Text style={styles.docTitle}>Aadhaar Back Image *</Text>
-              </View>
-              <View style={styles.uploadedPill}>
-                <CheckCircle2 size={14} color="#10B981" />
-                <Text style={styles.uploadedText}>Document Ready</Text>
-              </View>
-            </View>
+            <FileUploadField
+              label="Aadhaar Back Image"
+              required
+              value={aadharBack}
+              folder="wormup/kyc/vendor"
+              onUploadComplete={(url) => setAadharBack(url)}
+              helperText="Upload clear photo showing your permanent address"
+            />
 
-            <View style={styles.docBox}>
-              <View style={styles.docInfo}>
-                <Camera size={18} color="#60A5FA" />
-                <Text style={styles.docTitle}>PAN Card Image *</Text>
-              </View>
-              <View style={styles.uploadedPill}>
-                <CheckCircle2 size={14} color="#10B981" />
-                <Text style={styles.uploadedText}>Document Ready</Text>
-              </View>
-            </View>
+            <FileUploadField
+              label="PAN Card Image"
+              required
+              value={panCard}
+              folder="wormup/kyc/vendor"
+              onUploadComplete={(url) => setPanCard(url)}
+              helperText="Upload business or personal PAN card"
+            />
 
-            <View style={styles.docBox}>
-              <View style={styles.docInfo}>
-                <Camera size={18} color="#60A5FA" />
-                <Text style={styles.docTitle}>Shop Front Photo *</Text>
-              </View>
-              <View style={styles.uploadedPill}>
-                <CheckCircle2 size={14} color="#10B981" />
-                <Text style={styles.uploadedText}>Document Ready</Text>
-              </View>
-            </View>
+            <FileUploadField
+              label="Shop Front Photo"
+              required
+              value={shopPhoto}
+              folder="wormup/kyc/vendor"
+              onUploadComplete={(url) => setShopPhoto(url)}
+              helperText="Upload photo showing shop signboard clearly"
+            />
           </View>
         )}
 
