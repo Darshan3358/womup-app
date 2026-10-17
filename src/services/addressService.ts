@@ -79,11 +79,14 @@ export const AddressService = {
         type: item.label,
         fullName: item.fullName || 'Customer',
         phoneNumber: item.phoneNumber || '',
-        houseFlat: `${item.houseNumber}, ${item.street}`,
+        houseFlat: item.houseNumber ? `${item.houseNumber}, ${item.street}` : (item.street || ''),
+        street: item.street || '',
         areaLandmark: item.landmark || '',
-        city: item.city,
-        pincode: item.pincode,
+        city: item.city || 'Ahmedabad',
+        pincode: item.pincode || '',
         isDefault: item.isDefault,
+        latitude: item.location?.coordinates?.[1] !== undefined ? Number(item.location.coordinates[1]) : undefined,
+        longitude: item.location?.coordinates?.[0] !== undefined ? Number(item.location.coordinates[0]) : undefined,
       }));
     }
     return [];

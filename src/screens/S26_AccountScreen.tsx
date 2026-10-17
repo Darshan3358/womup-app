@@ -53,6 +53,14 @@ export const S26_AccountScreen: React.FC = () => {
       action: () => setActiveScreen('C11_AddAddress'),
     },
     {
+      title: 'KYC & Bank Verification',
+      subtitle: 'Aadhaar front/back, bank details & payouts',
+      badge: 'Verify',
+      icon: 'shield-checkmark-outline',
+      color: '#059669',
+      action: () => setActiveScreen('KYC'),
+    },
+    {
       title: 'Payment Methods',
       subtitle: 'Saved UPI, Cards & Wallets',
       icon: 'card-outline',

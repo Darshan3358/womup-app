@@ -24,6 +24,7 @@ import io from 'socket.io-client';
 
 export type ActiveTab =
   | 'Dashboard'
+  | 'Approvals'
   | 'Users'
   | 'Prices'
   | 'Inventory'

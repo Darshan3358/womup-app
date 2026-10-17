@@ -263,8 +263,8 @@ router.post('/', async (req, res) => {
   }
 });
 
-// 4. PATCH /api/admin/payout-rates/:id — Update rate
-router.patch('/:id', async (req, res) => {
+// 4. PUT / PATCH /api/admin/payout-rates/:id — Update rate
+const updateRateHandler = async (req, res) => {
   try {
     const { id } = req.params;
     const db = getDB();
@@ -277,19 +277,32 @@ router.patch('/:id', async (req, res) => {
     if (req.body.isActive !== undefined) updates.isActive = Boolean(req.body.isActive);
     updates.updatedAt = new Date();
 
-    const query = ObjectId.isValid(id) ? { _id: new ObjectId(id) } : { _id: id };
+    let query;
+    if (id === 'global_default' || req.body.scope === 'GLOBAL') {
+      query = { scope: 'GLOBAL' };
+    } else {
+      query = ObjectId.isValid(id) ? { _id: new ObjectId(id) } : { _id: id };
+    }
+
     const result = await db.collection('rider_payout_rates').updateOne(query, { $set: updates });
 
     if (result.matchedCount === 0) {
-      return res.status(404).json({ success: false, error: 'Payout rate not found' });
+      // If global_default not matched by id, try updating by scope
+      const globalRes = await db.collection('rider_payout_rates').updateOne({ scope: 'GLOBAL' }, { $set: updates });
+      if (globalRes.matchedCount === 0) {
+        return res.status(404).json({ success: false, error: 'Payout rate not found' });
+      }
     }
 
     return res.json({ success: true, message: 'Payout rate updated successfully' });
   } catch (err) {
-    console.error('[PayoutRates PATCH Error]:', err);
+    console.error('[PayoutRates UPDATE Error]:', err);
     return res.status(500).json({ success: false, error: err.message });
   }
-});
+};
+
+router.patch('/:id', updateRateHandler);
+router.put('/:id', updateRateHandler);
 
 // 5. PATCH /api/admin/payout-rates/:id/toggle — Toggle active status
 router.patch('/:id/toggle', async (req, res) => {

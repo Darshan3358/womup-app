@@ -422,6 +422,10 @@ app.use('/api/orders', ordersRouter);
 app.use('/api/print-orders', printOrdersRouter);
 app.use('/api/marketing', marketingRouter);
 app.use('/api/payout-rates', payoutRatesRouter);
+app.use('/api/admin/payout-rates', payoutRatesRouter);
+app.use('/api/admin/areas', areasRouter);
+app.use('/api/admin/cities', citiesRouter);
+app.use('/api/admin/stores', storesRouter);
 app.use('/api/finance', financeRouter);
 
 // 404 handler

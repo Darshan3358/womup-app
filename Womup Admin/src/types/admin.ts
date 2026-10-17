@@ -34,6 +34,35 @@ export interface Customer {
   appDownloadIncome?: number;
   pendingIncome?: number;
   availableIncome?: number;
+  firstName?: string;
+  surname?: string;
+  fatherHusbandName?: string;
+  gender?: string;
+  birthdate?: string;
+  birthDate?: string;
+  landmark?: string;
+  village?: string;
+  pincode?: string;
+  sponsorId?: string;
+  sponsorName?: string;
+  userCode?: string;
+  bankName?: string;
+  branchName?: string;
+  accountHolderName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  upiId?: string;
+  paymentStatus?: number;
+  isBlocked?: number;
+  isSuspended?: number;
+  adminNotes?: string;
+  aadhaarNumber?: string;
+  aadhaarFrontImage?: string;
+  customer_image_aadhar_front?: string;
+  aadhaarBackImage?: string;
+  customer_image_aadhar_back?: string;
+  kycSubmittedAt?: string;
+  kycRejectReason?: string;
 }
 
 export interface DeliveryPartnerItem {
@@ -58,7 +87,39 @@ export interface DeliveryPartnerItem {
   completionRate: number;
   avgDeliveryMinutes: number;
   joinedDate: string;
+  documents?: {
+    profilePhoto?: string | null;
+    profilePhotoUrl?: string | null;
+    dlNumber?: string | null;
+    dlFront?: string | null;
+    dlFrontUrl?: string | null;
+    dlBack?: string | null;
+    dlBackUrl?: string | null;
+    rcNumber?: string | null;
+    rcFront?: string | null;
+    rcFrontUrl?: string | null;
+    rcBack?: string | null;
+    rcBackUrl?: string | null;
+    aadhaarNumber?: string | null;
+    aadhaarFront?: string | null;
+    aadhaarFrontUrl?: string | null;
+    aadhaarBack?: string | null;
+    aadhaarBackUrl?: string | null;
+    insuranceNumber?: string | null;
+    insurance?: string | null;
+    insuranceUrl?: string | null;
+  };
+  bankAccount?: {
+    bankName?: string | null;
+    accountHolderName?: string | null;
+    accountNumber?: string | null;
+    ifscCode?: string | null;
+    branchName?: string | null;
+    upiId?: string | null;
+    isVerified?: boolean;
+  };
 }
+
 
 export interface SubCategoryItem {
   id: string;
@@ -85,6 +146,8 @@ export interface CategoryItem {
   slug: string;
   icon?: string;
   iconUrl?: string;
+  image?: string | null;
+  imageUrl?: string | null;
   bgColor?: string;
   description?: string;
   itemCount?: number;
@@ -312,6 +375,7 @@ export interface DarkStoreItem {
   pincode?: string;
   areaId?: string | null;
   areaName?: string | null;
+  status?: 'PENDING' | 'ACTIVE' | 'INACTIVE' | 'REJECTED' | string;
   isActive?: boolean;
   isOnShift?: boolean;
   isOnline?: boolean;

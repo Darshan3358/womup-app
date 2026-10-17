@@ -11,7 +11,10 @@ export const SPACING = {
 } as const;
 
 export const RADIUS = {
+  xs: 4,
   sm: 8,
+  md: 12,
+  lg: 16,
   input: 10,
   card: 14,
   button: 12,

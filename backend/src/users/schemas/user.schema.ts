@@ -242,10 +242,23 @@ export class User {
   customer_image_aadhar_front?: string;
 
   @Prop({ default: '' })
+  @Prop({ default: '' })
   aadharBackImage?: string;
 
   @Prop({ default: '' })
   customer_image_aadhar_back?: string;
+
+  @Prop({ default: '' })
+  passbookImage?: string;
+
+  @Prop({ default: '' })
+  bankProofImage?: string;
+
+  @Prop({ default: '' })
+  cancelledChequeImage?: string;
+
+  @Prop({ default: '' })
+  customer_image_bank?: string;
 
   @Prop({ default: 2 }) // 1 = yes, 2 = no
   customerIsVerify: number;
@@ -255,6 +268,12 @@ export class User {
 
   @Prop({ default: '' })
   kycRejectReason?: string;
+
+  @Prop({ default: 'Pending' })
+  kycStatus?: string;
+
+  @Prop()
+  kycSubmittedAt?: Date;
 
   // Sponsor Details
   @Prop({ default: '' })
@@ -294,6 +313,9 @@ export class User {
   @Prop({ default: '' })
   blockReason?: string;
 
+  @Prop({ default: '' })
+  adminNotes?: string;
+
   @Prop({ default: '1.0.0' })
   appVersion?: string;
 
@@ -305,6 +327,26 @@ export class User {
 
   @Prop({ default: '' })
   passwordHash?: string;
+
+  // ── Push Notification & Device Preferences ──
+
+  @Prop({
+    type: Object,
+    default: () => ({
+      orderUpdates: true,
+      promotions: true,
+      whatsappInvoices: true,
+      emailReceipts: true,
+      dndEnabled: false,
+    }),
+  })
+  notificationPrefs?: {
+    orderUpdates: boolean;
+    promotions: boolean;
+    whatsappInvoices: boolean;
+    emailReceipts: boolean;
+    dndEnabled: boolean;
+  };
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

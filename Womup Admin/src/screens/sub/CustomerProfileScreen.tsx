@@ -23,6 +23,7 @@ import {
 import { COLORS, RADIUS, SPACING } from '../../theme';
 import { useAdminState } from '../../context/AdminStateContext';
 import { Order, PrintOrder } from '../../types/admin';
+import { KYCTab } from '../../components/KYCTab';
 
 export const CustomerProfileScreen: React.FC = () => {
   const {
@@ -35,6 +36,7 @@ export const CustomerProfileScreen: React.FC = () => {
     setSelectedOrder,
     setSelectedPrintOrder,
     openLabelPrint,
+    updateCustomer,
   } = useAdminState();
 
   const [activeTab, setActiveTab] = useState<'Profile' | 'Orders' | 'Wallet' | 'KYC'>('Orders');
@@ -51,14 +53,14 @@ export const CustomerProfileScreen: React.FC = () => {
   const isBlocked = selectedCustomer.status === 'Blocked';
 
   const customerStoreOrders = orders.filter(
-    (o) =>
+    (o: Order) =>
       o.customerId === selectedCustomer.id ||
       (o.customerName && o.customerName.toLowerCase() === selectedCustomer.name.toLowerCase()) ||
       o.customerPhone === selectedCustomer.phone
   );
 
   const customerPrintOrders = printOrders.filter(
-    (p) =>
+    (p: PrintOrder) =>
       p.userId === selectedCustomer.id ||
       (p.customerName && p.customerName.toLowerCase() === selectedCustomer.name.toLowerCase()) ||
       p.customerPhone === selectedCustomer.phone
@@ -157,7 +159,7 @@ export const CustomerProfileScreen: React.FC = () => {
           </View>
 
           <Text style={[styles.cardTitle, { marginTop: SPACING.md }]}>Saved Delivery Addresses</Text>
-          {selectedCustomer.addresses.map((addr) => (
+          {selectedCustomer.addresses.map((addr: any) => (
             <View key={addr.id} style={styles.addressBox}>
               <View style={styles.addressHeader}>
                 <MapPin size={14} color={COLORS.purple} style={{ marginRight: 6 }} />
@@ -219,7 +221,7 @@ export const CustomerProfileScreen: React.FC = () => {
             <View>
               {/* STORE ORDERS */}
               {(ordersSubTab === 'All' || ordersSubTab === 'Store Orders') &&
-                customerStoreOrders.map((order) => (
+                customerStoreOrders.map((order: Order) => (
                   <TouchableOpacity
                     key={order.id}
                     style={styles.orderItemCard}
@@ -236,7 +238,7 @@ export const CustomerProfileScreen: React.FC = () => {
                         <Text style={styles.orderTimeText}>{order.timestamp}</Text>
                       </View>
                       <Text style={styles.orderSubText} numberOfLines={1}>
-                        {order.items.map((i) => i.name).join(', ')}
+                        {order.items.map((i: any) => i.name).join(', ')}
                       </Text>
                       <View style={styles.statusPillSmall}>
                         <Text style={styles.statusPillSmallText}>{order.status}</Text>
@@ -270,7 +272,7 @@ export const CustomerProfileScreen: React.FC = () => {
 
               {/* PAPER PRINT ORDERS */}
               {(ordersSubTab === 'All' || ordersSubTab === 'Paper Print') &&
-                customerPrintOrders.map((printOrder) => (
+                customerPrintOrders.map((printOrder: PrintOrder) => (
                   <TouchableOpacity
                     key={printOrder.id}
                     style={[styles.orderItemCard, styles.printOrderCard]}
@@ -411,13 +413,12 @@ export const CustomerProfileScreen: React.FC = () => {
       )}
 
       {activeTab === 'KYC' && (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Verification & KYC Status</Text>
-          <View style={styles.kycRow}>
-            <FileCheck size={20} color={COLORS.success} style={{ marginRight: 8 }} />
-            <Text style={styles.kycText}>Status: {selectedCustomer.kycStatus}</Text>
-          </View>
-        </View>
+        <KYCTab
+          customer={selectedCustomer}
+          onStatusChange={(newStatus) =>
+            updateCustomer(selectedCustomer.id, { kycStatus: newStatus })
+          }
+        />
       )}
 
       {/* Customer Metrics */}

@@ -46,13 +46,13 @@ export class DeliveryPartner {
   @Prop({ default: 'Satellite Hub Dark Store' })
   hubName: string;
 
-  @Prop({ default: 'APPROVED', enum: ['PENDING', 'APPROVED', 'REJECTED', 'SUSPENDED'] })
+  @Prop({ default: 'PENDING', enum: ['PENDING', 'APPROVED', 'REJECTED', 'SUSPENDED'] })
   status: string;
 
-  @Prop({ default: 'VERIFIED', enum: ['PENDING', 'VERIFIED', 'REJECTED'] })
+  @Prop({ default: 'PENDING', enum: ['PENDING', 'VERIFIED', 'REJECTED'] })
   verificationStatus: string;
 
-  @Prop({ default: true })
+  @Prop({ default: false })
   isOnline: boolean;
 
   @Prop({ default: 'EV_SCOOTER' })
@@ -125,7 +125,7 @@ export class DeliveryPartner {
     coordinates: number[];
   };
 
-  @Prop({ default: true })
+  @Prop({ default: false })
   isAvailable: boolean;
 
   @Prop({ type: Date })
@@ -133,6 +133,133 @@ export class DeliveryPartner {
 
   @Prop({ type: Types.ObjectId, ref: 'RiderBankAccount' })
   bankAccountId?: Types.ObjectId;
+
+  @Prop({ trim: true, index: true })
+  riderCode?: string;
+
+  @Prop({ trim: true })
+  mobile?: string;
+
+  @Prop({ default: false })
+  emailVerified: boolean;
+
+  @Prop({ select: false })
+  passwordHash?: string;
+
+  @Prop({ trim: true })
+  drivingLicense?: string;
+
+  @Prop()
+  dlImageUrl?: string;
+
+  @Prop({ type: Types.ObjectId, ref: 'Area' })
+  areaId?: Types.ObjectId;
+
+  @Prop({ trim: true })
+  areaName?: string;
+
+  @Prop({ default: false })
+  isActive: boolean;
+
+  @Prop()
+  approvedAt?: Date;
+
+  @Prop({ trim: true })
+  approvedBy?: string;
+
+  @Prop({ trim: true })
+  rejectionReason?: string;
+
+  @Prop({ default: false })
+  isBlocked: boolean;
+
+  @Prop({ default: false })
+  isSuspended: boolean;
+
+  @Prop({ default: 0 })
+  totalEarnings: number;
+
+  @Prop()
+  expoPushToken?: string;
+
+  @Prop()
+  androidToken?: string;
+
+  @Prop()
+  iosToken?: string;
+
+  @Prop()
+  lastLoginAt?: Date;
+
+  @Prop({ default: Date.now })
+  registeredAt: Date;
+
+  @Prop({ trim: true })
+  aadharNumber?: string;
+
+  @Prop()
+  aadharFrontUrl?: string;
+
+  @Prop()
+  aadharBackUrl?: string;
+
+  @Prop()
+  profilePhotoUrl?: string;
+
+  @Prop({ trim: true })
+  dlNumber?: string;
+
+  @Prop()
+  dlBackUrl?: string;
+
+  @Prop({ trim: true })
+  rcNumber?: string;
+
+  @Prop()
+  rcImageUrl?: string;
+
+  @Prop()
+  rcBackUrl?: string;
+
+  @Prop({ trim: true })
+  insuranceNumber?: string;
+
+  @Prop()
+  vehicleInsuranceUrl?: string;
+
+  @Prop({ trim: true })
+  vehicleModel?: string;
+
+  @Prop({ trim: true })
+  vehicleModelYear?: string;
+
+  @Prop({ trim: true })
+  shiftPreference?: string;
+
+
+  @Prop({ trim: true })
+  emergencyContact?: string;
+
+  @Prop({ trim: true })
+  bankName?: string;
+
+  @Prop({ trim: true })
+  bankBranch?: string;
+
+  @Prop({ trim: true })
+  accountHolderName?: string;
+
+  @Prop({ trim: true })
+  accountNumber?: string;
+
+  @Prop({ trim: true })
+  ifscCode?: string;
+
+  @Prop({ trim: true })
+  upiId?: string;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  addedBy?: Types.ObjectId;
 }
 
 export const DeliveryPartnerSchema = SchemaFactory.createForClass(DeliveryPartner);

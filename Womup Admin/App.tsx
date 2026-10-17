@@ -22,6 +22,7 @@ import { LocationManagementScreen } from './src/screens/LocationManagementScreen
 import { CategoryManagementScreen } from './src/screens/CategoryManagementScreen';
 import { PayoutRatesScreen } from './src/screens/PayoutRatesScreen';
 import { WalletsRevenueScreen } from './src/screens/WalletsRevenueScreen';
+import { ApprovalHubScreen } from './src/screens/ApprovalHubScreen';
 
 // Sub Views
 import { CustomerProfileScreen } from './src/screens/sub/CustomerProfileScreen';
@@ -82,6 +83,8 @@ const MainApp: React.FC = () => {
     switch (activeTab) {
       case 'Dashboard':
         return <DashboardScreen />;
+      case 'Approvals':
+        return <ApprovalHubScreen />;
       case 'Users':
         return <CustomersScreen />;
       case 'Prices':

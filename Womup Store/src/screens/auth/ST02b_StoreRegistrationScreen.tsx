@@ -12,7 +12,10 @@ import {
   ScrollView,
   Modal,
   FlatList,
+  Image,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../context/StoreContext';
 import { StoreApiService } from '../../services/storeApi';
@@ -70,6 +73,27 @@ export const ST02b_StoreRegistrationScreen: React.FC = () => {
   const [areas, setAreas] = useState<AreaItem[]>([]);
   const [selectedArea, setSelectedArea] = useState<AreaItem | null>(null);
 
+  // Address & Coordinates
+  const [fullAddress, setFullAddress] = useState('');
+  const [landmark, setLandmark] = useState('');
+  const [pincode, setPincode] = useState('382481');
+  const [latitude, setLatitude] = useState('23.0805');
+  const [longitude, setLongitude] = useState('72.5480');
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
+
+  // KYC Documents
+  const [storeLicense, setStoreLicense] = useState('');
+  const [ownerAadharFront, setOwnerAadharFront] = useState('');
+  const [ownerAadharBack, setOwnerAadharBack] = useState('');
+  const [shopPhoto, setShopPhoto] = useState('');
+
+  // Operations
+  const [openingTime, setOpeningTime] = useState('06:00 AM');
+  const [closingTime, setClosingTime] = useState('11:00 PM');
+  const [serviceRadius, setServiceRadius] = useState('5');
+  const [deliveryTime, setDeliveryTime] = useState('9');
+  const [staffCount, setStaffCount] = useState('4');
+
   // Loading States
   const [isLoadingCities, setIsLoadingCities] = useState(false);
   const [isLoadingAreas, setIsLoadingAreas] = useState(false);
@@ -88,6 +112,54 @@ export const ST02b_StoreRegistrationScreen: React.FC = () => {
     cityName: string;
     areaName: string;
   } | null>(null);
+
+  const pickDocument = async (field: 'license' | 'aadharFront' | 'aadharBack' | 'shop') => {
+    try {
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.8,
+        base64: true,
+      });
+      if (!res.canceled && res.assets && res.assets.length > 0) {
+        const uri = res.assets[0].base64 ? `data:image/jpeg;base64,${res.assets[0].base64}` : res.assets[0].uri;
+        if (field === 'license') setStoreLicense(uri);
+        else if (field === 'aadharFront') setOwnerAadharFront(uri);
+        else if (field === 'aadharBack') setOwnerAadharBack(uri);
+        else if (field === 'shop') setShopPhoto(uri);
+      }
+    } catch (e: any) {
+      Alert.alert('Upload Error', 'Failed to pick image file.');
+    }
+  };
+
+  const handleDetectGPS = async () => {
+    setIsDetectingLocation(true);
+    try {
+      if (Platform.OS === 'web') {
+        if (typeof navigator !== 'undefined' && navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              setLatitude(pos.coords.latitude.toFixed(6));
+              setLongitude(pos.coords.longitude.toFixed(6));
+              setIsDetectingLocation(false);
+            },
+            () => setIsDetectingLocation(false)
+          );
+        }
+      } else {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const loc = await Location.getCurrentPositionAsync({});
+          setLatitude(loc.coords.latitude.toFixed(6));
+          setLongitude(loc.coords.longitude.toFixed(6));
+        }
+        setIsDetectingLocation(false);
+      }
+    } catch (e) {
+      setIsDetectingLocation(false);
+    }
+  };
 
   // 1. Fetch Admin Master Cities on screen mount
   useEffect(() => {
@@ -194,6 +266,20 @@ export const ST02b_StoreRegistrationScreen: React.FC = () => {
         cityId,
         areaId,
         password,
+        fullAddress: fullAddress.trim() || undefined,
+        landmark: landmark.trim() || undefined,
+        pincode: pincode.trim() || undefined,
+        latitude: parseFloat(latitude) || undefined,
+        longitude: parseFloat(longitude) || undefined,
+        storeLicense: storeLicense || undefined,
+        ownerAadharFront: ownerAadharFront || undefined,
+        ownerAadharBack: ownerAadharBack || undefined,
+        shopPhoto: shopPhoto || undefined,
+        openingTime,
+        closingTime,
+        serviceRadius: parseFloat(serviceRadius) || undefined,
+        deliveryTime: parseInt(deliveryTime, 10) || undefined,
+        initialStaffCount: parseInt(staffCount, 10) || undefined,
       });
 
       if (res && res.success) {
@@ -394,6 +480,182 @@ export const ST02b_StoreRegistrationScreen: React.FC = () => {
               </Text>
             </View>
           )}
+
+          {/* Section: Physical Address & Map */}
+          <View style={[styles.sectionHeader, { marginTop: 22 }]}>
+            <Ionicons name="map-outline" size={16} color={COLORS.primary} />
+            <Text style={styles.sectionTitle}>PHYSICAL STORE LOCATION</Text>
+          </View>
+
+          <Text style={styles.label}>FULL STORE ADDRESS *</Text>
+          <View style={styles.inputWrapper}>
+            <Ionicons name="business-outline" size={20} color={COLORS.textMuted} />
+            <TextInput
+              style={styles.input}
+              value={fullAddress}
+              onChangeText={setFullAddress}
+              placeholder="Shop/Warehouse No, Building, Street"
+              placeholderTextColor={COLORS.textMuted}
+            />
+          </View>
+
+          <Text style={styles.label}>LANDMARK</Text>
+          <View style={styles.inputWrapper}>
+            <Ionicons name="compass-outline" size={20} color={COLORS.textMuted} />
+            <TextInput
+              style={styles.input}
+              value={landmark}
+              onChangeText={setLandmark}
+              placeholder="e.g. Opposite Metro Pillar 102"
+              placeholderTextColor={COLORS.textMuted}
+            />
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>PINCODE *</Text>
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={styles.input}
+                  value={pincode}
+                  onChangeText={setPincode}
+                  placeholder="382481"
+                  placeholderTextColor={COLORS.textMuted}
+                  keyboardType="numeric"
+                  maxLength={6}
+                />
+              </View>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>GPS AUTO-DETECT</Text>
+              <TouchableOpacity
+                style={[styles.dropdownBtn, { justifyContent: 'center' }]}
+                onPress={handleDetectGPS}
+                disabled={isDetectingLocation}
+              >
+                {isDetectingLocation ? (
+                  <ActivityIndicator size="small" color={COLORS.primary} />
+                ) : (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="locate" size={18} color={COLORS.primary} />
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: COLORS.primary }}>
+                      {latitude ? `${latitude.slice(0, 7)}, ${longitude.slice(0, 7)}` : 'Auto GPS'}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Section: KYC Documents */}
+          <View style={[styles.sectionHeader, { marginTop: 22 }]}>
+            <Ionicons name="document-text-outline" size={16} color={COLORS.primary} />
+            <Text style={styles.sectionTitle}>KYC DOCUMENTS & STORE PHOTOS</Text>
+          </View>
+
+          <Text style={styles.label}>TRADE / STORE LICENSE</Text>
+          <TouchableOpacity
+            style={[styles.dropdownBtn, { marginBottom: 10 }]}
+            onPress={() => pickDocument('license')}
+          >
+            <Ionicons name="cloud-upload-outline" size={20} color={COLORS.primary} />
+            <Text style={{ flex: 1, fontSize: 13, color: storeLicense ? COLORS.success : COLORS.textMuted, marginLeft: 8 }}>
+              {storeLicense ? 'License Document Attached ✓' : 'Upload Store Trade License'}
+            </Text>
+          </TouchableOpacity>
+
+          <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
+            <TouchableOpacity
+              style={[styles.dropdownBtn, { flex: 1 }]}
+              onPress={() => pickDocument('aadharFront')}
+            >
+              <Ionicons name="card-outline" size={18} color={COLORS.primary} />
+              <Text style={{ fontSize: 12, color: ownerAadharFront ? COLORS.success : COLORS.textMuted, marginLeft: 6 }}>
+                {ownerAadharFront ? 'Aadhaar Front ✓' : 'Aadhaar Front'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.dropdownBtn, { flex: 1 }]}
+              onPress={() => pickDocument('aadharBack')}
+            >
+              <Ionicons name="card-outline" size={18} color={COLORS.primary} />
+              <Text style={{ fontSize: 12, color: ownerAadharBack ? COLORS.success : COLORS.textMuted, marginLeft: 6 }}>
+                {ownerAadharBack ? 'Aadhaar Back ✓' : 'Aadhaar Back'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.dropdownBtn, { marginBottom: 10 }]}
+            onPress={() => pickDocument('shop')}
+          >
+            <Ionicons name="camera-outline" size={20} color={COLORS.primary} />
+            <Text style={{ flex: 1, fontSize: 13, color: shopPhoto ? COLORS.success : COLORS.textMuted, marginLeft: 8 }}>
+              {shopPhoto ? 'Storefront Photo Attached ✓' : 'Upload Storefront Photo'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Section: Operations */}
+          <View style={[styles.sectionHeader, { marginTop: 22 }]}>
+            <Ionicons name="time-outline" size={16} color={COLORS.primary} />
+            <Text style={styles.sectionTitle}>OPERATIONS & DISPATCH SETUP</Text>
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>OPENING TIME</Text>
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={styles.input}
+                  value={openingTime}
+                  onChangeText={setOpeningTime}
+                  placeholder="06:00 AM"
+                  placeholderTextColor={COLORS.textMuted}
+                />
+              </View>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>CLOSING TIME</Text>
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={styles.input}
+                  value={closingTime}
+                  onChangeText={setClosingTime}
+                  placeholder="11:00 PM"
+                  placeholderTextColor={COLORS.textMuted}
+                />
+              </View>
+            </View>
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>SERVICE RADIUS (KM)</Text>
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={styles.input}
+                  value={serviceRadius}
+                  onChangeText={setServiceRadius}
+                  placeholder="5"
+                  keyboardType="numeric"
+                  placeholderTextColor={COLORS.textMuted}
+                />
+              </View>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.label}>DELIVERY TIME (MINS)</Text>
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={styles.input}
+                  value={deliveryTime}
+                  onChangeText={setDeliveryTime}
+                  placeholder="9"
+                  keyboardType="numeric"
+                  placeholderTextColor={COLORS.textMuted}
+                />
+              </View>
+            </View>
+          </View>
 
           {/* Section 4: Security */}
           <View style={[styles.sectionHeader, { marginTop: 22 }]}>

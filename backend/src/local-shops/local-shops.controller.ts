@@ -19,6 +19,13 @@ import {
   VerifyOfflinePaymentDto,
   CreateCollectionRequestDto,
   WithdrawWalletDto,
+  SendVendorOtpDto,
+  VerifyVendorOtpDto,
+  VendorLoginDto,
+  VendorLoginOtpDto,
+  VendorForgotPasswordDto,
+  VendorResetPasswordDto,
+  RegisterVendorDto,
 } from './dto/local-shops.dto';
 
 @ApiTags('Local Shops & Vendors')
@@ -115,6 +122,13 @@ export class LocalShopsController {
   ) {
     const vendors = await this.localShopsService.adminGetVendors(city, category);
     return { success: true, data: vendors };
+  }
+
+  @Get('admin/vendors/analytics')
+  @ApiOperation({ summary: 'Get overall vendor network stats for Admin' })
+  async adminGetVendorsAnalytics() {
+    const stats = await this.localShopsService.adminGetVendorsAnalytics();
+    return { success: true, data: stats };
   }
 
   @Get('admin/vendors/:id')
@@ -226,12 +240,6 @@ export class LocalShopsController {
     return result;
   }
 
-  @Get('admin/vendors/analytics')
-  @ApiOperation({ summary: 'Get overall vendor network stats for Admin' })
-  async adminGetVendorsAnalytics() {
-    const stats = await this.localShopsService.adminGetVendorsAnalytics();
-    return { success: true, data: stats };
-  }
 
   @Get('admin/vendors/:id/qr')
   @ApiOperation({ summary: 'Get vendor QR code data for counter display & printing' })
@@ -271,19 +279,68 @@ export class LocalShopsController {
     return { success: true, data: category };
   }
 
-  // ── Vendor Merchant App Endpoints ─────────────────────────────────────────
+  // ── Vendor Merchant App Auth & Operations (tbl_vendor Alignment) ─────────
+
+  @Post('vendor/auth/send-otp')
+  @ApiOperation({ summary: 'Send 6-digit OTP to vendor mobile' })
+  async vendorSendOtp(@Body() dto: SendVendorOtpDto) {
+    return this.localShopsService.vendorSendOtp(dto);
+  }
+
+  @Post('vendor/auth/verify-otp')
+  @ApiOperation({ summary: 'Verify vendor mobile 6-digit OTP' })
+  async vendorVerifyOtp(@Body() dto: VerifyVendorOtpDto) {
+    return this.localShopsService.vendorVerifyOtp(dto);
+  }
+
+  @Post('vendor/auth/register')
+  @ApiOperation({ summary: 'Complete 5-step vendor registration with all tbl_vendor fields' })
+  async vendorRegister(@Body() dto: RegisterVendorDto) {
+    return this.localShopsService.vendorRegister(dto);
+  }
 
   @Post('vendor/auth/login')
-  @ApiOperation({ summary: 'Vendor merchant login' })
-  async vendorLogin(@Body() body: { loginId: string; password?: string }) {
+  @ApiOperation({ summary: 'Vendor merchant login with Mobile or Vendor Code + Password' })
+  async vendorLogin(@Body() body: VendorLoginDto) {
     const vendor = await this.localShopsService.vendorLogin(body.loginId, body.password || '');
     return { success: true, data: vendor };
   }
 
+  @Post('vendor/auth/login-otp')
+  @ApiOperation({ summary: 'Vendor login with Mobile + OTP' })
+  async vendorLoginOtp(@Body() body: VendorLoginOtpDto) {
+    const vendor = await this.localShopsService.vendorLoginWithOtp(body.mobile, body.otp);
+    return { success: true, data: vendor };
+  }
+
+  @Post('vendor/auth/forgot-password')
+  @ApiOperation({ summary: 'Request password reset OTP for vendor mobile' })
+  async vendorForgotPassword(@Body() body: VendorForgotPasswordDto) {
+    return this.localShopsService.vendorForgotPassword(body.mobile);
+  }
+
+  @Post('vendor/auth/reset-password')
+  @ApiOperation({ summary: 'Reset vendor password using mobile OTP' })
+  async vendorResetPassword(@Body() dto: VendorResetPasswordDto) {
+    return this.localShopsService.vendorResetPassword(dto);
+  }
+
+  @Get('vendor/auth/status')
+  @ApiOperation({ summary: 'Check vendor approval and verification status' })
+  async vendorStatus(
+    @Query('vendorCode') vendorCode?: string,
+    @Query('mobile') mobile?: string,
+    @Query('id') id?: string,
+  ) {
+    const identifier = vendorCode || mobile || id || 'VND001';
+    return this.localShopsService.vendorGetStatus(identifier);
+  }
+
   @Get('vendor/auth/me')
   @ApiOperation({ summary: 'Get current vendor profile' })
-  async vendorMe(@Query('vendorCode') vendorCode?: string) {
-    const vendor = await this.localShopsService.vendorLogin(vendorCode || 'VND001', '');
+  async vendorMe(@Query('vendorCode') vendorCode?: string, @Query('mobile') mobile?: string) {
+    const identifier = vendorCode || mobile || 'VND001';
+    const vendor = await this.localShopsService.vendorLogin(identifier, '');
     return { success: true, data: vendor };
   }
 

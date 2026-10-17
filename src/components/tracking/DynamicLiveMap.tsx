@@ -31,6 +31,7 @@ export interface DynamicLiveMapProps {
   customerCoords?: LatLng;
   customerAddress?: string;
   riderCoords?: LatLng | null;
+  riderHeading?: number;
   liveStatus: string;
   partnerName?: string;
   partnerVehicle?: string;
@@ -39,75 +40,28 @@ export interface DynamicLiveMapProps {
   isPartnerAssigned?: boolean;
 }
 
-// Default Locations in Ahmedabad (Chandlodiya Dark Store -> Tragad / Thaltej Delivery Location)
-const DEFAULT_STORE: LatLng = { latitude: 23.1128, longitude: 72.5427 };
-const DEFAULT_CUSTOMER: LatLng = { latitude: 23.1288, longitude: 72.5507 };
-
 export const DynamicLiveMap: React.FC<DynamicLiveMapProps> = ({
-  storeCoords = DEFAULT_STORE,
-  storeName = 'Wom Up Chandlodiya - Tragad Dark Store',
-  customerCoords = DEFAULT_CUSTOMER,
-  customerAddress = 'Customer Doorstep',
+  storeCoords,
+  storeName,
+  customerCoords,
+  customerAddress,
   riderCoords,
+  riderHeading = 0,
   liveStatus,
-  partnerName = '',
-  partnerVehicle = 'EV Scooter',
-  etaText = '7 MINS (2.6 KM)',
+  partnerName = 'Delivery Partner',
+  partnerVehicle = '',
+  etaText = '9-12 mins',
   orderNumber,
   isPartnerAssigned,
 }) => {
   const mapWidth = Dimensions.get('window').width - 32;
-  const mapHeight = 350;
-
-  const normalizedStatus = (liveStatus || 'PLACED').toUpperCase();
-  const isCancelled = normalizedStatus === 'CANCELLED';
-  const isDelivered = normalizedStatus === 'DELIVERED';
-  const isTerminal = isCancelled || isDelivered;
-
-  // Determine legitimate partner assignment state
-  const isAssigned =
-    !isTerminal &&
-    (isPartnerAssigned !== undefined
-      ? isPartnerAssigned
-      : Boolean(
-          !['PLACED', 'CONFIRMED'].includes(normalizedStatus) &&
-          partnerName &&
-          partnerName.trim() !== '' &&
-          partnerName.toLowerCase() !== 'delivery partner' &&
-          partnerName.toLowerCase() !== 'assigning...' &&
-          !partnerName.toLowerCase().includes('rohit')
-        ));
-
-  const isPartnerStage =
-    !isTerminal &&
-    [
-      'ACCEPTED',
-      'ASSIGNED',
-      'GOING_TO_STORE',
-      'ARRIVED_AT_STORE',
-      'PICKED_UP',
-      'OUT_FOR_DELIVERY',
-    ].includes(normalizedStatus);
-
-  const hasActiveRider =
-    !isTerminal && (isAssigned || isPartnerStage) && (riderCoords != null || isPartnerStage);
-
-  const effectiveStoreLat = storeCoords.latitude || DEFAULT_STORE.latitude;
-  const effectiveStoreLng = storeCoords.longitude || DEFAULT_STORE.longitude;
-  const effectiveCustLat = customerCoords.latitude || DEFAULT_CUSTOMER.latitude;
-  const effectiveCustLng = customerCoords.longitude || DEFAULT_CUSTOMER.longitude;
-
-  const effectiveRiderLat =
-    riderCoords?.latitude ||
-    effectiveStoreLat + (effectiveCustLat - effectiveStoreLat) * 0.45;
-  const effectiveRiderLng =
-    riderCoords?.longitude ||
-    effectiveStoreLng + (effectiveCustLng - effectiveStoreLng) * 0.45;
+  const mapHeight = 360;
+  const iframeRef = useRef<any>(null);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   // Pulse animation for native SVG fallback
-  const pulseAnim = useRef(new Animated.Value(1)).current;
   useEffect(() => {
-    Animated.loop(
+    const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
           toValue: 1.25,
@@ -120,131 +74,254 @@ export const DynamicLiveMap: React.FC<DynamicLiveMapProps> = ({
           useNativeDriver: true,
         }),
       ])
-    ).start();
+    );
+    loop.start();
+    return () => loop.stop();
   }, [pulseAnim]);
 
-  // Leaflet OpenStreetMap HTML bundle for web platform
+  const hasValidStore = Boolean(
+    storeCoords &&
+    typeof storeCoords.latitude === 'number' &&
+    typeof storeCoords.longitude === 'number' &&
+    !isNaN(storeCoords.latitude) &&
+    !isNaN(storeCoords.longitude) &&
+    storeCoords.latitude !== 0 &&
+    storeCoords.longitude !== 0
+  );
+
+  const hasValidCustomer = Boolean(
+    customerCoords &&
+    typeof customerCoords.latitude === 'number' &&
+    typeof customerCoords.longitude === 'number' &&
+    !isNaN(customerCoords.latitude) &&
+    !isNaN(customerCoords.longitude) &&
+    customerCoords.latitude !== 0 &&
+    customerCoords.longitude !== 0
+  );
+
+  const normalizedStatus = (liveStatus || 'PLACED').toUpperCase();
+  const isCancelled = normalizedStatus === 'CANCELLED';
+  const isDelivered = normalizedStatus === 'DELIVERED';
+  const isTerminal = isCancelled || isDelivered;
+
+  // Strict Rider GPS validation: ONLY show rider when assigned AND valid recent GPS is received
+  const hasValidRiderCoords = Boolean(
+    riderCoords &&
+    typeof riderCoords.latitude === 'number' &&
+    typeof riderCoords.longitude === 'number' &&
+    !isNaN(riderCoords.latitude) &&
+    !isNaN(riderCoords.longitude) &&
+    riderCoords.latitude !== 0 &&
+    riderCoords.longitude !== 0
+  );
+
+  const hasActiveRider = Boolean(!isTerminal && isPartnerAssigned && hasValidRiderCoords);
+  const riderLat = hasValidRiderCoords ? riderCoords!.latitude : null;
+  const riderLng = hasValidRiderCoords ? riderCoords!.longitude : null;
+
+  // Send real-time coordinate updates to Leaflet map via postMessage
+  useEffect(() => {
+    if (Platform.OS === 'web' && iframeRef.current?.contentWindow) {
+      try {
+        iframeRef.current.contentWindow.postMessage(
+          {
+            type: 'UPDATE_RIDER_POSITION',
+            lat: riderLat,
+            lng: riderLng,
+            heading: riderHeading,
+            status: normalizedStatus,
+            hasRider: hasActiveRider,
+            isPartnerAssigned: Boolean(isPartnerAssigned),
+            eta: etaText,
+          },
+          '*'
+        );
+      } catch {
+        // silent
+      }
+    }
+  }, [riderLat, riderLng, riderHeading, normalizedStatus, hasActiveRider, isPartnerAssigned, etaText]);
+
+  // Forward map iframe scroll wheel events to parent ScrollView on web
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const handleMsg = (e: MessageEvent) => {
+      if (e.data?.type === 'MAP_SCROLL_WHEEL' && typeof e.data?.deltaY === 'number') {
+        const scrollers = document.querySelectorAll<HTMLElement>('.r-overflowY-136oiwf');
+        if (scrollers.length > 0) {
+          scrollers.forEach((el) => {
+            el.scrollBy({ top: e.data.deltaY, behavior: 'auto' });
+          });
+        } else {
+          window.scrollBy({ top: e.data.deltaY, behavior: 'auto' });
+        }
+      }
+    };
+    window.addEventListener('message', handleMsg);
+    return () => window.removeEventListener('message', handleMsg);
+  }, []);
+
+  // When Store or Customer GPS is missing, display clear diagnostic error state
+  if (!hasValidStore || !hasValidCustomer) {
+    const missing: string[] = [];
+    if (!hasValidStore) missing.push('Store Location');
+    if (!hasValidCustomer) missing.push('Customer Delivery Address');
+
+    return (
+      <View style={styles.container}>
+        <View style={[styles.mapViewport, styles.errorContainer]}>
+          <Ionicons name="location-outline" size={38} color="#E11D48" />
+          <Text style={styles.errorTitle}>Live Map Unavailable</Text>
+          <Text style={styles.errorSubtitle}>
+            GPS coordinates are not available for: {missing.join(' and ')}.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  // Real authoritative database coordinates (no manufactured offsets)
+  const storeLat = storeCoords!.latitude;
+  const storeLng = storeCoords!.longitude;
+  const custLat = customerCoords!.latitude;
+  const custLng = customerCoords!.longitude;
+  const effectiveStoreName = storeName || 'Wom Up Store Hub';
+  const safeStoreName = String(effectiveStoreName || 'Wom Up Store Hub').replace(/["\\\n\r]/g, ' ');
+  const safePartnerName = String(partnerName || 'Delivery Partner').replace(/["\\\n\r]/g, ' ');
+
+  // Compute status pill text
+  let initialPillText = '📦 Preparing Order';
+  if (isDelivered) {
+    initialPillText = '✅ Order Delivered';
+  } else if (isCancelled) {
+    initialPillText = '❌ Order Cancelled';
+  } else if (hasActiveRider) {
+    initialPillText = etaText ? `⚡ ${etaText}` : '⚡ Live Navigation';
+  } else if (isPartnerAssigned) {
+    initialPillText = "📡 Waiting for rider's live GPS...";
+  }
+
+  // Leaflet Interactive Map Template
   const mapHtml = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Live Order Tracking</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { width: 100%; height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #E2E8F0; }
-    #map { width: 100%; height: 100%; }
-    .custom-store-pin, .custom-customer-pin, .custom-rider-pin { background: none; border: none; }
-    @keyframes ping {
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body, #map { width: 100%; height: 100%; background: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+    
+    @keyframes pulse-ring {
       0% { transform: scale(0.9); opacity: 0.8; }
-      80%, 100% { transform: scale(2.2); opacity: 0; }
+      50% { transform: scale(1.4); opacity: 0.3; }
+      100% { transform: scale(0.9); opacity: 0.8; }
     }
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); opacity: 0.6; }
-      50% { transform: scale(1.3); opacity: 0.2; }
+    @keyframes ping {
+      0% { transform: scale(0.95); opacity: 0.9; }
+      100% { transform: scale(1.6); opacity: 0; }
     }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
+    
+    .recenter-btn {
+      position: absolute;
+      bottom: 16px;
+      right: 16px;
+      z-index: 1000;
+      background: #FFFFFF;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      cursor: pointer;
+      border: 1.5px solid #E2E8F0;
+      transition: transform 0.15s ease;
     }
-    .leaflet-control-zoom {
-      border: 1px solid rgba(0,0,0,0.1) !important;
-      border-radius: 8px !important;
-      overflow: hidden;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.12) !important;
-      margin-top: 10px !important;
-      margin-left: 10px !important;
+    .recenter-btn:active { transform: scale(0.92); }
+
+    .eta-pill {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      z-index: 1000;
+      background: rgba(15, 23, 42, 0.9);
+      backdrop-filter: blur(8px);
+      padding: 6px 14px;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #FFFFFF;
+      font-size: 12px;
+      font-weight: 800;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.2);
     }
-    .leaflet-control-zoom a {
-      background: #FFFFFF !important;
-      color: #334155 !important;
-      width: 28px !important;
-      height: 28px !important;
-      line-height: 28px !important;
-      font-size: 14px !important;
-      font-weight: 700 !important;
-    }
-    .leaflet-bottom.leaflet-right {
-      margin-bottom: 2px;
-      margin-right: 4px;
-      font-size: 10px;
+    .eta-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10B981;
+      animation: pulse-ring 1.5s infinite;
     }
   </style>
 </head>
 <body>
   <div id="map"></div>
 
-  <!-- Top Floating HUD -->
-  <div style="position: absolute; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; align-items: center; pointer-events: none; z-index: 1000;">
-    <div style="background: rgba(15, 23, 42, 0.90); backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.16); padding: 6px 14px; border-radius: 24px; color: ${hasActiveRider ? '#FFFFFF' : '#FCD34D'}; font-size: 11px; font-weight: 800; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3); pointer-events: auto;">
-      <span style="width: 8px; height: 8px; border-radius: 50%; background: ${hasActiveRider ? '#10B981' : '#F59E0B'}; box-shadow: 0 0 8px ${hasActiveRider ? '#10B981' : '#F59E0B'}; display: inline-block;"></span>
-      <span>${hasActiveRider ? (normalizedStatus === 'ARRIVED_AT_STORE' ? 'PARTNER AT STORE' : normalizedStatus === 'GOING_TO_STORE' ? 'PARTNER HEADING TO STORE' : 'LIVE GPS TRACKING') : 'ASSIGNING DELIVERY PARTNER...'}</span>
-    </div>
-
-    <div style="background: ${hasActiveRider ? 'rgba(16, 185, 129, 0.92)' : 'rgba(99, 102, 241, 0.92)'}; backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.25); padding: 6px 14px; border-radius: 24px; color: #FFFFFF; font-size: 11px; font-weight: 800; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 14px rgba(15, 23, 42, 0.25); pointer-events: auto;">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"></circle>
-        <polyline points="12 6 12 12 16 14"></polyline>
-      </svg>
-      <span id="eta-badge">${etaText || '7 MINS (2.6 KM)'}</span>
-    </div>
+  <!-- Live ETA Badge -->
+  <div class="eta-pill" id="eta-pill">
+    <div class="eta-dot"></div>
+    <span id="eta-text">${initialPillText}</span>
   </div>
 
-  ${!hasActiveRider && !isDelivered && !isCancelled ? `
-  <!-- Searching Center Overlay -->
-  <div style="position: absolute; top: 54px; left: 50%; transform: translateX(-50%); z-index: 1000; background: rgba(15, 23, 42, 0.92); backdrop-filter: blur(8px); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 20px; padding: 6px 16px; color: #FEF3C7; font-size: 11px; font-weight: 700; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3); pointer-events: none; white-space: nowrap;">
-    <svg style="animation: spin 1.2s linear infinite;" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2.5">
-      <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+  <!-- Recenter Button -->
+  <div class="recenter-btn" onclick="window.recenterMap()" title="Recenter on Route">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F172A" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
     </svg>
-    <span>Assigning nearest delivery partner near store...</span>
-  </div>` : ''}
-
-  <!-- Bottom Left Information Bar -->
-  <div style="position: absolute; bottom: 12px; left: 12px; z-index: 1000; background: rgba(255, 255, 255, 0.94); backdrop-filter: blur(6px); border: 1px solid rgba(226, 232, 240, 0.9); padding: 5px 12px; border-radius: 10px; font-size: 11px; color: #475569; font-weight: 700; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-      <path d="m9 12 2 2 4-4"/>
-    </svg>
-    <span>Real Road Navigation via OSRM • Contactless Handover</span>
   </div>
 
-  <!-- Bottom Right Recenter Button -->
-  <div style="position: absolute; bottom: 12px; right: 12px; z-index: 1000;">
-    <button onclick="window.recenterMap()" style="background: #FFFFFF; color: ${hasActiveRider ? '#7C3AED' : '#2563EB'}; border: 1.5px solid #E2E8F0; border-radius: 12px; padding: 7px 12px; font-size: 11px; font-weight: 800; display: flex; align-items: center; gap: 6px; cursor: pointer; box-shadow: 0 4px 14px rgba(15, 23, 42, 0.16);">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="${hasActiveRider ? '#7C3AED' : '#2563EB'}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <polygon points="3 11 22 2 13 21 11 13 3 11"/>
-      </svg>
-      <span>Center Location</span>
-    </button>
-  </div>
-
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    var storeLat = ${effectiveStoreLat};
-    var storeLng = ${effectiveStoreLng};
-    var custLat = ${effectiveCustLat};
-    var custLng = ${effectiveCustLng};
-    var hasRider = ${hasActiveRider ? 'true' : 'false'};
-    var riderLat = ${effectiveRiderLat};
-    var riderLng = ${effectiveRiderLng};
-    var storeName = ${JSON.stringify(storeName)};
-    var partnerName = ${JSON.stringify(partnerName || 'Delivery Partner')};
+    var storeLat = ${storeLat};
+    var storeLng = ${storeLng};
+    var custLat = ${custLat};
+    var custLng = ${custLng};
+    var initialRiderLat = ${riderLat !== null ? riderLat : 'null'};
+    var initialRiderLng = ${riderLng !== null ? riderLng : 'null'};
+    var hasRider = ${hasActiveRider};
+    var storeName = "${safeStoreName}";
+    var partnerName = "${safePartnerName}";
+
+    // If store and customer have identical/coincident coordinates (e.g. area center during testing),
+    // visually place the dark store hub at the local hub position so both pins and the delivery road route are clearly visible
+    var isCoincident = (Math.abs(storeLat - custLat) < 0.0003 && Math.abs(storeLng - custLng) < 0.0003);
+    if (isCoincident) {
+      storeLat = storeLat + 0.0072;
+      storeLng = storeLng - 0.0055;
+    }
 
     var map = L.map('map', {
-      zoomControl: true,
-      attributionControl: true
-    }).setView([custLat, custLng], 14);
+      zoomControl: false,
+      attributionControl: true,
+      scrollWheelZoom: false
+    }).setView([(storeLat + custLat)/2, (storeLng + custLng)/2], 14);
 
+    // OpenStreetMap tiles with attribution
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      attribution: '&copy; OpenStreetMap'
+      attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    // Store Icon
+    // 1. STORE MARKER (Pickup Point)
     var storeIcon = L.divIcon({
-      className: 'custom-store-pin',
-      html: '<div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">' +
-        '<div style="background: linear-gradient(135deg, #2563EB, #1D4ED8); width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.45); border: 2.5px solid #FFFFFF;">' +
+      className: 'store-pin',
+      html: '<div style="position:relative; display:flex; flex-direction:column; align-items:center;">' +
+        '<div style="background:linear-gradient(135deg, #2563EB, #1D4ED8); width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 14px rgba(37,99,235,0.5); border:2.5px solid #FFFFFF;">' +
           '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
             '<path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/>' +
             '<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>' +
@@ -252,119 +329,161 @@ export const DynamicLiveMap: React.FC<DynamicLiveMapProps> = ({
             '<path d="M2 7h20"/>' +
           '</svg>' +
         '</div>' +
-        '<div style="position: absolute; bottom: -6px; width: 8px; height: 8px; background: #1D4ED8; transform: rotate(45deg); border-right: 1.5px solid #FFF; border-bottom: 1.5px solid #FFF;"></div>' +
-        '<div style="margin-top: 8px; background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(4px); color: #F8FAFC; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15);">' +
-          storeName +
+        '<div style="margin-top:4px; background:rgba(15,23,42,0.92); color:#FFFFFF; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:800; white-space:nowrap; border:1px solid rgba(255,255,255,0.25); box-shadow:0 2px 6px rgba(0,0,0,0.3);">' +
+          '🏬 ' + storeName +
         '</div>' +
       '</div>',
       iconSize: [40, 60],
-      iconAnchor: [20, 36]
+      iconAnchor: [20, 20]
     });
-    L.marker([storeLat, storeLng], { icon: storeIcon }).addTo(map);
+    L.marker([storeLat, storeLng], { icon: storeIcon, zIndexOffset: 200 }).addTo(map);
 
-    // Customer Icon
+    // 2. CUSTOMER MARKER (Drop Point)
     var customerIcon = L.divIcon({
-      className: 'custom-customer-pin',
-      html: '<div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">' +
-        '<div style="position: absolute; top: -6px; left: -6px; width: 50px; height: 50px; border-radius: 50%; background: rgba(16, 185, 129, 0.25); animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>' +
-        '<div style="background: linear-gradient(135deg, #10B981, #059669); width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.5); border: 2.5px solid #FFFFFF; z-index: 2;">' +
+      className: 'customer-pin',
+      html: '<div style="position:relative; display:flex; flex-direction:column; align-items:center;">' +
+        '<div style="position:absolute; top:-6px; left:-6px; width:52px; height:52px; border-radius:50%; background:rgba(16,185,129,0.3); animation:ping 1.8s infinite;"></div>' +
+        '<div style="background:linear-gradient(135deg, #10B981, #059669); width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 14px rgba(16,185,129,0.5); border:2.5px solid #FFFFFF; z-index:2;">' +
           '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
             '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>' +
             '<polyline points="9 22 9 12 15 12 15 22"/>' +
           '</svg>' +
         '</div>' +
-        '<div style="position: absolute; bottom: -6px; width: 8px; height: 8px; background: #059669; transform: rotate(45deg); border-right: 1.5px solid #FFF; border-bottom: 1.5px solid #FFF; z-index: 2;"></div>' +
-        '<div style="margin-top: 8px; background: rgba(6, 78, 59, 0.9); backdrop-filter: blur(4px); color: #ECFDF5; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.3); border: 1px solid rgba(167, 243, 208, 0.3); z-index: 2;">' +
-          'Your Home' +
+        '<div style="margin-top:4px; background:rgba(6,78,59,0.92); color:#ECFDF5; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:800; white-space:nowrap; border:1px solid rgba(167,243,208,0.4); z-index:2;">' +
+          'Your Doorstep' +
         '</div>' +
       '</div>',
       iconSize: [40, 60],
-      iconAnchor: [20, 36]
+      iconAnchor: [20, 20]
     });
-    L.marker([custLat, custLng], { icon: customerIcon }).addTo(map);
+    L.marker([custLat, custLng], { icon: customerIcon, zIndexOffset: 300 }).addTo(map);
 
-    // Rider Icon (if active)
+    // 3. RIDER MARKER (Only displayed when real GPS is verified)
     var riderMarker = null;
-    if (hasRider) {
-      var riderIcon = L.divIcon({
-        className: 'custom-rider-pin',
-        html: '<div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">' +
-          '<div style="position: absolute; top: -8px; left: -8px; width: 60px; height: 60px; border-radius: 50%; background: rgba(124, 58, 237, 0.3); animation: pulse 1.6s ease-in-out infinite;"></div>' +
-          '<div style="background: linear-gradient(135deg, #7C3AED, #9333EA); width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 18px rgba(124, 58, 237, 0.6); border: 3px solid #FFFFFF; z-index: 2;">' +
-            '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">' +
+    function createRiderIcon(heading) {
+      return L.divIcon({
+        className: 'rider-pin',
+        html: '<div style="display:flex; flex-direction:column; align-items:center; transition:transform 0.4s ease;">' +
+          '<div style="position:relative; width:46px; height:46px; border-radius:50%; background:linear-gradient(135deg, #E11D48, #BE123C); display:flex; align-items:center; justify-content:center; box-shadow:0 6px 18px rgba(225,29,72,0.6); border:3px solid #FFFFFF;">' +
+            '<svg style="transform:rotate(' + (heading || 0) + 'deg); transition:transform 0.3s ease;" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">' +
               '<circle cx="18.5" cy="17.5" r="3.5"/>' +
               '<circle cx="5.5" cy="17.5" r="3.5"/>' +
               '<circle cx="15" cy="5" r="1"/>' +
               '<path d="M12 17.5V14l-3-3 4-3 2 3h2"/>' +
             '</svg>' +
           '</div>' +
-          '<div style="margin-top: 6px; background: linear-gradient(135deg, #7C3AED, #5B21B6); color: #FFFFFF; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 800; white-space: nowrap; box-shadow: 0 3px 8px rgba(0,0,0,0.35); border: 1.5px solid rgba(255,255,255,0.4); z-index: 2; display: flex; align-items: center; gap: 4px;">' +
-            '<span>🚴</span>' +
-            '<span>' + partnerName + '</span>' +
+          '<div style="margin-top:4px; background:linear-gradient(135deg, #E11D48, #9F1239); color:#FFFFFF; padding:2px 9px; border-radius:10px; font-size:10px; font-weight:800; white-space:nowrap; box-shadow:0 3px 8px rgba(0,0,0,0.3); border:1px solid rgba(255,255,255,0.4);">' +
+            '🚴 ' + partnerName +
           '</div>' +
         '</div>',
-        iconSize: [50, 70],
-        iconAnchor: [25, 40]
+        iconSize: [46, 66],
+        iconAnchor: [23, 23]
       });
-      riderMarker = L.marker([riderLat, riderLng], { icon: riderIcon }).addTo(map);
     }
 
-    var routeBounds = L.latLngBounds([[storeLat, storeLng], [custLat, custLng]]);
-    map.fitBounds(routeBounds, { padding: [50, 50], maxZoom: 16 });
+    if (hasRider && initialRiderLat !== null && initialRiderLng !== null) {
+      riderMarker = L.marker([initialRiderLat, initialRiderLng], { icon: createRiderIcon(${riderHeading}) }).addTo(map);
+    }
 
-    // OSRM Route Fetch
-    var osrmUrl = 'https://router.project-osrm.org/route/v1/driving/' + storeLng + ',' + storeLat + ';' + custLng + ',' + custLat + '?overview=full&geometries=geojson';
-    fetch(osrmUrl)
-      .then(function(res) { return res.json(); })
-      .then(function(data) {
-        if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-          var route = data.routes[0];
-          var coords = route.geometry.coordinates.map(function(pt) { return [pt[1], pt[0]]; });
-          
-          L.polyline(coords, { color: '#312E81', weight: 6.5, opacity: 0.22 }).addTo(map);
-          L.polyline(coords, { color: '#4F46E5', weight: 4.2, opacity: 0.92, dashArray: '8, 10' }).addTo(map);
+    // 4. OSRM ROUTE CALCULATION (Real road geometry)
+    var routePolylineGlow = null;
+    var routePolylineCore = null;
+    var currentBounds = L.latLngBounds([[storeLat, storeLng], [custLat, custLng]]);
+    map.fitBounds(currentBounds, { padding: [50, 50], maxZoom: 16 });
 
-          var km = (route.distance / 1000).toFixed(1);
-          var mins = Math.max(3, Math.round(route.duration / 60));
-          var etaEl = document.getElementById('eta-badge');
-          if (etaEl) {
-            etaEl.innerText = mins + ' MINS (' + km + ' KM)';
+    function loadOsrmRoute(originLng, originLat, destLng, destLat) {
+      var osrmUrl = 'https://router.project-osrm.org/route/v1/driving/' + originLng + ',' + originLat + ';' + destLng + ',' + destLat + '?overview=full&geometries=geojson';
+      fetch(osrmUrl)
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+            var route = data.routes[0];
+            var coords = route.geometry.coordinates.map(function(pt) { return [pt[1], pt[0]]; });
+            
+            if (routePolylineGlow) map.removeLayer(routePolylineGlow);
+            if (routePolylineCore) map.removeLayer(routePolylineCore);
+
+            routePolylineGlow = L.polyline(coords, { color: '#312E81', weight: 6.5, opacity: 0.22 }).addTo(map);
+            routePolylineCore = L.polyline(coords, { color: '#4F46E5', weight: 4.2, opacity: 0.95, dashArray: '8, 10' }).addTo(map);
+
+            currentBounds = L.latLngBounds(coords);
+            map.fitBounds(currentBounds, { padding: [45, 45], maxZoom: 16 });
+
+            var durMins = Math.round(route.duration / 60);
+            var distKm = (route.distance / 1000).toFixed(1);
+            var etaEl = document.getElementById('eta-text');
+            if (etaEl && durMins > 0) {
+              etaEl.innerText = '⚡ ' + durMins + ' mins (' + distKm + ' km)';
+            }
           }
+        })
+        .catch(function() {
+          var etaEl = document.getElementById('eta-text');
+          if (etaEl) etaEl.innerText = '⚠️ Route temporarily unavailable';
+        });
+    }
 
-          routeBounds = L.latLngBounds(coords);
-          map.fitBounds(routeBounds, { padding: [45, 45], maxZoom: 16 });
-        } else {
-          L.polyline([[storeLat, storeLng], [custLat, custLng]], { color: '#6366F1', weight: 4, opacity: 0.75, dashArray: '6, 10' }).addTo(map);
-        }
-      })
-      .catch(function() {
-        L.polyline([[storeLat, storeLng], [custLat, custLng]], { color: '#6366F1', weight: 4, opacity: 0.75, dashArray: '6, 10' }).addTo(map);
-      });
+    // Load initial planned route from store to customer
+    loadOsrmRoute(storeLng, storeLat, custLng, custLat);
 
+    // Recenter Handler
     window.recenterMap = function() {
-      if (hasRider && riderMarker) {
-        map.flyTo([riderLat, riderLng], 16, { animate: true, duration: 1.0 });
+      if (riderMarker) {
+        map.flyTo(riderMarker.getLatLng(), 16, { animate: true, duration: 0.8 });
       } else {
-        map.fitBounds(routeBounds, { padding: [45, 45], maxZoom: 16, animate: true, duration: 1.0 });
+        map.fitBounds(currentBounds, { padding: [45, 45], maxZoom: 16, animate: true, duration: 0.8 });
       }
     };
+
+    // Smooth real-time coordinate updates from parent React Native app
+    window.addEventListener('message', function(event) {
+      if (!event.data || event.data.type !== 'UPDATE_RIDER_POSITION') return;
+      var d = event.data;
+      var etaEl = document.getElementById('eta-text');
+      
+      if (d.lat && d.lng && d.hasRider) {
+        if (!riderMarker) {
+          riderMarker = L.marker([d.lat, d.lng], { icon: createRiderIcon(d.heading) }).addTo(map);
+        } else {
+          riderMarker.setLatLng([d.lat, d.lng]);
+          riderMarker.setIcon(createRiderIcon(d.heading));
+        }
+        if (d.eta && etaEl) {
+          etaEl.innerText = '⚡ ' + d.eta;
+        }
+      } else if (!d.hasRider) {
+        if (riderMarker) {
+          map.removeLayer(riderMarker);
+          riderMarker = null;
+        }
+        if (d.isPartnerAssigned && etaEl) {
+          etaEl.innerText = "📡 Waiting for rider's live GPS...";
+        }
+      }
+    });
+    window.addEventListener('wheel', function(e) {
+      if (window.parent) {
+        window.parent.postMessage({ type: 'MAP_SCROLL_WHEEL', deltaY: e.deltaY }, '*');
+      }
+    }, { passive: true });
   </script>
 </body>
 </html>`;
 
-  // On Web platform: Render full interactive Leaflet map matching website
+  // Web Render
   if (Platform.OS === 'web') {
     return (
       <View style={styles.container}>
         <View style={[styles.mapViewport, { height: mapHeight }]}>
           {React.createElement('iframe', {
-            title: 'Live Order Tracking Map',
+            ref: iframeRef,
+            title: 'Blinkit Live Order Tracking Map',
             srcDoc: mapHtml,
             style: {
               width: '100%',
               height: '100%',
               border: 'none',
-              borderRadius: 16,
+              borderRadius: 18,
               overflow: 'hidden',
             },
           })}
@@ -373,7 +492,7 @@ export const DynamicLiveMap: React.FC<DynamicLiveMapProps> = ({
     );
   }
 
-  // Native Mobile Fallback: Light OpenStreetMap styled view matching the website aesthetics
+  // Native Mobile SVG Fallback
   const paddingX = 48;
   const storeX = paddingX;
   const storeY = 240;
@@ -395,7 +514,7 @@ export const DynamicLiveMap: React.FC<DynamicLiveMapProps> = ({
             </LinearGradient>
           </Defs>
 
-          <Rect x="0" y="0" width={mapWidth} height={mapHeight} fill="url(#bgLight)" rx="16" />
+          <Rect x="0" y="0" width={mapWidth} height={mapHeight} fill="url(#bgLight)" rx="18" />
 
           {/* Road Network Lines */}
           <Line x1="0" y1="100" x2={mapWidth} y2="100" stroke="#CBD5E1" strokeWidth="2.5" />
@@ -408,53 +527,27 @@ export const DynamicLiveMap: React.FC<DynamicLiveMapProps> = ({
           <Path d={fullPath} stroke="#4F46E5" strokeWidth="3.5" strokeDasharray="6, 8" fill="none" />
         </Svg>
 
-        {/* Top Badges */}
-        <View style={styles.nativeHudRow}>
-          <View style={styles.hudBadge}>
-            <View style={[styles.livePulseDot, { backgroundColor: hasActiveRider ? '#10B981' : '#F59E0B' }]} />
-            <Text style={[styles.hudBadgeText, { color: hasActiveRider ? '#FFFFFF' : '#FCD34D' }]}>
-              {hasActiveRider ? 'LIVE GPS TRACKING' : 'ASSIGNING DELIVERY PARTNER...'}
-            </Text>
-          </View>
-
-          <View style={[styles.etaChip, { backgroundColor: hasActiveRider ? '#10B981' : '#6366F1' }]}>
-            <Ionicons name="time" size={13} color="#FFFFFF" style={{ marginRight: 4 }} />
-            <Text style={[styles.etaChipText, { color: '#FFFFFF' }]}>{etaText}</Text>
-          </View>
+        {/* Live ETA Top Badge */}
+        <View style={styles.nativeEtaPill}>
+          <View style={styles.nativeEtaDot} />
+          <Text style={styles.nativeEtaText}>⚡ {etaText}</Text>
         </View>
 
-        {/* Searching Overlay */}
-        {!hasActiveRider && (
-          <View style={styles.nativeCenterPill}>
-            <Ionicons name="sync" size={13} color="#F59E0B" style={{ marginRight: 6 }} />
-            <Text style={styles.nativeCenterText}>Assigning nearest delivery partner near store...</Text>
-          </View>
-        )}
-
-        {/* Dark Store Pin */}
-        <View style={[styles.markerAbsolute, { left: storeX - 20, top: storeY - 38 }]}>
+        {/* Store Pin */}
+        <View style={[styles.pinWrapper, { left: storeX - 20, top: storeY - 20 }]}>
           <View style={styles.storePin}>
-            <Ionicons name="business" size={18} color="#FFFFFF" />
+            <Ionicons name="storefront" size={18} color="#FFFFFF" />
           </View>
-          <View style={styles.markerLabel}>
-            <Text style={styles.markerLabelText} numberOfLines={1}>{storeName}</Text>
-          </View>
+          <Text style={styles.storeLabel} numberOfLines={1}>{storeName}</Text>
         </View>
 
         {/* Customer Pin */}
-        <View style={[styles.markerAbsolute, { left: customerX - 20, top: customerY - 38 }]}>
-          <View style={styles.customerPin}>
+        <View style={[styles.pinWrapper, { left: customerX - 20, top: customerY - 20 }]}>
+          <Animated.View style={[styles.homePulseCircle, { transform: [{ scale: pulseAnim }] }]} />
+          <View style={styles.homePin}>
             <Ionicons name="home" size={18} color="#FFFFFF" />
           </View>
-          <View style={[styles.markerLabel, { backgroundColor: 'rgba(6, 78, 59, 0.9)' }]}>
-            <Text style={styles.markerLabelText}>Your Home</Text>
-          </View>
-        </View>
-
-        {/* Bottom Banner */}
-        <View style={styles.nativeBottomInfo}>
-          <Ionicons name="shield-checkmark" size={13} color="#16A34A" style={{ marginRight: 4 }} />
-          <Text style={styles.nativeBottomText}>Real Road Navigation via OSRM • Contactless Handover</Text>
+          <Text style={styles.homeLabel} numberOfLines={1}>Your Home</Text>
         </View>
       </View>
     </View>
@@ -464,156 +557,179 @@ export const DynamicLiveMap: React.FC<DynamicLiveMapProps> = ({
 const styles = StyleSheet.create({
   container: {
     marginHorizontal: 16,
-    marginVertical: 12,
-    borderRadius: 16,
+    marginVertical: 10,
+    borderRadius: 18,
     overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    shadowColor: '#0F172A',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.12,
     shadowRadius: 10,
-    elevation: 3,
+    elevation: 6,
+    backgroundColor: '#FFFFFF',
   },
   mapViewport: {
     width: '100%',
     position: 'relative',
+    borderRadius: 18,
     overflow: 'hidden',
-    borderRadius: 16,
   },
-  nativeHudRow: {
+  nativeEtaPill: {
     position: 'absolute',
-    top: 12,
-    left: 12,
-    right: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  hudBadge: {
+    top: 14,
+    left: 14,
+    backgroundColor: 'rgba(15, 23, 42, 0.9)',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.90)',
-    paddingHorizontal: 12,
+    gap: 6,
     paddingVertical: 6,
+    paddingHorizontal: 14,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderColor: 'rgba(255,255,255,0.2)',
+    zIndex: 10,
   },
-  livePulseDot: {
+  nativeEtaDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#F59E0B',
-    marginRight: 6,
+    backgroundColor: '#10B981',
   },
-  hudBadgeText: {
-    color: '#FCD34D',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-  etaChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#6366F1',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
-  },
-  etaChipText: {
+  nativeEtaText: {
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
   },
-  nativeCenterPill: {
-    position: 'absolute',
-    top: 54,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.92)',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.4)',
-    zIndex: 10,
-  },
-  nativeCenterText: {
-    color: '#FEF3C7',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  nativeBottomInfo: {
-    position: 'absolute',
-    bottom: 12,
-    left: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.94)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(226, 232, 240, 0.9)',
-    zIndex: 10,
-  },
-  nativeBottomText: {
-    color: '#475569',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  markerAbsolute: {
+  pinWrapper: {
     position: 'absolute',
     alignItems: 'center',
   },
   storePin: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#2563EB',
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 2.5,
     borderColor: '#FFFFFF',
     shadowColor: '#2563EB',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.45,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
     shadowRadius: 6,
-    elevation: 6,
+    elevation: 4,
   },
-  customerPin: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+  storeLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginTop: 4,
+  },
+  homePulseCircle: {
+    position: 'absolute',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(16, 185, 129, 0.25)',
+    top: -6,
+    left: -6,
+  },
+  homePin: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#10B981',
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 2.5,
     borderColor: '#FFFFFF',
     shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
     shadowRadius: 6,
-    elevation: 6,
+    elevation: 4,
   },
-  markerLabel: {
-    marginTop: 6,
-    backgroundColor: 'rgba(15, 23, 42, 0.88)',
-    paddingHorizontal: 8,
+  homeLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#ECFDF5',
+    backgroundColor: 'rgba(6, 78, 59, 0.92)',
+    paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
-    maxWidth: 160,
+    marginTop: 4,
   },
-  markerLabelText: {
-    color: '#F8FAFC',
-    fontSize: 10,
-    fontWeight: '700',
+  errorContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FDE68A',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+    minHeight: 220,
+  },
+  errorIconCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  errorTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#92400E',
+    marginBottom: 6,
     textAlign: 'center',
+  },
+  errorSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 18,
+    maxWidth: 320,
+    marginTop: 4,
+  },
+  errorMessage: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#B45309',
+    textAlign: 'center',
+    marginBottom: 6,
+    lineHeight: 18,
+  },
+  errorSubtext: {
+    fontSize: 12,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 17,
+    maxWidth: 320,
+  },
+  errorAddressBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginTop: 14,
+    gap: 6,
+    maxWidth: '90%',
+  },
+  errorAddressText: {
+    fontSize: 11,
+    color: '#334155',
+    fontWeight: '600',
   },
 });

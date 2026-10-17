@@ -5,6 +5,7 @@ import { StoresService } from './stores.service';
 import { StoresController } from './stores.controller';
 
 import { Area, AreaSchema } from '../areas/schemas/area.schema';
+import { TrackingModule } from '../tracking/tracking.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { Area, AreaSchema } from '../areas/schemas/area.schema';
       { name: Store.name, schema: StoreSchema },
       { name: Area.name, schema: AreaSchema },
     ]),
+    TrackingModule,
   ],
   controllers: [StoresController],
   providers: [StoresService],

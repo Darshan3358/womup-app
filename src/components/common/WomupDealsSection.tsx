@@ -132,7 +132,7 @@ export const WomupDealsSection: React.FC<WomupDealsSectionProps> = ({
               : 12;
 
           const isWishlisted = isInWishlist(item.id);
-          const quantity = getBlinkitQty(item.id);
+          const quantity = getBlinkitQty(item.id, activeVariant?.id);
 
           const handleAddToCart = () => {
             const enrichedProduct: BlinkitProduct = {
@@ -140,8 +140,9 @@ export const WomupDealsSection: React.FC<WomupDealsSectionProps> = ({
               sellingPrice: currentSellingPrice,
               mrp: currentMrp,
               packSize: currentPackSize,
+              selectedVariantId: activeVariant?.id,
             };
-            updateBlinkitQty(enrichedProduct, 1);
+            updateBlinkitQty(enrichedProduct, 1, activeVariant?.id);
           };
 
           const handleUpdateQty = (delta: number) => {
@@ -150,8 +151,9 @@ export const WomupDealsSection: React.FC<WomupDealsSectionProps> = ({
               sellingPrice: currentSellingPrice,
               mrp: currentMrp,
               packSize: currentPackSize,
+              selectedVariantId: activeVariant?.id,
             };
-            updateBlinkitQty(enrichedProduct, delta);
+            updateBlinkitQty(enrichedProduct, delta, activeVariant?.id);
           };
 
           return (

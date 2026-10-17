@@ -144,6 +144,23 @@ export const SidebarDrawer: React.FC = () => {
               <ChevronRight size={16} color={COLORS.secondaryText} />
             </TouchableOpacity>
 
+            {/* 1b. Pending Approvals Hub */}
+            <TouchableOpacity
+              style={[
+                styles.menuItem,
+                activeTab === 'Approvals' && subView === 'none' && styles.menuItemActive,
+              ]}
+              onPress={() => handleNavigateTab('Approvals')}
+            >
+              <View style={[styles.iconContainer, activeTab === 'Approvals' && subView === 'none' && styles.iconActive]}>
+                <ShieldCheck size={18} color={activeTab === 'Approvals' && subView === 'none' ? COLORS.white : '#DC2626'} />
+              </View>
+              <Text style={[styles.menuLabel, activeTab === 'Approvals' && subView === 'none' && styles.menuLabelActive]}>
+                🛡️ Pending Approvals
+              </Text>
+              <ChevronRight size={16} color={COLORS.secondaryText} />
+            </TouchableOpacity>
+
             {/* 2. Users */}
             <TouchableOpacity
               style={[

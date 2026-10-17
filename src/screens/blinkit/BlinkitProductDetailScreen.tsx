@@ -37,7 +37,6 @@ export const BlinkitProductDetailScreen: React.FC = () => {
   } = useApp();
 
   const product = selectedBlinkitProduct;
-  const quantity = product ? getBlinkitQty(product.id) : 0;
   const isWishlisted = product ? isInWishlist(product.id) : false;
 
   const [activeImageIndex, setActiveImageIndex] = useState(0);
@@ -55,6 +54,7 @@ export const BlinkitProductDetailScreen: React.FC = () => {
   }, [product?.id]);
 
   const activeVariant = variants.find((v) => v.id === selectedVariantId) || defaultVariant;
+  const quantity = product ? getBlinkitQty(product.id, activeVariant?.id) : 0;
   let displayPrice = activeVariant ? activeVariant.price : product?.sellingPrice || 0;
   let displayMrp = activeVariant ? activeVariant.mrp : product?.mrp || 0;
 
@@ -436,8 +436,10 @@ export const BlinkitProductDetailScreen: React.FC = () => {
                   sellingPrice: displayPrice,
                   mrp: displayMrp,
                   packSize: displayPackSize,
+                  selectedVariantId: activeVariant?.id,
                 },
-                1
+                1,
+                activeVariant?.id
               )
             }
             style={styles.stickyAddToCartBtn}
@@ -449,7 +451,19 @@ export const BlinkitProductDetailScreen: React.FC = () => {
           <View style={styles.stickyStepperContainer}>
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={() => updateBlinkitQty(product, -1)}
+              onPress={() =>
+                updateBlinkitQty(
+                  {
+                    ...product,
+                    sellingPrice: displayPrice,
+                    mrp: displayMrp,
+                    packSize: displayPackSize,
+                    selectedVariantId: activeVariant?.id,
+                  },
+                  -1,
+                  activeVariant?.id
+                )
+              }
               style={styles.stickyStepperBtn}
               accessibilityLabel="Decrease"
             >
@@ -458,7 +472,19 @@ export const BlinkitProductDetailScreen: React.FC = () => {
             <Text style={styles.stickyStepperQty}>{quantity}</Text>
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={() => updateBlinkitQty(product, 1)}
+              onPress={() =>
+                updateBlinkitQty(
+                  {
+                    ...product,
+                    sellingPrice: displayPrice,
+                    mrp: displayMrp,
+                    packSize: displayPackSize,
+                    selectedVariantId: activeVariant?.id,
+                  },
+                  1,
+                  activeVariant?.id
+                )
+              }
               style={styles.stickyStepperBtn}
               accessibilityLabel="Increase"
             >

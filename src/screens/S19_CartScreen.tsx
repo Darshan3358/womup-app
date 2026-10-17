@@ -55,7 +55,7 @@ export const S19_CartScreen: React.FC = () => {
         onBack={goBack}
       />
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ flex: 1, width: '100%' }} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Cart Item Cards matching wireframe */}
         <View style={styles.itemsList}>
           {cart.map((item) => (
@@ -188,10 +188,11 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
     backgroundColor: COLORS.white,
+    minHeight: 0,
   },
   scrollContent: {
     padding: SPACING.md,
-    paddingBottom: 40,
+    paddingBottom: 60,
   },
   itemsList: {
     backgroundColor: COLORS.white,

@@ -51,6 +51,7 @@ export interface Product {
   description?: string;
   specifications?: Record<string, string>;
   variants?: ProductVariantPriced[];  // ← populated from MongoDB via area pricing
+  selectedVariantId?: string;
 }
 
 
@@ -175,9 +176,24 @@ export interface UserProfile {
   customerPaymentStatus?: number;
   customerKycStatus?: number;
   bankName?: string;
+  branchName?: string;
+  accountHolderName?: string;
   accountNumber?: string;
+  bankAccountNo?: string;
   ifscCode?: string;
   upiId?: string;
+  aadhaarNumber?: string;
+  aadharNumber?: string;
+  customer_aadhar_no?: string;
+  customer_image_aadhar_front?: string;
+  customer_image_aadhar_back?: string;
+  aadharFrontImage?: string;
+  aadharBackImage?: string;
+  passbookImage?: string;
+  bankProofImage?: string;
+  cancelledChequeImage?: string;
+  kycStatus?: string;
+  kycRejectReason?: string;
 }
 
 
@@ -236,7 +252,9 @@ export type ScreenId =
   | 'Blinkit_Checkout'
   | 'Blinkit_OrderSuccess'
   | 'Blinkit_Wishlist'
-  | 'Local_Home';
+  | 'Local_Home'
+  | 'C27_KYC'
+  | 'KYC';
 
 export interface BlinkitProduct {
   id: string;
@@ -266,6 +284,7 @@ export interface BlinkitProduct {
   };
   specifications?: Record<string, string>;
   variants?: ProductVariantPriced[];  // ← DB-driven weight/size picker options
+  selectedVariantId?: string;         // ← Active selected variant ID for cart sync
 }
 
 export interface BlinkitCategoryCard {

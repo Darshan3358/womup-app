@@ -188,13 +188,14 @@ export const ProductSection: React.FC<ProductSectionProps> = ({
               : 0;
 
           const isWishlisted = isInWishlist(item.id);
-          const quantity = getBlinkitQty(item.id);
+          const quantity = getBlinkitQty(item.id, activeVariant?.id);
 
           const getProductPayload = (): BlinkitProduct => ({
             ...item,
             sellingPrice: currentSellingPrice,
             mrp: currentMrp,
             packSize: currentPackSize,
+            selectedVariantId: activeVariant?.id,
           });
 
           return (
@@ -347,7 +348,7 @@ export const ProductSection: React.FC<ProductSectionProps> = ({
                   <View style={[styles.stepperContainer, isCompact && { paddingHorizontal: 2, height: 26 }]}>
                     <TouchableOpacity
                       activeOpacity={0.7}
-                      onPress={() => updateBlinkitQty(getProductPayload(), -1)}
+                      onPress={() => updateBlinkitQty(getProductPayload(), -1, activeVariant?.id)}
                       style={styles.stepperBtn}
                       hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
                     >
@@ -358,7 +359,7 @@ export const ProductSection: React.FC<ProductSectionProps> = ({
                     </Text>
                     <TouchableOpacity
                       activeOpacity={0.7}
-                      onPress={() => updateBlinkitQty(getProductPayload(), 1)}
+                      onPress={() => updateBlinkitQty(getProductPayload(), 1, activeVariant?.id)}
                       style={styles.stepperBtn}
                       hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
                     >
@@ -368,7 +369,7 @@ export const ProductSection: React.FC<ProductSectionProps> = ({
                 ) : (
                   <TouchableOpacity
                     activeOpacity={0.8}
-                    onPress={() => updateBlinkitQty(getProductPayload(), 1)}
+                    onPress={() => updateBlinkitQty(getProductPayload(), 1, activeVariant?.id)}
                     style={[styles.addButton, isCompact && { height: 25, paddingHorizontal: 8 }]}
                     accessibilityLabel={`Add ${item.name}`}
                   >

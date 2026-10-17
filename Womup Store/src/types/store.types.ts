@@ -118,13 +118,24 @@ export interface StoreOrder {
   };
 }
 
+export interface InventoryVariantItem {
+  id: string;
+  weightOrVolume: string;
+  sellingPrice: number;
+  mrp: number;
+  stock: number;
+  isDefault?: boolean;
+}
+
 export interface InventoryItem {
   productId: string;
   name: string;
   brand?: string;
+  category?: string;
   imageUrl: string;
   quantityLabel: string;
   sellingPrice: number;
+  mrp?: number;
   availableQty: number;
   reservedQty: number;
   threshold: number;
@@ -132,6 +143,7 @@ export interface InventoryItem {
   isOutOfStock: boolean;
   shelfLocation: string;
   sku: string;
+  variants?: InventoryVariantItem[];
 }
 
 export interface InventoryLogItem {

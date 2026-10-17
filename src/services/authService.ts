@@ -203,7 +203,19 @@ export const AuthService = {
   },
 
   async verifyAadhaar(
-    aadhaarNumber: string,
+    aadhaarOrPayload: string | {
+      aadhaarNumber: string;
+      fullNameAsPerAadhaar?: string;
+      frontImage?: string;
+      backImage?: string;
+      bankName?: string;
+      branchName?: string;
+      accountHolderName?: string;
+      accountNumber?: string;
+      ifscCode?: string;
+      upiId?: string;
+      bankProofImage?: string;
+    },
     fullNameAsPerAadhaar?: string,
     frontImage?: string,
     backImage?: string,
@@ -212,24 +224,46 @@ export const AuthService = {
     user?: any;
     message?: string;
   }> {
-    const res = await api.post<any>('/users/verify-aadhaar', {
-      aadhaarNumber,
-      fullNameAsPerAadhaar,
-      customer_image_aadhar_front: frontImage,
-      customer_image_aadhar_back: backImage,
-      aadhaarFrontImage: frontImage,
-      aadhaarBackImage: backImage,
-    });
+    let payload: any = {};
+    if (typeof aadhaarOrPayload === 'string') {
+      payload = {
+        aadhaarNumber: aadhaarOrPayload,
+        fullNameAsPerAadhaar,
+        customer_image_aadhar_front: frontImage,
+        customer_image_aadhar_back: backImage,
+        aadhaarFrontImage: frontImage,
+        aadhaarBackImage: backImage,
+      };
+    } else {
+      payload = {
+        aadhaarNumber: aadhaarOrPayload.aadhaarNumber,
+        fullNameAsPerAadhaar: aadhaarOrPayload.fullNameAsPerAadhaar,
+        customer_image_aadhar_front: aadhaarOrPayload.frontImage,
+        customer_image_aadhar_back: aadhaarOrPayload.backImage,
+        aadhaarFrontImage: aadhaarOrPayload.frontImage,
+        aadhaarBackImage: aadhaarOrPayload.backImage,
+        bankName: aadhaarOrPayload.bankName,
+        branchName: aadhaarOrPayload.branchName,
+        accountHolderName: aadhaarOrPayload.accountHolderName,
+        accountNumber: aadhaarOrPayload.accountNumber,
+        ifscCode: aadhaarOrPayload.ifscCode,
+        upiId: aadhaarOrPayload.upiId,
+        bankProofImage: aadhaarOrPayload.bankProofImage,
+        passbookImage: aadhaarOrPayload.bankProofImage,
+      };
+    }
+
+    const res = await api.post<any>('/users/verify-aadhaar', payload);
     if (res.success && res.data) {
       return {
         success: true,
         user: res.data.user,
-        message: res.data.message || 'Aadhaar verified successfully',
+        message: res.data.message || 'KYC & Bank details submitted successfully',
       };
     }
     return {
       success: false,
-      message: res.message || 'Aadhaar verification failed',
+      message: res.message || 'Verification submission failed',
     };
   },
 
@@ -239,6 +273,14 @@ export const AuthService = {
       return res.data;
     }
     return null;
+  },
+
+  async getIncomeHistory(page = 1, limit = 50): Promise<{ success: boolean; data?: any; message?: string }> {
+    const res = await api.get<any>(`/users/income-history?page=${page}&limit=${limit}`);
+    if (res.success && res.data) {
+      return { success: true, data: res.data };
+    }
+    return { success: false, message: res.message || 'Failed to fetch income history' };
   },
 
   async withdrawIncome(amount: number, bankDetails?: any): Promise<{ success: boolean; message: string; data?: any }> {
@@ -319,6 +361,20 @@ export const AuthService = {
             verificationStatus: res.data.verificationStatus || (res.data.aadhaarVerified ? 'VERIFIED' : 'NON_VERIFIED'),
             aadhaarVerified: res.data.aadhaarVerified || false,
             fullNameAsPerAadhaar: res.data.fullNameAsPerAadhaar || res.data.name || '',
+            aadhaarNumber: res.data.aadhaarNumber || res.data.customer_aadhar_no || '',
+            aadharNumber: res.data.aadhaarNumber || res.data.customer_aadhar_no || '',
+            aadharFrontImage: res.data.customer_image_aadhar_front || res.data.aadharFrontImage || '',
+            aadharBackImage: res.data.customer_image_aadhar_back || res.data.aadharBackImage || '',
+            bankName: res.data.bankName || '',
+            branchName: res.data.branchName || '',
+            accountHolderName: res.data.accountHolderName || res.data.fullNameAsPerAadhaar || res.data.name || '',
+            accountNumber: res.data.accountNumber || res.data.bankAccountNo || '',
+            bankAccountNo: res.data.accountNumber || res.data.bankAccountNo || '',
+            ifscCode: res.data.ifscCode || '',
+            upiId: res.data.upiId || '',
+            passbookImage: res.data.passbookImage || res.data.bankProofImage || res.data.cancelledChequeImage || '',
+            bankProofImage: res.data.bankProofImage || res.data.passbookImage || res.data.cancelledChequeImage || '',
+            customerKycStatus: res.data.customerKycStatus,
             registrationCity: res.data.city || res.data.preferredCityName || '',
             registrationPincode: res.data.pincode || '',
             savedAddresses: [],

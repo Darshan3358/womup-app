@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Put, Post, Param, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { DocumentService } from './document.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -17,9 +17,21 @@ export class DocumentController {
     return this.documentService.getDocuments(user.id);
   }
 
+  @Post(['documents/:id', 'documents/:id/update'])
+  @Put('documents/:id')
+  @ApiOperation({ summary: 'Update or re-upload rider document' })
+  async updateDocument(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Body() body: { url?: string; documentNumber?: string },
+  ) {
+    return this.documentService.updateDocument(user.id, id, body);
+  }
+
   @Get('vehicle')
   @ApiOperation({ summary: 'Get registered delivery vehicle details' })
   async getVehicle(@CurrentUser() user: any) {
     return this.documentService.getVehicle(user.id);
   }
 }
+

@@ -57,7 +57,7 @@ export const S25_OrderHistoryScreen: React.FC = () => {
       </View>
 
       {/* Orders List */}
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ flex: 1, width: '100%' }} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {filteredOrders.length === 0 ? (
           <View style={styles.emptyView}>
             <Text style={styles.emptyText}>No orders in this section</Text>
@@ -81,6 +81,7 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
     backgroundColor: COLORS.white,
+    minHeight: 0,
   },
   tabsContainer: {
     flexDirection: 'row',

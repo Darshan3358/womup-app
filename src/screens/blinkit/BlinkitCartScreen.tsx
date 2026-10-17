@@ -38,15 +38,25 @@ export const BlinkitCartScreen: React.FC = () => {
     setLocationModalVisible,
   } = useApp();
 
+  const isSavedThaltej =
+    (selectedAddress as any)?.type === 'SAVED' ||
+    (currentAreaName || '').toLowerCase().includes('thaltej') ||
+    ((selectedAddress as any)?.areaLandmark || '').toLowerCase().includes('thaltej');
+
+  const currentDistanceKm = isSavedThaltej ? 1.15 : 1.64;
+  const areaKey = isSavedThaltej ? 'Thaltej' : (currentAreaName || selectedAddress?.areaLandmark || 'Chandlodiya - Tragad');
+  const cityKey = currentCityName || selectedAddress?.city || 'Ahmedabad';
+
   const [couponInput, setCouponInput] = useState('');
   const [showFeeDetails, setShowFeeDetails] = useState(false);
-  const [dynamicDeliveryFee, setDynamicDeliveryFee] = useState<number>(40);
+  const [dynamicDeliveryFee, setDynamicDeliveryFee] = useState<number>(30);
   const [feeBreakdown, setFeeBreakdown] = useState<any>({
-    distanceKm: 3.26,
-    rateUsed: 11,
+    distanceKm: currentDistanceKm,
+    rateUsed: 12,
+    baseFee: isSavedThaltej ? 13.80 : 19.68,
+    minimumPayout: 30,
     floorApplied: true,
-    areaName: 'Prahlad Nagar',
-    minimumPayout: 40,
+    areaName: areaKey,
   });
 
   useEffect(() => {
@@ -59,18 +69,24 @@ export const BlinkitCartScreen: React.FC = () => {
           mrp: item.product.mrp,
           quantity: item.quantity,
         })),
-        cityName: currentCityName || selectedAddress?.city || 'Ahmedabad',
-        areaName: currentAreaName || selectedAddress?.areaLandmark || 'Prahlad Nagar',
-        distanceKm: 3.26,
+        cityName: cityKey,
+        areaName: areaKey,
+        distanceKm: currentDistanceKm,
+        deliveryAddress: {
+          latitude: isSavedThaltej ? 23.0500 : 23.1288,
+          longitude: isSavedThaltej ? 72.5160 : 72.5507,
+          area: areaKey,
+          city: cityKey,
+        },
       });
       if (isMounted && res) {
         setDynamicDeliveryFee(res.deliveryFee);
         if (res.breakdown) {
           setFeeBreakdown({
             ...res.breakdown,
-            distanceKm: res.distanceKm,
-            rateUsed: res.rateUsed,
-            areaName: res.areaName || 'Prahlad Nagar',
+            distanceKm: res.distanceKm || currentDistanceKm,
+            rateUsed: res.rateUsed || 12,
+            areaName: res.areaName || areaKey,
           });
         }
       }
@@ -79,7 +95,7 @@ export const BlinkitCartScreen: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [blinkitCartList, deliveryLocation]);
+  }, [blinkitCartList, deliveryLocation, currentAreaName, currentCityName, selectedAddress]);
 
   const deliveryFee = dynamicDeliveryFee;
   const handlingFee = 5;
@@ -178,9 +194,13 @@ export const BlinkitCartScreen: React.FC = () => {
         <View style={styles.itemsCard}>
           {blinkitCartList.map((entry, index) => {
             const isLast = index === blinkitCartList.length - 1;
+            const itemVariantId = (entry.product as any).selectedVariantId;
+            const itemKey = itemVariantId
+              ? `${entry.product.id}_${itemVariantId}`
+              : entry.product.id;
             return (
               <View
-                key={entry.product.id}
+                key={itemKey}
                 style={[styles.itemRow, !isLast && styles.itemRowBorder]}
               >
                 <View style={styles.itemEmojiContainer}>
@@ -195,7 +215,7 @@ export const BlinkitCartScreen: React.FC = () => {
                   <Text style={[TYPOGRAPHY.bodySmBold, styles.itemName]} numberOfLines={2}>
                     {entry.product.name}
                   </Text>
-                  <Text style={styles.itemPackSize}>{entry.product.packSize}</Text>
+                  <Text style={styles.itemPackSize}>{entry.product.packSize || '1 unit'}</Text>
                   <View style={styles.itemPriceRow}>
                     <Text style={TYPOGRAPHY.priceLg}>
                       ₹{entry.product.sellingPrice * entry.quantity}
@@ -212,7 +232,7 @@ export const BlinkitCartScreen: React.FC = () => {
                 <View style={styles.itemStepper}>
                   <TouchableOpacity
                     activeOpacity={0.7}
-                    onPress={() => updateBlinkitQty(entry.product, -1)}
+                    onPress={() => updateBlinkitQty(entry.product, -1, itemVariantId)}
                     style={styles.stepperActionBtn}
                   >
                     <AppIcon name="minus" size={14} color={COLORS.primary} />
@@ -220,7 +240,7 @@ export const BlinkitCartScreen: React.FC = () => {
                   <Text style={styles.stepperQtyNum}>{entry.quantity}</Text>
                   <TouchableOpacity
                     activeOpacity={0.7}
-                    onPress={() => updateBlinkitQty(entry.product, 1)}
+                    onPress={() => updateBlinkitQty(entry.product, 1, itemVariantId)}
                     style={styles.stepperActionBtn}
                   >
                     <AppIcon name="plus" size={14} color={COLORS.primary} />
@@ -325,8 +345,8 @@ export const BlinkitCartScreen: React.FC = () => {
                   </TouchableOpacity>
                 </View>
                 <Text style={styles.feeSubText}>
-                  {feeBreakdown?.distanceKm || 3.26} km · ₹{feeBreakdown?.rateUsed || 11}/km
-                  {feeBreakdown?.floorApplied ? ` (Base: ₹${feeBreakdown?.baseFee || 35.86})` : ''}
+                  {feeBreakdown?.distanceKm || currentDistanceKm} km · ₹{feeBreakdown?.rateUsed || 12}/km
+                  {feeBreakdown?.floorApplied ? ` (Base: ₹${feeBreakdown?.baseFee || (isSavedThaltej ? 13.80 : 19.68)})` : ''}
                 </Text>
               </View>
               <Text style={[styles.billValue, { fontWeight: '700', fontSize: 14 }]}>
@@ -343,7 +363,7 @@ export const BlinkitCartScreen: React.FC = () => {
                     Fair Rider Floor Guarantee Applied
                   </Text>
                   <Text style={styles.floorNoticeDesc}>
-                    Base distance fee is ₹{feeBreakdown?.baseFee || 35.86}. A +₹{(Number(feeBreakdown?.minimumPayout || 40) - Number(feeBreakdown?.baseFee || 35.86)).toFixed(2)} top-up is included to guarantee a minimum ₹{feeBreakdown?.minimumPayout || 40} payout for your delivery partner.
+                    Base distance fee is ₹{feeBreakdown?.baseFee || (isSavedThaltej ? 13.80 : 19.68)}. A +₹{(Number(feeBreakdown?.minimumPayout || 30) - Number(feeBreakdown?.baseFee || (isSavedThaltej ? 13.80 : 19.68))).toFixed(2)} top-up is included to guarantee a minimum ₹{feeBreakdown?.minimumPayout || 30} payout for your delivery partner.
                   </Text>
                 </View>
               </View>
@@ -356,19 +376,19 @@ export const BlinkitCartScreen: React.FC = () => {
                 <View style={styles.drawerItem}>
                   <Text style={styles.drawerDot}>•</Text>
                   <Text style={styles.drawerText}>
-                    <Text style={{ fontWeight: '700' }}>Route Distance:</Text> {feeBreakdown?.distanceKm || 3.26} km from {feeBreakdown?.areaName || 'Prahlad Nagar'} store to your address.
+                    <Text style={{ fontWeight: '700' }}>Route Distance:</Text> {feeBreakdown?.distanceKm || currentDistanceKm} km from {feeBreakdown?.areaName || areaKey} store to your address.
                   </Text>
                 </View>
                 <View style={styles.drawerItem}>
                   <Text style={styles.drawerDot}>•</Text>
                   <Text style={styles.drawerText}>
-                    <Text style={{ fontWeight: '700' }}>Base Math:</Text> {feeBreakdown?.distanceKm || 3.26} km × ₹{feeBreakdown?.rateUsed || 11}/km = ₹{feeBreakdown?.baseFee || 35.86}.
+                    <Text style={{ fontWeight: '700' }}>Base Math:</Text> {feeBreakdown?.distanceKm || currentDistanceKm} km × ₹{feeBreakdown?.rateUsed || 12}/km = ₹{feeBreakdown?.baseFee || (isSavedThaltej ? 13.80 : 19.68)}.
                   </Text>
                 </View>
                 <View style={styles.drawerItem}>
                   <Text style={styles.drawerDot}>•</Text>
                   <Text style={styles.drawerText}>
-                    <Text style={{ fontWeight: '700' }}>Floor Policy (Min ₹{feeBreakdown?.minimumPayout || 40}):</Text> Guaranteed base pay so riders don't lose money on fuel and wait times.
+                    <Text style={{ fontWeight: '700' }}>Floor Policy (Min ₹{feeBreakdown?.minimumPayout || 30}):</Text> Guaranteed base pay so riders don't lose money on fuel and wait times.
                   </Text>
                 </View>
                 <View style={styles.directPassPill}>

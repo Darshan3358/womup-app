@@ -41,7 +41,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
     storeName: 'Gokul Vegetables',
     coinPercentage: 15,
     shoppingCoinPercent: 15,
-    address: 'Near Nandanvan Society, Mahesana',
+    address: 'Near Nandanvan Society, Ahmedabad',
   };
 
   const vendorPercent = (selectedVendor as any).shoppingCoinPercent || selectedVendor.coinPercentage || 10;

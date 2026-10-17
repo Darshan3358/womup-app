@@ -31,6 +31,7 @@ import { QRScannerScreen } from './QRScannerScreen';
 import { MyCoinWalletScreen } from './MyCoinWalletScreen';
 import { MyOrdersScreen } from './MyOrdersScreen';
 import { MyProfileScreen } from './MyProfileScreen';
+import { CityAreaDropdownModal, AdminArea } from '../../components/common/CityAreaDropdownModal';
 
 // API & Types
 import { LocalShopApi } from '../api/localShopApi';
@@ -38,7 +39,17 @@ import { LocalVendor, LocalCartItem } from '../types/localShop.types';
 
 export const LocalShopHomeScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const { setActiveScreen, user } = useApp();
+  const {
+    setActiveScreen,
+    user,
+    currentCityName,
+    currentAreaName,
+    setCurrentCityName,
+    setCurrentArea,
+  } = useApp();
+
+  // City & Area Modal State
+  const [isCityModalVisible, setIsCityModalVisible] = useState(false);
 
   // Navigation State
   const [activeTab, setActiveTab] = useState<LocalTabKey>('Home');
@@ -78,7 +89,7 @@ export const LocalShopHomeScreen: React.FC = () => {
           });
         }
       } catch {
-        // Fallback to default (Mahesana)
+        // Fallback to default (Ahmedabad)
       }
     })();
   }, []);
@@ -283,9 +294,9 @@ export const LocalShopHomeScreen: React.FC = () => {
   // Master Screen: Home & Shops Tabs (Pixel-matched with the screenshot!)
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* 1. Header (Logo, Location: Mahesana, Notification badge) */}
+      {/* 1. Header (Logo, Location: Admin-verified City/Area, Notification badge) */}
       <WomupHeader
-        location="Mahesana"
+        location={currentAreaName ? `${currentAreaName}` : (currentCityName || 'Ahmedabad')}
         onOpenMenu={() => {
           Alert.alert(
             'WOMUP Menu',
@@ -299,7 +310,7 @@ export const LocalShopHomeScreen: React.FC = () => {
           );
         }}
         onSelectLocation={() => {
-          Alert.alert('Select Location', 'Selected: Mahesana (Gujarat)');
+          setIsCityModalVisible(true);
         }}
         onOpenNotifications={() => {
           Alert.alert(
@@ -363,7 +374,7 @@ export const LocalShopHomeScreen: React.FC = () => {
             onPress={() => {
               Alert.alert(
                 'Map View',
-                'Interactive Map loaded for Mahesana with 4 live partner locations.'
+                `Interactive Map loaded for ${currentCityName || 'Ahmedabad'} with live partner locations.`
               );
             }}
           >
@@ -428,6 +439,17 @@ export const LocalShopHomeScreen: React.FC = () => {
         onClose={() => setIsQRModalOpen(false)}
         onPaymentSuccess={(earnedCoins) => {
           setCoinBalance((prev) => prev + earnedCoins);
+        }}
+      />
+
+      {/* Official Admin City & Delivery Zone Dropdown Modal */}
+      <CityAreaDropdownModal
+        visible={isCityModalVisible}
+        onClose={() => setIsCityModalVisible(false)}
+        currentSelectedCity={currentCityName || 'Ahmedabad'}
+        currentSelectedArea={currentAreaName || undefined}
+        onSelectArea={() => {
+          loadVendors();
         }}
       />
     </View>

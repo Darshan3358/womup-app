@@ -8,7 +8,7 @@ interface StockAdjustmentModalProps {
   visible: boolean;
   onClose: () => void;
   item: InventoryItem | null;
-  onConfirm: (delta: number, reason: string, changeType: string) => Promise<void>;
+  onConfirm: (delta: number, reason: string, changeType: string, variantId?: string) => Promise<void>;
 }
 
 export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
@@ -20,23 +20,37 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
   const [delta, setDelta] = useState<number>(-1);
   const [reason, setReason] = useState<string>('Damaged during storage');
   const [changeType, setChangeType] = useState<'DAMAGE' | 'RETURN' | 'ADJUSTMENT'>('DAMAGE');
+  const [selectedVariantId, setSelectedVariantId] = useState<string | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Sync selected variant when item changes
+  React.useEffect(() => {
+    if (item?.variants && item.variants.length > 0) {
+      const def = item.variants.find((v) => v.isDefault) || item.variants[0];
+      setSelectedVariantId(def.id);
+    } else {
+      setSelectedVariantId(undefined);
+    }
+    setDelta(-1);
+  }, [item]);
+
   if (!item) return null;
+
+  const activeVariant = item.variants?.find((v) => v.id === selectedVariantId);
+  const currentBaseQty = activeVariant ? activeVariant.stock : item.availableQty;
+  const newProjectedQty = Math.max(0, currentBaseQty + delta);
 
   const handleAdjust = async () => {
     if (!reason.trim()) return;
     setIsSubmitting(true);
     try {
-      await onConfirm(delta, reason.trim(), changeType);
+      await onConfirm(delta, reason.trim(), changeType, selectedVariantId);
       setIsSubmitting(false);
       onClose();
     } catch (e) {
       setIsSubmitting(false);
     }
   };
-
-  const newProjectedQty = Math.max(0, item.availableQty + delta);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -55,11 +69,43 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
             </TouchableOpacity>
           </View>
 
+          {/* Variant Selector Pills if product has variants */}
+          {Boolean(item.variants && item.variants.length > 1) && (
+            <View style={{ marginBottom: 12 }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: COLORS.textMuted, marginBottom: 6, textTransform: 'uppercase' }}>
+                Select Variant / Pack Size:
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                {item.variants?.map((v) => {
+                  const isSel = v.id === selectedVariantId;
+                  return (
+                    <TouchableOpacity
+                      key={v.id}
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 6,
+                        borderRadius: 6,
+                        backgroundColor: isSel ? COLORS.primary : COLORS.surfaceCard,
+                        borderWidth: 1,
+                        borderColor: isSel ? COLORS.primary : COLORS.border,
+                      }}
+                      onPress={() => setSelectedVariantId(v.id)}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: isSel ? '700' : '500', color: isSel ? '#FFF' : COLORS.textPrimary }}>
+                        {v.weightOrVolume} (Stock: {v.stock})
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
           {/* Current vs Projected */}
           <View style={styles.statsCard}>
             <View style={styles.statCol}>
               <Text style={styles.statLabel}>Current Stock</Text>
-              <Text style={styles.statValue}>{item.availableQty}</Text>
+              <Text style={styles.statValue}>{currentBaseQty}</Text>
             </View>
             <Ionicons name="arrow-forward" size={18} color={COLORS.textMuted} />
             <View style={styles.statCol}>

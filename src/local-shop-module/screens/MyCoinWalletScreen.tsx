@@ -86,7 +86,7 @@ export const MyCoinWalletScreen: React.FC<MyCoinWalletScreenProps> = ({ onGoBack
             <View style={{ flex: 1 }}>
               <Text style={styles.stepTitle}>Shop at Partner Stores</Text>
               <Text style={styles.stepSub}>
-                Visit verified local shops in Mahesana and Ahmedabad.
+                Visit verified local shops in Ahmedabad and Surat.
               </Text>
             </View>
           </View>

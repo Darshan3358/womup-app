@@ -27,6 +27,18 @@ const getApiBaseUrl = () => {
 
 export const API_BASE_URL = getApiBaseUrl();
 
+const getNestApiBaseUrl = () => {
+  if (typeof window !== 'undefined' && window.location) {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') {
+      return 'http://localhost:5050/api/v1';
+    }
+  }
+  return 'https://womup-app.onrender.com/api/v1';
+};
+
+export const NEST_API_BASE_URL = getNestApiBaseUrl();
+
 export interface LiveDbData {
   customers: Customer[];
   riders: DeliveryPartnerItem[];
@@ -81,14 +93,46 @@ export const AdminApiService = {
         name: u.name || 'Customer',
         phone: u.phone || '',
         email: u.email || '',
-        status: u.isActive !== false ? 'Active' : 'Blocked',
+        status: (u.isBlocked === 1 || u.isActive === false) ? 'Blocked' : 'Active',
         spend: u.spend || 0,
         totalOrders: u.orderCount || u.totalOrders || 0,
         avatar: u.avatar || '',
         walletBalance: u.walletBalance || 0,
         shoppingCoinBalance: u.shoppingCoins !== undefined ? u.shoppingCoins : (u.coins || 0),
-        kycStatus: u.kycStatus || 'Verified',
+        kycStatus: (u.customerKycStatus === 2 || u.verificationStatus === 'VERIFIED') ? 'Verified' : (u.customerKycStatus === 3 ? 'Rejected' : 'Pending'),
         createdAt: u.createdAt || new Date().toISOString(),
+        firstName: u.firstName || (u.name ? u.name.split(' ')[0] : ''),
+        surname: u.surname || (u.name ? u.name.split(' ').slice(1).join(' ') : ''),
+        fatherHusbandName: u.fatherHusbandName || '',
+        gender: u.gender || 'Female',
+        birthdate: u.birthDate || u.birthday || '',
+        birthDate: u.birthDate || u.birthday || '',
+        address: u.address || '',
+        landmark: u.landmark || '',
+        village: u.village || '',
+        zoneName: u.preferredCityName || u.zoneName || 'Bopal',
+        pincode: u.customerPincode || u.registrationPincode || '380015',
+        sponsorId: u.sponsorId ? String(u.sponsorId) : (u.sponsorCode || 'WORM5871'),
+        sponsorName: u.sponsorName || 'Darshan T.',
+        referralCode: u.sponsorCode || 'WORM5871',
+        userCode: u.referralCode || u.customerCode || 'WORM1213',
+        bankName: u.bankName || 'HDFC Bank',
+        branchName: u.branchName || 'SG Highway',
+        accountHolderName: u.accountHolderName || u.name,
+        accountNumber: u.accountNumber || u.bankAccountNo || '',
+        ifscCode: u.ifscCode || 'HDFC0000123',
+        upiId: u.upiId || 'ayushi@okhdfcbank',
+        paymentStatus: u.customerPaymentStatus !== undefined ? u.customerPaymentStatus : 1,
+        isBlocked: u.isBlocked !== undefined ? u.isBlocked : (u.isActive === false ? 1 : 0),
+        isSuspended: u.isSuspended || 0,
+        adminNotes: u.adminNotes || '',
+        aadhaarNumber: u.aadhaarNumber || u.customer_aadhar_no || '',
+        aadhaarFrontImage: u.customer_image_aadhar_front || u.aadharFrontImage || '',
+        customer_image_aadhar_front: u.customer_image_aadhar_front || u.aadharFrontImage || '',
+        aadhaarBackImage: u.customer_image_aadhar_back || u.aadharBackImage || '',
+        customer_image_aadhar_back: u.customer_image_aadhar_back || u.aadharBackImage || '',
+        kycSubmittedAt: u.updatedAt || u.createdAt || '',
+        kycRejectReason: u.kycRejectReason || '',
       }));
 
       const riders: DeliveryPartnerItem[] = (raw.deliveryPartners || raw.riders || []).map((r: any) => ({
@@ -728,7 +772,18 @@ export const AdminApiService = {
   },
 
   // 17. RIDERS & USERS MANAGEMENT
+  async fetchRiderDetail(riderId: string): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/riders/${riderId}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  },
+
   async updateRider(riderId: string, payload: any): Promise<any> {
+
     try {
       const res = await fetch(`${API_BASE_URL}/api/admin/riders/${riderId}`, {
         method: 'PUT',
@@ -767,8 +822,51 @@ export const AdminApiService = {
     }
   },
 
+  async getCustomerKyc(userId: string): Promise<any> {
+    try {
+      const res = await fetch(`${NEST_API_BASE_URL}/admin/customers/${userId}/kyc`);
+      return await res.json();
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  async approveCustomerKyc(userId: string): Promise<any> {
+    try {
+      const res = await fetch(`${NEST_API_BASE_URL}/admin/customers/${userId}/approve-kyc`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'APPROVE' }),
+      });
+      return await res.json();
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  async rejectCustomerKyc(userId: string, reason?: string): Promise<any> {
+    try {
+      const res = await fetch(`${NEST_API_BASE_URL}/admin/customers/${userId}/reject-kyc`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'REJECT', rejectionReason: reason || 'Aadhaar image not clear' }),
+      });
+      return await res.json();
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  },
+
   async updateCustomer(userId: string, payload: any): Promise<any> {
     try {
+      // Sync to Nest API
+      await fetch(`${NEST_API_BASE_URL}/admin/customers/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }).catch(() => null);
+
+      // Sync to Express API
       const res = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },

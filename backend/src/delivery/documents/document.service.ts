@@ -18,7 +18,12 @@ export class DocumentService {
   ) {}
 
   private async getPartner(userId: string): Promise<DeliveryPartnerDocument> {
-    const partner = await this.partnerModel.findOne({ userId: new Types.ObjectId(userId) });
+    const partner = await this.partnerModel.findOne({
+      $or: [
+        { userId: Types.ObjectId.isValid(userId) ? new Types.ObjectId(userId) : undefined },
+        { _id: Types.ObjectId.isValid(userId) ? new Types.ObjectId(userId) : undefined },
+      ].filter(Boolean),
+    });
     if (!partner) {
       throw new NotFoundException('Delivery partner not found');
     }
@@ -27,69 +32,91 @@ export class DocumentService {
 
   async getDocuments(userId: string) {
     const partner = await this.getPartner(userId);
-    let docs = await this.docModel.find({ riderId: partner._id });
+    const isApproved = partner.status === 'APPROVED' || partner.verificationStatus === 'VERIFIED';
 
-    if (docs.length === 0) {
-      // Return and seed initial verified documents
-      const defaults = [
-        {
-          riderId: partner._id,
-          type: 'DRIVING_LICENSE',
-          title: 'Commercial Driving License',
-          documentNumberMasked: 'GJ01-2019-0034****',
-          status: 'VERIFIED',
-          issuedAt: '12 Jan 2021',
-          expiresAt: '11 Jan 2031',
-        },
-        {
-          riderId: partner._id,
-          type: 'VEHICLE_RC',
-          title: 'Vehicle Registration Certificate (RC)',
-          documentNumberMasked: 'GJ-01-ET-****',
-          status: 'VERIFIED',
-          issuedAt: '04 Mar 2022',
-          expiresAt: '03 Mar 2037',
-        },
-        {
-          riderId: partner._id,
-          type: 'INSURANCE',
-          title: 'Two-Wheeler Comprehensive Insurance',
-          documentNumberMasked: 'POL-ICICI-9938****',
-          status: 'VERIFIED',
-          issuedAt: '15 Oct 2025',
-          expiresAt: '14 Oct 2026',
-        },
-        {
-          riderId: partner._id,
-          type: 'AADHAAR_PAN',
-          title: 'National Identity Proof (Aadhaar)',
-          documentNumberMasked: 'XXXX-XXXX-8921',
-          status: 'VERIFIED',
-        },
-      ];
-      docs = await this.docModel.insertMany(defaults);
+    const mask = (str?: string) => {
+      if (!str || str.length < 4) return 'Not Provided';
+      return `${str.slice(0, 4)}****${str.slice(-4)}`;
+    };
+
+    return [
+      {
+        id: 'doc_dl',
+        type: 'DRIVING_LICENSE',
+        title: 'Commercial Driving License',
+        documentNumberMasked: partner.drivingLicense ? mask(partner.drivingLicense) : 'Not uploaded',
+        url: partner.dlImageUrl || '',
+        status: isApproved && partner.dlImageUrl ? 'VERIFIED' : partner.dlImageUrl || partner.drivingLicense ? 'PENDING' : 'NOT_UPLOADED',
+        issuedAt: 'Recent',
+        expiresAt: partner.drivingLicense ? 'Active' : undefined,
+      },
+      {
+        id: 'doc_rc',
+        type: 'VEHICLE_RC',
+        title: 'Vehicle Registration Certificate (RC)',
+        documentNumberMasked: partner.rcNumber ? mask(partner.rcNumber) : (partner.vehicleNumber || 'Not uploaded'),
+        url: partner.rcImageUrl || '',
+        status: isApproved && partner.rcImageUrl ? 'VERIFIED' : partner.rcImageUrl || partner.rcNumber ? 'PENDING' : 'NOT_UPLOADED',
+        issuedAt: 'Recent',
+        expiresAt: partner.vehicleNumber ? 'Active' : undefined,
+      },
+      {
+        id: 'doc_insurance',
+        type: 'INSURANCE',
+        title: 'Two-Wheeler Comprehensive Insurance',
+        documentNumberMasked: partner.vehicleInsuranceUrl ? 'Insurance Document Linked' : 'Not uploaded',
+        url: partner.vehicleInsuranceUrl || '',
+        status: isApproved && partner.vehicleInsuranceUrl ? 'VERIFIED' : partner.vehicleInsuranceUrl ? 'PENDING' : 'NOT_UPLOADED',
+        issuedAt: 'Recent',
+        expiresAt: partner.vehicleInsuranceUrl ? 'Active' : undefined,
+      },
+      {
+        id: 'doc_aadhaar',
+        type: 'AADHAAR_PAN',
+        title: 'National Identity Proof (Aadhaar)',
+        documentNumberMasked: partner.aadharNumber ? `XXXX-XXXX-${partner.aadharNumber.slice(-4)}` : 'Not uploaded',
+        url: partner.aadharFrontUrl || '',
+        backUrl: partner.aadharBackUrl || '',
+        status: isApproved && partner.aadharFrontUrl ? 'VERIFIED' : partner.aadharFrontUrl || partner.aadharNumber ? 'PENDING' : 'NOT_UPLOADED',
+        issuedAt: 'Government UIDAI',
+      },
+    ];
+  }
+
+  async updateDocument(userId: string, docId: string, updates: { url?: string; documentNumber?: string }) {
+    const partner = await this.getPartner(userId);
+
+    if (docId === 'doc_dl' || docId === 'DRIVING_LICENSE') {
+      if (updates.url) partner.dlImageUrl = updates.url;
+      if (updates.documentNumber) partner.drivingLicense = updates.documentNumber.toUpperCase();
+    } else if (docId === 'doc_rc' || docId === 'VEHICLE_RC') {
+      if (updates.url) partner.rcImageUrl = updates.url;
+      if (updates.documentNumber) partner.rcNumber = updates.documentNumber.toUpperCase();
+    } else if (docId === 'doc_insurance' || docId === 'INSURANCE') {
+      if (updates.url) partner.vehicleInsuranceUrl = updates.url;
+    } else if (docId === 'doc_aadhaar' || docId === 'AADHAAR_PAN') {
+      if (updates.url) partner.aadharFrontUrl = updates.url;
+      if (updates.documentNumber) partner.aadharNumber = updates.documentNumber.replace(/\D/g, '');
     }
 
-    return docs.map((d) => ({
-      id: d._id.toString(),
-      type: d.type,
-      title: d.title,
-      documentNumberMasked: d.documentNumberMasked,
-      status: d.status,
-      issuedAt: d.issuedAt,
-      expiresAt: d.expiresAt,
-    }));
+    // When updating, set verificationStatus to PENDING if not already APPROVED
+    if (partner.status !== 'APPROVED') {
+      partner.verificationStatus = 'PENDING';
+      partner.status = 'PENDING';
+    }
+
+    await partner.save();
+    return this.getDocuments(userId);
   }
 
   async getVehicle(userId: string) {
     const partner = await this.getPartner(userId);
     return {
-      vehicleType: partner.vehicleType || 'EV_SCOOTER',
-      vehicleNumber: partner.vehicleNumber || 'GJ-01-ET-4829',
-      registrationDate: '04 Mar 2022',
-      insuranceExpiry: '14 Oct 2026',
-      pucExpiry: '11 Jan 2027',
-      status: 'VERIFIED',
+      vehicleType: partner.vehicleType || 'BIKE',
+      vehicleNumber: partner.vehicleNumber || 'Not Registered',
+      vehicleModelYear: partner.vehicleModelYear || '2023',
+      insuranceStatus: partner.vehicleInsuranceUrl ? 'LINKED' : 'PENDING',
+      status: partner.status === 'APPROVED' ? 'VERIFIED' : 'PENDING',
     };
   }
 }

@@ -15,7 +15,7 @@ import {
   TalukaSchema,
 } from './schemas/location-hierarchy.schema';
 import { AreasService } from './areas.service';
-import { AreasController } from './areas.controller';
+import { AreasController, DetectAreaController, DeliveryQuoteController } from './areas.controller';
 
 @Module({
   imports: [
@@ -30,7 +30,7 @@ import { AreasController } from './areas.controller';
       { name: Taluka.name, schema: TalukaSchema },
     ]),
   ],
-  controllers: [AreasController],
+  controllers: [AreasController, DetectAreaController, DeliveryQuoteController],
   providers: [AreasService],
   exports: [AreasService],
 })

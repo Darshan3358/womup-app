@@ -586,8 +586,10 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     const fetchFee = async () => {
       const res = await CartService.calculateDynamicDeliveryFee({
         items: blinkitCartList.map((item) => {
-          const isTomato = item.product.name.toLowerCase().includes('tomato');
-          const unitPrice = isTomato ? (isSavedThaltej ? 12 : 7) : item.product.sellingPrice;
+          const isTomato250g =
+            item.product.name.toLowerCase().includes('tomato') &&
+            (!item.product.packSize || item.product.packSize === '250 g');
+          const unitPrice = isTomato250g ? (isSavedThaltej ? 12 : 7) : item.product.sellingPrice;
           return {
             name: item.product.name,
             price: unitPrice,
@@ -899,6 +901,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
       </View>
 
       <ScrollView
+        style={{ flex: 1, width: '100%' }}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
@@ -1147,29 +1150,33 @@ export const BlinkitCheckoutScreen: React.FC = () => {
             Items in Cart ({blinkitCartList.length})
           </Text>
           {blinkitCartList.map((item) => {
-            const isTomato = item.product.name.toLowerCase().includes('tomato');
-            const unitPrice = isTomato ? (isSavedThaltej ? 12 : 7) : item.product.sellingPrice;
+            const isTomato250g =
+              item.product.name.toLowerCase().includes('tomato') &&
+              (!item.product.packSize || item.product.packSize === '250 g');
+            const unitPrice = isTomato250g ? (isSavedThaltej ? 12 : 7) : item.product.sellingPrice;
+            const itemVariantId = (item.product as any).selectedVariantId;
+            const itemKey = itemVariantId ? `${item.product.id}_${itemVariantId}` : item.product.id;
             return (
-              <View key={item.product.id} style={styles.cartItemRow}>
+              <View key={itemKey} style={styles.cartItemRow}>
                 <Image source={{ uri: item.product.imageUrl }} style={styles.cartItemImg} />
                 <View style={styles.cartItemInfo}>
                   <Text style={styles.cartItemName} numberOfLines={1}>
                     {item.product.name}
                   </Text>
                   <Text style={styles.cartItemPack}>
-                    {item.product.packSize} • ₹{unitPrice} each
+                    {item.product.packSize || '1 unit'} • ₹{unitPrice} each
                   </Text>
                 </View>
                 <View style={styles.cartItemQtyBox}>
                   <TouchableOpacity
-                    onPress={() => updateBlinkitQty(item.product, -1)}
+                    onPress={() => updateBlinkitQty(item.product, -1, itemVariantId)}
                     style={styles.qtyBtn}
                   >
                     <Text style={styles.qtyBtnText}>-</Text>
                   </TouchableOpacity>
                   <Text style={styles.qtyCountText}>{item.quantity}</Text>
                   <TouchableOpacity
-                    onPress={() => updateBlinkitQty(item.product, 1)}
+                    onPress={() => updateBlinkitQty(item.product, 1, itemVariantId)}
                     style={styles.qtyBtn}
                   >
                     <Text style={styles.qtyBtnText}>+</Text>
@@ -1937,6 +1944,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.cardBackground,
+    minHeight: 0,
   },
   plainHeader: {
     flexDirection: 'row',

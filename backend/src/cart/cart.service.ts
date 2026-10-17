@@ -183,7 +183,67 @@ export class CartService {
       }
     }
 
-    const deliveryFee = itemSubtotal >= 199 || itemSubtotal === 0 ? 0 : 25; // Free over ₹199
+    // Resolve user's confirmed saved address and coordinates
+    let userAddress: any = null;
+    if (user) {
+      userAddress = await this.connection.collection('addresses').findOne({
+        userId: user._id,
+        isDefault: true,
+      });
+      if (!userAddress) {
+        userAddress = await this.connection.collection('addresses').findOne({
+          userId: user._id,
+        });
+      }
+    }
+
+    // Resolve assigned store
+    let assignedStore: any = null;
+    const sId = storeId || (cart.storeId ? cart.storeId.toString() : undefined);
+    if (sId && Types.ObjectId.isValid(sId)) {
+      assignedStore = await this.connection.collection('stores').findOne({ _id: new Types.ObjectId(sId) });
+    }
+    if (!assignedStore && targetAreaId) {
+      const areaObjId = Types.ObjectId.isValid(targetAreaId) ? new Types.ObjectId(targetAreaId) : targetAreaId;
+      assignedStore = await this.connection.collection('stores').findOne({
+        $or: [{ areaId: areaObjId }, { areaId: targetAreaId.toString() }],
+        isActive: true,
+      });
+    }
+    if (!assignedStore) {
+      assignedStore = await this.connection.collection('stores').findOne({ isActive: true });
+    }
+
+    // Calculate dynamic delivery fee from authoritative OSRM quote
+    let deliveryFee = 35;
+    let dynamicQuoteData: any = null;
+
+    if (itemSubtotal === 0) {
+      deliveryFee = 0;
+    } else if (userAddress && assignedStore) {
+      try {
+        const quote = await this.calculateDynamic({
+          items: detailedItems.map((it) => ({
+            productId: it.product.id,
+            variantId: it.variantId,
+            quantity: it.quantity,
+            price: it.product.sellingPrice,
+            mrp: it.product.mrp,
+          })),
+          deliveryAddress: userAddress,
+          storeId: assignedStore._id.toString(),
+          cityName: userAddress.city || 'Ahmedabad',
+          areaName: userAddress.landmark || userAddress.street || 'Prahlad Nagar',
+        });
+        if (quote?.success && quote.data) {
+          dynamicQuoteData = quote.data;
+          deliveryFee = quote.data.deliveryFee;
+        }
+      } catch (err: any) {
+        deliveryFee = 35;
+      }
+    }
+
     const handlingFee = itemSubtotal > 0 ? 5 : 0;
     const tip = cart.tip || 0;
 
@@ -223,6 +283,17 @@ export class CartService {
       availableCoins: userCoinBalance,
       maxCoinsAllowed,
       deliveryFee,
+      deliveryDistanceKm: dynamicQuoteData?.deliveryDistanceKm ?? 2.6,
+      deliveryDistanceMeters: dynamicQuoteData?.deliveryDistanceMeters,
+      deliveryRatePerKm: dynamicQuoteData?.deliveryRatePerKm ?? 12,
+      deliveryMinFee: dynamicQuoteData?.deliveryMinFee ?? 35,
+      deliveryMaxFee: dynamicQuoteData?.deliveryMaxFee ?? 160,
+      rawDeliveryFee: dynamicQuoteData?.rawDeliveryFee,
+      floorApplied: dynamicQuoteData?.floorApplied,
+      capApplied: dynamicQuoteData?.capApplied,
+      rateSource: dynamicQuoteData?.rateSource ?? 'GLOBAL',
+      roundingPolicy: 'WHOLE_RUPEE',
+      deliveryQuote: dynamicQuoteData,
       handlingFee,
       tip,
       totalAmount,
@@ -273,7 +344,7 @@ export class CartService {
     return summary;
   }
 
-  async updateQuantity(userId: string, productId: string, delta: number) {
+  async updateQuantity(userId: string, productId: string, delta: number, variantId?: string) {
     const product = Types.ObjectId.isValid(productId)
       ? await this.productModel.findById(productId).exec()
       : await this.productModel.findOne({
@@ -281,10 +352,16 @@ export class CartService {
         }).exec();
 
     const targetIdStr = product ? product._id.toString() : productId;
+    const resolvedVariantId = variantId && Types.ObjectId.isValid(variantId) ? new Types.ObjectId(variantId) : undefined;
     const cart = await this.getOrCreateCart(userId);
-    const existingIndex = cart.items.findIndex(
-      (i) => i.productId.toString() === targetIdStr || i.productId.toString() === productId,
-    );
+    const existingIndex = cart.items.findIndex((i) => {
+      const pMatch = i.productId.toString() === targetIdStr || i.productId.toString() === productId;
+      if (!pMatch) return false;
+      if (resolvedVariantId && i.variantId) {
+        return i.variantId.toString() === resolvedVariantId.toString();
+      }
+      return !resolvedVariantId && !i.variantId;
+    });
 
     if (existingIndex > -1) {
       cart.items[existingIndex].quantity += delta;
@@ -295,6 +372,7 @@ export class CartService {
     } else if (delta > 0 && product) {
       cart.items.push({
         productId: product._id,
+        variantId: resolvedVariantId,
         quantity: delta,
       } as any);
       await cart.save();
@@ -305,7 +383,7 @@ export class CartService {
     return summary;
   }
 
-  async setExactQuantity(userId: string, productId: string, quantity: number) {
+  async setExactQuantity(userId: string, productId: string, quantity: number, variantId?: string) {
     const product = Types.ObjectId.isValid(productId)
       ? await this.productModel.findById(productId).exec()
       : await this.productModel.findOne({
@@ -313,10 +391,16 @@ export class CartService {
         }).exec();
 
     const targetIdStr = product ? product._id.toString() : productId;
+    const resolvedVariantId = variantId && Types.ObjectId.isValid(variantId) ? new Types.ObjectId(variantId) : undefined;
     const cart = await this.getOrCreateCart(userId);
-    const existingIndex = cart.items.findIndex(
-      (i) => i.productId.toString() === targetIdStr || i.productId.toString() === productId,
-    );
+    const existingIndex = cart.items.findIndex((i) => {
+      const pMatch = i.productId.toString() === targetIdStr || i.productId.toString() === productId;
+      if (!pMatch) return false;
+      if (resolvedVariantId && i.variantId) {
+        return i.variantId.toString() === resolvedVariantId.toString();
+      }
+      return !resolvedVariantId && !i.variantId;
+    });
 
     if (quantity <= 0) {
       if (existingIndex > -1) {
@@ -330,6 +414,7 @@ export class CartService {
       } else if (product) {
         cart.items.push({
           productId: product._id,
+          variantId: resolvedVariantId,
           quantity,
         } as any);
         await cart.save();
@@ -341,18 +426,24 @@ export class CartService {
     return summary;
   }
 
-  async removeItem(userId: string, productId: string) {
+  async removeItem(userId: string, productId: string, variantId?: string) {
     const product = Types.ObjectId.isValid(productId)
       ? await this.productModel.findById(productId).exec()
       : await this.productModel.findOne({
           $or: [{ slug: productId }, { name: new RegExp(productId, 'i') }],
         }).exec();
     const targetIdStr = product ? product._id.toString() : productId;
+    const resolvedVariantIdStr = variantId && Types.ObjectId.isValid(variantId) ? variantId.toString() : undefined;
 
     const cart = await this.getOrCreateCart(userId);
-    cart.items = cart.items.filter(
-      (i) => i.productId.toString() !== targetIdStr && i.productId.toString() !== productId,
-    );
+    cart.items = cart.items.filter((i) => {
+      const pMatch = i.productId.toString() === targetIdStr || i.productId.toString() === productId;
+      if (!pMatch) return true;
+      if (resolvedVariantIdStr && i.variantId) {
+        return i.variantId.toString() !== resolvedVariantIdStr;
+      }
+      return false;
+    });
     await cart.save();
 
     const summary = await this.getCartSummary(userId);
@@ -469,39 +560,103 @@ export class CartService {
       });
     }
 
-    // 3. Compute Distance (Haversine)
-    let custLat = deliveryAddress.latitude || deliveryAddress.lat;
-    let custLng = deliveryAddress.longitude || deliveryAddress.lng;
-    if (Array.isArray(deliveryAddress.coordinates) && deliveryAddress.coordinates.length === 2) {
-      custLng = deliveryAddress.coordinates[0];
-      custLat = deliveryAddress.coordinates[1];
-    }
+    // 3. Compute Distance using Real OSRM Road Route (Customer Coordinates to Store Coordinates)
+    const latValue =
+      deliveryAddress.latitude ??
+      deliveryAddress.lat ??
+      deliveryAddress.location?.coordinates?.[1] ??
+      deliveryAddress.coordinates?.[1];
 
-    let storeLat = 23.0125;
-    let storeLng = 72.5082;
-    if (resolvedStore?.location?.coordinates?.length === 2) {
-      storeLng = resolvedStore.location.coordinates[0];
-      storeLat = resolvedStore.location.coordinates[1];
-    }
+    const lngValue =
+      deliveryAddress.longitude ??
+      deliveryAddress.lng ??
+      deliveryAddress.location?.coordinates?.[0] ??
+      deliveryAddress.coordinates?.[0];
 
-    let distanceKm = 3.26; // Default verified Vejalpur-Prahlad Nagar distance
-    if (customDist && !isNaN(Number(customDist))) {
+    const custLat = Number(latValue);
+    const custLng = Number(lngValue);
+
+    const storeCoords = resolvedStore?.location?.coordinates;
+    const storeLng = Number(storeCoords?.[0]);
+    const storeLat = Number(storeCoords?.[1]);
+
+    let routeDistanceMeters: number;
+    let distanceKm: number;
+
+    // Admin simulator override flow (only if explicitly flagged isSimulator)
+    if (dto.isSimulator && customDist && !isNaN(Number(customDist))) {
       distanceKm = Number(customDist);
-    } else if (custLat && custLng && storeLat && storeLng) {
-      const R = 6371;
-      const dLat = ((storeLat - custLat) * Math.PI) / 180;
-      const dLon = ((storeLng - custLng) * Math.PI) / 180;
-      const a =
-        Math.sin(dLat / 2) ** 2 +
-        Math.cos((custLat * Math.PI) / 180) *
-          Math.cos((storeLat * Math.PI) / 180) *
-          Math.sin(dLon / 2) ** 2;
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      const calcDist = Number((R * c).toFixed(2));
-      if (calcDist > 0.1) distanceKm = calcDist;
+      routeDistanceMeters = Math.round(distanceKm * 1000);
+    } else {
+      if (
+        !resolvedStore ||
+        !Number.isFinite(storeLat) ||
+        !Number.isFinite(storeLng) ||
+        !Number.isFinite(custLat) ||
+        !Number.isFinite(custLng) ||
+        Math.abs(storeLat) > 90 ||
+        Math.abs(custLat) > 90 ||
+        Math.abs(storeLng) > 180 ||
+        Math.abs(custLng) > 180 ||
+        (storeLat === 0 && storeLng === 0) ||
+        (custLat === 0 && custLng === 0)
+      ) {
+        throw new BadRequestException(
+          'Valid assigned Store and delivery coordinates are required to calculate the delivery fee.',
+        );
+      }
+
+      // Do not trust client-supplied distanceKm for a customer order.
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      try {
+        const url =
+          `https://router.project-osrm.org/route/v1/driving/` +
+          `${storeLng},${storeLat};${custLng},${custLat}?overview=false`;
+
+        const response = await fetch(url, {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`OSRM HTTP ${response.status}`);
+        }
+
+        const data: any = await response.json();
+        const route = data?.routes?.[0];
+
+        if (
+          data?.code !== 'Ok' ||
+          typeof route?.distance !== 'number' ||
+          !Number.isFinite(route.distance) ||
+          route.distance < 0
+        ) {
+          throw new Error('No valid OSRM route');
+        }
+
+        routeDistanceMeters = route.distance;
+      } catch {
+        // Fallback to Haversine with 1.25 urban road curvature factor if OSRM service is unreachable
+        const R = 6371;
+        const dLat = ((storeLat - custLat) * Math.PI) / 180;
+        const dLon = ((storeLng - custLng) * Math.PI) / 180;
+        const a =
+          Math.sin(dLat / 2) ** 2 +
+          Math.cos((custLat * Math.PI) / 180) *
+            Math.cos((storeLat * Math.PI) / 180) *
+            Math.sin(dLon / 2) ** 2;
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        routeDistanceMeters = Math.round(R * c * 1.25 * 1000);
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
+      // Keep full precision for calculation; round only for display.
+      distanceKm = routeDistanceMeters / 1000;
     }
 
-    // 4. Rate Resolution (Area > City > Global)
+    // 4. Rate Resolution (Area Override > City Override > Global Fallback)
     let rateRecord: any = null;
     let winningScope = 'GLOBAL';
 
@@ -536,16 +691,26 @@ export class CartService {
       if (rateRecord) winningScope = 'GLOBAL';
     }
 
-    const ratePerKm = rateRecord ? Number(rateRecord.ratePerKm) : 11;
-    const minPayout = rateRecord ? Number(rateRecord.minimumPayout) : 40;
-    const maxPayout = rateRecord ? Number(rateRecord.maximumPayout) : 180;
+    // Admin PayoutRates configuration: Default Global fallback ₹12/km, min ₹35, max ₹160
+    const ratePerKm = rateRecord ? Number(rateRecord.ratePerKm) : 12;
+    const minPayout = rateRecord ? Number(rateRecord.minimumPayout) : 35;
+    const maxPayout = rateRecord ? Number(rateRecord.maximumPayout) : 160;
 
-    // 5. Dynamic Delivery Fee:
-    const baseFee = Number((distanceKm * ratePerKm).toFixed(2));
-    const floorApplied = baseFee < minPayout;
-    const floorAdjustment = floorApplied ? Number((minPayout - baseFee).toFixed(2)) : 0;
-    const capApplied = baseFee > maxPayout;
-    const deliveryFee = Math.round(Math.min(Math.max(baseFee, minPayout), maxPayout));
+    // 5. Dynamic Delivery Fee Calculation:
+    const rawFee = distanceKm * ratePerKm;
+    const floorApplied = rawFee < minPayout;
+    const capApplied = rawFee > maxPayout;
+
+    const boundedFee = Math.min(
+      maxPayout,
+      Math.max(minPayout, rawFee),
+    );
+
+    // Preserve current whole-rupee rounding policy.
+    const deliveryFee = Math.round(boundedFee);
+    const floorAdjustment = floorApplied
+      ? Number((minPayout - rawFee).toFixed(2))
+      : 0;
 
     // 6. Subtotals
     let itemSubtotal = 0;
@@ -573,32 +738,53 @@ export class CartService {
       itemSubtotal + deliveryFee + handlingFee + tipAmount - couponDiscount - coinsDiscount,
     );
 
+    const formulaText = floorApplied
+      ? `${distanceKm.toFixed(1)} km × ₹${ratePerKm}/km = ₹${rawFee.toFixed(2)} · ₹${minPayout} minimum applied`
+      : capApplied
+      ? `${distanceKm.toFixed(1)} km × ₹${ratePerKm}/km = ₹${rawFee.toFixed(2)} · ₹${maxPayout} maximum cap applied`
+      : `${distanceKm.toFixed(1)} km × ₹${ratePerKm}/km = ₹${rawFee.toFixed(2)}`;
+
     return {
       success: true,
       data: {
         itemSubtotal,
         mrpTotal,
         discount: Math.max(0, mrpTotal - itemSubtotal),
-        deliveryFee, // Dynamic: e.g. ₹40 instead of hardcoded ₹15
+        deliveryFee,
+        deliveryDistanceMeters: routeDistanceMeters,
+        deliveryDistanceKm: distanceKm,
+        deliveryRatePerKm: ratePerKm,
+        deliveryMinFee: minPayout,
+        deliveryMaxFee: maxPayout,
+        rawDeliveryFee: Number(rawFee.toFixed(2)),
+        floorApplied,
+        capApplied,
+        rateSource: winningScope,
+        roundingPolicy: 'WHOLE_RUPEE',
         handlingFee,
+        convenienceFee: handlingFee,
         tip: tipAmount,
         couponDiscount,
         coinsDiscount,
         total: grandTotal,
-        distanceKm,
+        distanceKm: Number(distanceKm.toFixed(1)),
+        routeDistanceKm: Number(distanceKm.toFixed(1)),
         rateUsed: ratePerKm,
-        rateSource: winningScope,
-        storeName: resolvedStore?.name || 'Wom Up Prahlad Nagar Dark Store',
+        ratePerKm,
+        minimumFee: minPayout,
+        maximumFee: maxPayout,
+        rawFee: Number(rawFee.toFixed(2)),
+        storeName: resolvedStore?.name || 'Wom Up Dark Store',
         areaName: rateRecord?.areaName || effectiveArea,
         cityName: rateRecord?.cityName || effectiveCity,
         breakdown: {
-          baseFee,
+          rawFee: Number(rawFee.toFixed(2)),
           minimumPayout: minPayout,
           maximumPayout: maxPayout,
           floorApplied,
           floorAdjustment,
           capApplied,
-          formula: `${distanceKm} km × ₹${ratePerKm}/km = ₹${baseFee} (Floor: ₹${minPayout}, Cap: ₹${maxPayout}) → ₹${deliveryFee}`,
+          formula: formulaText,
           explanation: floorApplied
             ? `Includes ₹${floorAdjustment} minimum pay guarantee for delivery partner`
             : capApplied

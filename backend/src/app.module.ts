@@ -25,6 +25,8 @@ import { SettingsModule } from './settings/settings.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { LocalShopsModule } from './local-shops/local-shops.module';
 import { PaymentsModule } from './payments/payments.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -62,6 +64,8 @@ import { PaymentsModule } from './payments/payments.module';
     ReviewsModule,
     LocalShopsModule,
     PaymentsModule,
+    NotificationsModule,
+    AdminModule,
   ],
   controllers: [AppController],
 })

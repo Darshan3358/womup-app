@@ -78,18 +78,19 @@ export const CartService = {
     return res.success ? res.data : null;
   },
 
-  async addItemToServer(productId: string, quantity: number = 1): Promise<any> {
-    const res = await api.post<any>('/cart/items', { productId, quantity });
+  async addItemToServer(productId: string, quantity: number = 1, variantId?: string): Promise<any> {
+    const res = await api.post<any>('/cart/items', { productId, quantity, variantId });
     return res.success ? res.data : null;
   },
 
-  async updateQuantityOnServer(productId: string, delta: number): Promise<any> {
-    const res = await api.patch<any>(`/cart/items/${productId}`, { delta });
+  async updateQuantityOnServer(productId: string, delta: number, variantId?: string): Promise<any> {
+    const res = await api.patch<any>(`/cart/items/${productId}`, { delta, variantId });
     return res.success ? res.data : null;
   },
 
-  async removeItemFromServer(productId: string): Promise<boolean> {
-    const res = await api.delete<any>(`/cart/items/${productId}`);
+  async removeItemFromServer(productId: string, variantId?: string): Promise<boolean> {
+    const qs = variantId ? `?variantId=${encodeURIComponent(variantId)}` : '';
+    const res = await api.delete<any>(`/cart/items/${productId}${qs}`);
     return res.success;
   },
 
@@ -171,7 +172,7 @@ export const CartService = {
           ? window.location.hostname
           : 'localhost';
 
-        const res = await fetch(`http://${host}:5001/api/v1/cart/calculate`, {
+        const res = await fetch(`http://${host}:5050/api/v1/cart/calculate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(params),
@@ -188,34 +189,49 @@ export const CartService = {
       }
 
       // High fidelity fallback matching configured Admin rates:
-      const dist = params.distanceKm || 3.26;
-      const rate = 11;
-      const minPayout = 30;
-      const maxPayout = 180;
+      const dist = params.distanceKm || 2.6;
+      const rate = 12;
+      const minPayout = 35;
+      const maxPayout = 160;
       const baseFee = Number((dist * rate).toFixed(2));
       const floorApplied = baseFee < minPayout;
       const floorAdjustment = floorApplied ? Number((minPayout - baseFee).toFixed(2)) : 0;
+      const capApplied = baseFee > maxPayout;
       const finalFee = Math.round(Math.min(Math.max(baseFee, minPayout), maxPayout));
+
+      const formulaText = floorApplied
+        ? `${dist} km × ₹${rate}/km = ₹${baseFee.toFixed(2)} · ₹${minPayout} minimum applied`
+        : capApplied
+        ? `${dist} km × ₹${rate}/km = ₹${baseFee.toFixed(2)} · ₹${maxPayout} maximum cap applied`
+        : `${dist} km × ₹${rate}/km = ₹${baseFee.toFixed(2)}`;
 
       const fallbackData = {
         deliveryFee: finalFee,
         handlingFee: 5,
+        convenienceFee: 5,
         distanceKm: dist,
         rateUsed: rate,
-        rateSource: 'AREA',
-        areaName: 'Prahlad Nagar',
-        cityName: 'Ahmedabad',
+        ratePerKm: rate,
+        minimumFee: minPayout,
+        maximumFee: maxPayout,
+        rawFee: baseFee,
+        rateSource: 'GLOBAL',
+        areaName: params.areaName || 'Prahlad Nagar',
+        cityName: params.cityName || 'Ahmedabad',
         total: (params.items?.reduce((s, it) => s + (it.price || 0) * (it.quantity || 1), 0) || 60) + finalFee + 5,
         breakdown: {
           baseFee,
+          rawFee: baseFee,
           minimumPayout: minPayout,
           maximumPayout: maxPayout,
           floorApplied,
           floorAdjustment,
-          capApplied: false,
-          formula: `${dist} km × ₹${rate}/km = ₹${baseFee} (Floor: ₹${minPayout}, Cap: ₹${maxPayout}) → ₹${finalFee}`,
+          capApplied,
+          formula: formulaText,
           explanation: floorApplied
             ? `Includes ₹${floorAdjustment} minimum pay guarantee for delivery partner`
+            : capApplied
+            ? `Capped at maximum fee of ₹${maxPayout}`
             : `Distance-based fee at ₹${rate}/km`,
         },
       };

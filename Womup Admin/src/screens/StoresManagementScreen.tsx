@@ -49,7 +49,7 @@ export const StoresManagementScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'All' | 'Active' | 'On Shift' | 'Logged In'>('All');
+  const [filterStatus, setFilterStatus] = useState<'All' | 'Active' | 'Pending' | 'On Shift' | 'Logged In'>('All');
 
   // Sync stores from real-time admin context (WebSocket & DB)
   useEffect(() => {
@@ -141,6 +141,36 @@ export const StoresManagementScreen: React.FC = () => {
     setRefreshing(true);
     await loadStores();
     await refreshFromDb();
+  };
+
+  const handleApproveStore = async (storeId: string) => {
+    try {
+      const res = await ApiService.approveDarkStore(storeId);
+      if (res?.success) {
+        Alert.alert('Store Approved', 'Dark store has been approved and activated successfully.');
+        await loadStores();
+        await refreshFromDb();
+      } else {
+        Alert.alert('Approval Failed', res?.error || res?.message || 'Failed to approve store');
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    }
+  };
+
+  const handleRejectStore = async (storeId: string) => {
+    try {
+      const res = await ApiService.rejectDarkStore(storeId, 'Incomplete documentation');
+      if (res?.success) {
+        Alert.alert('Store Rejected', 'Dark store registration rejected.');
+        await loadStores();
+        await refreshFromDb();
+      } else {
+        Alert.alert('Rejection Failed', res?.error || res?.message || 'Failed to reject store');
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    }
   };
 
   const copyToClipboard = async (text: string, label: string) => {
@@ -357,6 +387,7 @@ export const StoresManagementScreen: React.FC = () => {
     if (!matchesQuery) return false;
 
     if (filterStatus === 'Active' && s.isActive === false) return false;
+    if (filterStatus === 'Pending' && s.status !== 'PENDING' && s.isActive !== false) return false;
     if (filterStatus === 'On Shift' && !(Number(s.staffOnShift || 0) > 0 || s.isOnShift)) return false;
     if (filterStatus === 'Logged In' && !s.lastLoginAt) return false;
 
@@ -630,7 +661,7 @@ export const StoresManagementScreen: React.FC = () => {
 
         {/* Row 3: Status Filter Chips */}
         <View style={styles.filterChipsRow}>
-          {(['All', 'Active', 'On Shift', 'Logged In'] as const).map((filter) => (
+          {(['All', 'Active', 'Pending', 'On Shift', 'Logged In'] as const).map((filter) => (
             <TouchableOpacity
               key={filter}
               style={[styles.filterChip, filterStatus === filter && styles.filterChipActive]}
@@ -721,7 +752,12 @@ export const StoresManagementScreen: React.FC = () => {
                               <View style={styles.storeNameContainer}>
                                 <Text style={styles.storeName}>{store.name}</Text>
                               </View>
-                              {!isStoreActive ? (
+                              {store.status === 'PENDING' ? (
+                                <View style={[styles.activeTag, { backgroundColor: '#FEF3C7' }]}>
+                                  <View style={[styles.activeDot, { backgroundColor: '#F59E0B' }]} />
+                                  <Text style={[styles.activeTagText, { color: '#B45309' }]}>APPROVAL PENDING</Text>
+                                </View>
+                              ) : !isStoreActive ? (
                                 <View style={[styles.activeTag, styles.statusInactiveTag]}>
                                   <View style={[styles.activeDot, { backgroundColor: COLORS.error }]} />
                                   <Text style={[styles.activeTagText, { color: COLORS.error }]}>STORE INACTIVE</Text>
@@ -847,6 +883,35 @@ export const StoresManagementScreen: React.FC = () => {
                             </Text>
                           </View>
                         </View>
+
+                        {/* Real Admin Approval Action Bar for Pending Stores */}
+                        {store.status === 'PENDING' && (
+                          <View style={styles.storeApprovalBanner}>
+                            <View style={styles.storeApprovalLeft}>
+                              <AlertTriangle size={15} color="#D97706" style={{ marginRight: 6 }} />
+                              <View>
+                                <Text style={styles.storeApprovalTitle}>Approval Required</Text>
+                                <Text style={styles.storeApprovalSub}>Dark Store registration is awaiting admin verification</Text>
+                              </View>
+                            </View>
+                            <View style={styles.storeApprovalBtns}>
+                              <TouchableOpacity
+                                style={styles.rejectStoreBtn}
+                                onPress={() => handleRejectStore(store.id)}
+                              >
+                                <X size={13} color={COLORS.error} style={{ marginRight: 4 }} />
+                                <Text style={styles.rejectStoreBtnText}>Reject</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={styles.approveStoreBtn}
+                                onPress={() => handleApproveStore(store.id)}
+                              >
+                                <CheckCircle2 size={13} color="#FFFFFF" style={{ marginRight: 4 }} />
+                                <Text style={styles.approveStoreBtnText}>Approve Store</Text>
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        )}
 
                         {/* Location & Status Footer */}
                         <View style={styles.cardFooter}>
@@ -2279,6 +2344,69 @@ const styles = StyleSheet.create({
   deleteBtn: {
     padding: 5,
     borderRadius: 6,
+  },
+  storeApprovalBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+    borderRadius: RADIUS.card,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 8,
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  storeApprovalLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    minWidth: 200,
+  },
+  storeApprovalTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#92400E',
+  },
+  storeApprovalSub: {
+    fontSize: 11,
+    color: '#B45309',
+    marginTop: 1,
+  },
+  storeApprovalBtns: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  rejectStoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: RADIUS.sm,
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  rejectStoreBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.error,
+  },
+  approveStoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: RADIUS.sm,
+    backgroundColor: COLORS.success,
+  },
+  approveStoreBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   modalBackdrop: {
     flex: 1,

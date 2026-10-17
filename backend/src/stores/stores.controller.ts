@@ -48,4 +48,41 @@ export class StoresController {
       message: res.message,
     };
   }
+
+  // ── Admin Store Approval Endpoints ──
+  @Get('admin/stores')
+  @ApiOperation({ summary: 'List all dark stores with status and search filters' })
+  async adminGetStores(
+    @Param('status') status?: string,
+    @Param('search') search?: string,
+  ) {
+    const data = await this.storesService.adminGetStores({ status, search });
+    return { success: true, data };
+  }
+
+  @Get('admin/stores/pending')
+  @ApiOperation({ summary: 'List all dark stores pending admin approval' })
+  async adminGetPendingStores() {
+    const data = await this.storesService.adminGetPendingStores();
+    return { success: true, data };
+  }
+
+  @Post('admin/stores/:id/approve')
+  @ApiOperation({ summary: 'Approve and activate dark store' })
+  async adminApproveStore(
+    @Param('id') id: string,
+    @Body('adminId') adminId?: string,
+  ) {
+    return this.storesService.adminApproveStore(id, adminId);
+  }
+
+  @Post('admin/stores/:id/reject')
+  @ApiOperation({ summary: 'Reject dark store registration' })
+  async adminRejectStore(
+    @Param('id') id: string,
+    @Body('reason') reason?: string,
+    @Body('adminId') adminId?: string,
+  ) {
+    return this.storesService.adminRejectStore(id, reason, adminId);
+  }
 }

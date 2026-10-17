@@ -31,6 +31,7 @@ import { VehicleDetailsScreen } from './src/screens/more/VehicleDetailsScreen';
 import { BankSettlementScreen } from './src/screens/more/BankSettlementScreen';
 import { NotificationsScreen } from './src/screens/more/NotificationsScreen';
 import { SettingsScreen } from './src/screens/more/SettingsScreen';
+import { NavigationScreen } from './src/screens/delivery/NavigationScreen';
 
 // Operational Modals (R09, R11, R15, R18, R28, R29)
 import { NewDeliveryModal } from './src/components/modals/NewDeliveryModal';
@@ -62,6 +63,7 @@ const MainRiderApp: React.FC = () => {
     if (subScreen === 'BankSettlement') return <BankSettlementScreen />;
     if (subScreen === 'Notifications') return <NotificationsScreen />;
     if (subScreen === 'Settings') return <SettingsScreen />;
+    if (subScreen === 'Navigation') return <NavigationScreen />;
 
     // Primary Tab Screen
     switch (currentTab) {

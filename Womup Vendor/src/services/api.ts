@@ -59,7 +59,7 @@ export interface VendorAnalyticsData {
 }
 
 export const VendorApi = {
-  // 1. Vendor Login
+  // 1. Vendor Login with Mobile or Vendor Code + Password
   async login(loginId: string, password?: string): Promise<{ success: boolean; vendor?: VendorProfile; error?: string }> {
     try {
       const res = await fetch(`${API_BASE}/vendor/auth/login`, {
@@ -74,6 +74,133 @@ export const VendorApi = {
       return { success: false, error: data.message || 'Login failed' };
     } catch (err: any) {
       return { success: false, error: err.message || 'Network error connecting to backend' };
+    }
+  },
+
+  // 1b. Send Mobile OTP
+  async sendOtp(mobile: string, purpose = 'REGISTRATION'): Promise<{ success: boolean; verificationId?: string; expiresIn?: number; error?: string; devOtp?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/vendor/auth/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobile, purpose }),
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        return { success: true, verificationId: data.data.verificationId, expiresIn: data.data.expiresIn, devOtp: data.data.devOtp };
+      }
+      return { success: false, error: data.message || 'Failed to send OTP' };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error sending OTP' };
+    }
+  },
+
+  // 1c. Verify Mobile OTP
+  async verifyOtp(mobile: string, otp: string, verificationId?: string): Promise<{ success: boolean; verified?: boolean; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/vendor/auth/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobile, otp, verificationId }),
+      });
+      const data = await res.json();
+      if (data.success && data.verified) {
+        return { success: true, verified: true };
+      }
+      return { success: false, error: data.message || 'Invalid OTP' };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error verifying OTP' };
+    }
+  },
+
+  // 1d. Login with Mobile + OTP
+  async loginWithOtp(mobile: string, otp: string): Promise<{ success: boolean; vendor?: VendorProfile; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/vendor/auth/login-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobile, otp }),
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        return { success: true, vendor: data.data };
+      }
+      return { success: false, error: data.message || 'OTP Login failed' };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error connecting to backend' };
+    }
+  },
+
+  // 1e. Complete 5-Step Registration
+  async register(payload: any): Promise<{ success: boolean; vendor?: VendorProfile; vendorCode?: string; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/vendor/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        return {
+          success: true,
+          vendor: data.data.vendor,
+          vendorCode: data.data.vendorCode,
+          message: data.data.message || 'Registration submitted for review',
+        };
+      }
+      return { success: false, error: data.message || 'Registration failed' };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error connecting to backend' };
+    }
+  },
+
+  // 1f. Forgot Password
+  async forgotPassword(mobile: string): Promise<{ success: boolean; message?: string; error?: string; devOtp?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/vendor/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobile }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        return { success: true, message: data.data?.message, devOtp: data.data?.devOtp };
+      }
+      return { success: false, error: data.message || 'Failed to send reset OTP' };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error' };
+    }
+  },
+
+  // 1g. Reset Password
+  async resetPassword(mobile: string, otp: string, newPassword: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/vendor/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobile, otp, newPassword }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        return { success: true, message: data.message };
+      }
+      return { success: false, error: data.message || 'Failed to reset password' };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error' };
+    }
+  },
+
+  // 1h. Get Verification & Approval Status
+  async getStatus(identifier: string): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/vendor/auth/status?vendorCode=${identifier}`);
+      const data = await res.json();
+      if (data.success && data.data) {
+        return { success: true, data: data.data };
+      }
+      return { success: false, error: data.message || 'Status check failed' };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error' };
     }
   },
 

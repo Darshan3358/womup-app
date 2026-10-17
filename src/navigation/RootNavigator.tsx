@@ -1,10 +1,25 @@
 import React, { useEffect } from 'react';
 import { View, StyleSheet, BackHandler, Platform } from 'react-native';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { BottomNavigation, BlinkitTabKey } from '../components/common/BottomNavigation';
 import { LocationPickerModal } from '../components/common/LocationPickerModal';
 import { DistrictModal } from '../components/common/DistrictModal';
 import { COLORS } from '../theme/colors';
+
+// Allowed screens when user is not authenticated (AuthStack)
+const AUTH_STACK_SCREENS = [
+  'C01_Splash',
+  'C02_Onboarding1',
+  'C03_Onboarding2',
+  'C04_Onboarding3',
+  'C05_Onboarding4',
+  'C06_MobileNumber',
+  'C07_OtpVerification',
+  'C08_CreateAccount',
+  'C09_ReferralCode',
+  'C10_LocationPermission',
+];
 
 // Blinkit Screens
 import { BlinkitHomeScreen } from '../screens/blinkit/BlinkitHomeScreen';
@@ -46,9 +61,20 @@ import { S23_OrderPlacedScreen } from '../screens/S23_OrderPlacedScreen';
 import { S24_OrderTrackingScreen } from '../screens/S24_OrderTrackingScreen';
 import { S25_OrderHistoryScreen } from '../screens/S25_OrderHistoryScreen';
 import { S26_AccountScreen } from '../screens/S26_AccountScreen';
+import { KYCScreen } from '../screens/KYCScreen';
 
 export const RootNavigator: React.FC = () => {
   const { activeScreen, setActiveScreen, goBack, canGoBack } = useApp();
+  const { isAuthenticated, isLoading } = useAuth();
+
+  // Enforce Layer 2 Navigation Guard:
+  // If user is not authenticated, they can only view screens in AUTH_STACK_SCREENS.
+  // Any attempt to view protected screens redirects directly to Login.
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated && !AUTH_STACK_SCREENS.includes(activeScreen)) {
+      setActiveScreen('C06_MobileNumber');
+    }
+  }, [isLoading, isAuthenticated, activeScreen, setActiveScreen]);
 
   // Listen to Android hardware back button
   useEffect(() => {
@@ -80,17 +106,18 @@ export const RootNavigator: React.FC = () => {
     }
   }, [activeScreen, canGoBack, goBack]);
 
-  // Screens that show bottom navigation bar
+  // Screens that show bottom navigation bar (ONLY when authenticated)
   const isMainTabScreen =
-    activeScreen === 'Blinkit_Home' ||
-    activeScreen === 'Blinkit_OrderAgain' ||
-    activeScreen === 'Blinkit_Categories' ||
-    activeScreen === 'Blinkit_Profile' ||
-    activeScreen === 'C12_Home' ||
-    activeScreen === 'C13_Category' ||
-    activeScreen === 'C19_Cart' ||
-    activeScreen === 'C25_OrderHistory' ||
-    activeScreen === 'C26_Account';
+    isAuthenticated &&
+    (activeScreen === 'Blinkit_Home' ||
+      activeScreen === 'Blinkit_OrderAgain' ||
+      activeScreen === 'Blinkit_Categories' ||
+      activeScreen === 'Blinkit_Profile' ||
+      activeScreen === 'C12_Home' ||
+      activeScreen === 'C13_Category' ||
+      activeScreen === 'C19_Cart' ||
+      activeScreen === 'C25_OrderHistory' ||
+      activeScreen === 'C26_Account');
 
   const getCurrentTabKey = (): BlinkitTabKey => {
     switch (activeScreen) {
@@ -135,6 +162,41 @@ export const RootNavigator: React.FC = () => {
   };
 
   const renderCurrentScreen = () => {
+    // 1. Initial Loading State: Splash Screen
+    if (isLoading && activeScreen === 'C01_Splash') {
+      return <S01_SplashScreen />;
+    }
+
+    // 2. Unauthenticated User (AuthStack ONLY)
+    // Non-logged-in users CANNOT access any protected screen
+    if (!isAuthenticated) {
+      switch (activeScreen) {
+        case 'C01_Splash':
+          return <S01_SplashScreen />;
+        case 'C02_Onboarding1':
+          return <S02_Onboarding1Screen />;
+        case 'C03_Onboarding2':
+          return <S03_Onboarding2Screen />;
+        case 'C04_Onboarding3':
+          return <S04_Onboarding3Screen />;
+        case 'C05_Onboarding4':
+          return <S05_Onboarding4Screen />;
+        case 'C06_MobileNumber':
+          return <S06_MobileNumberScreen />;
+        case 'C07_OtpVerification':
+          return <S07_OtpVerificationScreen />;
+        case 'C08_CreateAccount':
+          return <S08_CreateAccountScreen />;
+        case 'C09_ReferralCode':
+          return <S09_ReferralCodeScreen />;
+        case 'C10_LocationPermission':
+          return <S10_LocationPermissionScreen />;
+        default:
+          return <S06_MobileNumberScreen />;
+      }
+    }
+
+    // 3. Authenticated User (Full AppStack access)
     switch (activeScreen) {
       // WOMUP Local Hyperlocal Shop & Earn
       case 'Local_Home':
@@ -215,6 +277,9 @@ export const RootNavigator: React.FC = () => {
         return <S25_OrderHistoryScreen />;
       case 'C26_Account':
         return <S26_AccountScreen />;
+      case 'KYC':
+      case 'C27_KYC':
+        return <KYCScreen />;
 
       default:
         return <BlinkitHomeScreen />;
@@ -225,7 +290,7 @@ export const RootNavigator: React.FC = () => {
     <View style={styles.container}>
       <View style={styles.screenContainer}>{renderCurrentScreen()}</View>
 
-      {/* 5-Tab Bottom Navigation for main tab screens */}
+      {/* 5-Tab Bottom Navigation for main tab screens (Authenticated Only) */}
       {isMainTabScreen && (
         <BottomNavigation
           currentTab={getCurrentTabKey()}
@@ -233,9 +298,13 @@ export const RootNavigator: React.FC = () => {
         />
       )}
 
-      {/* Global Modals */}
-      <LocationPickerModal />
-      <DistrictModal />
+      {/* Global Modals (Authenticated Only) */}
+      {isAuthenticated && (
+        <>
+          <LocationPickerModal />
+          <DistrictModal />
+        </>
+      )}
     </View>
   );
 };
@@ -246,12 +315,21 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     width: '100%',
     maxWidth: '100%',
+    minHeight: 0,
     overflow: 'hidden',
   },
   screenContainer: {
     flex: 1,
     width: '100%',
     maxWidth: '100%',
-    overflow: 'hidden',
+    minHeight: 0,
+    ...(Platform.OS === 'web'
+      ? {
+          overflowY: 'auto' as any,
+          overflowX: 'hidden' as any,
+        }
+      : {
+          overflow: 'hidden',
+        }),
   },
 });

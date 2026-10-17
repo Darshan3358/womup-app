@@ -2,6 +2,8 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
+  Put,
   Param,
   Query,
   Body,
@@ -51,6 +53,12 @@ export class AdminCustomersController {
     });
   }
 
+  @Get([':id/kyc', ':id/kyc-details'])
+  @ApiOperation({ summary: 'Get customer KYC details with document images, personal and bank info' })
+  async getCustomerKyc(@Param('id') id: string): Promise<any> {
+    return this.usersService.adminGetCustomerKyc(id);
+  }
+
   @Get(':id/kyc-review')
   @ApiOperation({ summary: 'Get customer KYC review details with masked fields and document images' })
   async getCustomerKycReview(@Param('id') id: string): Promise<any> {
@@ -63,15 +71,31 @@ export class AdminCustomersController {
     return this.usersService.adminGetCustomerById(id);
   }
 
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update customer profile fields from admin modal' })
+  async updateCustomerPatch(@Param('id') id: string, @Body() body: any) {
+    return this.usersService.adminUpdateCustomer(id, body);
+  }
+
+  @Put(':id')
+  @ApiOperation({ summary: 'Update customer profile fields (PUT alias)' })
+  async updateCustomerPut(@Param('id') id: string, @Body() body: any) {
+    return this.usersService.adminUpdateCustomer(id, body);
+  }
+
   @Post([':id/kyc-approve', ':id/approve-kyc', ':id/approve'])
   @ApiOperation({ summary: 'Approve customer Aadhaar / KYC and release sponsor download income' })
-  async approveKyc(@Param('id') id: string) {
+  async approveKyc(@Param('id') id: string, @Body() body?: any) {
+    if (body?.action === 'REJECT') {
+      return this.usersService.adminRejectCustomerKyc(id, body?.rejectionReason || body?.reason);
+    }
     return this.usersService.adminApproveCustomerKyc(id);
   }
 
   @Post([':id/kyc-reject', ':id/reject-kyc', ':id/reject'])
   @ApiOperation({ summary: 'Reject customer KYC with reason' })
-  async rejectKyc(@Param('id') id: string, @Body('reason') reason?: string) {
+  async rejectKyc(@Param('id') id: string, @Body() body?: any) {
+    const reason = body?.rejectionReason || body?.reason;
     return this.usersService.adminRejectCustomerKyc(id, reason);
   }
 

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Modal,
   Alert,
   ActivityIndicator,
+  Image,
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -16,47 +17,48 @@ import {
   FolderTree,
   Plus,
   Search,
-  Edit2,
   Trash2,
-  CheckCircle2,
-  AlertCircle,
-  Eye,
-  EyeOff,
-  Layers,
-  ChevronUp,
-  ChevronDown,
-  ArrowLeft,
+  Edit2,
   X,
   Check,
-  Lock,
-  Package,
-  Sparkles,
+  Tag,
+  Image as ImageIcon,
+  AlertCircle,
+  Store,
+  ChevronDown,
   RefreshCw,
-  SlidersHorizontal,
-  Info,
-  Palette,
-  Smile,
 } from 'lucide-react-native';
 import { COLORS, GRADIENTS, RADIUS, SPACING } from '../theme';
 import { useAdminState } from '../context/AdminStateContext';
 import { CategoryItem, SubCategoryItem } from '../types/admin';
 
-// Preset color options for category backgrounds
-const PRESET_BG_COLORS = [
-  { label: 'Mint Green', hex: '#EEF9F3' },
-  { label: 'Pastel Pink', hex: '#FCEAF5' },
-  { label: 'Ice Blue', hex: '#EBF5FF' },
-  { label: 'Warm Orange', hex: '#FFF4E5' },
-  { label: 'Soft Lavender', hex: '#F5EEFD' },
-  { label: 'Light Peach', hex: '#FDF0EE' },
-  { label: 'Butter Yellow', hex: '#FEF9E7' },
-  { label: 'Soft Slate', hex: '#F1F4F9' },
+// 100% Website Parity Image Presets (Matching localhost:5175)
+const IMAGE_PRESETS = [
+  { label: 'Vegetables', url: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=500&q=80', emoji: '🥦', color: '#E8F5E9' },
+  { label: 'Fruits', url: 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=500&q=80', emoji: '🍎', color: '#FFF3E0' },
+  { label: 'Dairy & Milk', url: 'https://images.unsplash.com/photo-1628088062854-d1870b4553da?w=500&q=80', emoji: '🥛', color: '#E3F2FD' },
+  { label: 'Cooking Essentials', url: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=500&q=80', emoji: '🧄', color: '#F3E5F5' },
+  { label: 'Bakery & Bread', url: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=500&q=80', emoji: '🍞', color: '#FFF8E1' },
+  { label: 'Cold Beverages', url: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=500&q=80', emoji: '🥤', color: '#FCE4EC' },
+  { label: 'Snacks & Munchies', url: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=500&q=80', emoji: '🍿', color: '#FBE9E7' },
+  { label: 'Organic Wellness', url: 'https://images.unsplash.com/photo-1512069772995-ec65ed45afd6?w=500&q=80', emoji: '🌿', color: '#EEF9F3' },
+  { label: 'Personal Care', url: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=500&q=80', emoji: '🧴', color: '#EDE9FE' },
+  { label: 'Cleaning & Household', url: 'https://images.unsplash.com/photo-1585421514738-01798e348b17?w=500&q=80', emoji: '🧼', color: '#F1F5F9' },
+  { label: 'Paan Corner', url: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=500&q=80', emoji: '🍃', color: '#DCFCE7' },
+  { label: 'Baby Care', url: 'https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=500&q=80', emoji: '🍼', color: '#FCE7F3' },
 ];
 
-// Preset quick emojis for categories
-const PRESET_EMOJIS = [
-  '🥬', '🍿', '💄', '🏠', '🐾', '🥛', '🍎', '🍞',
-  '☕', '🥩', '🍫', '🧼', '🍼', '🍰', '🍪', '🎁'
+const COLOR_PRESETS = [
+  '#E8F5E9',
+  '#FFF3E0',
+  '#E3F2FD',
+  '#F3E5F5',
+  '#FFF8E1',
+  '#FCE4EC',
+  '#FBE9E7',
+  '#EEF9F3',
+  '#EDE9FE',
+  '#F1F5F9',
 ];
 
 export const CategoryManagementScreen: React.FC = () => {
@@ -69,49 +71,55 @@ export const CategoryManagementScreen: React.FC = () => {
     toggleCategoryItemStatus,
     deleteCategoryItem,
     addSubcategoryItem,
-    updateSubcategoryItem,
     deleteSubcategoryItem,
   } = useAdminState();
 
-  const [refreshing, setRefreshing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [search, setSearch] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Active' | 'Inactive'>('All');
+  const [refreshing, setRefreshing] = useState<boolean>(false);
 
-  // Category Add / Edit Modal
-  const [showCategoryModal, setShowCategoryModal] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<CategoryItem | null>(null);
-  const [categoryName, setCategoryName] = useState('');
-  const [categoryCode, setCategoryCode] = useState('');
-  const [categoryIcon, setCategoryIcon] = useState('🥬');
-  const [categoryBgColor, setCategoryBgColor] = useState('#EEF9F3');
-  const [categorySortOrder, setCategorySortOrder] = useState('1');
-  const [categoryIsActive, setCategoryIsActive] = useState(true);
-  const [categoryDescription, setCategoryDescription] = useState('');
-  const [categorySubmitting, setCategorySubmitting] = useState(false);
+  // Top Dark Store Selector
+  const [selectedDarkStore, setSelectedDarkStore] = useState<string>('All Dark Stores & Shops (12)');
+  const [showDarkStoreModal, setShowDarkStoreModal] = useState<boolean>(false);
+  const darkStoresList = [
+    'All Dark Stores & Shops (12)',
+    'Satellite Hub Dark Store',
+    'Chandlodiya - Tragad Dark Store',
+    'Prahlad Nagar Express Store',
+    'Vastrapur - Bodakdev Hub',
+    'Navrangpura Quick Hub',
+  ];
 
-  // Sub-Category Management Modal
-  const [managingCategory, setManagingCategory] = useState<CategoryItem | null>(null);
-  const [showSubModal, setShowSubModal] = useState(false);
-  const [subCategoriesList, setSubCategoriesList] = useState<SubCategoryItem[]>([]);
-  const [loadingSubs, setLoadingSubs] = useState(false);
+  // ================= ADD CATEGORY MODAL STATE =================
+  const [showAddCatModal, setShowAddCatModal] = useState<boolean>(false);
+  const [newCatName, setNewCatName] = useState<string>('');
+  const [newCatSlug, setNewCatSlug] = useState<string>('');
+  const [newCatImage, setNewCatImage] = useState<string>('');
+  const [newCatBgColor, setNewCatBgColor] = useState<string>('#E8F5E9');
+  const [newCatIcon, setNewCatIcon] = useState<string>('🥦');
+  const [newCatDescription, setNewCatDescription] = useState<string>('');
+  const [newCatSortOrder, setNewCatSortOrder] = useState<string>(String(categories.length + 1));
+  const [submittingCat, setSubmittingCat] = useState<boolean>(false);
+  const [addError, setAddError] = useState<string | null>(null);
 
-  // Add / Edit Sub-Category Form Modal
-  const [showSubFormModal, setShowSubFormModal] = useState(false);
-  const [editingSub, setEditingSub] = useState<SubCategoryItem | null>(null);
-  const [subName, setSubName] = useState('');
-  const [subSlug, setSubSlug] = useState('');
-  const [subIcon, setSubIcon] = useState('grid');
-  const [subShelf, setSubShelf] = useState('');
-  const [subSortOrder, setSubSortOrder] = useState('1');
-  const [subIsActive, setSubIsActive] = useState(true);
-  const [subSubmitting, setSubSubmitting] = useState(false);
+  // ================= EDIT CATEGORY MODAL STATE =================
+  const [editingCat, setEditingCat] = useState<CategoryItem | null>(null);
+  const [editName, setEditName] = useState<string>('');
+  const [editSlug, setEditSlug] = useState<string>('');
+  const [editImage, setEditImage] = useState<string>('');
+  const [editBgColor, setEditBgColor] = useState<string>('#F3E5F5');
+  const [editIcon, setEditIcon] = useState<string>('');
+  const [editDescription, setEditDescription] = useState<string>('');
+  const [editSortOrder, setEditSortOrder] = useState<string>('0');
+  const [editIsActive, setEditIsActive] = useState<boolean>(true);
+  const [savingEdit, setSavingEdit] = useState<boolean>(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
-  // Confirmation Modals
-  const [deactivateCategoryTarget, setDeactivateCategoryTarget] = useState<CategoryItem | null>(null);
-  const [deleteCategoryTarget, setDeleteCategoryTarget] = useState<CategoryItem | null>(null);
-  const [deleteBlockedInfo, setDeleteBlockedInfo] = useState<{ categoryName: string; count: number } | null>(null);
+  // ================= SUBCATEGORY MODAL STATE =================
+  const [selectedCatForSub, setSelectedCatForSub] = useState<CategoryItem | null>(null);
+  const [newSubName, setNewSubName] = useState<string>('');
+  const [submittingSub, setSubmittingSub] = useState<boolean>(false);
 
-  // Load latest on mount
   useEffect(() => {
     refreshCategories();
   }, []);
@@ -122,807 +130,781 @@ export const CategoryManagementScreen: React.FC = () => {
     setRefreshing(false);
   };
 
-  // KPI Calculations
-  const totalCategories = categories.length;
-  const activeCategoriesCount = categories.filter((c) => c.isActive !== false).length;
-  const inactiveCategoriesCount = totalCategories - activeCategoriesCount;
+  // Helper to resolve preset image if category has no custom image
+  const getCategoryImage = (cat: CategoryItem): string => {
+    if (cat.image && cat.image.startsWith('http')) return cat.image;
+    if (cat.imageUrl && cat.imageUrl.startsWith('http')) return cat.imageUrl;
 
-  const totalSubCategories = useMemo(() => {
-    return categories.reduce((sum, cat) => {
-      const subs = cat.subCategories || [];
-      return sum + (subs.length > 0 ? subs.length : (cat.subCategoryCount || 0));
-    }, 0);
-  }, [categories]);
-
-  const zeroProductCategoriesCount = useMemo(() => {
-    return categories.filter((c) => {
-      const count = c.productCount ?? 0;
-      return count === 0;
-    }).length;
-  }, [categories]);
+    const lowerName = cat.name.toLowerCase();
+    const preset = IMAGE_PRESETS.find(
+      (p) =>
+        lowerName.includes(p.label.toLowerCase()) ||
+        p.label.toLowerCase().includes(lowerName) ||
+        (cat.slug && p.label.toLowerCase().includes(cat.slug.toLowerCase()))
+    );
+    return preset?.url || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=500&q=80';
+  };
 
   // Filtered categories
   const filteredCategories = useMemo(() => {
-    return categories.filter((cat) => {
-      const matchesSearch =
-        cat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (cat.code && cat.code.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (cat.slug && cat.slug.toLowerCase().includes(searchQuery.toLowerCase()));
+    return categories.filter((c) => {
+      const q = search.toLowerCase().trim();
+      const matchSearch =
+        !q ||
+        c.name.toLowerCase().includes(q) ||
+        (c.slug && c.slug.toLowerCase().includes(q)) ||
+        (c.code && c.code.toLowerCase().includes(q));
+      const matchStatus =
+        statusFilter === 'All'
+          ? true
+          : statusFilter === 'Active'
+          ? c.isActive !== false
+          : c.isActive === false;
+      return matchSearch && matchStatus;
+    });
+  }, [categories, search, statusFilter]);
 
-      if (!matchesSearch) return false;
+  // Start Edit Category
+  const startEditCategory = (cat: CategoryItem) => {
+    setEditingCat(cat);
+    setEditName(cat.name || '');
+    setEditSlug(cat.slug || cat.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
+    setEditImage(getCategoryImage(cat));
+    setEditIcon(cat.icon || '🥦');
+    setEditBgColor(cat.bgColor || '#F3E5F5');
+    setEditDescription(cat.description || '');
+    setEditSortOrder(String(cat.sortOrder ?? 0));
+    setEditIsActive(cat.isActive !== false);
+    setEditError(null);
+  };
 
-      if (statusFilter === 'Active') return cat.isActive !== false;
-      if (statusFilter === 'Inactive') return cat.isActive === false;
-      return true;
-    }).sort((a, b) => (a.sortOrder || a.displayOrder || 0) - (b.sortOrder || b.displayOrder || 0));
-  }, [categories, searchQuery, statusFilter]);
+  // Save Category Edit
+  const handleSaveCategoryEdit = async () => {
+    if (!editingCat || !editName.trim()) return;
+    setSavingEdit(true);
+    setEditError(null);
 
-  // Auto-generate code when category name changes in Add mode
-  const handleCategoryNameChange = (name: string) => {
-    setCategoryName(name);
-    if (!editingCategory) {
-      const genCode = name
-        .toUpperCase()
-        .replace(/[^A-Z0-9]+/g, '_')
-        .replace(/^_+|_+$/g, '');
-      setCategoryCode(genCode);
+    const catId = editingCat.id || editingCat._id || '';
+    const cleanSlug = (editSlug.trim() || editName.toLowerCase().replace(/[^a-z0-9]+/g, '-')).replace(/^-+|-+$/g, '');
+
+    const updates = {
+      name: editName.trim(),
+      slug: cleanSlug,
+      image: editImage.trim() || null,
+      imageUrl: editImage.trim() || null,
+      icon: editIcon.trim() || 'shopping-bag',
+      bgColor: editBgColor,
+      description: editDescription.trim(),
+      sortOrder: Number(editSortOrder) || 0,
+      isActive: Boolean(editIsActive),
+    };
+
+    const res = await updateCategoryItem(catId, updates);
+    setSavingEdit(false);
+
+    if (res?.success) {
+      setEditingCat(null);
+      await refreshCategories();
+    } else {
+      setEditError(res?.error || 'Failed to update category.');
     }
   };
 
-  // Open Add Category Modal
-  const openAddCategoryModal = () => {
-    setEditingCategory(null);
-    setCategoryName('');
-    setCategoryCode('');
-    setCategoryIcon('🥬');
-    setCategoryBgColor('#EEF9F3');
-    setCategorySortOrder(String(categories.length + 1));
-    setCategoryIsActive(true);
-    setCategoryDescription('');
-    setShowCategoryModal(true);
-  };
-
-  // Open Edit Category Modal
-  const openEditCategoryModal = (cat: CategoryItem) => {
-    setEditingCategory(cat);
-    setCategoryName(cat.name);
-    setCategoryCode(cat.code || cat.slug?.toUpperCase().replace(/-/g, '_') || '');
-    setCategoryIcon(cat.icon || cat.iconUrl || '🥬');
-    setCategoryBgColor(cat.bgColor || '#EEF9F3');
-    setCategorySortOrder(String(cat.sortOrder || cat.displayOrder || 1));
-    setCategoryIsActive(cat.isActive !== false);
-    setCategoryDescription(cat.description || '');
-    setShowCategoryModal(true);
-  };
-
-  // Save Category (Add or Edit)
-  const handleSaveCategory = async () => {
-    if (!categoryName.trim()) {
-      Alert.alert('Validation Error', 'Category name is required.');
+  // Create Category
+  const handleCreateCategory = async () => {
+    if (!newCatName.trim()) {
+      setAddError('Category name is required');
       return;
     }
+    setSubmittingCat(true);
+    setAddError(null);
 
-    setCategorySubmitting(true);
-    try {
-      if (editingCategory) {
-        const catId = editingCategory.id || (editingCategory as any)._id;
-        const res = await updateCategoryItem(catId, {
-          name: categoryName.trim(),
-          icon: categoryIcon,
-          bgColor: categoryBgColor,
-          sortOrder: parseInt(categorySortOrder, 10) || 1,
-          displayOrder: parseInt(categorySortOrder, 10) || 1,
-          isActive: categoryIsActive,
-          description: categoryDescription.trim(),
-        });
-        if (!res.success) {
-          Alert.alert('Update Failed', res.error || 'Failed to update category.');
-        } else {
-          setShowCategoryModal(false);
-        }
-      } else {
-        const res = await addCategoryItem({
-          name: categoryName.trim(),
-          code: categoryCode.trim() || undefined,
-          icon: categoryIcon,
-          bgColor: categoryBgColor,
-          sortOrder: parseInt(categorySortOrder, 10) || categories.length + 1,
-          displayOrder: parseInt(categorySortOrder, 10) || categories.length + 1,
-          isActive: categoryIsActive,
-          description: categoryDescription.trim(),
-        });
-        if (!res.success) {
-          Alert.alert('Creation Failed', res.error || 'Failed to create category.');
-        } else {
-          setShowCategoryModal(false);
-        }
+    const cleanSlug = (newCatSlug.trim() || newCatName.toLowerCase().replace(/[^a-z0-9]+/g, '-')).replace(/^-+|-+$/g, '');
+    const cleanCode = cleanSlug.toUpperCase().replace(/-/g, '_');
+
+    const payload = {
+      name: newCatName.trim(),
+      code: cleanCode,
+      slug: cleanSlug,
+      image: newCatImage.trim() || null,
+      imageUrl: newCatImage.trim() || null,
+      bgColor: newCatBgColor,
+      icon: newCatIcon.trim() || 'shopping-bag',
+      description: newCatDescription.trim(),
+      sortOrder: Number(newCatSortOrder) || categories.length + 1,
+      isActive: true,
+    };
+
+    const res = await addCategoryItem(payload);
+    setSubmittingCat(false);
+
+    if (res?.success) {
+      setShowAddCatModal(false);
+      setNewCatName('');
+      setNewCatSlug('');
+      setNewCatImage('');
+      setNewCatDescription('');
+      await refreshCategories();
+    } else {
+      setAddError(res?.error || 'Failed to create category.');
+    }
+  };
+
+  // Toggle Category Status
+  const handleToggleStatus = async (cat: CategoryItem) => {
+    const catId = cat.id || cat._id || '';
+    await toggleCategoryItemStatus(catId);
+  };
+
+  // Delete Category
+  const handleDeleteCategory = (cat: CategoryItem) => {
+    const doDelete = async () => {
+      const catId = cat.id || cat._id || '';
+      await deleteCategoryItem(catId);
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Are you sure you want to delete category "${cat.name}"? This action cannot be undone.`)) {
+        doDelete();
       }
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'An unexpected error occurred.');
-    } finally {
-      setCategorySubmitting(false);
-    }
-  };
-
-  // Handle Deactivate Category
-  const handleDeactivateCategory = async () => {
-    if (!deactivateCategoryTarget) return;
-    const catId = deactivateCategoryTarget.id || (deactivateCategoryTarget as any)._id;
-    const nextStatus = !deactivateCategoryTarget.isActive;
-    await toggleCategoryItemStatus(catId, nextStatus);
-    setDeactivateCategoryTarget(null);
-  };
-
-  // Handle Delete Category Safe Check
-  const initiateDeleteCategory = (cat: CategoryItem) => {
-    const pCount = cat.productCount ?? 0;
-    if (pCount > 0) {
-      setDeleteBlockedInfo({
-        categoryName: cat.name,
-        count: pCount,
-      });
-      return;
-    }
-    setDeleteCategoryTarget(cat);
-  };
-
-  const confirmDeleteCategory = async () => {
-    if (!deleteCategoryTarget) return;
-    const catId = deleteCategoryTarget.id || (deleteCategoryTarget as any)._id;
-    const res = await deleteCategoryItem(catId);
-    if (!res.success) {
-      Alert.alert('Delete Blocked', res.error || 'Could not delete category.');
-    }
-    setDeleteCategoryTarget(null);
-  };
-
-  // --- SUB-CATEGORY MANAGEMENT ---
-
-  const openSubCategoryManager = (cat: CategoryItem) => {
-    setManagingCategory(cat);
-    const initialSubs = cat.subCategories || [];
-    setSubCategoriesList(initialSubs);
-    setShowSubModal(true);
-  };
-
-  const openAddSubForm = () => {
-    setEditingSub(null);
-    setSubName('');
-    setSubSlug('');
-    setSubIcon('grid');
-    setSubShelf('');
-    setSubSortOrder(String(subCategoriesList.length + 1));
-    setSubIsActive(true);
-    setShowSubFormModal(true);
-  };
-
-  const openEditSubForm = (sub: SubCategoryItem) => {
-    setEditingSub(sub);
-    setSubName(sub.name);
-    setSubSlug(sub.slug);
-    setSubIcon(sub.icon || 'grid');
-    setSubShelf(sub.defaultShelfAisle || '');
-    setSubSortOrder(String(sub.sortOrder || 1));
-    setSubIsActive(sub.isActive !== false);
-    setShowSubFormModal(true);
-  };
-
-  const handleSubNameChange = (name: string) => {
-    setSubName(name);
-    if (!editingSub) {
-      const slug = name
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-      setSubSlug(slug);
-    }
-  };
-
-  const handleSaveSubCategory = async () => {
-    if (!managingCategory || !subName.trim()) {
-      Alert.alert('Validation Error', 'Sub-category name is required.');
-      return;
-    }
-
-    setSubSubmitting(true);
-    const catId = managingCategory.id || (managingCategory as any)._id;
-
-    try {
-      if (editingSub) {
-        const subId = editingSub.id || (editingSub as any)._id;
-        const res = await updateSubcategoryItem(catId, subId, {
-          name: subName.trim(),
-          slug: subSlug.trim() || undefined,
-          icon: subIcon,
-          defaultShelfAisle: subShelf.trim(),
-          sortOrder: parseInt(subSortOrder, 10) || 1,
-          isActive: subIsActive,
-        });
-
-        if (res.success) {
-          setSubCategoriesList((prev) =>
-            prev.map((s) =>
-              (s.id === subId || (s as any)._id === subId)
-                ? { ...s, name: subName.trim(), slug: subSlug.trim(), defaultShelfAisle: subShelf.trim(), sortOrder: parseInt(subSortOrder, 10) || 1, isActive: subIsActive }
-                : s
-            )
-          );
-          setShowSubFormModal(false);
-        } else {
-          Alert.alert('Update Failed', res.error || 'Failed to update sub-category.');
-        }
-      } else {
-        const res = await addSubcategoryItem(catId, {
-          name: subName.trim(),
-          slug: subSlug.trim() || undefined,
-          icon: subIcon,
-          defaultShelfAisle: subShelf.trim(),
-          sortOrder: parseInt(subSortOrder, 10) || subCategoriesList.length + 1,
-          isActive: subIsActive,
-        });
-
-        if (res.success && res.data) {
-          setSubCategoriesList((prev) => [...prev, res.data as SubCategoryItem]);
-          setShowSubFormModal(false);
-        } else {
-          Alert.alert('Creation Failed', res.error || 'Failed to add sub-category.');
-        }
-      }
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'An error occurred.');
-    } finally {
-      setSubSubmitting(false);
-    }
-  };
-
-  const handleToggleSubStatus = async (sub: SubCategoryItem) => {
-    if (!managingCategory) return;
-    const catId = managingCategory.id || (managingCategory as any)._id;
-    const subId = sub.id || (sub as any)._id;
-    const nextStatus = !sub.isActive;
-
-    const res = await updateSubcategoryItem(catId, subId, { isActive: nextStatus });
-    if (res.success) {
-      setSubCategoriesList((prev) =>
-        prev.map((s) => (s.id === subId || (s as any)._id === subId ? { ...s, isActive: nextStatus } : s))
+    } else {
+      Alert.alert(
+        'Delete Category',
+        `Are you sure you want to delete category "${cat.name}"? This action cannot be undone.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Delete', style: 'destructive', onPress: doDelete },
+        ]
       );
     }
   };
 
-  const handleReorderSub = async (index: number, direction: 'up' | 'down') => {
-    if (!managingCategory) return;
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= subCategoriesList.length) return;
-
-    const updated = [...subCategoriesList];
-    const current = updated[index];
-    const target = updated[targetIndex];
-
-    const currentOrder = current.sortOrder || index + 1;
-    const targetOrder = target.sortOrder || targetIndex + 1;
-
-    current.sortOrder = targetOrder;
-    target.sortOrder = currentOrder;
-
-    updated[index] = target;
-    updated[targetIndex] = current;
-    setSubCategoriesList(updated);
-
-    const catId = managingCategory.id || (managingCategory as any)._id;
-    await updateSubcategoryItem(catId, current.id || (current as any)._id, { sortOrder: current.sortOrder });
-    await updateSubcategoryItem(catId, target.id || (target as any)._id, { sortOrder: target.sortOrder });
+  // Add Subcategory
+  const handleCreateSubcategory = async () => {
+    if (!selectedCatForSub || !newSubName.trim()) return;
+    setSubmittingSub(true);
+    const catId = selectedCatForSub.id || selectedCatForSub._id || '';
+    await addSubcategoryItem(catId, {
+      name: newSubName.trim(),
+      slug: newSubName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+    });
+    setSubmittingSub(false);
+    setSelectedCatForSub(null);
+    setNewSubName('');
   };
 
-  const handleDeleteSub = async (sub: SubCategoryItem) => {
-    if (!managingCategory) return;
-    const catId = managingCategory.id || (managingCategory as any)._id;
-    const subId = sub.id || (sub as any)._id;
+  // Delete Subcategory
+  const handleDeleteSubcategory = (cat: CategoryItem, subId: string, subName: string) => {
+    const doDelete = async () => {
+      const catId = cat.id || cat._id || '';
+      await deleteSubcategoryItem(catId, subId);
+    };
 
-    Alert.alert(
-      'Delete Sub-Category',
-      `Are you sure you want to remove "${sub.name}"?`,
-      [
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Delete subcategory "${subName}" from ${cat.name}?`)) {
+        doDelete();
+      }
+    } else {
+      Alert.alert('Delete Subcategory', `Delete subcategory "${subName}" from ${cat.name}?`, [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            const res = await deleteSubcategoryItem(catId, subId);
-            if (res.success) {
-              setSubCategoriesList((prev) => prev.filter((s) => s.id !== subId && (s as any)._id !== subId));
-            } else {
-              Alert.alert('Cannot Delete', res.error || 'Failed to delete subcategory.');
-            }
-          },
-        },
-      ]
-    );
+        { text: 'Delete', style: 'destructive', onPress: doDelete },
+      ]);
+    }
   };
 
   return (
-    <View style={styles.container}>
-      {/* Top Banner Header */}
-      <LinearGradient colors={GRADIENTS.navyHeader} style={styles.headerBanner}>
-        <View style={styles.headerContent}>
-          <View style={styles.headerLeft}>
-            <View style={styles.titleIconBadge}>
-              <FolderTree size={20} color={COLORS.white} />
-            </View>
-            <View>
-              <Text style={styles.headerTitle}>Category Management</Text>
-              <Text style={styles.headerSubtitle}>
-                Manage categories & subcategories shown to customers
-              </Text>
-            </View>
-          </View>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+      {/* 1. Top Breadcrumb & Store Selector (100% Website Header Alignment) */}
+      <View style={styles.topBar}>
+        <View style={styles.breadcrumbRow}>
+          <Text style={styles.breadcrumbPortal}>Portal</Text>
+          <Text style={styles.breadcrumbSlash}> / </Text>
+          <Text style={styles.breadcrumbActive}>Categories</Text>
+        </View>
 
-          <TouchableOpacity
-            style={styles.refreshBtn}
-            onPress={handleRefresh}
-            disabled={refreshing}
+        <TouchableOpacity
+          style={styles.storeSelectorBtn}
+          onPress={() => setShowDarkStoreModal(true)}
+          activeOpacity={0.8}
+        >
+          <Store size={14} color="#071B52" />
+          <Text style={styles.storeSelectorText} numberOfLines={1}>
+            {selectedDarkStore}
+          </Text>
+          <ChevronDown size={14} color="#64748B" />
+        </TouchableOpacity>
+      </View>
+
+      {/* 2. Main Page Header */}
+      <View style={styles.headerRow}>
+        <View style={styles.headerLeft}>
+          <Text style={styles.mainTitle}>Category Taxonomy & Department Shelves</Text>
+          <Text style={styles.mainSubtitle}>
+            Manage category titles, product images, visual icons, background colors, and subcategories
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          style={styles.addCategoryBtn}
+          onPress={() => {
+            setNewCatSortOrder(String(categories.length + 1));
+            setShowAddCatModal(true);
+          }}
+          activeOpacity={0.85}
+        >
+          <LinearGradient
+            colors={['#071B52', '#1E293B']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.addCategoryGradient}
           >
-            <RefreshCw
-              size={16}
-              color={COLORS.white}
-              style={refreshing ? { transform: [{ rotate: '45deg' }] } : undefined}
-            />
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
+            <Plus size={16} color="#FFFFFF" />
+            <Text style={styles.addCategoryBtnText}>+ Add Department / Category</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
 
-      <ScrollView style={styles.scrollArea} contentContainerStyle={styles.scrollContent}>
-        {/* KPI Strip */}
-        <View style={styles.kpiStrip}>
-          <View style={styles.kpiCard}>
-            <View style={[styles.kpiIconWrapper, { backgroundColor: '#F0EBFB' }]}>
-              <Layers size={18} color={COLORS.purple} />
-            </View>
-            <Text style={styles.kpiValue}>{totalCategories}</Text>
-            <Text style={styles.kpiLabel}>Categories</Text>
-          </View>
-
-          <View style={styles.kpiCard}>
-            <View style={[styles.kpiIconWrapper, { backgroundColor: '#EBF5FF' }]}>
-              <FolderTree size={18} color={COLORS.blue} />
-            </View>
-            <Text style={styles.kpiValue}>{totalSubCategories}</Text>
-            <Text style={styles.kpiLabel}>Sub-Cats</Text>
-          </View>
-
-          <View style={styles.kpiCard}>
-            <View style={[styles.kpiIconWrapper, { backgroundColor: '#FFF4E5' }]}>
-              <Package size={18} color={COLORS.warning} />
-            </View>
-            <Text style={styles.kpiValue}>{zeroProductCategoriesCount}</Text>
-            <Text style={styles.kpiLabel}>No Products</Text>
-          </View>
-
-          <View style={styles.kpiCard}>
-            <View style={[styles.kpiIconWrapper, { backgroundColor: '#EEF9F3' }]}>
-              <Sparkles size={18} color={COLORS.success} />
-            </View>
-            <Text style={styles.kpiValue}>{activeCategoriesCount}</Text>
-            <Text style={styles.kpiLabel}>Active</Text>
-          </View>
-        </View>
-
-        {/* Controls: Search + Add Category Button */}
-        <View style={styles.controlsRow}>
-          <View style={styles.searchBar}>
-            <Search size={16} color={COLORS.textMuted} style={{ marginRight: SPACING.xs }} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search categories or codes..."
-              placeholderTextColor={COLORS.secondaryText}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <X size={16} color={COLORS.textMuted} />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          <TouchableOpacity style={styles.addCategoryBtn} onPress={openAddCategoryModal}>
-            <LinearGradient colors={GRADIENTS.cardBadge} style={styles.addCategoryGradient}>
-              <Plus size={16} color={COLORS.white} />
-              <Text style={styles.addCategoryBtnText}>ADD CATEGORY</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-
-        {/* Filter Pills */}
-        <View style={styles.filterPillsRow}>
-          {(['All', 'Active', 'Inactive'] as const).map((filter) => {
-            const isSelected = statusFilter === filter;
-            const count =
-              filter === 'All'
-                ? totalCategories
-                : filter === 'Active'
-                ? activeCategoriesCount
-                : inactiveCategoriesCount;
-
+      {/* 3. Filter Pills and Search Bar */}
+      <View style={styles.filterCard}>
+        {/* Status Filter Tabs (Pill Bar) */}
+        <View style={styles.statusFilterRow}>
+          {(['All', 'Active', 'Inactive'] as const).map((tab) => {
+            const isSelected = statusFilter === tab;
             return (
               <TouchableOpacity
-                key={filter}
-                style={[styles.filterPill, isSelected && styles.filterPillActive]}
-                onPress={() => setStatusFilter(filter)}
+                key={tab}
+                style={[styles.statusPill, isSelected && styles.statusPillActive]}
+                onPress={() => setStatusFilter(tab)}
+                activeOpacity={0.8}
               >
-                <Text style={[styles.filterPillText, isSelected && styles.filterPillTextActive]}>
-                  {filter} ({count})
+                <Text style={[styles.statusPillText, isSelected && styles.statusPillTextActive]}>
+                  {tab}
                 </Text>
               </TouchableOpacity>
             );
           })}
         </View>
 
-        {/* Categories List */}
-        <View style={styles.listContainer}>
-          {filteredCategories.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <FolderTree size={48} color={COLORS.secondaryText} />
-              <Text style={styles.emptyTitle}>No categories found</Text>
-              <Text style={styles.emptySubtitle}>
-                {searchQuery
-                  ? `No categories match "${searchQuery}"`
-                  : 'Get started by creating your first catalog category.'}
-              </Text>
-              <TouchableOpacity style={styles.emptyAddBtn} onPress={openAddCategoryModal}>
-                <Plus size={16} color={COLORS.purple} />
-                <Text style={styles.emptyAddBtnText}>Add New Category</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            filteredCategories.map((cat, idx) => {
-              const subsCount = (cat.subCategories && cat.subCategories.length > 0)
-                ? cat.subCategories.length
-                : (cat.subCategoryCount || 0);
-              const pCount = cat.productCount ?? 0;
-              const orderNum = cat.sortOrder || cat.displayOrder || idx + 1;
-              const isActive = cat.isActive !== false;
-              const iconEmoji = cat.icon || cat.iconUrl || '🥬';
-              const cardBg = cat.bgColor || '#F4F4FA';
-
-              return (
-                <View key={cat.id || (cat as any)._id || idx} style={styles.categoryCard}>
-                  {/* Top Row: Icon + Name + Active Status Badge */}
-                  <View style={styles.cardHeaderRow}>
-                    <View style={styles.cardHeaderLeft}>
-                      <View style={[styles.categoryIconCircle, { backgroundColor: cardBg }]}>
-                        <Text style={styles.categoryIconText}>{iconEmoji}</Text>
-                      </View>
-                      <View style={styles.nameBlock}>
-                        <View style={styles.nameRow}>
-                          <Text style={styles.categoryNameText}>{cat.name}</Text>
-                          {cat.code && (
-                            <View style={styles.codeBadge}>
-                              <Text style={styles.codeBadgeText}>{cat.code}</Text>
-                            </View>
-                          )}
-                        </View>
-                        <Text style={styles.categoryMetaText}>
-                          {subsCount} sub-categories · {pCount} products · Order: {orderNum}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* Status Pill */}
-                    <View
-                      style={[
-                        styles.statusPill,
-                        isActive ? styles.statusPillActive : styles.statusPillInactive,
-                      ]}
-                    >
-                      <View
-                        style={[
-                          styles.statusDot,
-                          { backgroundColor: isActive ? COLORS.success : COLORS.error },
-                        ]}
-                      />
-                      <Text
-                        style={[
-                          styles.statusPillText,
-                          { color: isActive ? COLORS.success : COLORS.error },
-                        ]}
-                      >
-                        {isActive ? 'Active' : 'Inactive'}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Description if present */}
-                  {cat.description ? (
-                    <Text style={styles.categoryDescriptionText} numberOfLines={2}>
-                      {cat.description}
-                    </Text>
-                  ) : null}
-
-                  {/* Action Buttons Strip */}
-                  <View style={styles.cardActionsRow}>
-                    <TouchableOpacity
-                      style={styles.actionBtnSecondary}
-                      onPress={() => openEditCategoryModal(cat)}
-                    >
-                      <Edit2 size={13} color={COLORS.purple} />
-                      <Text style={styles.actionBtnSecondaryText}>Edit</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.actionBtnPrimary}
-                      onPress={() => openSubCategoryManager(cat)}
-                    >
-                      <Layers size={13} color={COLORS.blue} />
-                      <Text style={styles.actionBtnPrimaryText}>Manage Sub-Cats ({subsCount})</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[
-                        styles.actionBtnToggle,
-                        isActive ? styles.actionBtnDeactivate : styles.actionBtnActivate,
-                      ]}
-                      onPress={() => setDeactivateCategoryTarget(cat)}
-                    >
-                      {isActive ? (
-                        <>
-                          <EyeOff size={13} color={COLORS.textMuted} />
-                          <Text style={styles.actionBtnToggleText}>Deactivate</Text>
-                        </>
-                      ) : (
-                        <>
-                          <Eye size={13} color={COLORS.success} />
-                          <Text style={[styles.actionBtnToggleText, { color: COLORS.success }]}>
-                            Activate
-                          </Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.actionBtnDelete}
-                      onPress={() => initiateDeleteCategory(cat)}
-                    >
-                      <Trash2 size={15} color={COLORS.error} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              );
-            })
+        {/* Search Input */}
+        <View style={styles.searchBox}>
+          <Search size={15} color="#94A3B8" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search categories & slugs..."
+            placeholderTextColor="#94A3B8"
+            value={search}
+            onChangeText={setSearch}
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch('')}>
+              <X size={15} color="#94A3B8" />
+            </TouchableOpacity>
           )}
         </View>
-      </ScrollView>
+      </View>
+
+      {/* 4. Category Cards Grid (Mobile Responsive Matching Image 1) */}
+      <View style={styles.categoriesGrid}>
+        {filteredCategories.map((c) => {
+          const catId = c.id || c._id || '';
+          const productCount = products.filter(
+            (p) =>
+              p.category === c.name ||
+              p.categoryId === catId ||
+              (p.category && c.slug && p.category.toLowerCase() === c.slug.toLowerCase())
+          ).length;
+          const subCount = c.subCategories?.length || 0;
+          const catImg = getCategoryImage(c);
+
+          return (
+            <View key={catId} style={styles.categoryCard}>
+              {/* Header row with Image, Title, Metadata & Actions */}
+              <View style={styles.cardHeaderRow}>
+                {/* Category Thumbnail Box */}
+                <View
+                  style={[
+                    styles.thumbnailBox,
+                    { backgroundColor: c.bgColor || '#F3F0FF' },
+                  ]}
+                >
+                  <Image
+                    source={{ uri: catImg }}
+                    style={styles.thumbnailImage}
+                    resizeMode="cover"
+                  />
+                  {c.icon && c.icon.length <= 4 && (
+                    <View style={styles.emojiOverlayBadge}>
+                      <Text style={styles.emojiOverlayText}>{c.icon}</Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Title & Metadata */}
+                <View style={styles.cardTitleCol}>
+                  <Text style={styles.cardCategoryName} numberOfLines={1}>
+                    {c.name}
+                  </Text>
+                  <Text style={styles.cardSlug}>/{c.slug || c.name.toLowerCase().replace(/\s+/g, '-')}</Text>
+
+                  <View style={styles.tagsRow}>
+                    {c.sortOrder !== undefined && (
+                      <View style={styles.orderTag}>
+                        <Text style={styles.orderTagText}>Order #{c.sortOrder}</Text>
+                      </View>
+                    )}
+                    {c.code && (
+                      <View style={styles.codeTag}>
+                        <Text style={styles.codeTagText}>{c.code}</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                {/* Top-Right Action Buttons: Edit, Status, Delete */}
+                <View style={styles.cardActionsCol}>
+                  <TouchableOpacity
+                    style={styles.editBtn}
+                    onPress={() => startEditCategory(c)}
+                    activeOpacity={0.7}
+                  >
+                    <Edit2 size={12} color="#1D4ED8" />
+                    <Text style={styles.editBtnText}>Edit</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.statusBadge,
+                      c.isActive !== false ? styles.statusActive : styles.statusHidden,
+                    ]}
+                    onPress={() => handleToggleStatus(c)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.statusBadgeText,
+                        c.isActive !== false ? styles.statusActiveText : styles.statusHiddenText,
+                      ]}
+                    >
+                      {c.isActive !== false ? 'ACTIVE' : 'HIDDEN'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.deleteIconBtn}
+                    onPress={() => handleDeleteCategory(c)}
+                    activeOpacity={0.7}
+                  >
+                    <Trash2 size={14} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Optional Description */}
+              {c.description ? (
+                <Text style={styles.categoryDesc} numberOfLines={2}>
+                  {c.description}
+                </Text>
+              ) : null}
+
+              {/* Subcategories Section */}
+              <View style={styles.subcategoriesSection}>
+                <View style={styles.subcategoriesHeader}>
+                  <Text style={styles.subcategoriesTitle}>
+                    SUBCATEGORIES ({subCount})
+                  </Text>
+                  <TouchableOpacity onPress={() => setSelectedCatForSub(c)}>
+                    <Text style={styles.addSubText}>+ Add Sub</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.subChipsRow}>
+                  {c.subCategories && c.subCategories.length > 0 ? (
+                    c.subCategories.map((sub, i) => (
+                      <View key={sub.id || sub._id || i} style={styles.subChip}>
+                        <Text style={styles.subChipText}>{sub.name}</Text>
+                        <TouchableOpacity
+                          onPress={() => handleDeleteSubcategory(c, sub.id || sub._id || '', sub.name)}
+                          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+                        >
+                          <X size={11} color="#94A3B8" />
+                        </TouchableOpacity>
+                      </View>
+                    ))
+                  ) : (
+                    <Text style={styles.noSubsText}>No subcategories defined</Text>
+                  )}
+                </View>
+              </View>
+
+              {/* Footer with Product Count & Quick Edit Link */}
+              <View style={styles.cardFooter}>
+                <View style={styles.productCountRow}>
+                  <Text style={styles.productCountLabel}>Live Products: </Text>
+                  <Text style={styles.productCountValue}>{productCount} items</Text>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.quickEditLink}
+                  onPress={() => startEditCategory(c)}
+                  activeOpacity={0.7}
+                >
+                  <ImageIcon size={12} color="#2563EB" />
+                  <Text style={styles.quickEditText}>Edit Image / Details →</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        })}
+      </View>
 
       {/* ========================================================================= */}
-      {/* MODAL 1: ADD / EDIT CATEGORY MODAL                                        */}
+      {/* EDIT CATEGORY MODAL (100% Same as Website Image 2)                       */}
       {/* ========================================================================= */}
-      <Modal
-        visible={showCategoryModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowCategoryModal(false)}
-      >
+      <Modal visible={Boolean(editingCat)} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalDialog}>
+          <View style={styles.modalCard}>
+            {/* Modal Header */}
             <View style={styles.modalHeader}>
-              <View style={styles.modalHeaderTitleRow}>
-                <FolderTree size={20} color={COLORS.purple} />
-                <Text style={styles.modalTitle}>
-                  {editingCategory ? `Edit Category: ${editingCategory.name}` : 'Add New Category'}
-                </Text>
+              <View style={styles.modalHeaderLeft}>
+                <View style={[styles.modalEmojiBox, { backgroundColor: editBgColor }]}>
+                  <Text style={styles.modalEmojiText}>{editIcon || '🥦'}</Text>
+                </View>
+                <View>
+                  <Text style={styles.modalTitle} numberOfLines={1}>
+                    Edit Category: {editingCat?.name}
+                  </Text>
+                  <Text style={styles.modalSubtitle}>ID: {editingCat?.id || editingCat?._id}</Text>
+                </View>
               </View>
-              <TouchableOpacity
-                style={styles.modalCloseBtn}
-                onPress={() => setShowCategoryModal(false)}
-              >
-                <X size={18} color={COLORS.textMuted} />
+              <TouchableOpacity onPress={() => setEditingCat(null)} style={styles.modalCloseBtn}>
+                <X size={18} color="#94A3B8" />
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-              {/* Category Name */}
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Category Name *</Text>
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="e.g. Organic Products"
-                  placeholderTextColor={COLORS.secondaryText}
-                  value={categoryName}
-                  onChangeText={handleCategoryNameChange}
-                />
-              </View>
+            <ScrollView style={{ maxHeight: 520 }} showsVerticalScrollIndicator={false}>
+              {editError && (
+                <View style={styles.errorBox}>
+                  <AlertCircle size={16} color="#B91C1C" />
+                  <Text style={styles.errorText}>{editError}</Text>
+                </View>
+              )}
 
-              {/* Category Code */}
-              <View style={styles.fieldGroup}>
-                <View style={styles.fieldLabelRow}>
-                  <Text style={styles.fieldLabel}>Category Code *</Text>
-                  {editingCategory ? (
-                    <View style={styles.lockedPill}>
-                      <Lock size={12} color={COLORS.textMuted} />
-                      <Text style={styles.lockedText}>Read-Only</Text>
-                    </View>
+              {/* 1. Category Image URL & Preview */}
+              <Text style={styles.formLabel}>Category Image URL *</Text>
+              <Text style={styles.formSubLabel}>Direct image URL (PNG/JPG/WEBP)</Text>
+
+              <View style={styles.imageInputRow}>
+                <View style={[styles.imagePreviewBox, { backgroundColor: editBgColor }]}>
+                  {editImage ? (
+                    <Image source={{ uri: editImage }} style={styles.imagePreview} resizeMode="cover" />
                   ) : (
-                    <Text style={styles.fieldHint}>Auto-generated</Text>
+                    <ImageIcon size={28} color="#94A3B8" />
                   )}
                 </View>
-                <TextInput
-                  style={[styles.textInput, editingCategory && styles.textInputDisabled]}
-                  placeholder="e.g. ORGANIC_PRODUCTS"
-                  placeholderTextColor={COLORS.secondaryText}
-                  value={categoryCode}
-                  onChangeText={setCategoryCode}
-                  editable={!editingCategory}
-                  autoCapitalize="characters"
-                />
+
+                <View style={{ flex: 1 }}>
+                  <TextInput
+                    style={styles.urlInput}
+                    placeholder="https://images.unsplash.com/... or CDN link"
+                    placeholderTextColor="#94A3B8"
+                    value={editImage}
+                    onChangeText={setEditImage}
+                  />
+                  <Text style={styles.urlHint}>Paste any online image URL or click a ready preset below:</Text>
+                </View>
               </View>
 
-              {/* Icon Selector (Emoji or Uploaded) */}
-              <View style={styles.fieldGroup}>
-                <View style={styles.fieldLabelRow}>
-                  <Smile size={14} color={COLORS.purple} />
-                  <Text style={[styles.fieldLabel, { marginLeft: 4 }]}>Category Icon / Emoji *</Text>
-                </View>
-                <View style={styles.iconSelectionRow}>
-                  <View style={[styles.iconPreviewBox, { backgroundColor: categoryBgColor }]}>
-                    <Text style={styles.iconPreviewText}>{categoryIcon || '🥬'}</Text>
-                  </View>
+              {/* ⚡ Quick-Select Image Presets */}
+              <Text style={styles.presetsHeader}>⚡ Quick-Select Image Presets:</Text>
+              <View style={styles.presetsRow}>
+                {IMAGE_PRESETS.map((p) => {
+                  const isSelected = editImage === p.url;
+                  return (
+                    <TouchableOpacity
+                      key={p.label}
+                      style={[styles.presetChip, isSelected && styles.presetChipActive]}
+                      onPress={() => {
+                        setEditImage(p.url);
+                        setEditIcon(p.emoji);
+                        setEditBgColor(p.color);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.presetChipEmoji}>{p.emoji}</Text>
+                      <Text style={[styles.presetChipLabel, isSelected && styles.presetChipLabelActive]}>
+                        {p.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* 2. Category Name & URL Slug */}
+              <View style={styles.twoColRow}>
+                <View style={styles.col}>
+                  <Text style={styles.formLabel}>Category Name *</Text>
                   <TextInput
-                    style={[styles.textInput, { flex: 1, marginLeft: SPACING.sm }]}
-                    placeholder="Custom emoji or icon name"
-                    placeholderTextColor={COLORS.secondaryText}
-                    value={categoryIcon}
-                    onChangeText={setCategoryIcon}
+                    style={styles.textInput}
+                    value={editName}
+                    onChangeText={(val) => {
+                      setEditName(val);
+                      if (!editSlug || editSlug === editingCat?.slug) {
+                        setEditSlug(val.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
+                      }
+                    }}
                   />
                 </View>
 
-                {/* Preset Emoji Picker Grid */}
-                <View style={styles.presetEmojiRow}>
-                  {PRESET_EMOJIS.map((emoji) => (
-                    <TouchableOpacity
-                      key={emoji}
-                      style={[
-                        styles.presetEmojiChip,
-                        categoryIcon === emoji && styles.presetEmojiChipSelected,
-                      ]}
-                      onPress={() => setCategoryIcon(emoji)}
-                    >
-                      <Text style={styles.presetEmojiText}>{emoji}</Text>
-                    </TouchableOpacity>
-                  ))}
+                <View style={styles.col}>
+                  <Text style={styles.formLabel}>URL Slug *</Text>
+                  <TextInput
+                    style={[styles.textInput, styles.monoFont]}
+                    value={editSlug}
+                    onChangeText={setEditSlug}
+                    autoCapitalize="none"
+                  />
                 </View>
               </View>
 
-              {/* Background Pastel Color */}
-              <View style={styles.fieldGroup}>
-                <View style={styles.fieldLabelRow}>
-                  <Palette size={14} color={COLORS.purple} />
-                  <Text style={[styles.fieldLabel, { marginLeft: 4 }]}>Background Pastel Color</Text>
-                </View>
-                <View style={styles.presetColorsGrid}>
-                  {PRESET_BG_COLORS.map((c) => (
-                    <TouchableOpacity
-                      key={c.hex}
-                      style={[
-                        styles.colorChip,
-                        { backgroundColor: c.hex },
-                        categoryBgColor.toLowerCase() === c.hex.toLowerCase() && styles.colorChipSelected,
-                      ]}
-                      onPress={() => setCategoryBgColor(c.hex)}
-                    >
-                      {categoryBgColor.toLowerCase() === c.hex.toLowerCase() && (
-                        <Check size={14} color={COLORS.navy} />
-                      )}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <TextInput
-                  style={[styles.textInput, { marginTop: SPACING.xs }]}
-                  placeholder="#EEF9F3"
-                  placeholderTextColor={COLORS.secondaryText}
-                  value={categoryBgColor}
-                  onChangeText={setCategoryBgColor}
-                />
-              </View>
-
-              {/* Display Order & Status in Row */}
+              {/* 3. Icon / Emoji & Sort Order */}
               <View style={styles.twoColRow}>
-                <View style={[styles.fieldGroup, { flex: 1, marginRight: SPACING.sm }]}>
-                  <Text style={styles.fieldLabel}>Display Order</Text>
+                <View style={styles.col}>
+                  <Text style={styles.formLabel}>Icon / Emoji</Text>
                   <TextInput
                     style={styles.textInput}
-                    placeholder="1"
-                    placeholderTextColor={COLORS.secondaryText}
-                    value={categorySortOrder}
-                    onChangeText={setCategorySortOrder}
+                    value={editIcon}
+                    onChangeText={setEditIcon}
+                    placeholder="e.g. 🥦 or 🧄"
+                  />
+                </View>
+
+                <View style={styles.col}>
+                  <Text style={styles.formLabel}>Display Sort Order</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={editSortOrder}
+                    onChangeText={setEditSortOrder}
                     keyboardType="numeric"
                   />
                 </View>
+              </View>
 
-                <View style={[styles.fieldGroup, { flex: 1 }]}>
-                  <Text style={styles.fieldLabel}>Status</Text>
-                  <View style={styles.statusToggleContainer}>
-                    <TouchableOpacity
-                      style={[
-                        styles.statusToggleOption,
-                        categoryIsActive && styles.statusToggleActive,
-                      ]}
-                      onPress={() => setCategoryIsActive(true)}
-                    >
-                      <Text
-                        style={[
-                          styles.statusToggleOptionText,
-                          categoryIsActive && styles.statusToggleOptionTextActive,
-                        ]}
-                      >
-                        Active
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.statusToggleOption,
-                        !categoryIsActive && styles.statusToggleInactive,
-                      ]}
-                      onPress={() => setCategoryIsActive(false)}
-                    >
-                      <Text
-                        style={[
-                          styles.statusToggleOptionText,
-                          !categoryIsActive && styles.statusToggleOptionTextInactive,
-                        ]}
-                      >
-                        Inactive
-                      </Text>
-                    </TouchableOpacity>
+              {/* 4. Background Color Swatches */}
+              <Text style={styles.formLabel}>Card Background Accent Color</Text>
+              <View style={styles.colorSwatchesRow}>
+                {COLOR_PRESETS.map((color) => (
+                  <TouchableOpacity
+                    key={color}
+                    style={[
+                      styles.colorSwatch,
+                      { backgroundColor: color },
+                      editBgColor === color && styles.colorSwatchActive,
+                    ]}
+                    onPress={() => setEditBgColor(color)}
+                    activeOpacity={0.8}
+                  >
+                    {editBgColor === color && <Check size={14} color="#071B52" />}
+                  </TouchableOpacity>
+                ))}
+                <TextInput
+                  style={styles.hexInput}
+                  value={editBgColor}
+                  onChangeText={setEditBgColor}
+                />
+              </View>
+
+              {/* 5. Description (Optional) */}
+              <Text style={[styles.formLabel, { marginTop: 14 }]}>Description (Optional)</Text>
+              <TextInput
+                style={styles.textAreaInput}
+                placeholder="Short description of products found in this aisle..."
+                placeholderTextColor="#94A3B8"
+                value={editDescription}
+                onChangeText={setEditDescription}
+                multiline={true}
+                numberOfLines={2}
+              />
+
+              {/* 6. Category Visibility Checkbox */}
+              <View style={styles.visibilityCard}>
+                <TouchableOpacity
+                  style={styles.visibilityRow}
+                  onPress={() => setEditIsActive(!editIsActive)}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.checkbox, editIsActive && styles.checkboxActive]}>
+                    {editIsActive && <Check size={14} color="#FFFFFF" />}
                   </View>
+                  <Text style={styles.visibilityLabel}>ACTIVE</Text>
+                </TouchableOpacity>
+                <Text style={styles.visibilityHint}>
+                  Active categories appear in consumer app & website navigation
+                </Text>
+              </View>
+            </ScrollView>
+
+            {/* Modal Footer */}
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setEditingCat(null)}
+                disabled={savingEdit}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalSaveBtn}
+                onPress={handleSaveCategoryEdit}
+                disabled={savingEdit}
+              >
+                <LinearGradient
+                  colors={GRADIENTS.primary}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.modalSaveGradient}
+                >
+                  <Text style={styles.modalSaveText}>
+                    {savingEdit ? 'Saving...' : 'Commit Category Changes'}
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* ADD CATEGORY MODAL                                                        */}
+      {/* ========================================================================= */}
+      <Modal visible={showAddCatModal} transparent={true} animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderLeft}>
+                <Plus size={20} color="#FF3B98" />
+                <Text style={styles.modalTitle}>Add Department / Category</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowAddCatModal(false)}>
+                <X size={18} color="#94A3B8" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 520 }} showsVerticalScrollIndicator={false}>
+              {addError && (
+                <View style={styles.errorBox}>
+                  <AlertCircle size={16} color="#B91C1C" />
+                  <Text style={styles.errorText}>{addError}</Text>
+                </View>
+              )}
+
+              {/* Category Name & Slug */}
+              <View style={styles.twoColRow}>
+                <View style={styles.col}>
+                  <Text style={styles.formLabel}>Category Name *</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="e.g. Vegetables"
+                    value={newCatName}
+                    onChangeText={(val) => {
+                      setNewCatName(val);
+                      if (!newCatSlug) {
+                        setNewCatSlug(val.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
+                      }
+                    }}
+                  />
+                </View>
+                <View style={styles.col}>
+                  <Text style={styles.formLabel}>URL Slug *</Text>
+                  <TextInput
+                    style={[styles.textInput, styles.monoFont]}
+                    placeholder="e.g. vegetables"
+                    value={newCatSlug}
+                    onChangeText={setNewCatSlug}
+                  />
+                </View>
+              </View>
+
+              {/* Image URL & Presets */}
+              <Text style={[styles.formLabel, { marginTop: 12 }]}>Category Image URL</Text>
+              <TextInput
+                style={styles.urlInput}
+                placeholder="https://images.unsplash.com/..."
+                value={newCatImage}
+                onChangeText={setNewCatImage}
+              />
+
+              <Text style={styles.presetsHeader}>⚡ Quick Presets:</Text>
+              <View style={styles.presetsRow}>
+                {IMAGE_PRESETS.map((p) => (
+                  <TouchableOpacity
+                    key={p.label}
+                    style={styles.presetChip}
+                    onPress={() => {
+                      setNewCatName(p.label);
+                      setNewCatSlug(p.label.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
+                      setNewCatImage(p.url);
+                      setNewCatIcon(p.emoji);
+                      setNewCatBgColor(p.color);
+                    }}
+                  >
+                    <Text>{p.emoji} {p.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Icon & Sort Order */}
+              <View style={[styles.twoColRow, { marginTop: 12 }]}>
+                <View style={styles.col}>
+                  <Text style={styles.formLabel}>Icon / Emoji</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={newCatIcon}
+                    onChangeText={setNewCatIcon}
+                  />
+                </View>
+                <View style={styles.col}>
+                  <Text style={styles.formLabel}>Display Sort Order</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={newCatSortOrder}
+                    onChangeText={setNewCatSortOrder}
+                    keyboardType="numeric"
+                  />
                 </View>
               </View>
 
               {/* Description */}
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Description (Optional)</Text>
-                <TextInput
-                  style={[styles.textInput, { height: 70, textAlignVertical: 'top' }]}
-                  placeholder="Short internal note about this category"
-                  placeholderTextColor={COLORS.secondaryText}
-                  value={categoryDescription}
-                  onChangeText={setCategoryDescription}
-                  multiline
-                />
-              </View>
-
-              {/* If Editing: Stats strip */}
-              {editingCategory && (
-                <View style={styles.modalStatsBox}>
-                  <Text style={styles.modalStatsTitle}>CATALOG STATS</Text>
-                  <Text style={styles.modalStatsText}>
-                    Products Assigned: {editingCategory.productCount ?? 0} · Sub-Categories:{' '}
-                    {editingCategory.subCategories?.length ?? (editingCategory.subCategoryCount || 0)}
-                  </Text>
-                </View>
-              )}
+              <Text style={[styles.formLabel, { marginTop: 12 }]}>Description</Text>
+              <TextInput
+                style={styles.textAreaInput}
+                placeholder="Short description..."
+                value={newCatDescription}
+                onChangeText={setNewCatDescription}
+              />
             </ScrollView>
 
             <View style={styles.modalFooter}>
               <TouchableOpacity
                 style={styles.modalCancelBtn}
-                onPress={() => setShowCategoryModal(false)}
-                disabled={categorySubmitting}
+                onPress={() => setShowAddCatModal(false)}
+                disabled={submittingCat}
               >
-                <Text style={styles.modalCancelBtnText}>Cancel</Text>
+                <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
-
               <TouchableOpacity
-                style={styles.modalSubmitBtn}
-                onPress={handleSaveCategory}
-                disabled={categorySubmitting}
+                style={styles.modalSaveBtn}
+                onPress={handleCreateCategory}
+                disabled={submittingCat}
               >
-                <LinearGradient colors={GRADIENTS.cardBadge} style={styles.modalSubmitGradient}>
-                  {categorySubmitting ? (
-                    <ActivityIndicator size="small" color={COLORS.white} />
-                  ) : (
-                    <Text style={styles.modalSubmitBtnText}>
-                      {editingCategory ? 'Save Changes' : 'Create Category'}
-                    </Text>
-                  )}
+                <LinearGradient
+                  colors={GRADIENTS.primary}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.modalSaveGradient}
+                >
+                  <Text style={styles.modalSaveText}>
+                    {submittingCat ? 'Creating...' : '+ Create Category'}
+                  </Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -931,1203 +913,820 @@ export const CategoryManagementScreen: React.FC = () => {
       </Modal>
 
       {/* ========================================================================= */}
-      {/* MODAL 2: MANAGE SUB-CATEGORIES MODAL                                      */}
+      {/* ADD SUBCATEGORY MODAL                                                     */}
       {/* ========================================================================= */}
-      <Modal
-        visible={showSubModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowSubModal(false)}
-      >
+      <Modal visible={Boolean(selectedCatForSub)} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalDialog, { maxWidth: 640 }]}>
-            {/* Header */}
+          <View style={[styles.modalCard, { maxWidth: 360 }]}>
             <View style={styles.modalHeader}>
-              <TouchableOpacity
-                style={styles.backBtn}
-                onPress={() => setShowSubModal(false)}
-              >
-                <ArrowLeft size={18} color={COLORS.navy} />
-              </TouchableOpacity>
-              <View style={{ flex: 1, marginLeft: SPACING.xs }}>
-                <Text style={styles.modalTitle}>
-                  {managingCategory?.name || 'Category'}
-                </Text>
-                <Text style={styles.modalSubtitle}>Sub-Category Management</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.addSubBtn}
-                onPress={openAddSubForm}
-              >
-                <Plus size={14} color={COLORS.white} />
-                <Text style={styles.addSubBtnText}>ADD SUB-CATEGORY</Text>
+              <Text style={styles.modalTitle}>Add Subcategory</Text>
+              <TouchableOpacity onPress={() => setSelectedCatForSub(null)}>
+                <X size={18} color="#94A3B8" />
               </TouchableOpacity>
             </View>
 
-            {/* Subcategories List */}
-            <ScrollView style={styles.subModalBody} showsVerticalScrollIndicator={false}>
-              {subCategoriesList.length === 0 ? (
-                <View style={styles.subEmptyBox}>
-                  <Layers size={36} color={COLORS.secondaryText} />
-                  <Text style={styles.subEmptyTitle}>No sub-categories yet</Text>
-                  <Text style={styles.subEmptySubtitle}>
-                    Add specific subcategories (e.g. Fresh Vegetables, Milk & Curd) to organize
-                    customer browsing.
+            <Text style={styles.formSubLabel}>
+              Adding subcategory to <Text style={{ fontWeight: '800', color: '#071B52' }}>{selectedCatForSub?.name}</Text>
+            </Text>
+
+            <Text style={[styles.formLabel, { marginTop: 12 }]}>Subcategory Name *</Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="e.g. Potato, Onion & Tomato"
+              value={newSubName}
+              onChangeText={setNewSubName}
+            />
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setSelectedCatForSub(null)}
+                disabled={submittingSub}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalSaveBtn}
+                onPress={handleCreateSubcategory}
+                disabled={submittingSub}
+              >
+                <LinearGradient
+                  colors={GRADIENTS.primary}
+                  style={styles.modalSaveGradient}
+                >
+                  <Text style={styles.modalSaveText}>
+                    {submittingSub ? 'Adding...' : '+ Add Subcategory'}
                   </Text>
-                  <TouchableOpacity style={styles.emptyAddBtn} onPress={openAddSubForm}>
-                    <Plus size={14} color={COLORS.purple} />
-                    <Text style={styles.emptyAddBtnText}>Add First Sub-Category</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                subCategoriesList.map((sub, idx) => {
-                  const isActive = sub.isActive !== false;
-                  const shelfInfo = sub.defaultShelfAisle ? ` · Shelf: ${sub.defaultShelfAisle}` : '';
-                  const pCount = sub.productCount ?? sub.itemCount ?? 0;
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
-                  return (
-                    <View key={sub.id || (sub as any)._id || idx} style={styles.subCategoryCard}>
-                      <View style={styles.subCardTop}>
-                        <View style={styles.subCardInfo}>
-                          <View style={styles.subNameRow}>
-                            <Text style={styles.subIndexText}>{idx + 1}.</Text>
-                            <Text style={styles.subCategoryName}>{sub.name}</Text>
-                          </View>
-                          <Text style={styles.subMetaText}>
-                            {pCount} products{shelfInfo} · Order: {sub.sortOrder || idx + 1}
-                          </Text>
-                        </View>
-
-                        {/* Status Pill */}
-                        <TouchableOpacity
-                          style={[
-                            styles.statusPill,
-                            isActive ? styles.statusPillActive : styles.statusPillInactive,
-                          ]}
-                          onPress={() => handleToggleSubStatus(sub)}
-                        >
-                          <View
-                            style={[
-                              styles.statusDot,
-                              { backgroundColor: isActive ? COLORS.success : COLORS.error },
-                            ]}
-                          />
-                          <Text
-                            style={[
-                              styles.statusPillText,
-                              { color: isActive ? COLORS.success : COLORS.error },
-                            ]}
-                          >
-                            {isActive ? 'Active' : 'Inactive'}
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-
-                      {/* Sub-Category Actions */}
-                      <View style={styles.subCardActions}>
-                        <TouchableOpacity
-                          style={styles.subActionBtn}
-                          onPress={() => openEditSubForm(sub)}
-                        >
-                          <Edit2 size={12} color={COLORS.purple} />
-                          <Text style={styles.subActionText}>Edit</Text>
-                        </TouchableOpacity>
-
-                        {/* Reorder Buttons */}
-                        <TouchableOpacity
-                          style={[styles.subActionBtn, idx === 0 && styles.subActionDisabled]}
-                          disabled={idx === 0}
-                          onPress={() => handleReorderSub(idx, 'up')}
-                        >
-                          <ChevronUp size={14} color={idx === 0 ? COLORS.secondaryText : COLORS.blue} />
-                          <Text style={[styles.subActionText, idx === 0 && { color: COLORS.secondaryText }]}>
-                            Up
-                          </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={[
-                            styles.subActionBtn,
-                            idx === subCategoriesList.length - 1 && styles.subActionDisabled,
-                          ]}
-                          disabled={idx === subCategoriesList.length - 1}
-                          onPress={() => handleReorderSub(idx, 'down')}
-                        >
-                          <ChevronDown
-                            size={14}
-                            color={idx === subCategoriesList.length - 1 ? COLORS.secondaryText : COLORS.blue}
-                          />
-                          <Text
-                            style={[
-                              styles.subActionText,
-                              idx === subCategoriesList.length - 1 && { color: COLORS.secondaryText },
-                            ]}
-                          >
-                            Down
-                          </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={[styles.subActionBtn, { borderColor: '#FEE2E2' }]}
-                          onPress={() => handleDeleteSub(sub)}
-                        >
-                          <Trash2 size={13} color={COLORS.error} />
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  );
-                })
-              )}
+      {/* Dark Store Filter Modal */}
+      <Modal visible={showDarkStoreModal} transparent={true} animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.pickerModalCard}>
+            <View style={styles.pickerModalHeader}>
+              <Text style={styles.pickerModalTitle}>Select Dark Store / Shop</Text>
+              <TouchableOpacity onPress={() => setShowDarkStoreModal(false)}>
+                <X size={18} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ maxHeight: 280 }}>
+              {darkStoresList.map((storeName) => (
+                <TouchableOpacity
+                  key={storeName}
+                  style={[
+                    styles.pickerItem,
+                    selectedDarkStore === storeName && styles.pickerItemActive,
+                  ]}
+                  onPress={() => {
+                    setSelectedDarkStore(storeName);
+                    setShowDarkStoreModal(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.pickerItemText,
+                      selectedDarkStore === storeName && styles.pickerItemTextActive,
+                    ]}
+                  >
+                    {storeName}
+                  </Text>
+                  {selectedDarkStore === storeName && <Check size={16} color="#FF3B98" />}
+                </TouchableOpacity>
+              ))}
             </ScrollView>
-
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={[styles.modalSubmitBtn, { width: '100%' }]}
-                onPress={() => setShowSubModal(false)}
-              >
-                <LinearGradient colors={GRADIENTS.cardBadge} style={styles.modalSubmitGradient}>
-                  <Text style={styles.modalSubmitBtnText}>Done</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
           </View>
         </View>
       </Modal>
-
-      {/* ========================================================================= */}
-      {/* MODAL 3: ADD / EDIT SUBCATEGORY FORM                                      */}
-      {/* ========================================================================= */}
-      <Modal
-        visible={showSubFormModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowSubFormModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalDialog}>
-            <View style={styles.modalHeader}>
-              <View style={styles.modalHeaderTitleRow}>
-                <Layers size={18} color={COLORS.blue} />
-                <Text style={styles.modalTitle}>
-                  {editingSub ? `Edit: ${editingSub.name}` : 'Add Sub-Category'}
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={styles.modalCloseBtn}
-                onPress={() => setShowSubFormModal(false)}
-              >
-                <X size={18} color={COLORS.textMuted} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.modalBody}>
-              {/* Parent Category (Locked) */}
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Parent Category</Text>
-                <View style={styles.lockedCategoryBox}>
-                  <Text style={styles.lockedCategoryText}>
-                    📂 {managingCategory?.name || 'Category'} (locked)
-                  </Text>
-                </View>
-              </View>
-
-              {/* Sub-Category Name */}
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Sub-Category Name *</Text>
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="e.g. Fresh Vegetables"
-                  placeholderTextColor={COLORS.secondaryText}
-                  value={subName}
-                  onChangeText={handleSubNameChange}
-                />
-              </View>
-
-              {/* Sub-Category Slug */}
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Sub-Category Slug *</Text>
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="e.g. fresh-vegetables"
-                  placeholderTextColor={COLORS.secondaryText}
-                  value={subSlug}
-                  onChangeText={setSubSlug}
-                  autoCapitalize="none"
-                />
-              </View>
-
-              {/* Default Shelf Aisle */}
-              <View style={styles.fieldGroup}>
-                <View style={styles.fieldLabelRow}>
-                  <Text style={styles.fieldLabel}>Default Shelf Aisle (Optional)</Text>
-                  <Text style={styles.fieldHint}>For picker routing</Text>
-                </View>
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="e.g. A2-R3"
-                  placeholderTextColor={COLORS.secondaryText}
-                  value={subShelf}
-                  onChangeText={setSubShelf}
-                  autoCapitalize="characters"
-                />
-              </View>
-
-              {/* Display Order */}
-              <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>Display Order</Text>
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="1"
-                  placeholderTextColor={COLORS.secondaryText}
-                  value={subSortOrder}
-                  onChangeText={setSubSortOrder}
-                  keyboardType="numeric"
-                />
-              </View>
-            </View>
-
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={styles.modalCancelBtn}
-                onPress={() => setShowSubFormModal(false)}
-                disabled={subSubmitting}
-              >
-                <Text style={styles.modalCancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.modalSubmitBtn}
-                onPress={handleSaveSubCategory}
-                disabled={subSubmitting}
-              >
-                <LinearGradient colors={GRADIENTS.cardBadge} style={styles.modalSubmitGradient}>
-                  {subSubmitting ? (
-                    <ActivityIndicator size="small" color={COLORS.white} />
-                  ) : (
-                    <Text style={styles.modalSubmitBtnText}>
-                      {editingSub ? 'Save Changes' : 'Create Sub-Cat'}
-                    </Text>
-                  )}
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ========================================================================= */}
-      {/* MODAL 4: DEACTIVATE CONFIRMATION MODAL                                    */}
-      {/* ========================================================================= */}
-      <Modal
-        visible={!!deactivateCategoryTarget}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setDeactivateCategoryTarget(null)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalDialog, { maxWidth: 440 }]}>
-            <View style={[styles.confirmIconBox, { backgroundColor: '#FEE2E2' }]}>
-              <EyeOff size={28} color={COLORS.error} />
-            </View>
-
-            <Text style={styles.confirmTitle}>
-              {deactivateCategoryTarget?.isActive
-                ? `Hide "${deactivateCategoryTarget?.name}"?`
-                : `Activate "${deactivateCategoryTarget?.name}"?`}
-            </Text>
-
-            <Text style={styles.confirmText}>
-              {deactivateCategoryTarget?.isActive
-                ? `Hiding this category removes it from customer browsing immediately. All products and sub-categories are preserved safely and can be reactivated anytime.`
-                : `Activating this category makes it immediately visible to customers on the app home screen and category grid.`}
-            </Text>
-
-            <View style={styles.confirmActionsRow}>
-              <TouchableOpacity
-                style={styles.modalCancelBtn}
-                onPress={() => setDeactivateCategoryTarget(null)}
-              >
-                <Text style={styles.modalCancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.confirmActionBtn,
-                  { backgroundColor: deactivateCategoryTarget?.isActive ? COLORS.error : COLORS.success },
-                ]}
-                onPress={handleDeactivateCategory}
-              >
-                <Text style={styles.confirmActionBtnText}>
-                  {deactivateCategoryTarget?.isActive ? 'Deactivate' : 'Activate'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ========================================================================= */}
-      {/* MODAL 5: DELETE BLOCKED (Products > 0)                                     */}
-      {/* ========================================================================= */}
-      <Modal
-        visible={!!deleteBlockedInfo}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setDeleteBlockedInfo(null)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalDialog, { maxWidth: 460 }]}>
-            <View style={[styles.confirmIconBox, { backgroundColor: '#FEF3C7' }]}>
-              <AlertCircle size={28} color={COLORS.warning} />
-            </View>
-
-            <Text style={styles.confirmTitle}>Cannot Delete Category</Text>
-            <Text style={styles.confirmText}>
-              Cannot delete <Text style={{ fontWeight: '700' }}>"{deleteBlockedInfo?.categoryName}"</Text>.
-              It currently has{' '}
-              <Text style={{ fontWeight: '700', color: COLORS.error }}>
-                {deleteBlockedInfo?.count} products
-              </Text>{' '}
-              assigned. Move or delete those products first, or use <Text style={{ fontWeight: '700' }}>Deactivate</Text> instead.
-            </Text>
-
-            <TouchableOpacity
-              style={[styles.confirmActionBtn, { backgroundColor: COLORS.navy, marginTop: SPACING.md }]}
-              onPress={() => setDeleteBlockedInfo(null)}
-            >
-              <Text style={styles.confirmActionBtnText}>Understood</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ========================================================================= */}
-      {/* MODAL 6: PERMANENT DELETE CONFIRMATION                                    */}
-      {/* ========================================================================= */}
-      <Modal
-        visible={!!deleteCategoryTarget}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setDeleteCategoryTarget(null)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalDialog, { maxWidth: 440 }]}>
-            <View style={[styles.confirmIconBox, { backgroundColor: '#FEE2E2' }]}>
-              <Trash2 size={28} color={COLORS.error} />
-            </View>
-
-            <Text style={styles.confirmTitle}>
-              Permanently delete "{deleteCategoryTarget?.name}"?
-            </Text>
-            <Text style={styles.confirmText}>
-              This will remove the category and all nested subcategories. This action cannot be undone.
-            </Text>
-
-            <View style={styles.confirmActionsRow}>
-              <TouchableOpacity
-                style={styles.modalCancelBtn}
-                onPress={() => setDeleteCategoryTarget(null)}
-              >
-                <Text style={styles.modalCancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.confirmActionBtn, { backgroundColor: COLORS.error }]}
-                onPress={confirmDeleteCategory}
-              >
-                <Text style={styles.confirmActionBtnText}>Delete Permanently</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FD',
-  },
-  headerBanner: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
-  titleIconBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: COLORS.white,
-    letterSpacing: 0.3,
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: COLORS.secondaryText,
-    marginTop: 2,
-  },
-  refreshBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scrollArea: {
-    flex: 1,
+    backgroundColor: '#F8FAFC',
   },
   scrollContent: {
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    paddingBottom: 80,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 48,
   },
 
-  // KPI Strip
-  kpiStrip: {
+  // 1. Top Bar
+  topBar: {
     flexDirection: 'row',
-    gap: SPACING.sm,
-    marginBottom: SPACING.md,
-  },
-  kpiCard: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.card,
-    padding: SPACING.md,
+    justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 16,
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  breadcrumbRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  breadcrumbPortal: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  breadcrumbSlash: {
+    fontSize: 13,
+    color: '#94A3B8',
+  },
+  breadcrumbActive: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#071B52',
+  },
+  storeSelectorBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#ECECF2',
+    borderColor: '#E2E8F0',
+    borderRadius: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 },
-      android: { elevation: 2 },
+      web: { filter: 'drop-shadow(0px 1px 2px rgba(0,0,0,0.05))' },
+      default: { elevation: 1 },
     }),
   },
-  kpiIconWrapper: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  kpiValue: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: COLORS.navy,
-  },
-  kpiLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: COLORS.textMuted,
-    marginTop: 2,
+  storeSelectorText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#071B52',
+    maxWidth: 180,
   },
 
-  // Controls Row
-  controlsRow: {
+  // 2. Main Page Header
+  headerRow: {
     flexDirection: 'row',
-    gap: SPACING.sm,
-    alignItems: 'center',
-    marginBottom: SPACING.sm,
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+    flexWrap: 'wrap',
+    gap: 12,
   },
-  searchBar: {
+  headerLeft: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: '#E2E4EB',
-    borderRadius: RADIUS.card,
-    paddingHorizontal: SPACING.sm,
-    height: 44,
+    minWidth: 220,
   },
-  searchInput: {
-    flex: 1,
-    fontSize: 13,
-    color: COLORS.navy,
+  mainTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#071B52',
+    letterSpacing: -0.3,
+  },
+  mainSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 3,
+    lineHeight: 16,
   },
   addCategoryBtn: {
-    borderRadius: RADIUS.card,
+    borderRadius: 12,
     overflow: 'hidden',
   },
   addCategoryGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: SPACING.md,
-    height: 44,
-    justifyContent: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
   addCategoryBtnText: {
-    color: COLORS.white,
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+
+  // 3. Filter & Search Bar
+  filterCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  statusFilterRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  statusPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+  },
+  statusPillActive: {
+    backgroundColor: '#071B52',
+  },
+  statusPillText: {
     fontSize: 12,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    color: '#64748B',
   },
-
-  // Filter Pills
-  filterPillsRow: {
+  statusPillTextActive: {
+    color: '#FFFFFF',
+  },
+  searchBox: {
     flexDirection: 'row',
-    gap: SPACING.xs,
-    marginBottom: SPACING.md,
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    height: 38,
+    paddingHorizontal: 10,
+    flex: 1,
+    minWidth: 180,
+    gap: 8,
   },
-  filterPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: '#EDEFF5',
-  },
-  filterPillActive: {
-    backgroundColor: COLORS.navy,
-  },
-  filterPillText: {
+  searchInput: {
+    flex: 1,
+    height: '100%',
     fontSize: 12,
     fontWeight: '600',
-    color: COLORS.textMuted,
-  },
-  filterPillTextActive: {
-    color: COLORS.white,
+    color: '#071B52',
   },
 
-  // Categories List
-  listContainer: {
-    gap: SPACING.sm,
+  // 4. Categories Grid & Cards
+  categoriesGrid: {
+    gap: 14,
   },
   categoryCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.card,
-    borderWidth: 1,
-    borderColor: '#ECECF2',
-    padding: SPACING.md,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    padding: 16,
+    gap: 12,
     ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 3 },
-      android: { elevation: 1 },
+      web: { filter: 'drop-shadow(0px 2px 4px rgba(15,23,42,0.03))' },
+      default: { elevation: 1 },
     }),
   },
   cardHeaderRow: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  thumbnailBox: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  thumbnailImage: {
+    width: '100%',
+    height: '100%',
+  },
+  emojiOverlayBadge: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderRadius: 6,
+    paddingHorizontal: 3,
+    paddingVertical: 1,
+  },
+  emojiOverlayText: {
+    fontSize: 10,
+  },
+  cardTitleCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  cardCategoryName: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#071B52',
+  },
+  cardSlug: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  tagsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+    flexWrap: 'wrap',
+  },
+  orderTag: {
+    backgroundColor: '#F1F5F9',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  orderTagText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  codeTag: {
+    backgroundColor: '#EEF2FF',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  codeTagText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#4F46E5',
+  },
+  cardActionsCol: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  editBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  editBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#1D4ED8',
+  },
+  statusBadge: {
+    borderRadius: 6,
+    borderWidth: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+  },
+  statusActive: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+  statusHidden: {
+    backgroundColor: '#F1F5F9',
+    borderColor: '#CBD5E1',
+  },
+  statusBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  statusActiveText: {
+    color: '#059669',
+  },
+  statusHiddenText: {
+    color: '#64748B',
+  },
+  deleteIconBtn: {
+    padding: 4,
+  },
+  categoryDesc: {
+    fontSize: 12,
+    color: '#64748B',
+    lineHeight: 16,
+  },
+  subcategoriesSection: {
+    gap: 6,
+  },
+  subcategoriesHeader: {
+    flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  cardHeaderLeft: {
+  subcategoriesTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#64748B',
+    textTransform: 'uppercase',
+  },
+  addSubText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FF3B98',
+  },
+  subChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  subChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
-    flex: 1,
-  },
-  categoryIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-  },
-  categoryIconText: {
-    fontSize: 22,
-  },
-  nameBlock: {
-    flex: 1,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  categoryNameText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: COLORS.navy,
-  },
-  codeBadge: {
-    backgroundColor: '#F1F4F9',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  codeBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: COLORS.textMuted,
-    letterSpacing: 0.5,
-  },
-  categoryMetaText: {
-    fontSize: 12,
-    color: COLORS.textMuted,
-    marginTop: 2,
-  },
-  categoryDescriptionText: {
-    fontSize: 12,
-    color: COLORS.textMuted,
-    marginTop: 6,
-    lineHeight: 16,
-  },
-
-  // Status Pill
-  statusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+    borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 12,
   },
-  statusPillActive: {
-    backgroundColor: '#EEF9F3',
-  },
-  statusPillInactive: {
-    backgroundColor: '#FEE2E2',
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  statusPillText: {
+  subChipText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '600',
+    color: '#334155',
   },
-
-  // Card Actions Strip
-  cardActionsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: SPACING.sm,
-    paddingTop: SPACING.sm,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F2F6',
-  },
-  actionBtnSecondary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: RADIUS.sm,
-    backgroundColor: '#F5EEFD',
-  },
-  actionBtnSecondaryText: {
+  noSubsText: {
     fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.purple,
+    color: '#94A3B8',
+    fontStyle: 'italic',
   },
-  actionBtnPrimary: {
+  cardFooter: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: RADIUS.sm,
-    backgroundColor: '#EBF5FF',
-  },
-  actionBtnPrimaryText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.blue,
-  },
-  actionBtnToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: RADIUS.sm,
-  },
-  actionBtnDeactivate: {
-    backgroundColor: '#F1F2F6',
-  },
-  actionBtnActivate: {
-    backgroundColor: '#EEF9F3',
-  },
-  actionBtnToggleText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.textMuted,
-  },
-  actionBtnDelete: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#FEE2E2',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // Empty State
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.navy,
-    marginTop: SPACING.sm,
-  },
-  emptySubtitle: {
-    fontSize: 12,
-    color: COLORS.textMuted,
-    textAlign: 'center',
-    maxWidth: 280,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     marginTop: 4,
   },
-  emptyAddBtn: {
+  productCountRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#F5EEFD',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
-    borderRadius: RADIUS.sm,
-    marginTop: SPACING.md,
   },
-  emptyAddBtnText: {
+  productCountLabel: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  productCountValue: {
     fontSize: 12,
+    fontWeight: '800',
+    color: '#071B52',
+  },
+  quickEditLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  quickEditText: {
+    fontSize: 11,
     fontWeight: '700',
-    color: COLORS.purple,
+    color: '#2563EB',
   },
 
-  // Modal Dialogs
+  // Modal Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(5, 6, 42, 0.65)',
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 20,
+    padding: 16,
   },
-  modalDialog: {
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.banner,
+  modalCard: {
     width: '100%',
-    maxWidth: 480,
-    maxHeight: '90%',
-    overflow: 'hidden',
-    alignSelf: 'center',
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8 },
-      android: { elevation: 6 },
-    }),
+    maxWidth: 500,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 18,
   },
   modalHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 12,
+    alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#ECECF2',
+    borderBottomColor: '#F1F5F9',
+    paddingBottom: 12,
+    marginBottom: 12,
   },
-  modalHeaderTitleRow: {
+  modalHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
     flex: 1,
-    marginRight: 8,
+  },
+  modalEmojiBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalEmojiText: {
+    fontSize: 18,
   },
   modalTitle: {
     fontSize: 15,
     fontWeight: '800',
-    color: COLORS.navy,
-    flexShrink: 1,
+    color: '#071B52',
   },
   modalSubtitle: {
-    fontSize: 12,
-    color: COLORS.textMuted,
-    marginTop: 2,
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
   },
   modalCloseBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F1F2F6',
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: 4,
   },
-  modalBody: {
-    padding: SPACING.md,
-  },
-  fieldGroup: {
-    marginBottom: SPACING.sm,
-  },
-  fieldLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.navy,
-    marginBottom: 4,
-  },
-  fieldLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  fieldHint: {
+  formLabel: {
     fontSize: 11,
-    color: COLORS.textMuted,
+    fontWeight: '800',
+    color: '#071B52',
+    marginBottom: 4,
   },
-  lockedPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#F1F2F6',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  lockedText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: COLORS.textMuted,
-  },
-  textInput: {
-    borderWidth: 1,
-    borderColor: '#D2D1E1',
-    borderRadius: RADIUS.sm,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 8,
-    fontSize: 13,
-    color: COLORS.navy,
-    backgroundColor: COLORS.white,
-  },
-  textInputDisabled: {
-    backgroundColor: '#F1F2F6',
-    color: COLORS.textMuted,
-  },
-
-  // Emojis & Icons
-  iconSelectionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  iconPreviewBox: {
-    width: 44,
-    height: 44,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: '#D2D1E1',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  iconPreviewText: {
-    fontSize: 22,
-  },
-  presetEmojiRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 8,
-  },
-  presetEmojiChip: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
-    backgroundColor: '#F1F4F9',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  presetEmojiChipSelected: {
-    backgroundColor: '#FCEAF5',
-    borderWidth: 1.5,
-    borderColor: COLORS.hotPink,
-  },
-  presetEmojiText: {
-    fontSize: 16,
-  },
-
-  // Colors Grid
-  presetColorsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+  formSubLabel: {
+    fontSize: 11,
+    color: '#64748B',
     marginBottom: 6,
   },
-  colorChip: {
-    width: 34,
-    height: 34,
-    borderRadius: 8,
+  imageInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 10,
+  },
+  imagePreviewBox: {
+    width: 64,
+    height: 64,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imagePreview: {
+    width: '100%',
+    height: '100%',
+  },
+  urlInput: {
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#D2D1E1',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  colorChipSelected: {
-    borderWidth: 2,
-    borderColor: COLORS.navy,
-  },
-
-  twoColRow: {
-    flexDirection: 'row',
-  },
-  statusToggleContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#EDEFF5',
-    borderRadius: RADIUS.sm,
-    padding: 2,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
     height: 38,
+    paddingHorizontal: 10,
+    fontSize: 12,
+    color: '#071B52',
   },
-  statusToggleOption: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: RADIUS.sm - 2,
-  },
-  statusToggleActive: {
-    backgroundColor: COLORS.success,
-  },
-  statusToggleInactive: {
-    backgroundColor: COLORS.error,
-  },
-  statusToggleOptionText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.textMuted,
-  },
-  statusToggleOptionTextActive: {
-    color: COLORS.white,
-  },
-  statusToggleOptionTextInactive: {
-    color: COLORS.white,
-  },
-  modalStatsBox: {
-    backgroundColor: '#F5F6FB',
-    borderRadius: RADIUS.sm,
-    padding: SPACING.sm,
+  urlHint: {
+    fontSize: 10,
+    color: '#64748B',
     marginTop: 4,
   },
-  modalStatsTitle: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: COLORS.purple,
-    letterSpacing: 0.5,
-  },
-  modalStatsText: {
+  presetsHeader: {
     fontSize: 11,
-    color: COLORS.navy,
-    marginTop: 2,
+    fontWeight: '700',
+    color: '#475569',
+    marginBottom: 6,
   },
-
-  modalFooter: {
+  presetsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: SPACING.sm,
-    padding: SPACING.md,
-    borderTopWidth: 1,
-    borderTopColor: '#ECECF2',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 12,
   },
-  modalCancelBtn: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 10,
-    borderRadius: RADIUS.sm,
-    backgroundColor: '#EDEFF5',
-  },
-  modalCancelBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.textMuted,
-  },
-  modalSubmitBtn: {
-    borderRadius: RADIUS.sm,
-    overflow: 'hidden',
-  },
-  modalSubmitGradient: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalSubmitBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.white,
-  },
-
-  // Sub-Category Manager Modal Styles
-  backBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F1F2F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addSubBtn: {
+  presetChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: COLORS.navy,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: RADIUS.sm,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
   },
-  addSubBtnText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: COLORS.white,
-    letterSpacing: 0.5,
+  presetChipActive: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#2563EB',
   },
-  subModalBody: {
-    padding: SPACING.md,
-    maxHeight: 450,
-  },
-  subEmptyBox: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  subEmptyTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.navy,
-    marginTop: 8,
-  },
-  subEmptySubtitle: {
+  presetChipEmoji: {
     fontSize: 12,
-    color: COLORS.textMuted,
+  },
+  presetChipLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  presetChipLabelActive: {
+    color: '#1D4ED8',
+    fontWeight: '700',
+  },
+  twoColRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 10,
+  },
+  col: {
+    flex: 1,
+  },
+  textInput: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    height: 40,
+    paddingHorizontal: 10,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#071B52',
+  },
+  monoFont: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  colorSwatchesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+    marginBottom: 10,
+  },
+  colorSwatch: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  colorSwatchActive: {
+    borderColor: '#071B52',
+    borderWidth: 2.5,
+  },
+  hexInput: {
+    width: 80,
+    height: 30,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    fontSize: 11,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    color: '#071B52',
     textAlign: 'center',
-    maxWidth: 280,
+    backgroundColor: '#FFFFFF',
+  },
+  textAreaInput: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 12,
+    color: '#071B52',
+    minHeight: 50,
+    marginBottom: 10,
+  },
+  visibilityCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     marginTop: 4,
   },
-  subCategoryCard: {
-    backgroundColor: '#F9FAFE',
-    borderWidth: 1,
-    borderColor: '#ECECF2',
-    borderRadius: RADIUS.sm,
-    padding: SPACING.sm,
-    marginBottom: SPACING.xs,
+  visibilityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  subCardTop: {
+  checkbox: {
+    width: 18,
+    height: 18,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxActive: {
+    backgroundColor: '#059669',
+    borderColor: '#059669',
+  },
+  visibilityLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#071B52',
+  },
+  visibilityHint: {
+    fontSize: 10,
+    color: '#64748B',
+    marginTop: 4,
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 14,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  modalCancelBtn: {
+    backgroundColor: '#F1F5F9',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  modalCancelText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  modalSaveBtn: {
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  modalSaveGradient: {
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+  },
+  modalSaveText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  errorText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#B91C1C',
+    flex: 1,
+  },
+
+  // Dark Store Picker Modal
+  pickerModalCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+  },
+  pickerModalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    paddingBottom: 10,
+    marginBottom: 8,
   },
-  subCardInfo: {
-    flex: 1,
-  },
-  subNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  subIndexText: {
-    fontSize: 12,
+  pickerModalTitle: {
+    fontSize: 15,
     fontWeight: '800',
-    color: COLORS.textMuted,
+    color: '#071B52',
   },
-  subCategoryName: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.navy,
-  },
-  subMetaText: {
-    fontSize: 11,
-    color: COLORS.textMuted,
-    marginTop: 2,
-  },
-  subCardActions: {
+  pickerItem: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 6,
-    marginTop: 6,
-    paddingTop: 6,
-    borderTopWidth: 1,
-    borderTopColor: '#ECECF2',
-  },
-  subActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
+    paddingVertical: 12,
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: '#E2E4EB',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8FAFC',
   },
-  subActionDisabled: {
-    opacity: 0.4,
+  pickerItemActive: {
+    backgroundColor: 'rgba(255, 59, 152, 0.06)',
+    borderRadius: 8,
   },
-  subActionText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: COLORS.navy,
+  pickerItemText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#071B52',
   },
-  lockedCategoryBox: {
-    backgroundColor: '#F1F4F9',
-    padding: 10,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  lockedCategoryText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.navy,
-  },
-
-  // Confirmation Modals
-  confirmIconBox: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    justifyContent: 'center',
-    alignItems: 'center',
-    alignSelf: 'center',
-    marginTop: SPACING.md,
-    marginBottom: SPACING.sm,
-  },
-  confirmTitle: {
-    fontSize: 16,
+  pickerItemTextActive: {
+    color: '#FF3B98',
     fontWeight: '800',
-    color: COLORS.navy,
-    textAlign: 'center',
-    paddingHorizontal: SPACING.md,
-  },
-  confirmText: {
-    fontSize: 13,
-    color: COLORS.textMuted,
-    textAlign: 'center',
-    paddingHorizontal: SPACING.md,
-    marginTop: SPACING.xs,
-    lineHeight: 18,
-  },
-  confirmActionsRow: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    padding: SPACING.md,
-    marginTop: SPACING.xs,
-  },
-  confirmActionBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: RADIUS.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  confirmActionBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.white,
   },
 });

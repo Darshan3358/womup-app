@@ -19,6 +19,7 @@ import { AddressService } from '../services/addressService';
 import { LocationService } from '../services/locationService';
 import { api } from '../services/api';
 import io, { Socket } from 'socket.io-client';
+import { matchAreaByName } from '../data/areas';
 
 export interface BlinkitCartEntry {
   product: BlinkitProduct;
@@ -97,7 +98,11 @@ interface AppContextType {
   user: UserProfile;
   setUser: React.Dispatch<React.SetStateAction<UserProfile>>;
   selectedAddress: Address;
+  selectedAddressId: string | null;
+  selectedAddressSource: 'SAVED' | 'GPS';
   setSelectedAddress: (address: Address) => void;
+  setActiveDeliveryAddress: (address: Address) => Promise<void>;
+  setActiveGpsLocation: (loc: any) => Promise<void>;
   addAddress: (address: Address) => void;
 
   // Cart
@@ -163,8 +168,8 @@ interface AppContextType {
   blinkitCartCount: number;
   blinkitCartTotal: number;
   blinkitMrpTotal: number;
-  updateBlinkitQty: (product: BlinkitProduct, delta: number) => void;
-  getBlinkitQty: (productId: string) => number;
+  updateBlinkitQty: (product: BlinkitProduct, delta: number, variantId?: string) => void;
+  getBlinkitQty: (productId: string, variantId?: string) => number;
   clearBlinkitCart: () => void;
   appliedCoupon: string | null;
   couponDiscount: number;
@@ -328,7 +333,175 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // User Profile
   const [user, setUser] = useState<UserProfile>(INITIAL_USER);
-  const [selectedAddress, setSelectedAddress] = useState<Address>(INITIAL_ADDRESS);
+  const [selectedAddress, setSelectedAddressState] = useState<Address>(INITIAL_ADDRESS);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [selectedAddressSource, setSelectedAddressSource] = useState<'SAVED' | 'GPS'>('SAVED');
+  const activeSelectionEpochRef = useRef<number>(0);
+
+  const setSelectedAddress = useCallback((addr: Address) => {
+    setSelectedAddressState(addr);
+    const id = addr?.id || (addr as any)?._id || null;
+    setSelectedAddressId(id);
+    if (addr?.type === 'Current' && (!id || id.startsWith('current_'))) {
+      setSelectedAddressSource('GPS');
+    } else {
+      setSelectedAddressSource('SAVED');
+    }
+    if (addr) {
+      StorageService.saveItem(StorageService.KEYS.SELECTED_ADDRESS, addr);
+    }
+  }, []);
+
+  const setActiveDeliveryAddress = useCallback(async (address: Address) => {
+    const epoch = ++activeSelectionEpochRef.current;
+    const addrId = address.id || (address as any)._id || null;
+    console.log(`[AppContext] 🏠 setActiveDeliveryAddress [epoch=${epoch}]: addrId=${addrId}, type=${address.type}, coords=[${address.latitude}, ${address.longitude}]`);
+
+    // Ensure valid coordinates
+    let targetLat = typeof address.latitude === 'number' && !isNaN(address.latitude) ? address.latitude : undefined;
+    let targetLng = typeof address.longitude === 'number' && !isNaN(address.longitude) ? address.longitude : undefined;
+
+    if (targetLat === undefined || targetLng === undefined) {
+      const queryStr = `${address.houseFlat || ''} ${address.street || ''} ${address.areaLandmark || ''} ${address.city || ''}`;
+      const matched = matchAreaByName(queryStr);
+      if (matched) {
+        targetLat = matched.lat;
+        targetLng = matched.lng;
+        console.log(`[AppContext] Geocoded saved address via matchAreaByName: [${targetLat}, ${targetLng}]`);
+      }
+    }
+
+    const normalized: Address = {
+      ...address,
+      id: addrId || `addr_${Date.now()}`,
+      latitude: targetLat,
+      longitude: targetLng,
+    };
+
+    const shortLabel = normalized.houseFlat || normalized.street || normalized.areaLandmark || normalized.city;
+    const displayLabel = `${normalized.type || 'Home'} — ${shortLabel}`;
+
+    // 1. Authoritative state transition
+    setSelectedAddressState(normalized);
+    setSelectedAddressId(addrId);
+    setSelectedAddressSource('SAVED');
+    setDeliveryLocation(displayLabel);
+
+    await StorageService.saveItem(StorageService.KEYS.SELECTED_ADDRESS, {
+      ...normalized,
+      _selectedAddressId: addrId,
+      _selectedSource: 'SAVED',
+    });
+
+    // 2. Resolve delivery area and eligible dark store
+    if (targetLat !== undefined && targetLng !== undefined) {
+      LocationService.clearCache();
+      try {
+        const area = await LocationService.resolveArea(targetLat, targetLng, true);
+        if (epoch !== activeSelectionEpochRef.current) {
+          console.warn(`[AppContext] Stale resolveArea dropped for epoch ${epoch} (current is ${activeSelectionEpochRef.current})`);
+          return;
+        }
+
+        if (area) {
+          console.log(`[AppContext] ✅ Saved address resolved: areaId=${area.areaId} (${area.areaName}), storeId=${area.storeId} (${area.storeName}), city=${area.city}`);
+          setCurrentAreaId(area.areaId);
+          setCurrentAreaName(area.areaName);
+          setCurrentCityName(area.city || user.preferredCityName || 'Ahmedabad');
+          setCurrentStoreId(area.storeId || null);
+          setCurrentStoreName(area.storeName || null);
+          setIsServiceable(area.serviceable === true);
+          setDeliveryEtaMinutes(area.deliveryMinutes || 9);
+
+          // Refresh products catalog for this new area and store
+          try {
+            const liveProducts = await ProductService.fetchProducts({
+              areaId: area.areaId,
+              storeId: area.storeId,
+            });
+            if (epoch === activeSelectionEpochRef.current && liveProducts && liveProducts.length > 0) {
+              setSelectedProduct(liveProducts[0]);
+              setSelectedBlinkitProduct(mapProductToBlinkit(liveProducts[0]));
+            }
+          } catch (pErr) {
+            console.warn('[AppContext] Failed to refresh products for resolved area:', pErr);
+          }
+        }
+      } catch (err) {
+        console.error('[AppContext] Error resolving area for saved address:', err);
+      }
+    }
+  }, [user.preferredCityName]);
+
+  const setActiveGpsLocation = useCallback(async (loc: any) => {
+    if (!loc) return;
+    const epoch = ++activeSelectionEpochRef.current;
+    console.log(`[AppContext] 📍 setActiveGpsLocation [epoch=${epoch}]: coords=[${loc.latitude}, ${loc.longitude}]`);
+
+    const shortLabel = loc.shortAddress || loc.readableAddress;
+    const displayLabel = `Current Location — ${shortLabel}`;
+
+    const addressObj: Address = {
+      id: `current_${Date.now()}`,
+      type: 'Current' as const,
+      fullName: user.fullName || 'Customer',
+      phoneNumber: user.phoneNumber || '',
+      houseFlat: loc.street || 'Current GPS Location',
+      areaLandmark: loc.areaLandmark || loc.shortAddress,
+      city: loc.city || 'Ahmedabad',
+      pincode: loc.pincode || '380015',
+      latitude: loc.latitude,
+      longitude: loc.longitude,
+      isDefault: true,
+    };
+
+    setSelectedAddressState(addressObj);
+    setSelectedAddressId(addressObj.id);
+    setSelectedAddressSource('GPS');
+    setDeliveryLocation(displayLabel);
+
+    await StorageService.saveItem(StorageService.KEYS.SELECTED_ADDRESS, {
+      ...addressObj,
+      _selectedAddressId: addressObj.id,
+      _selectedSource: 'GPS',
+    });
+
+    LocationService.clearCache();
+
+    try {
+      const area = await LocationService.resolveArea(loc.latitude, loc.longitude, true);
+      if (epoch !== activeSelectionEpochRef.current) {
+        console.warn(`[AppContext] Stale GPS resolveArea dropped for epoch ${epoch}`);
+        return;
+      }
+
+      if (area) {
+        console.log(`[AppContext] ✅ GPS resolved: areaId=${area.areaId} (${area.areaName}), storeId=${area.storeId} (${area.storeName})`);
+        setCurrentAreaId(area.areaId);
+        setCurrentAreaName(area.areaName);
+        setCurrentCityName(area.city || user.preferredCityName || 'Ahmedabad');
+        setCurrentStoreId(area.storeId || null);
+        setCurrentStoreName(area.storeName || null);
+        setIsServiceable(area.serviceable === true);
+        setDeliveryEtaMinutes(area.deliveryMinutes || 9);
+
+        try {
+          const liveProducts = await ProductService.fetchProducts({
+            areaId: area.areaId,
+            storeId: area.storeId,
+          });
+          if (epoch === activeSelectionEpochRef.current && liveProducts && liveProducts.length > 0) {
+            setSelectedProduct(liveProducts[0]);
+            setSelectedBlinkitProduct(mapProductToBlinkit(liveProducts[0]));
+          }
+        } catch (pErr) {
+          console.warn('[AppContext] Failed to refresh products for GPS area:', pErr);
+        }
+      }
+    } catch (err) {
+      console.error('[AppContext] Error resolving area for GPS:', err);
+    }
+  }, [user.fullName, user.phoneNumber, user.preferredCityName]);
 
   // Delivery Area, City & Dark Store Resolution
   const [currentAreaId, setCurrentAreaId] = useState<string | null>(null);
@@ -379,32 +552,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
-    const isThaltej = (areaName || '').toLowerCase().includes('thaltej') || areaId === '6aa11866c6c3e5984e2ef5e5';
-    const isChandlodiya =
-      (areaName || '').toLowerCase().includes('chandlodiya') ||
-      (areaName || '').toLowerCase().includes('tragad') ||
-      areaId === '6aac257b8f337240651ef43c';
-
-    const resolvedAreaId = isThaltej ? '6aa11866c6c3e5984e2ef5e5' : (isChandlodiya ? '6aac257b8f337240651ef43c' : areaId);
-    const resolvedAreaName = isThaltej ? 'Thaltej' : (isChandlodiya ? 'Chandlodiya - Tragad' : areaName);
-    const resolvedStoreId = isThaltej ? '6aa277a8fc02997cbe281ac7' : (isChandlodiya ? '6aac257b8f337240651ef43b' : currentStoreId);
-    const resolvedStoreName = isThaltej ? 'Wom Up Thaltej Dark Store' : (isChandlodiya ? 'Wom Up Chandlodiya - Tragad Dark Store' : currentStoreName);
-
-    setCurrentAreaId(resolvedAreaId);
-    setCurrentAreaName(resolvedAreaName);
-    if (isThaltej || isChandlodiya) {
-      setCurrentStoreId(resolvedStoreId);
-      setCurrentStoreName(resolvedStoreName);
-    }
+    setCurrentAreaId(areaId);
+    setCurrentAreaName(areaName);
 
     if (syncSocketRef.current?.connected) {
       syncSocketRef.current.emit('location_changed', {
-        areaId: resolvedAreaId,
-        areaName: resolvedAreaName,
-        storeId: resolvedStoreId,
-        storeName: resolvedStoreName,
+        areaId,
+        areaName,
+        storeId: currentStoreId,
+        storeName: currentStoreName,
         city: currentCityName || 'Ahmedabad',
-        deliveryMinutes: deliveryEtaMinutes || (isThaltej ? 8 : 9),
+        deliveryMinutes: deliveryEtaMinutes || 9,
       });
     }
   };
@@ -420,32 +578,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
-    const isThaltej = (storeName || '').toLowerCase().includes('thaltej') || storeId === '6aa277a8fc02997cbe281ac7';
-    const isChandlodiya =
-      (storeName || '').toLowerCase().includes('chandlodiya') ||
-      (storeName || '').toLowerCase().includes('tragad') ||
-      storeId === '6aac257b8f337240651ef43b';
-
-    const resolvedStoreId = isThaltej ? '6aa277a8fc02997cbe281ac7' : (isChandlodiya ? '6aac257b8f337240651ef43b' : storeId);
-    const resolvedStoreName = isThaltej ? 'Wom Up Thaltej Dark Store' : (isChandlodiya ? 'Wom Up Chandlodiya - Tragad Dark Store' : storeName);
-    const resolvedAreaId = isThaltej ? '6aa11866c6c3e5984e2ef5e5' : (isChandlodiya ? '6aac257b8f337240651ef43c' : currentAreaId);
-    const resolvedAreaName = isThaltej ? 'Thaltej' : (isChandlodiya ? 'Chandlodiya - Tragad' : currentAreaName);
-
-    setCurrentStoreId(resolvedStoreId);
-    setCurrentStoreName(resolvedStoreName);
-    if (isThaltej || isChandlodiya) {
-      setCurrentAreaId(resolvedAreaId);
-      setCurrentAreaName(resolvedAreaName);
-    }
+    setCurrentStoreId(storeId);
+    setCurrentStoreName(storeName);
 
     if (syncSocketRef.current?.connected) {
       syncSocketRef.current.emit('location_changed', {
-        areaId: resolvedAreaId,
-        areaName: resolvedAreaName,
-        storeId: resolvedStoreId,
-        storeName: resolvedStoreName,
+        areaId: currentAreaId,
+        areaName: currentAreaName,
+        storeId,
+        storeName,
         city: currentCityName || 'Ahmedabad',
-        deliveryMinutes: deliveryEtaMinutes || (isThaltej ? 8 : 9),
+        deliveryMinutes: deliveryEtaMinutes || 9,
       });
     }
   };
@@ -734,6 +877,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             ? Number(it.variant.mrp)
             : Number(it.product.mrp ?? (it.totalMrp && it.quantity ? it.totalMrp / it.quantity : vPrice));
           const vLabel = it.variant?.label || it.product.quantityLabel || '1 unit';
+          const resolvedVId = it.variantId || it.variant?.id || it.variant?._id;
           return {
             product: {
               id: it.product.id || it.product._id,
@@ -750,6 +894,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               rating: 4.8,
               reviewCount: 50,
               deliveryMinutes: 9,
+              selectedVariantId: resolvedVId,
             } as any,
             quantity: it.quantity,
           };
@@ -757,8 +902,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCart(newCart);
         const newBlinkitCart: Record<string, { product: BlinkitProduct; quantity: number }> = {};
         newCart.forEach((ci) => {
-          newBlinkitCart[ci.product.id] = {
-            product: mapProductToBlinkit(ci.product),
+          const bp = mapProductToBlinkit(ci.product);
+          bp.packSize = ci.product.quantityLabel || '1 unit';
+          (bp as any).selectedVariantId = (ci.product as any).selectedVariantId;
+          const k = (ci.product as any).selectedVariantId ? `${ci.product.id}_${(ci.product as any).selectedVariantId}` : ci.product.id;
+          newBlinkitCart[k] = {
+            product: bp,
             quantity: ci.quantity,
           };
         });
@@ -1263,59 +1412,76 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // 3a. Restore saved address from previous session
       let initialLat: number | undefined = undefined;
       let initialLng: number | undefined = undefined;
+      let hasRestoredSavedAddress = false;
 
       try {
-        const savedAddress = await StorageService.getItem<Address | null>(
+        const savedAddress = await StorageService.getItem<any>(
           StorageService.KEYS.SELECTED_ADDRESS,
           null
         );
         if (savedAddress && (savedAddress.latitude || savedAddress.houseFlat)) {
-          setSelectedAddress(savedAddress);
+          const isGps = savedAddress._selectedSource === 'GPS' || savedAddress.type === 'Current';
+          const addrId = savedAddress._selectedAddressId || savedAddress.id || savedAddress._id || null;
+          setSelectedAddressState(savedAddress);
+          setSelectedAddressId(addrId);
+          setSelectedAddressSource(isGps ? 'GPS' : 'SAVED');
+
           const shortLabel = savedAddress.houseFlat || savedAddress.areaLandmark || savedAddress.city;
-          setDeliveryLocation(`${savedAddress.type || 'Current Location'} — ${shortLabel}`);
+          setDeliveryLocation(isGps ? `Current Location — ${shortLabel}` : `${savedAddress.type || 'Home'} — ${shortLabel}`);
           if (savedAddress.latitude && savedAddress.longitude) {
-            initialLat = savedAddress.latitude;
-            initialLng = savedAddress.longitude;
+            initialLat = Number(savedAddress.latitude);
+            initialLng = Number(savedAddress.longitude);
           }
+          hasRestoredSavedAddress = true;
+          console.log(`[AppContext] Boot restored address: id=${addrId}, source=${isGps ? 'GPS' : 'SAVED'}, coords=[${initialLat}, ${initialLng}]`);
         }
       } catch (e) {
         console.warn('Error restoring saved address:', e);
       }
 
-      // 3b. Auto-detect real-time device GPS immediately on boot
-      try {
-        const detected = await LocationService.getCurrentLocation();
-        if (detected) {
-          initialLat = detected.latitude;
-          initialLng = detected.longitude;
-          const shortLabel = detected.shortAddress || detected.readableAddress;
-          setDeliveryLocation(`Current Location — ${shortLabel}`);
-          const addressObj: Address = {
-            id: `current_${Date.now()}`,
-            type: 'Current' as const,
-            fullName: user?.fullName || 'Customer',
-            phoneNumber: user?.phoneNumber || '',
-            houseFlat: detected.street || 'Current GPS Location',
-            areaLandmark: detected.areaLandmark || detected.shortAddress,
-            city: detected.city || 'Ahmedabad',
-            pincode: detected.pincode || '380015',
-            latitude: detected.latitude,
-            longitude: detected.longitude,
-            isDefault: true,
-          };
-          setSelectedAddress(addressObj);
-          StorageService.saveItem(StorageService.KEYS.SELECTED_ADDRESS, addressObj);
+      // 3b. Auto-detect real-time device GPS immediately on boot ONLY IF NO SAVED ADDRESS WAS RESTORED
+      if (!hasRestoredSavedAddress) {
+        try {
+          const detected = await LocationService.getCurrentLocation();
+          if (detected) {
+            initialLat = detected.latitude;
+            initialLng = detected.longitude;
+            const shortLabel = detected.shortAddress || detected.readableAddress;
+            setDeliveryLocation(`Current Location — ${shortLabel}`);
+            const addressObj: Address = {
+              id: `current_${Date.now()}`,
+              type: 'Current' as const,
+              fullName: user?.fullName || 'Customer',
+              phoneNumber: user?.phoneNumber || '',
+              houseFlat: detected.street || 'Current GPS Location',
+              areaLandmark: detected.areaLandmark || detected.shortAddress,
+              city: detected.city || 'Ahmedabad',
+              pincode: detected.pincode || '380015',
+              latitude: detected.latitude,
+              longitude: detected.longitude,
+              isDefault: true,
+            };
+            setSelectedAddressState(addressObj);
+            setSelectedAddressId(addressObj.id);
+            setSelectedAddressSource('GPS');
+            StorageService.saveItem(StorageService.KEYS.SELECTED_ADDRESS, {
+              ...addressObj,
+              _selectedAddressId: addressObj.id,
+              _selectedSource: 'GPS',
+            });
+            hasRestoredSavedAddress = true;
+          }
+        } catch (err) {
+          console.log('[AppContext] Auto GPS on boot waiting for permission or unavailable:', err);
         }
-      } catch (err) {
-        console.log('[AppContext] Auto GPS on boot waiting for permission or unavailable:', err);
       }
 
-      // 3c. Listen for browser geolocation permission changes (instant resolution on user allow)
+      // 3c. Listen for browser geolocation permission changes (only switch if no saved address was active)
       if (typeof navigator !== 'undefined' && (navigator as any).permissions) {
         try {
           (navigator as any).permissions.query({ name: 'geolocation' }).then((status: any) => {
             status.onchange = async () => {
-              if (status.state === 'granted') {
+              if (status.state === 'granted' && !hasRestoredSavedAddress && selectedAddressSource !== 'SAVED') {
                 try {
                   const loc = await LocationService.getCurrentLocation();
                   if (loc) {
@@ -1334,8 +1500,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                       longitude: loc.longitude,
                       isDefault: true,
                     };
-                    setSelectedAddress(addrObj);
-                    StorageService.saveItem(StorageService.KEYS.SELECTED_ADDRESS, addrObj);
+                    setSelectedAddressState(addrObj);
+                    setSelectedAddressId(addrObj.id);
+                    setSelectedAddressSource('GPS');
+                    StorageService.saveItem(StorageService.KEYS.SELECTED_ADDRESS, {
+                      ...addrObj,
+                      _selectedAddressId: addrObj.id,
+                      _selectedSource: 'GPS',
+                    });
                     const area = await LocationService.resolveArea(loc.latitude, loc.longitude, true);
                     if (area) {
                       setCurrentAreaId(area.areaId);
@@ -1402,24 +1574,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     })();
   }, []);
 
-  // Re-resolve area and dark store when selected address coordinates change
-  useEffect(() => {
-    if (selectedAddress?.latitude && selectedAddress?.longitude) {
-      LocationService.resolveArea(selectedAddress.latitude, selectedAddress.longitude, true).then(
-        (area) => {
-          if (area) {
-            setCurrentAreaId(area.areaId);
-            setCurrentAreaName(area.areaName);
-            setCurrentCityName(area.city || user.preferredCityName || 'Ahmedabad');
-            setCurrentStoreId(area.storeId || null);
-            setCurrentStoreName(area.storeName || null);
-            setIsServiceable(area.serviceable ?? false);
-            setDeliveryEtaMinutes(area.deliveryMinutes || 9);
-          }
-        }
-      );
-    }
-  }, [selectedAddress?.latitude, selectedAddress?.longitude]);
+
 
   // When currentAreaId or currentStoreId or currentAreaName updates, re-fetch products with store-specific stock and area prices
   useEffect(() => {
@@ -1436,12 +1591,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setBlinkitCart((prev) => {
             const updated = { ...prev };
             let hasChanged = false;
-            Object.keys(updated).forEach((productId) => {
-              const item = updated[productId];
+            Object.keys(updated).forEach((cartKey) => {
+              const item = updated[cartKey];
+              const rawProdId = item.product.id;
               const matched = liveProducts.find(
                 (p) =>
-                  p.id === productId ||
-                  (p as any)._id === productId ||
+                  p.id === rawProdId ||
+                  (p as any)._id === rawProdId ||
                   p.name.toLowerCase().trim() === item.product.name.toLowerCase().trim()
               );
 
@@ -1452,6 +1608,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               // Check if item has a specific variant (e.g. 1 kg variant of Atta with dynamic area price)
               if (matched?.variants && matched.variants.length > 0) {
                 const matchedVariant = matched.variants.find((v: any) =>
+                  (v.id && (item.product as any).selectedVariantId === v.id) ||
                   (v.label && item.product.packSize && v.label.toLowerCase().trim() === item.product.packSize.toLowerCase().trim()) ||
                   (v.weightOrVolume && item.product.packSize && v.weightOrVolume.toLowerCase().trim() === item.product.packSize.toLowerCase().trim()) ||
                   (v.label && (item.product as any).quantityLabel && v.label.toLowerCase().trim() === (item.product as any).quantityLabel.toLowerCase().trim())
@@ -1463,8 +1620,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 }
               }
 
-              // Area-specific catalog price override (e.g. ₹7 in Tragad vs ₹12 in Thaltej)
-              if (item.product.name.toLowerCase().includes('tomato')) {
+              // Area-specific catalog price override for 250g base Tomato
+              if (
+                item.product.name.toLowerCase().includes('tomato') &&
+                (!item.product.packSize || item.product.packSize === '250 g')
+              ) {
                 if (currentAreaName?.toLowerCase().includes('thaltej')) {
                   targetPrice = 12;
                 } else if (
@@ -1477,7 +1637,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
               if (item.product.sellingPrice !== targetPrice || item.product.mrp !== targetMrp) {
                 hasChanged = true;
-                updated[productId] = {
+                updated[cartKey] = {
                   ...item,
                   product: {
                     ...item.product,
@@ -1501,7 +1661,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 const vMrp = it.variant?.mrp !== undefined
                   ? Number(it.variant.mrp)
                   : Number(it.product.mrp ?? (it.totalMrp && it.quantity ? it.totalMrp / it.quantity : vPrice));
-                const vLabel = it.variant?.label || it.product.quantityLabel || '1 unit';
+                const vLabel = it.variant?.label || it.variant?.weightOrVolume || it.product.quantityLabel || '1 unit';
+                const resolvedVId = it.variantId || it.variant?.id || it.variant?._id;
                 return {
                   product: {
                     id: it.product.id || it.product._id,
@@ -1518,6 +1679,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                     rating: 4.8,
                     reviewCount: 50,
                     deliveryMinutes: 9,
+                    selectedVariantId: resolvedVId,
                   } as any,
                   quantity: it.quantity,
                 };
@@ -1525,8 +1687,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               setCart(newCart);
               const newBlinkitCart: Record<string, { product: BlinkitProduct; quantity: number }> = {};
               newCart.forEach((ci) => {
-                newBlinkitCart[ci.product.id] = {
-                  product: mapProductToBlinkit(ci.product),
+                const bp = mapProductToBlinkit(ci.product);
+                bp.packSize = ci.product.quantityLabel || '1 unit';
+                (bp as any).selectedVariantId = (ci.product as any).selectedVariantId;
+                const k = (ci.product as any).selectedVariantId ? `${ci.product.id}_${(ci.product as any).selectedVariantId}` : ci.product.id;
+                newBlinkitCart[k] = {
+                  product: bp,
                   quantity: ci.quantity,
                 };
               });
@@ -1654,8 +1820,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     paymentMethod: string,
     options?: { tip?: number; deliveryInstructions?: string; walletDeduction?: number; deliveryFee?: number },
   ): Promise<Order> => {
-    const orderItems = (cartCount > 0 ? cart : blinkitCartList).map((i: any) => ({
+    const isBlinkit = blinkitCartCount > 0;
+    const activeList = isBlinkit ? blinkitCartList : cart;
+    const activeCount = isBlinkit ? blinkitCartCount : cartCount;
+
+    const orderItems = activeList.map((i: any) => ({
       productId: i.product.id,
+      variantId: (i.product as any).selectedVariantId,
       name: `${i.product.name} ${i.product.quantityLabel || i.product.packSize || ''}`.trim(),
       quantity: i.quantity,
       price: i.product.sellingPrice,
@@ -1674,8 +1845,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...prev,
       shoppingCoins:
         prev.shoppingCoins -
-        (cartCount > 0 ? cartSummary.shoppingCoinDiscount : 0) +
-        (cartCount > 0 ? cartSummary.totalCoinsEarnable : 10),
+        (!isBlinkit ? cartSummary.shoppingCoinDiscount : appliedCoins) +
+        (!isBlinkit ? cartSummary.totalCoinsEarnable : 10),
     }));
 
     let liveOrder: Order | null = null;
@@ -1712,15 +1883,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           status: liveData.status || 'PLACED',
           itemCount: liveData.items?.length || orderItems.length,
           items: orderItems,
-          subtotal: liveData.itemSubtotal || (cartCount > 0 ? cartSummary.subtotalSelling : blinkitCartTotal),
-          discount: liveData.discount ?? (cartCount > 0 ? cartSummary.productDiscount : 0),
-          couponDiscount: liveData.couponDiscount ?? (cartCount > 0 ? 0 : couponDiscount),
-          shoppingCoinsUsed: liveData.coinsUsed ?? (cartCount > 0 ? cartSummary.shoppingCoinDiscount : appliedCoins),
-          coinsDiscount: liveData.coinsDiscount ?? (cartCount > 0 ? cartSummary.shoppingCoinDiscount : appliedCoins),
-          deliveryFee: liveData.deliveryFee ?? (typeof options?.deliveryFee === 'number' ? options.deliveryFee : (cartCount > 0 ? cartSummary.deliveryFee : 40)),
-          handlingFee: liveData.handlingFee ?? (cartCount > 0 ? cartSummary.handlingFee : 5),
+          subtotal: liveData.itemSubtotal || (isBlinkit ? blinkitCartTotal : cartSummary.subtotalSelling),
+          discount: liveData.discount ?? (isBlinkit ? Math.max(0, blinkitMrpTotal - blinkitCartTotal) : cartSummary.productDiscount),
+          couponDiscount: liveData.couponDiscount ?? (isBlinkit ? couponDiscount : 0),
+          shoppingCoinsUsed: liveData.coinsUsed ?? (isBlinkit ? appliedCoins : cartSummary.shoppingCoinDiscount),
+          coinsDiscount: liveData.coinsDiscount ?? (isBlinkit ? appliedCoins : cartSummary.shoppingCoinDiscount),
+          deliveryFee: liveData.deliveryFee ?? (typeof options?.deliveryFee === 'number' ? options.deliveryFee : (isBlinkit ? 39 : cartSummary.deliveryFee)),
+          handlingFee: liveData.handlingFee ?? (isBlinkit ? 5 : cartSummary.handlingFee),
           tip: liveData.tip ?? (options?.tip || 0),
-          totalAmount: liveData.totalAmount || (cartCount > 0 ? cartSummary.totalPayable : Math.max(0, blinkitCartTotal + (typeof options?.deliveryFee === 'number' ? options.deliveryFee : 40) + 5 - couponDiscount - appliedCoins + (options?.tip || 0))),
+          totalAmount: liveData.totalAmount || (isBlinkit ? Math.max(0, blinkitCartTotal + (typeof options?.deliveryFee === 'number' ? options.deliveryFee : 39) + 5 - couponDiscount - appliedCoins + (options?.tip || 0)) : cartSummary.totalPayable),
           deliveryAddress: selectedAddress,
           deliverySlot: 'Today, within 9 minutes',
           paymentMethod,
@@ -1742,37 +1913,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       orderNumber: `#W${Math.floor(10000000 + Math.random() * 90000000)}`,
       date: 'Just now',
       status: 'PLACED',
-      itemCount: cartCount > 0 ? cartCount : blinkitCartCount,
-      items:
-        cartCount > 0
-          ? cart.map((i) => ({
-              productId: i.product.id,
-              name: `${i.product.name} ${i.product.quantityLabel}`,
-              quantity: i.quantity,
-              price: i.product.sellingPrice,
-              image: i.product.image,
-              imageUrl: i.product.imageUrl,
-            }))
-          : blinkitCartList.map((i) => ({
-              productId: i.product.id,
-              name: `${i.product.name} ${i.product.packSize}`,
-              quantity: i.quantity,
-              price: i.product.sellingPrice,
-              image: (i.product as any).image,
-              imageUrl: (i.product as any).imageUrl,
-            })),
-      subtotal: cartCount > 0 ? cartSummary.subtotalSelling : blinkitCartTotal,
-      discount: cartCount > 0 ? cartSummary.productDiscount : Math.max(0, blinkitMrpTotal - blinkitCartTotal),
-      couponDiscount: cartCount > 0 ? 0 : couponDiscount,
-      shoppingCoinsUsed: cartCount > 0 ? cartSummary.shoppingCoinDiscount : appliedCoins,
-      coinsDiscount: cartCount > 0 ? cartSummary.shoppingCoinDiscount : appliedCoins,
-      deliveryFee: typeof options?.deliveryFee === 'number' ? options.deliveryFee : (cartCount > 0 ? cartSummary.deliveryFee : 40),
-      handlingFee: cartCount > 0 ? cartSummary.handlingFee : 5,
+      itemCount: activeCount,
+      items: isBlinkit
+        ? blinkitCartList.map((i) => ({
+            productId: i.product.id,
+            name: `${i.product.name} ${i.product.packSize || (i.product as any).quantityLabel || ''}`.trim(),
+            quantity: i.quantity,
+            price: i.product.sellingPrice,
+            image: (i.product as any).image,
+            imageUrl: (i.product as any).imageUrl,
+          }))
+        : cart.map((i) => ({
+            productId: i.product.id,
+            name: `${i.product.name} ${i.product.quantityLabel}`,
+            quantity: i.quantity,
+            price: i.product.sellingPrice,
+            image: i.product.image,
+            imageUrl: i.product.imageUrl,
+          })),
+      subtotal: isBlinkit ? blinkitCartTotal : cartSummary.subtotalSelling,
+      discount: isBlinkit ? Math.max(0, blinkitMrpTotal - blinkitCartTotal) : cartSummary.productDiscount,
+      couponDiscount: isBlinkit ? couponDiscount : 0,
+      shoppingCoinsUsed: isBlinkit ? appliedCoins : cartSummary.shoppingCoinDiscount,
+      coinsDiscount: isBlinkit ? appliedCoins : cartSummary.shoppingCoinDiscount,
+      deliveryFee: typeof options?.deliveryFee === 'number' ? options.deliveryFee : (isBlinkit ? 39 : cartSummary.deliveryFee),
+      handlingFee: isBlinkit ? 5 : cartSummary.handlingFee,
       tip: options?.tip || 0,
-      totalAmount:
-        cartCount > 0
-          ? cartSummary.totalPayable
-          : Math.max(0, blinkitCartTotal + (typeof options?.deliveryFee === 'number' ? options.deliveryFee : 40) + 5 - couponDiscount - appliedCoins + (options?.tip || 0)),
+      totalAmount: isBlinkit
+        ? Math.max(0, blinkitCartTotal + (typeof options?.deliveryFee === 'number' ? options.deliveryFee : 39) + 5 - couponDiscount - appliedCoins + (options?.tip || 0))
+        : cartSummary.totalPayable,
       deliveryAddress: selectedAddress,
       deliverySlot: 'Today, within 9 minutes',
       paymentMethod,
@@ -1829,15 +1998,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return sum + mrp * item.quantity;
   }, 0);
 
-  const getBlinkitQty = (productId: string): number => {
-    if (blinkitCart[productId]?.quantity) {
-      return blinkitCart[productId].quantity;
+  const getBlinkitQty = (productId: string, variantId?: string): number => {
+    if (variantId) {
+      const key = `${productId}_${variantId}`;
+      if (blinkitCart[key]?.quantity) {
+        return blinkitCart[key].quantity;
+      }
+      if (
+        blinkitCart[productId]?.quantity &&
+        (blinkitCart[productId]?.product as any)?.selectedVariantId === variantId
+      ) {
+        return blinkitCart[productId].quantity;
+      }
+      return 0;
     }
+    let total = 0;
+    for (const [k, v] of Object.entries(blinkitCart)) {
+      if (k === productId || k.startsWith(`${productId}_`)) {
+        total += v.quantity || 0;
+      }
+    }
+    if (total > 0) return total;
     const legacyItem = cart.find((i) => i.product.id === productId);
     return legacyItem?.quantity || 0;
   };
 
-  const updateBlinkitQty = (product: BlinkitProduct, delta: number) => {
+  const updateBlinkitQty = (product: BlinkitProduct, delta: number, variantId?: string) => {
+    const resolvedVariantId =
+      variantId ||
+      (product as any).selectedVariantId ||
+      (product.variants && product.variants.find((v) => v.isDefault)?.id);
+    const cartKey = resolvedVariantId ? `${product.id}_${resolvedVariantId}` : product.id;
+
     const isTomato = (product.name || '').toLowerCase().includes('tomato');
     const isThaltej = (currentAreaName || '').toLowerCase().includes('thaltej');
     const isChandlodiya =
@@ -1850,47 +2042,79 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             ...product,
             sellingPrice: isThaltej ? 12 : (isChandlodiya ? 7 : product.sellingPrice),
             mrp: 15,
+            selectedVariantId: resolvedVariantId,
           }
-        : product;
+        : {
+            ...product,
+            selectedVariantId: resolvedVariantId,
+          };
 
     // 1. Update blinkitCart
     setBlinkitCart((prev) => {
-      const current = prev[product.id]?.quantity || 0;
+      let current = 0;
+      if (prev[cartKey]?.quantity) {
+        current = prev[cartKey].quantity;
+      } else if (!resolvedVariantId && prev[product.id]?.quantity) {
+        current = prev[product.id].quantity;
+      } else if (
+        resolvedVariantId &&
+        prev[product.id] &&
+        (prev[product.id].product as any)?.selectedVariantId === resolvedVariantId
+      ) {
+        current = prev[product.id].quantity;
+      }
+
       const nextQty = Math.max(0, current + delta);
-      // Cap at stock if limited
       const finalQty = effectiveProd.stock ? Math.min(nextQty, effectiveProd.stock) : nextQty;
 
+      const copy = { ...prev };
       if (finalQty <= 0) {
-        const copy = { ...prev };
-        delete copy[product.id];
+        delete copy[cartKey];
+        if (
+          resolvedVariantId &&
+          copy[product.id] &&
+          (copy[product.id]?.product as any)?.selectedVariantId === resolvedVariantId
+        ) {
+          delete copy[product.id];
+        }
         return copy;
       }
 
-      return {
-        ...prev,
-        [product.id]: {
-          product: effectiveProd,
-          quantity: finalQty,
-        },
+      if (
+        resolvedVariantId &&
+        copy[product.id] &&
+        (copy[product.id]?.product as any)?.selectedVariantId === resolvedVariantId
+      ) {
+        delete copy[product.id];
+      }
+
+      copy[cartKey] = {
+        product: effectiveProd,
+        quantity: finalQty,
       };
+      return copy;
     });
 
     // 2. Synchronize to legacy cart immediately
     setCart((prev) => {
-      const existing = prev.find((item) => item.product.id === product.id);
+      const existing = prev.find(
+        (item) =>
+          item.product.id === product.id &&
+          ((item.product as any).selectedVariantId === resolvedVariantId || !resolvedVariantId)
+      );
       let next: CartItem[];
       if (delta > 0) {
         if (existing) {
           next = prev.map((item) =>
-            item.product.id === product.id ? { ...item, quantity: item.quantity + delta } : item
+            item === existing ? { ...item, quantity: item.quantity + delta } : item
           );
         } else {
-          next = [...prev, { product: mapBlinkitToProduct(product), quantity: delta }];
+          next = [...prev, { product: mapBlinkitToProduct(effectiveProd), quantity: delta }];
         }
       } else {
         next = prev
           .map((item) => {
-            if (item.product.id === product.id) {
+            if (item === existing) {
               const newQty = item.quantity + delta;
               return newQty > 0 ? { ...item, quantity: newQty } : null;
             }
@@ -1901,8 +2125,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return next;
     });
 
-    // 3. Fire-and-forget sync to backend API
-    CartService.updateQuantityOnServer(product.id, delta).catch(() => {});
+    // 3. Fire-and-forget sync to backend API with variantId
+    CartService.updateQuantityOnServer(product.id, delta, resolvedVariantId).catch(() => {});
   };
 
   const clearBlinkitCart = () => {
@@ -1958,7 +2182,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         user,
         setUser,
         selectedAddress,
+        selectedAddressId,
+        selectedAddressSource,
         setSelectedAddress,
+        setActiveDeliveryAddress,
+        setActiveGpsLocation,
         addAddress,
         cart,
         cartCount,

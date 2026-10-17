@@ -22,6 +22,9 @@ export class LevelStatSnapshot {
 
   @Prop({ default: 0 })
   incomeEarned: number;
+
+  @Prop({ type: [Object], default: [] })
+  members?: any[];
 }
 
 @Schema({ collection: 'team_purchase_income', timestamps: true })

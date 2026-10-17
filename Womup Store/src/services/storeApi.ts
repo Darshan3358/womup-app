@@ -90,6 +90,20 @@ export class StoreApiService {
     cityId: string;
     areaId: string;
     password: string;
+    fullAddress?: string;
+    landmark?: string;
+    pincode?: string;
+    latitude?: number;
+    longitude?: number;
+    storeLicense?: string;
+    ownerAadharFront?: string;
+    ownerAadharBack?: string;
+    shopPhoto?: string;
+    openingTime?: string;
+    closingTime?: string;
+    serviceRadius?: number;
+    deliveryTime?: number;
+    initialStaffCount?: number;
   }) {
     return this.request<{
       success: boolean;
@@ -257,10 +271,10 @@ export class StoreApiService {
     return this.request<any[]>(`/inventory?${params.toString()}`);
   }
 
-  static async adjustStock(productId: string, delta: number, reason: string, changeType?: string) {
+  static async adjustStock(productId: string, delta: number, reason: string, changeType?: string, variantId?: string) {
     return this.request<any>(`/inventory/${productId}`, {
       method: 'PATCH',
-      body: JSON.stringify({ delta, reason, changeType }),
+      body: JSON.stringify({ delta, reason, changeType, variantId }),
     });
   }
 

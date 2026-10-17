@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { Platform, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
+import { uploadService } from '../services/uploadService';
 
 export interface UploadResult {
   url: string;
@@ -12,16 +13,26 @@ export interface UploadResult {
 export interface UseFileUploadOptions {
   folder?: string;
   backendBaseUrl?: string;
+  entityType?: 'customer' | 'user' | 'rider' | 'vendor' | 'store';
+  entityId?: string;
+  resourceType?: string;
 }
 
 export function useFileUpload(options: UseFileUploadOptions = {}) {
-  const { folder = 'wormup/kyc', backendBaseUrl = 'http://localhost:5050/api/v1' } = options;
+  const {
+    folder = 'wormup/kyc',
+    backendBaseUrl = 'http://localhost:5050/api/v1',
+    entityType,
+    entityId,
+    resourceType,
+  } = options;
 
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
   const [localUri, setLocalUri] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
 
   /**
    * Request media library permissions
@@ -122,7 +133,8 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
   }, []);
 
   /**
-   * Upload file to Cloudinary via backend or signed direct upload
+  /**
+   * Upload file to Cloudinary via universal signed direct upload or backend fallback
    */
   const uploadFile = useCallback(
     async (fileUri?: string, customFolder?: string): Promise<UploadResult | null> => {
@@ -139,103 +151,41 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
       const targetFolder = customFolder || folder;
 
       try {
-        // Step 1: Request upload signature from backend
-        let signatureData: any = null;
-        try {
-          const sigRes = await fetch(`${backendBaseUrl}/uploads/signature`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ folder: targetFolder }),
-          });
-          if (sigRes.ok) {
-            const json = await sigRes.json();
-            signatureData = json.data;
-          }
-        } catch (sigErr) {
-          console.warn('Backend signature fallback to direct upload:', sigErr);
-        }
-
-        setProgress(30);
-
-        // Step 2: Prepare FormData
-        const formData = new FormData();
-
-        if (Platform.OS === 'web') {
-          // On Web, fetch blob from object/local URL
-          const res = await fetch(uriToUpload);
-          const blob = await res.blob();
-          const filename = `upload_${Date.now()}.${blob.type.split('/')[1] || 'jpg'}`;
-          formData.append('file', blob, filename);
-        } else {
-          // React Native native file object
-          const uriParts = uriToUpload.split('/');
-          const filename = uriParts[uriParts.length - 1];
-          const match = /\.(\w+)$/.exec(filename);
-          const type = match ? `image/${match[1]}` : 'image/jpeg';
-
-          formData.append('file', {
-            uri: uriToUpload,
-            name: filename,
-            type,
-          } as any);
-        }
-
-        setProgress(50);
-
-        // Step 3: Execute upload (Signed Cloudinary or Backend Proxy)
-        let finalUrl = '';
-        let publicId = '';
-
-        if (signatureData?.uploadUrl && signatureData?.apiKey) {
-          // Direct signed Cloudinary upload
-          formData.append('api_key', signatureData.apiKey);
-          formData.append('timestamp', String(signatureData.timestamp));
-          formData.append('signature', signatureData.signature);
-          formData.append('folder', signatureData.folder);
-
-          const cRes = await fetch(signatureData.uploadUrl, {
-            method: 'POST',
-            body: formData,
-          });
-
-          const cData = await cRes.json();
-          if (cRes.ok && cData.secure_url) {
-            finalUrl = cData.secure_url;
-            publicId = cData.public_id;
-          } else {
-            throw new Error(cData.error?.message || 'Cloudinary upload failed');
-          }
-        } else {
-          // Fallback through backend media upload
-          const bRes = await fetch(`${backendBaseUrl}/media/upload?folder=${encodeURIComponent(targetFolder)}`, {
-            method: 'POST',
-            body: formData,
-          });
-          const bData = await bRes.json();
-          if (bRes.ok && bData.data?.url) {
-            finalUrl = bData.data.url;
-            publicId = bData.data.publicId;
-          } else {
-            throw new Error(bData.message || 'Backend upload failed');
-          }
-        }
+        const result = await uploadService.uploadMedia(uriToUpload, {
+          folder: targetFolder,
+          entityType,
+          entityId,
+          resourceType,
+          onProgress: (p) => setProgress(p),
+        });
 
         setProgress(100);
         setIsUploading(false);
-        setUploadedUrl(finalUrl);
+        setUploadedUrl(result.url);
 
-        return { url: finalUrl, publicId };
+        return { url: result.url, publicId: result.publicId };
       } catch (err: any) {
         setIsUploading(false);
         setProgress(0);
-        const errMsg = err.message || 'File upload failed. Please try again.';
-        setError(errMsg);
-        Alert.alert('Upload Error', errMsg);
+        setError(err.message || 'Upload failed');
+        Alert.alert('Upload Failed', err.message || 'Failed to upload document');
         return null;
       }
     },
-    [localUri, folder, backendBaseUrl]
+    [localUri, folder, entityType, entityId, resourceType],
   );
+
+  const retry = useCallback(() => {
+    if (localUri) {
+      return uploadFile(localUri);
+    }
+  }, [localUri, uploadFile]);
+
+  const cancel = useCallback(() => {
+    setIsUploading(false);
+    setProgress(0);
+    setError('Upload cancelled.');
+  }, []);
 
   const reset = useCallback(() => {
     setIsUploading(false);
@@ -255,6 +205,8 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
     pickFromGallery,
     pickDocument,
     uploadFile,
+    retry,
+    cancel,
     reset,
   };
 }

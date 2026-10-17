@@ -70,7 +70,7 @@ export const MyProfileScreen: React.FC<MyProfileScreenProps> = ({
               <Text style={styles.userIdText}>Sponsor ID : {user?.referralCode || 'WORM5871'}</Text>
             </View>
             <Text style={styles.userPhone}>{user?.phoneNumber || '+91 98765 43210'}</Text>
-            <Text style={styles.userCity}>📍 Mahesana, Gujarat</Text>
+            <Text style={styles.userCity}>📍 Ahmedabad, Gujarat</Text>
           </View>
         </View>
 
@@ -105,8 +105,8 @@ export const MyProfileScreen: React.FC<MyProfileScreenProps> = ({
             {
               icon: 'location-outline',
               label: 'Saved Delivery Addresses',
-              sub: 'Home, Work, Parents (Mahesana)',
-              onPress: () => Alert.alert('Saved Addresses', '1. Near Nandanvan Society, Mahesana\n2. Saket Plaza, Mahesana'),
+              sub: 'Home, Work, Parents (Ahmedabad)',
+              onPress: () => Alert.alert('Saved Addresses', '1. Near Nandanvan Society, Ahmedabad\n2. Saket Plaza, Ahmedabad'),
             },
             {
               icon: 'card-outline',

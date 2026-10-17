@@ -2,7 +2,10 @@ import React from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AuthProvider } from './src/context/AuthContext';
 import { AppProvider } from './src/context/AppContext';
+import { ToastProvider } from './src/context/ToastContext';
+import { NotificationProvider } from './src/context/NotificationContext';
 import { RootNavigator } from './src/navigation/RootNavigator';
 
 // Lock web viewport to 100vw and prevent any horizontal scroll overflow
@@ -12,13 +15,28 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
     const style = document.createElement('style');
     style.id = styleId;
     style.textContent = `
-      html, body, #root {
+      html, body {
         width: 100% !important;
+        height: 100% !important;
         max-width: 100vw !important;
         overflow-x: hidden !important;
         margin: 0 !important;
         padding: 0 !important;
         position: relative !important;
+      }
+      #root {
+        width: 100% !important;
+        height: 100% !important;
+        max-width: 100vw !important;
+        overflow-x: hidden !important;
+        display: flex !important;
+        flex-direction: column !important;
+      }
+      /* Enable smooth scrolling and prevent scroll locking across all screens */
+      .r-overflowY-136oiwf {
+        -webkit-overflow-scrolling: touch !important;
+        overscroll-behavior-y: contain !important;
+        touch-action: pan-y !important;
       }
       * {
         box-sizing: border-box !important;
@@ -27,6 +45,8 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
     document.head.appendChild(style);
   }
 }
+
+import { ErrorBoundary } from './src/components/common/ErrorBoundary';
 
 export default function App() {
   React.useEffect(() => {
@@ -39,10 +59,18 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <AppProvider>
-        <RootNavigator />
-        <StatusBar style="dark" />
-      </AppProvider>
+      <ErrorBoundary>
+        <AuthProvider>
+          <AppProvider>
+            <ToastProvider>
+              <NotificationProvider>
+                <RootNavigator />
+                <StatusBar style="dark" />
+              </NotificationProvider>
+            </ToastProvider>
+          </AppProvider>
+        </AuthProvider>
+      </ErrorBoundary>
     </SafeAreaProvider>
   );
 }

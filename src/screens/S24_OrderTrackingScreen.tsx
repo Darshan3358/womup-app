@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
+  Image,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
@@ -21,43 +22,57 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { DynamicLiveMap } from '../components/tracking/DynamicLiveMap';
 import { S27_ChatModal } from '../components/tracking/S27_ChatModal';
 import { RiderReviewModal } from '../components/tracking/RiderReviewModal';
+import { api } from '../services/api';
 
 export const S24_OrderTrackingScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { currentOrder, setActiveScreen, goBack, user, addToCart } = useApp();
 
-  const order = currentOrder;
-  const orderNum = order?.orderNumber || (order as any)?.orderId || '';
-  const orderId = (order as any)?._id || order?.id || (orderNum ? orderNum.replace(/^#/, '') : '');
+  const [freshOrder, setFreshOrder] = useState<any>(null);
+  const activeOrder = freshOrder || currentOrder || {};
+  const orderNum = activeOrder?.orderNumber || (activeOrder as any)?.orderId || '';
+  const orderId = (activeOrder as any)?._id || activeOrder?.id || (orderNum ? orderNum.replace(/^#/, '') : '');
+
+  useEffect(() => {
+    const targetId = (currentOrder as any)?._id || currentOrder?.id || currentOrder?.orderNumber || orderId || orderNum;
+    if (targetId && targetId !== 'W12345678') {
+      api.get<any>(`/orders/${targetId}`).then((res) => {
+        const found = (res as any)?._id ? res : res?.data;
+        if (found) {
+          setFreshOrder(found);
+        }
+      }).catch(() => { });
+    }
+  }, [orderId, orderNum, currentOrder]);
 
   // Real-time tracking state
-  const [liveStatus, setLiveStatus] = useState<string>((order?.status || 'PLACED').toUpperCase());
-  const [deliveryPin, setDeliveryPin] = useState<string>((order as any)?.deliveryOtp || '4821');
+  const [liveStatus, setLiveStatus] = useState<string>((activeOrder?.status || 'PLACED').toUpperCase());
+  const [deliveryPin, setDeliveryPin] = useState<string>(String(activeOrder?.deliveryOtp || '4821'));
 
   const rawPartnerName =
-    order?.deliveryPartner?.name ||
-    order?.deliveryPartnerId?.fullName ||
-    (order as any)?.partnerName ||
-    (order as any)?.riderName ||
-    (order as any)?.rider?.name ||
+    activeOrder?.deliveryPartner?.name ||
+    activeOrder?.deliveryPartnerId?.fullName ||
+    (activeOrder as any)?.partnerName ||
+    (activeOrder as any)?.riderName ||
+    (activeOrder as any)?.rider?.name ||
     '';
-  const cleanInitial = rawPartnerName.replace(/\s*\(Worm Up Express\)/gi, '').trim();
+  const cleanInitial = String(rawPartnerName || '').replace(/\s*\(Worm Up Express\)/gi, '').trim();
   const initialPartnerName =
     cleanInitial.toLowerCase().includes('rohit') || cleanInitial.toLowerCase() === 'delivery partner'
       ? ''
       : (cleanInitial.toLowerCase() === 'darshanthanki' ? 'DARSHAN THANKI' : cleanInitial);
 
   const initialPartnerPhone =
-    order?.deliveryPartner?.phone ||
-    order?.deliveryPartnerId?.phoneNumber ||
-    (order as any)?.partnerPhone ||
-    (order as any)?.rider?.phone ||
+    activeOrder?.deliveryPartner?.phone ||
+    activeOrder?.deliveryPartnerId?.phoneNumber ||
+    (activeOrder as any)?.partnerPhone ||
+    (activeOrder as any)?.rider?.phone ||
     '';
   const initialVehicleNumber =
-    order?.deliveryPartner?.vehicleNumber ||
-    order?.deliveryPartnerId?.vehicleNumber ||
-    (order as any)?.vehicleNumber ||
-    (order as any)?.rider?.vehicleNumber ||
+    activeOrder?.deliveryPartner?.vehicleNumber ||
+    activeOrder?.deliveryPartnerId?.vehicleNumber ||
+    (activeOrder as any)?.vehicleNumber ||
+    (activeOrder as any)?.rider?.vehicleNumber ||
     '';
 
   const [partner, setPartner] = useState({
@@ -66,25 +81,98 @@ export const S24_OrderTrackingScreen: React.FC = () => {
     vehicleNumber: initialVehicleNumber,
   });
   const [riderCoords, setRiderCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [riderHeading, setRiderHeading] = useState<number>(0);
+  const [timelineList, setTimelineList] = useState<any[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [etaText, setEtaText] = useState('9-12 minutes');
   const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
-  const [hasReviewed, setHasReviewed] = useState(Boolean((order as any)?.riderReview?.isSubmitted));
+  const [hasReviewed, setHasReviewed] = useState(Boolean((activeOrder as any)?.riderReview?.isSubmitted));
+  const [routeDistanceKm, setRouteDistanceKm] = useState<number | null>(null);
 
-  // Sync real-time updates whenever currentOrder changes in AppContext
+  // Authoritative coordinates for map routing and transparent distance fee
+  const storeLocation =
+    (activeOrder as any)?.store?.location?.coordinates ||
+    (activeOrder as any)?.storeId?.location?.coordinates ||
+    (activeOrder as any)?.storeLocation?.coordinates;
+  const storeLat =
+    storeLocation?.[1] ??
+    (activeOrder as any)?.store?.location?.latitude ??
+    (activeOrder as any)?.storeId?.location?.latitude ??
+    (activeOrder as any)?.storeId?.latitude;
+  const storeLng =
+    storeLocation?.[0] ??
+    (activeOrder as any)?.store?.location?.longitude ??
+    (activeOrder as any)?.storeId?.location?.longitude ??
+    (activeOrder as any)?.storeId?.longitude;
+
+  const custLocation =
+    (activeOrder as any)?.customer?.location?.coordinates ||
+    (activeOrder as any)?.deliveryAddress?.location?.coordinates ||
+    (activeOrder as any)?.deliveryAddress?.coordinates;
+  const custLat =
+    custLocation?.[1] ??
+    (activeOrder as any)?.deliveryAddress?.latitude ??
+    (activeOrder as any)?.deliveryAddress?.lat;
+  const custLng =
+    custLocation?.[0] ??
+    (activeOrder as any)?.deliveryAddress?.longitude ??
+    (activeOrder as any)?.deliveryAddress?.lng;
+
+  const defaultStoreLat = 23.1128;
+  const defaultStoreLng = 72.5427;
+  const storeCoords =
+    typeof storeLat === 'number' && typeof storeLng === 'number' && !isNaN(storeLat) && !isNaN(storeLng) && storeLat !== 0 && storeLng !== 0
+      ? { latitude: storeLat, longitude: storeLng }
+      : { latitude: defaultStoreLat, longitude: defaultStoreLng };
+
+  const customerCoords =
+    typeof custLat === 'number' && typeof custLng === 'number' && !isNaN(custLat) && !isNaN(custLng) && custLat !== 0 && custLng !== 0
+      ? { latitude: custLat, longitude: custLng }
+      : { latitude: 23.1165, longitude: 72.5460 };
+
   useEffect(() => {
-    if (order) {
-      if (order.status) {
-        setLiveStatus(order.status.toUpperCase());
+    const savedDist = Number((activeOrder as any)?.deliveryDistanceKm);
+    if (savedDist && savedDist > 0) {
+      setRouteDistanceKm(savedDist);
+      return;
+    }
+
+    if (storeCoords && customerCoords) {
+      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${storeCoords.longitude},${storeCoords.latitude};${customerCoords.longitude},${customerCoords.latitude}?overview=false`;
+      fetch(osrmUrl)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.code === 'Ok' && data.routes && data.routes.length > 0 && typeof data.routes[0].distance === 'number') {
+            const km = Number((data.routes[0].distance / 1000).toFixed(1));
+            if (km > 0) {
+              setRouteDistanceKm(km);
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [
+    (activeOrder as any)?.deliveryDistanceKm,
+    storeCoords?.latitude,
+    storeCoords?.longitude,
+    customerCoords?.latitude,
+    customerCoords?.longitude,
+  ]);
+
+  // Sync real-time updates whenever activeOrder changes
+  useEffect(() => {
+    if (activeOrder && Object.keys(activeOrder).length > 0) {
+      if (activeOrder.status) {
+        setLiveStatus(String(activeOrder.status).toUpperCase());
       }
-      if (order.deliveryOtp) {
-        setDeliveryPin(order.deliveryOtp);
+      if (activeOrder.deliveryOtp) {
+        setDeliveryPin(String(activeOrder.deliveryOtp));
       }
-      const p = order.deliveryPartner || order.deliveryPartnerId || (order as any).rider;
+      const p = activeOrder.deliveryPartner || activeOrder.deliveryPartnerId || (activeOrder as any).rider;
       if (p) {
         const raw = (p as any).name || (p as any).fullName || '';
-        const clean = raw.replace(/\s*\(Worm Up Express\)/gi, '').trim();
+        const clean = String(raw || '').replace(/\s*\(Worm Up Express\)/gi, '').trim();
         const formatted = clean.toLowerCase() === 'darshanthanki' ? 'DARSHAN THANKI' : clean;
         if (formatted && !formatted.toLowerCase().includes('rohit') && formatted.toLowerCase() !== 'delivery partner') {
           setPartner((prev) => ({
@@ -95,7 +183,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
         }
       }
     }
-  }, [order]);
+  }, [freshOrder, currentOrder]);
 
   const isPartnerAssigned = Boolean(
     !['PLACED', 'CONFIRMED', 'CANCELLED'].includes(liveStatus) &&
@@ -114,7 +202,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
       );
       return;
     }
-    const clean = partner.phone.replace(/[^0-9+]/g, '');
+    const clean = String(partner.phone || '').replace(/[^0-9+]/g, '');
     const url = `tel:${clean}`;
     try {
       const supported = await Linking.canOpenURL(url);
@@ -254,19 +342,32 @@ export const S24_OrderTrackingScreen: React.FC = () => {
       }
     });
 
-    socket.on('update_delivery_location', (data: any) => {
+    const handleLocationUpdate = (data: any) => {
       if (!data) return;
       const eventOrderId = data.orderId?.toString();
       if (eventOrderId && orderId && eventOrderId !== orderId && eventOrderId !== orderNum) return;
-      if (data.latitude && data.longitude) {
-        setRiderCoords({ latitude: data.latitude, longitude: data.longitude });
+      const lat = data.lat ?? data.latitude;
+      const lng = data.lng ?? data.longitude;
+      if (lat && lng) {
+        setRiderCoords({ latitude: lat, longitude: lng });
+        if (data.heading !== undefined) {
+          setRiderHeading(data.heading);
+        }
+        if (data.etaMinutes) {
+          setEtaText(`Arriving in ${data.etaMinutes} mins${data.distanceKm ? ` (${data.distanceKm} km)` : ''}`);
+        }
       }
-    });
+    };
+
+    socket.on('rider_location_update', handleLocationUpdate);
+    socket.on('update_delivery_location', handleLocationUpdate);
+    socket.on('update_rider_location', handleLocationUpdate);
+    socket.on('delivery.location.updated', handleLocationUpdate);
 
     // Helper to refresh order data with self-healing REST fallback
     const refreshOrderData = async () => {
       if (liveStatusRef.current === 'DELIVERED') return;
-      const targetQuery = (order as any)?._id || (orderNum && orderNum.replace(/^#/, '')) || orderNum || orderId;
+      const targetQuery = (activeOrder as any)?._id || (orderNum && orderNum.replace(/^#/, '')) || orderNum || orderId;
       if (!targetQuery || targetQuery === 'W12345678') return;
 
       try {
@@ -274,6 +375,9 @@ export const S24_OrderTrackingScreen: React.FC = () => {
         if (res.ok) {
           const json = await res.json();
           const fresh = json.data || json;
+          if (fresh) {
+            setFreshOrder(fresh);
+          }
           const rawStatus = fresh?.status || fresh?.orderStatus || '';
           const targetStatus = rawStatus.toUpperCase();
           if (targetStatus) {
@@ -287,11 +391,14 @@ export const S24_OrderTrackingScreen: React.FC = () => {
             }
           }
           if (fresh?.deliveryOtp) setDeliveryPin(fresh.deliveryOtp);
+          if (fresh?.statusTimeline && Array.isArray(fresh.statusTimeline)) {
+            setTimelineList(fresh.statusTimeline);
+          }
           const pObj = fresh?.deliveryPartner || fresh?.deliveryPartnerId || fresh?.rider;
-          if (pObj) {
+          if (pObj && (pObj.name || pObj.fullName)) {
             const raw = pObj.name || pObj.fullName || '';
             const clean = raw.replace(/\s*\(Worm Up Express\)/gi, '').trim();
-            const finalName = clean.toLowerCase() === 'darshanthanki' ? 'DARSHAN THANKI' : clean;
+            const finalName = clean;
             if (finalName && !finalName.toLowerCase().includes('rohit') && finalName.toLowerCase() !== 'delivery partner') {
               setPartner((prev) => ({
                 ...prev,
@@ -300,12 +407,24 @@ export const S24_OrderTrackingScreen: React.FC = () => {
                 vehicleNumber: pObj.vehicleNumber || prev.vehicleNumber,
               }));
             }
-            if (pObj.currentLocation && pObj.currentLocation.latitude && pObj.currentLocation.longitude) {
+            if (
+              pObj.currentLocation &&
+              typeof pObj.currentLocation.latitude === 'number' &&
+              typeof pObj.currentLocation.longitude === 'number' &&
+              !isNaN(pObj.currentLocation.latitude) &&
+              !isNaN(pObj.currentLocation.longitude) &&
+              pObj.currentLocation.latitude !== 0 &&
+              pObj.currentLocation.longitude !== 0
+            ) {
               setRiderCoords({
                 latitude: pObj.currentLocation.latitude,
                 longitude: pObj.currentLocation.longitude,
               });
+            } else {
+              setRiderCoords(null);
             }
+          } else {
+            setRiderCoords(null);
           }
         }
       } catch (err) {
@@ -342,27 +461,58 @@ export const S24_OrderTrackingScreen: React.FC = () => {
   const isOutForDelivery = liveStatus === 'OUT_FOR_DELIVERY' || liveStatus === 'ARRIVED_AT_CUSTOMER' || isDelivered;
   const isPacked = ['GOING_TO_STORE', 'ARRIVED_AT_STORE', 'PACKING', 'PACKED', 'OUT_FOR_DELIVERY', 'ARRIVED_AT_CUSTOMER', 'DELIVERED'].includes(liveStatus);
 
+  const formatTime = (ts?: string | Date) => {
+    if (!ts) return null;
+    try {
+      const d = new Date(ts);
+      return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    } catch {
+      return null;
+    }
+  };
+
+  const placedEntry = timelineList.find((t) => t.status === 'PLACED');
+  const packedEntry = timelineList.find((t) => ['PACKED', 'PACKING', 'ARRIVED_AT_STORE', 'READY_FOR_PICKUP'].includes(t.status));
+  const outEntry = timelineList.find((t) => ['OUT_FOR_DELIVERY', 'ARRIVED_AT_CUSTOMER'].includes(t.status));
+  const deliveredEntry = timelineList.find((t) => t.status === 'DELIVERED');
+
   // Stepper steps based on real-time authoritative status
   const steps = [
     {
       title: 'Order Confirmed',
-      time: order?.date ? order.date.split(',')[1] || 'Just now' : 'Just now',
+      time:
+        formatTime(placedEntry?.timestamp) ||
+        (typeof activeOrder?.date === 'string' && activeOrder.date.includes(',')
+          ? activeOrder.date.split(',')[1].trim()
+          : 'Just now'),
       status: 'completed',
     },
     {
       title: 'Packed & Dispatched',
-      time: isPacked ? 'Completed' : 'In 3 mins',
-      status: isPacked ? 'completed' : (['PACKING', 'PACKED', 'GOING_TO_STORE', 'ARRIVED_AT_STORE'].includes(liveStatus) ? 'active' : 'pending'),
+      time: formatTime(packedEntry?.timestamp) || (isPacked ? 'Completed' : 'In 3 mins'),
+      status: isPacked
+        ? 'completed'
+        : ['PACKING', 'PACKED', 'GOING_TO_STORE', 'ARRIVED_AT_STORE'].includes(liveStatus)
+          ? 'active'
+          : 'pending',
     },
     {
       title: 'Out for Delivery',
-      time: isOutForDelivery ? (liveStatus === 'ARRIVED_AT_CUSTOMER' ? 'At Doorstep' : 'In progress') : 'In 6 mins',
-      status: isDelivered ? 'completed' : (isOutForDelivery ? 'active' : 'pending'),
+      time:
+        formatTime(outEntry?.timestamp) ||
+        (isDelivered
+          ? 'Completed'
+          : isOutForDelivery
+            ? liveStatus === 'ARRIVED_AT_CUSTOMER'
+              ? 'At Doorstep'
+              : 'In progress'
+            : 'In 6 mins'),
+      status: isDelivered ? 'completed' : isOutForDelivery ? 'active' : 'pending',
     },
     {
-      title: isDelivered ? 'Delivered' : 'Delivering in 9 mins',
-      time: isDelivered ? 'Verified & Delivered' : etaText,
-      status: isDelivered ? 'completed' : (liveStatus === 'ARRIVED_AT_CUSTOMER' ? 'active' : 'pending'),
+      title: isDelivered ? 'Delivered' : 'Delivered',
+      time: formatTime(deliveredEntry?.timestamp) || (isDelivered ? 'Verified & Delivered' : etaText),
+      status: isDelivered ? 'completed' : liveStatus === 'ARRIVED_AT_CUSTOMER' ? 'active' : 'pending',
     },
   ];
 
@@ -373,18 +523,23 @@ export const S24_OrderTrackingScreen: React.FC = () => {
   else if (liveStatus === 'OUT_FOR_DELIVERY') scooterLeft = '60%';
   else if (liveStatus === 'ARRIVED_AT_CUSTOMER' || liveStatus === 'DELIVERED') scooterLeft = '80%';
 
-  const pinDigits = (deliveryPin || '4821').slice(0, 4).split('');
+  const pinDigits = String(deliveryPin || activeOrder?.deliveryOtp || '4821')
+    .replace(/\D/g, '')
+    .padEnd(4, '0')
+    .slice(0, 4)
+    .split('');
 
   const handleRepeatOrder = () => {
-    if (order?.items && order.items.length > 0) {
-      order.items.forEach((it) => {
+    const items = activeOrder?.items;
+    if (items && items.length > 0) {
+      items.forEach((it: any) => {
         addToCart({
-          id: it.productId || `prod_${Date.now()}`,
+          id: it.productId?._id || it.productId || `prod_${Date.now()}`,
           name: it.name,
           brand: 'Worm Up',
           categoryId: 'cooking',
-          sellingPrice: it.price,
-          mrp: Math.round(it.price * 1.15),
+          sellingPrice: it.price || it.unitPrice || 0,
+          mrp: Math.round((it.price || it.unitPrice || 0) * 1.15),
           discountPercent: 12,
           shoppingCoins: 10,
           rating: 4.8,
@@ -392,7 +547,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
           stock: 100,
           deliveryMinutes: 9,
           description: '',
-          quantityLabel: `${it.quantity} unit`,
+          quantityLabel: it.quantityLabel || `${it.quantity || 1} unit`,
         });
       });
       setActiveScreen('C19_Cart');
@@ -401,6 +556,29 @@ export const S24_OrderTrackingScreen: React.FC = () => {
     }
   };
 
+  if (!orderId && !orderNum) {
+    return (
+      <View style={[styles.flex, { paddingTop: insets.top, backgroundColor: '#FFFFFF' }]}>
+        <Header title="Live Order Tracking" onBack={goBack} />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <Ionicons name="receipt-outline" size={64} color="#94A3B8" style={{ marginBottom: 16 }} />
+          <Text style={{ fontSize: 18, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 8 }}>
+            No Active Order Selected
+          </Text>
+          <Text style={{ fontSize: 14, color: COLORS.textSecondary, textAlign: 'center', marginBottom: 24 }}>
+            Please select an order from your Order History to track live delivery.
+          </Text>
+          <TouchableOpacity
+            style={{ backgroundColor: COLORS.navy, paddingVertical: 12, paddingHorizontal: 24, borderRadius: 8 }}
+            onPress={() => setActiveScreen('C25_OrderHistory')}
+          >
+            <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 15 }}>View Order History</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.flex, { paddingTop: insets.top }]}>
       <Header
@@ -408,7 +586,11 @@ export const S24_OrderTrackingScreen: React.FC = () => {
         onBack={goBack}
       />
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Connection Status Banner */}
         <View style={styles.connectionBar}>
           <View style={[styles.statusDot, isConnected ? styles.dotConnected : styles.dotDisconnected]} />
@@ -420,17 +602,163 @@ export const S24_OrderTrackingScreen: React.FC = () => {
         {/* Order Info & Status Header */}
         <View style={styles.orderInfoCard}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.orderNumberTitle}>{orderNum}</Text>
-            <Text style={styles.orderDateSubtitle}>Placed on {order?.date || 'Today'}</Text>
+            <Text style={styles.orderNumberTitle}>{orderNum || 'Order Details'}</Text>
+            <Text style={styles.orderDateSubtitle}>
+              Placed on {activeOrder?.createdAt ? new Date(activeOrder.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : (activeOrder?.date || 'Today')}
+            </Text>
           </View>
-          <View style={[styles.statusPill, isDelivered ? styles.statusPillDelivered : styles.statusPillActive]}>
-            <Text style={[styles.statusPillText, isDelivered ? styles.statusTextDelivered : styles.statusTextActive]}>
+          <View style={[styles.statusPill, isDelivered ? styles.statusPillDelivered : (liveStatus === 'CANCELLED' ? styles.statusPillCancelled : styles.statusPillActive)]}>
+            <Text style={[styles.statusPillText, isDelivered ? styles.statusTextDelivered : (liveStatus === 'CANCELLED' ? styles.statusTextCancelled : styles.statusTextActive)]}>
               {liveStatus}
             </Text>
           </View>
         </View>
 
-        {/* ANTI-FRAUD DELIVERY PIN CARD */}
+        {/* Cancelled Banner if Order was cancelled */}
+        {liveStatus === 'CANCELLED' && (
+          <View style={styles.cancelledCard}>
+            <View style={styles.cancelledIconWrap}>
+              <Ionicons name="close-circle" size={24} color="#DC2626" />
+            </View>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.cancelledTitle}>Order Cancelled</Text>
+              <Text style={styles.cancelledReason}>
+                {activeOrder?.cancellationReason || 'No delivery partner was available within delivery timeframe.'}
+              </Text>
+              <Text style={styles.cancelledRefund}>
+                Any amount charged will be refunded to your original payment method within 2-4 business hours.
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* 1. Live Interactive Map (Top 40%) */}
+        {(() => {
+          const customerAddressText =
+            activeOrder?.deliveryAddress?.houseFlat
+              ? `${activeOrder.deliveryAddress.houseFlat}, ${activeOrder.deliveryAddress.areaLandmark || ''}`.trim()
+              : (activeOrder?.deliveryAddress as any)?.street ||
+              (activeOrder?.deliveryAddress as any)?.address ||
+              (activeOrder?.deliveryAddress as any)?.city ||
+              '';
+
+          return (
+            <DynamicLiveMap
+              storeCoords={storeCoords}
+              storeName={
+                (activeOrder as any)?.store?.name ||
+                (activeOrder as any)?.storeId?.name ||
+                (activeOrder as any)?.storeName ||
+                'Wom Up Dark Store'
+              }
+              customerCoords={customerCoords}
+              customerAddress={customerAddressText}
+              riderCoords={riderCoords}
+              riderHeading={riderHeading}
+              liveStatus={liveStatus}
+              partnerName={partner.name}
+              partnerVehicle={partner.vehicleNumber}
+              etaText={etaText}
+              orderNumber={orderNum}
+              isPartnerAssigned={isPartnerAssigned}
+            />
+          );
+        })()}
+
+        {/* 2. Rider Status Card */}
+        <View style={styles.riderStatusCard}>
+          <View style={styles.riderStatusLeft}>
+            <View style={styles.bikeIconCircle}>
+              <Ionicons name="bicycle" size={22} color="#E11D48" />
+            </View>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.riderStatusTitle}>
+                {liveStatus === 'DELIVERED'
+                  ? 'Delivered Successfully'
+                  : liveStatus === 'ARRIVED_AT_CUSTOMER'
+                    ? 'Rider is at your doorstep'
+                    : liveStatus === 'OUT_FOR_DELIVERY'
+                      ? 'Rider on the way'
+                      : liveStatus === 'ARRIVED_AT_STORE'
+                        ? 'Rider arrived at store hub'
+                        : 'Preparing & packing your order'}
+              </Text>
+              <Text style={styles.riderStatusEta}>
+                {liveStatus === 'DELIVERED' ? 'Handover completed' : etaText}
+              </Text>
+            </View>
+          </View>
+
+          {isPartnerAssigned && partner.phone ? (
+            <TouchableOpacity
+              style={styles.callCircleBtn}
+              onPress={handleCallPartner}
+              activeOpacity={0.8}
+              accessibilityLabel="Call Delivery Partner"
+            >
+              <Ionicons name="call" size={18} color="#FFFFFF" />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        {/* 3. Rider Details Card (Blinkit-Style) */}
+        {isPartnerAssigned ? (
+          <View style={styles.blinkitRiderCard}>
+            <View style={styles.riderAvatarWrap}>
+              <Image
+                source={{
+                  uri: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+                }}
+                style={styles.blinkitRiderAvatar}
+              />
+              <View style={styles.riderOnlineDot} />
+            </View>
+
+            <View style={styles.riderInfoCol}>
+              <Text style={styles.blinkitRiderName} numberOfLines={1}>
+                {String(partner.name || '').replace(/\s*\(Worm Up Express\)/gi, '').trim() || 'DARSHAN THANKI'}
+              </Text>
+              <View style={styles.riderMetaRow}>
+                <Text style={styles.riderVehicleText}>{partner.vehicleNumber || 'GJ 01 AB 3456'}</Text>
+                <Text style={styles.riderMetaSep}>•</Text>
+                <View style={styles.riderRatingPill}>
+                  <Ionicons name="star" size={11} color="#F59E0B" />
+                  <Text style={styles.riderRatingVal}>4.9 (128+)</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.riderActionButtons}>
+              <TouchableOpacity
+                onPress={handleCallPartner}
+                style={styles.riderCallPill}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="call" size={14} color="#059669" />
+                <Text style={styles.riderCallPillText}>Call</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setIsChatModalOpen(true)}
+                style={styles.riderChatIconBtn}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="chatbubble-ellipses" size={16} color="#4F46E5" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.assigningCard}>
+            <View style={styles.assigningPulse}>
+              <ActivityIndicator size="small" color="#E11D48" />
+            </View>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.assigningTitle}>Assigning delivery partner...</Text>
+              <Text style={styles.assigningSub}>Locating nearest available rider at dark store</Text>
+            </View>
+          </View>
+        )}
+
+        {/* 4. ANTI-FRAUD DELIVERY PIN CARD */}
         {!isDelivered ? (
           <View style={styles.pinCard}>
             <LinearGradient
@@ -503,31 +831,6 @@ export const S24_OrderTrackingScreen: React.FC = () => {
           </View>
         )}
 
-        {/* Dynamic Real-Time Live Map Tracker */}
-        <DynamicLiveMap
-          storeCoords={{
-            latitude: (order as any)?.storeId?.location?.coordinates?.[1] || 23.1128,
-            longitude: (order as any)?.storeId?.location?.coordinates?.[0] || 72.5427,
-          }}
-          storeName={(order as any)?.storeId?.name || 'Wom Up Chandlodiya - Tragad Dark Store'}
-          customerCoords={{
-            latitude: (order as any)?.deliveryAddress?.coordinates?.[1] || 23.1288,
-            longitude: (order as any)?.deliveryAddress?.coordinates?.[0] || 72.5507,
-          }}
-          customerAddress={
-            order?.deliveryAddress?.houseFlat
-              ? `${order.deliveryAddress.houseFlat}, ${order.deliveryAddress.areaLandmark || ''}`
-              : 'Customer Doorstep'
-          }
-          riderCoords={riderCoords}
-          liveStatus={liveStatus}
-          partnerName={partner.name}
-          partnerVehicle={partner.vehicleNumber}
-          etaText={etaText}
-          orderNumber={orderNum}
-          isPartnerAssigned={isPartnerAssigned}
-        />
-
         {/* Timeline Progress */}
         <View style={styles.timelineCard}>
           <Text style={styles.timelineHeading}>Order Status</Text>
@@ -582,29 +885,37 @@ export const S24_OrderTrackingScreen: React.FC = () => {
         </View>
 
         {/* Ordered Items Breakdown Card */}
-        <View style={styles.sectionCard}>
-          <View style={styles.sectionHeaderRow}>
-            <Ionicons name="cart-outline" size={18} color={COLORS.navy} style={{ marginRight: 8 }} />
-            <Text style={styles.sectionHeading}>
-              Items in this Order ({order?.items?.length || 0})
-            </Text>
-          </View>
-
-          {order?.items && order.items.length > 0 ? (
-            order.items.map((item, idx) => (
-              <View key={idx} style={styles.itemRow}>
-                <View style={styles.itemBullet} />
-                <View style={styles.itemInfoCol}>
-                  <Text style={styles.itemNameText}>{item.name}</Text>
-                  <Text style={styles.itemQtyText}>Quantity: {item.quantity}</Text>
-                </View>
-                <Text style={styles.itemPriceText}>₹{item.price * item.quantity}</Text>
+        {(() => {
+          const items = activeOrder?.items || [];
+          const totalUnits = items.reduce((sum: number, it: any) => sum + (it.quantity || 1), 0) || activeOrder?.itemCount || 0;
+          return (
+            <View style={styles.sectionCard}>
+              <View style={styles.sectionHeaderRow}>
+                <Ionicons name="cart-outline" size={18} color={COLORS.navy} style={{ marginRight: 8 }} />
+                <Text style={styles.sectionHeading}>
+                  Items in this Order ({totalUnits} {totalUnits === 1 ? 'item' : 'items'})
+                </Text>
               </View>
-            ))
-          ) : (
-            <Text style={styles.noItemsText}>Order items details not available</Text>
-          )}
-        </View>
+
+              {items && items.length > 0 ? (
+                items.map((item: any, idx: number) => (
+                  <View key={idx} style={styles.itemRow}>
+                    <View style={styles.itemBullet} />
+                    <View style={styles.itemInfoCol}>
+                      <Text style={styles.itemNameText}>{item.name}</Text>
+                      <Text style={styles.itemQtyText}>Quantity: {item.quantity}</Text>
+                    </View>
+                    <Text style={styles.itemPriceText}>
+                      ₹{item.subtotal || ((item.price || item.unitPrice || 0) * (item.quantity || 1))}
+                    </Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.noItemsText}>Order items details not available</Text>
+              )}
+            </View>
+          );
+        })()}
 
         {/* Delivery Address Card */}
         <View style={styles.sectionCard}>
@@ -613,102 +924,235 @@ export const S24_OrderTrackingScreen: React.FC = () => {
             <Text style={styles.sectionHeading}>Delivery Address</Text>
           </View>
           <Text style={styles.recipientName}>
-            {order?.deliveryAddress?.fullName || user?.fullName || 'Worm Up Customer'} ({order?.deliveryAddress?.type || 'Home'})
+            {activeOrder?.deliveryAddress?.fullName || user?.fullName || 'Worm Up Customer'} ({activeOrder?.deliveryAddress?.type || activeOrder?.deliveryAddress?.label || 'Home'})
           </Text>
           <Text style={styles.addressLine}>
-            {order?.deliveryAddress?.houseFlat ? `${order.deliveryAddress.houseFlat}, ` : ''}
-            {order?.deliveryAddress?.areaLandmark || 'Current Delivery Location'}
-            {order?.deliveryAddress?.city ? `, ${order.deliveryAddress.city}` : ''}
-            {order?.deliveryAddress?.pincode ? ` - ${order.deliveryAddress.pincode}` : ''}
+            {activeOrder?.deliveryAddress?.houseFlat
+              ? `${activeOrder.deliveryAddress.houseFlat}, `
+              : activeOrder?.deliveryAddress?.houseNumber
+                ? `${activeOrder.deliveryAddress.houseNumber}, `
+                : ''}
+            {activeOrder?.deliveryAddress?.areaLandmark || activeOrder?.deliveryAddress?.landmark || activeOrder?.deliveryAddress?.street || 'Current Delivery Location'}
+            {activeOrder?.deliveryAddress?.city ? `, ${activeOrder.deliveryAddress.city}` : ''}
+            {activeOrder?.deliveryAddress?.pincode ? ` - ${activeOrder.deliveryAddress.pincode}` : ''}
           </Text>
         </View>
 
         {/* Bill Summary Card */}
-        <View style={styles.sectionCard}>
-          <View style={styles.sectionHeaderRow}>
-            <Ionicons name="receipt-outline" size={18} color={COLORS.purple} style={{ marginRight: 8 }} />
-            <Text style={styles.sectionHeading}>Bill & Payment Summary</Text>
-          </View>
+        {(() => {
+          const items = Array.isArray(activeOrder?.items) ? activeOrder.items : [];
 
-          <View style={styles.billRow}>
-            <Text style={styles.billLabel}>Items Subtotal</Text>
-            <Text style={styles.billValue}>₹{order?.subtotal || order?.totalAmount || 0}</Text>
-          </View>
+          // 1. Authoritative Item MRP & Selling Subtotals
+          let calculatedMrpSubtotal = 0;
+          let calculatedSellingSubtotal = 0;
 
-          <View style={styles.billRow}>
-            <Text style={styles.billLabel}>Delivery Fee</Text>
-            <Text style={[styles.billValue, { color: order?.deliveryFee ? COLORS.textPrimary : '#059669' }]}>
-              {order?.deliveryFee && order.deliveryFee > 0 ? `₹${order.deliveryFee}` : 'FREE'}
-            </Text>
-          </View>
+          items.forEach((it: any) => {
+            const qty = Math.max(1, Number(it.quantity) || 1);
+            const unitPrice = typeof it.unitPrice === 'number'
+              ? it.unitPrice
+              : (typeof it.price === 'number' ? it.price : 0);
+            const unitMrp = typeof it.unitMrp === 'number'
+              ? it.unitMrp
+              : (typeof it.mrp === 'number' ? it.mrp : unitPrice);
 
-          {order?.discount && order.discount > 0 ? (
-            <View style={styles.billRow}>
-              <Text style={styles.billLabel}>Discount</Text>
-              <Text style={[styles.billValue, { color: COLORS.hotPink }]}>-₹{order.discount}</Text>
+            calculatedSellingSubtotal += unitPrice * qty;
+            calculatedMrpSubtotal += unitMrp * qty;
+          });
+
+          // Fallbacks for legacy/mock orders if item details not expanded
+          const itemSellingSubtotal = typeof activeOrder?.itemSubtotal === 'number'
+            ? activeOrder.itemSubtotal
+            : (calculatedSellingSubtotal > 0 ? calculatedSellingSubtotal : (Number(activeOrder?.subtotal) || 0));
+
+          const itemMrpSubtotal = typeof (activeOrder as any)?.mrpSubtotal === 'number' && (activeOrder as any).mrpSubtotal > 0
+            ? (activeOrder as any).mrpSubtotal
+            : (calculatedMrpSubtotal > 0 ? calculatedMrpSubtotal : Math.max(itemSellingSubtotal, itemSellingSubtotal + (Number(activeOrder?.discount) || 0)));
+
+          // 2. Product Discount = MRP Subtotal - Selling Subtotal
+          const productDiscount = Math.max(0, itemMrpSubtotal - itemSellingSubtotal) || (Number(activeOrder?.discount) || 0);
+
+          // 3. Convenience / Handling Fee (authoritative mapping, single charge)
+          const convenienceFee = typeof (activeOrder as any)?.convenienceFee === 'number'
+            ? (activeOrder as any).convenienceFee
+            : (typeof activeOrder?.handlingFee === 'number' ? activeOrder.handlingFee : 5);
+
+          // 4. Delivery Fee & Rate Info
+          const hasDeliveryFee = typeof activeOrder?.deliveryFee === 'number';
+          const deliveryFee = hasDeliveryFee ? activeOrder.deliveryFee : null;
+
+          const rawOrder = activeOrder as any;
+
+          const toFiniteNumber = (value: unknown): number | null => {
+            if (value === null || value === undefined || value === '') {
+              return null;
+            }
+            const numberValue = Number(value);
+            return Number.isFinite(numberValue) ? numberValue : null;
+          };
+
+          const distanceKm = toFiniteNumber(rawOrder.deliveryDistanceKm);
+          const ratePerKm = toFiniteNumber(rawOrder.deliveryRatePerKm);
+          const minFee = toFiniteNumber(rawOrder.deliveryMinFee);
+          const maxFee = toFiniteNumber(rawOrder.deliveryMaxFee);
+          const rawFee =
+            toFiniteNumber(rawOrder.rawDeliveryFee ?? rawOrder.rawFee) ??
+            (distanceKm !== null && ratePerKm !== null
+              ? distanceKm * ratePerKm
+              : null);
+
+          const floorApplied =
+            typeof rawOrder.floorApplied === 'boolean'
+              ? rawOrder.floorApplied
+              : rawOrder.breakdown?.floorApplied;
+
+          const capApplied =
+            typeof rawOrder.capApplied === 'boolean'
+              ? rawOrder.capApplied
+              : rawOrder.breakdown?.capApplied;
+
+          let deliverySublabel: string | null = null;
+
+          if (
+            distanceKm !== null &&
+            ratePerKm !== null &&
+            rawFee !== null
+          ) {
+            if (floorApplied === true && minFee !== null) {
+              deliverySublabel =
+                `${distanceKm.toFixed(1)} km × ₹${ratePerKm}/km ` +
+                `= ₹${rawFee.toFixed(2)} · ₹${minFee} minimum applied`;
+            } else if (capApplied === true && maxFee !== null) {
+              deliverySublabel =
+                `${distanceKm.toFixed(1)} km × ₹${ratePerKm}/km ` +
+                `= ₹${rawFee.toFixed(2)} · ₹${maxFee} maximum cap applied`;
+            } else {
+              deliverySublabel =
+                `${distanceKm.toFixed(1)} km × ₹${ratePerKm}/km ` +
+                `= ₹${rawFee.toFixed(2)}` +
+                `${rawOrder.roundingPolicy === 'WHOLE_RUPEE' ? ' · Final fee rounded' : ''}`;
+            }
+          }
+
+          // 5. Discounts & Additional Charges
+          const couponDiscount = Number(activeOrder?.couponDiscount) || 0;
+          const coinsDiscount = Number(activeOrder?.coinsDiscount) || Number((activeOrder as any)?.coinsUsed) || 0;
+          const tip = Number(activeOrder?.tip) || 0;
+          const tax = Number((activeOrder as any)?.tax) || 0;
+
+          // 6. Total Amount Paid
+          const totalPaid = typeof activeOrder?.totalAmount === 'number'
+            ? activeOrder.totalAmount
+            : Math.max(0, itemSellingSubtotal + (deliveryFee || 0) + convenienceFee + tip + tax - couponDiscount - coinsDiscount);
+
+          return (
+            <View style={styles.sectionCard}>
+              <View style={styles.sectionHeaderRow}>
+                <Ionicons name="receipt-outline" size={18} color={COLORS.purple} style={{ marginRight: 8 }} />
+                <Text style={styles.sectionHeading}>Bill & Payment Summary</Text>
+              </View>
+
+              {/* Items Total (MRP) */}
+              <View style={styles.billRow}>
+                <Text style={styles.billLabel}>Items Total (MRP)</Text>
+                <Text style={styles.billValue}>₹{itemMrpSubtotal}</Text>
+              </View>
+
+              {/* Product Discount (MRP vs Selling Price) */}
+              {productDiscount > 0 && (
+                <View style={styles.billRow}>
+                  <Text style={[styles.billLabel, { color: '#059669' }]}>Product Discount</Text>
+                  <Text style={[styles.billValue, { color: '#059669', fontWeight: '700' }]}>-₹{productDiscount}</Text>
+                </View>
+              )}
+
+              {/* Items Total After Discount (Selling Subtotal) */}
+              <View style={styles.billRow}>
+                <Text style={[styles.billLabel, { fontWeight: '600', color: COLORS.navy }]}>Items Total After Discount</Text>
+                <Text style={[styles.billValue, { fontWeight: '700' }]}>₹{itemSellingSubtotal}</Text>
+              </View>
+
+              {/* Delivery Fee with transparent calculation sublabel */}
+              <View style={[styles.billRow, { alignItems: 'flex-start', paddingTop: 6 }]}>
+                <View style={{ flex: 1, paddingRight: 8 }}>
+                  <Text style={styles.billLabel}>Delivery Fee</Text>
+                  {deliverySublabel && (
+                    <Text style={{ fontSize: 11, color: '#64748B', marginTop: 1 }}>
+                      {deliverySublabel}
+                    </Text>
+                  )}
+                </View>
+                <Text
+                  style={[
+                    styles.billValue,
+                    {
+                      fontWeight: '700',
+                      color: deliveryFee === 0 ? '#059669' : (deliveryFee !== null ? COLORS.navy : '#94A3B8'),
+                    },
+                  ]}
+                >
+                  {deliveryFee === 0 ? 'FREE' : (deliveryFee !== null ? `₹${deliveryFee}` : 'Unavailable')}
+                </Text>
+              </View>
+
+              {/* Convenience Fee (Handling Fee) */}
+              <View style={styles.billRow}>
+                <Text style={styles.billLabel}>Convenience Fee</Text>
+                <Text style={styles.billValue}>₹{convenienceFee}</Text>
+              </View>
+
+              {/* Coupon Discount if applied */}
+              {couponDiscount > 0 && (
+                <View style={styles.billRow}>
+                  <Text style={[styles.billLabel, { color: '#059669' }]}>
+                    Coupon Discount {activeOrder?.couponCode ? `(${activeOrder.couponCode})` : ''}
+                  </Text>
+                  <Text style={[styles.billValue, { color: '#059669', fontWeight: '700' }]}>-₹{couponDiscount}</Text>
+                </View>
+              )}
+
+              {/* Shopping Coins used if applied */}
+              {coinsDiscount > 0 && (
+                <View style={styles.billRow}>
+                  <Text style={[styles.billLabel, { color: '#059669' }]}>Shopping Coins Applied</Text>
+                  <Text style={[styles.billValue, { color: '#059669', fontWeight: '700' }]}>-₹{coinsDiscount}</Text>
+                </View>
+              )}
+
+              {/* Delivery Partner Tip if applied */}
+              {tip > 0 && (
+                <View style={styles.billRow}>
+                  <Text style={styles.billLabel}>Delivery Partner Tip</Text>
+                  <Text style={[styles.billValue, { color: COLORS.navy, fontWeight: '700' }]}>+₹{tip}</Text>
+                </View>
+              )}
+
+              {/* Tax if applicable */}
+              {tax > 0 && (
+                <View style={styles.billRow}>
+                  <Text style={styles.billLabel}>Taxes & Charges</Text>
+                  <Text style={[styles.billValue, { color: COLORS.navy }]}>+₹{tax}</Text>
+                </View>
+              )}
+
+              <View style={styles.dividerLine} />
+
+              {/* Grand Total */}
+              <View style={styles.billTotalRow}>
+                <Text style={styles.billTotalLabel}>Total Amount Paid</Text>
+                <Text style={styles.billTotalValue}>₹{totalPaid}</Text>
+              </View>
+
+              <View style={styles.paymentMethodRow}>
+                <Ionicons name="card-outline" size={14} color={COLORS.textMuted} style={{ marginRight: 6 }} />
+                <Text style={styles.paymentMethodText}>
+                  Paid via {activeOrder?.paymentMethod || 'Online / Cash on Delivery'}
+                </Text>
+              </View>
             </View>
-          ) : null}
+          );
+        })()}
 
-          <View style={styles.dividerLine} />
 
-          <View style={styles.billTotalRow}>
-            <Text style={styles.billTotalLabel}>Total Amount Paid</Text>
-            <Text style={styles.billTotalValue}>₹{order?.totalAmount || 0}</Text>
-          </View>
-
-          <View style={styles.paymentMethodRow}>
-            <Ionicons name="card-outline" size={14} color={COLORS.textMuted} style={{ marginRight: 6 }} />
-            <Text style={styles.paymentMethodText}>
-              Paid via {order?.paymentMethod || 'Online / Cash on Delivery'}
-            </Text>
-          </View>
-        </View>
-
-        {/* Delivery Partner Section */}
-        {!isPartnerAssigned ? (
-          <View style={styles.assigningPartnerCard}>
-            <View style={styles.assigningBeacon}>
-              <View style={styles.assigningDot} />
-              <Ionicons name="bicycle" size={24} color={COLORS.hotPink} />
-            </View>
-
-            <View style={styles.assigningInfo}>
-              <Text style={styles.assigningTitle}>Assigning delivery partner...</Text>
-              <Text style={styles.assigningSub}>Locating nearest rider at dark store</Text>
-            </View>
-
-            <ActivityIndicator size="small" color={COLORS.hotPink} />
-          </View>
-        ) : (
-          <View style={styles.partnerCard}>
-            <View style={styles.partnerAvatar}>
-              <Ionicons name="person" size={24} color={COLORS.purple} />
-            </View>
-
-            <View style={styles.partnerInfo}>
-              <Text style={styles.partnerRole}>Delivery Partner</Text>
-              <Text style={styles.partnerName}>{partner.name.replace(/\s*\(Worm Up Express\)/gi, '').trim()}</Text>
-              <Text style={styles.partnerVehicle}>{partner.vehicleNumber || 'Electric Scooter'}</Text>
-            </View>
-
-            <View style={styles.partnerActions}>
-              <TouchableOpacity
-                onPress={handleCallPartner}
-                style={styles.circleActionButton}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="call" size={18} color={COLORS.hotPink} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setIsChatModalOpen(true)}
-                style={styles.circleActionButton}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="chatbubble-ellipses" size={18} color={COLORS.blue} />
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
 
         {/* Action Buttons: Repeat Order and Help */}
         <TouchableOpacity
@@ -759,9 +1203,9 @@ export const S24_OrderTrackingScreen: React.FC = () => {
         orderId={orderId || orderNum}
         orderNumber={orderNum}
         rider={{
-          id: (order as any)?.deliveryPartnerId?._id || 'default_rider',
-          name: partner.name || 'DARSHAN THANKI',
-          vehicleNumber: partner.vehicleNumber || 'GJ AE 2020',
+          id: (activeOrder as any)?.deliveryPartnerId?._id || (activeOrder as any)?.deliveryPartner?._id || 'default_rider',
+          name: partner.name || '',
+          vehicleNumber: partner.vehicleNumber || '',
           averageRating: 4.88,
           totalReviews: 128,
         }}
@@ -776,10 +1220,15 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
     backgroundColor: COLORS.white,
+    minHeight: 0,
+  },
+  scrollView: {
+    flex: 1,
+    width: '100%',
   },
   scrollContent: {
     padding: SPACING.md,
-    paddingBottom: 40,
+    paddingBottom: 60,
   },
   connectionBar: {
     flexDirection: 'row',
@@ -1219,6 +1668,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#E6F9F0',
     borderColor: '#059669',
   },
+  statusPillCancelled: {
+    backgroundColor: '#FEE2E2',
+    borderColor: '#DC2626',
+  },
   statusPillText: {
     fontSize: 12,
     fontWeight: '800',
@@ -1229,6 +1682,44 @@ const styles = StyleSheet.create({
   },
   statusTextDelivered: {
     color: '#059669',
+  },
+  statusTextCancelled: {
+    color: '#DC2626',
+  },
+  cancelledCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FEF2F2',
+    borderRadius: RADIUS.card,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+    borderWidth: 1.5,
+    borderColor: '#FCA5A5',
+  },
+  cancelledIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelledTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#991B1B',
+    marginBottom: 4,
+  },
+  cancelledReason: {
+    fontSize: 13,
+    color: '#B91C1C',
+    lineHeight: 18,
+    marginBottom: 6,
+  },
+  cancelledRefund: {
+    fontSize: 12,
+    color: '#475569',
+    lineHeight: 16,
   },
   sectionCard: {
     backgroundColor: COLORS.white,
@@ -1384,5 +1875,189 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: COLORS.purple,
+  },
+  riderStatusCard: {
+    marginHorizontal: 16,
+    marginTop: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  riderStatusLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  bikeIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFF1F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#FECDD3',
+  },
+  riderStatusTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  riderStatusEta: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#E11D48',
+    marginTop: 2,
+  },
+  callCircleBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#10B981',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  blinkitRiderCard: {
+    marginHorizontal: 16,
+    marginTop: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  riderAvatarWrap: {
+    position: 'relative',
+    width: 44,
+    height: 44,
+  },
+  blinkitRiderAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+  },
+  riderOnlineDot: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#10B981',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  riderInfoCol: {
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 8,
+  },
+  blinkitRiderName: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  riderMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 3,
+    gap: 6,
+  },
+  riderVehicleText: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  riderMetaSep: {
+    fontSize: 10,
+    color: '#CBD5E1',
+  },
+  riderRatingPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 8,
+  },
+  riderRatingVal: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#92400E',
+  },
+  riderActionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  riderCallPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 14,
+  },
+  riderCallPillText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#065F46',
+  },
+  riderChatIconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  assigningCard: {
+    marginHorizontal: 16,
+    marginTop: 10,
+    backgroundColor: '#FFF1F2',
+    borderRadius: 16,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FECDD3',
+  },
+  assigningPulse: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFE4E6',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

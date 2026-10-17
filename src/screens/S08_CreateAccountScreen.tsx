@@ -19,6 +19,7 @@ import { COLORS } from '../theme/colors';
 import { SPACING, RADIUS } from '../theme/spacing';
 import { GradientButton } from '../components/common/GradientButton';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { AuthService } from '../services/authService';
 import { StorageService } from '../services/storageService';
 
@@ -31,6 +32,7 @@ interface CityItem {
 
 export const S08_CreateAccountScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
+  const { login } = useAuth();
   const {
     setActiveScreen,
     user,
@@ -292,6 +294,9 @@ export const S08_CreateAccountScreen: React.FC = () => {
           };
           setUser(updatedUser);
           StorageService.saveItem(StorageService.KEYS.USER, updatedUser);
+          if (res.token) {
+            await login(res.token, undefined, res.user);
+          }
           StorageService.saveItem(StorageService.KEYS.ACTIVE_SCREEN, 'Blinkit_Home');
           setActiveScreen('C10_LocationPermission');
           return;

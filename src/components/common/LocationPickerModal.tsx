@@ -29,6 +29,10 @@ export const LocationPickerModal: React.FC = () => {
     user,
     setUser,
     selectedAddress,
+    selectedAddressId,
+    selectedAddressSource,
+    setActiveDeliveryAddress,
+    setActiveGpsLocation,
     setSelectedAddress,
     setActiveScreen,
     setCurrentArea,
@@ -87,68 +91,21 @@ export const LocationPickerModal: React.FC = () => {
       return;
     }
 
-    const shortLabel = loc.shortAddress || loc.readableAddress;
-    const locationString = `Current Location — ${shortLabel}`;
-    setDeliveryLocation(locationString);
-
-    const addressObj = {
-      id: `current_${Date.now()}`,
-      type: 'Current' as const,
-      fullName: user.fullName || 'Customer',
-      phoneNumber: user.phoneNumber || '',
-      houseFlat: loc.street || 'Current GPS Location',
-      areaLandmark: loc.areaLandmark || loc.shortAddress,
-      city: loc.city || 'Ahmedabad',
-      pincode: loc.pincode || '380015',
-      latitude: loc.latitude,
-      longitude: loc.longitude,
-      isDefault: true,
-    };
-
-    setSelectedAddress(addressObj);
     setLocationModalVisible(false);
-
-    // ✅ CRITICAL: Clear stale in-memory and storage cache BEFORE resolving
-    LocationService.clearCache();
-
-    // Immediately resolve area & dark store for store-specific inventory and pricing (force fresh)
-    try {
-      const area = await LocationService.resolveArea(loc.latitude, loc.longitude, true);
-      if (area) {
-        // Customer's neighborhood (e.g. Vejalpur) vs serving store (e.g. Prahlad Nagar)
-        const customerArea = loc.areaLandmark || loc.shortAddress || area.areaName;
-        setCurrentArea(area.areaId, customerArea);
-        if (area.city) {
-          setCurrentCityName(area.city);
-        }
-        if (area.storeId) {
-          const storeLabel =
-            area.distanceKm && area.distanceKm > 2.5
-              ? `${area.storeName} (${area.distanceKm} km)`
-              : area.storeName || null;
-          setCurrentStore(area.storeId, storeLabel);
-        }
-        setIsServiceable(area.serviceable === true);
-        if (area.deliveryMinutes) {
-          setDeliveryEtaMinutes(area.deliveryMinutes);
-        }
-      }
-    } catch (e) {
-      console.warn('[LocationPickerModal] resolveArea fresh check warning:', e);
-    }
+    await setActiveGpsLocation(loc);
 
     // Save to Database (MongoDB Atlas) in background
     try {
       await AddressService.saveAddress({
         type: 'Current',
-        fullName: addressObj.fullName,
-        phoneNumber: addressObj.phoneNumber,
-        houseFlat: addressObj.houseFlat,
-        areaLandmark: addressObj.areaLandmark,
-        city: addressObj.city,
-        pincode: addressObj.pincode,
-        latitude: addressObj.latitude,
-        longitude: addressObj.longitude,
+        fullName: user.fullName || 'Customer',
+        phoneNumber: user.phoneNumber || '',
+        houseFlat: loc.street || 'Current GPS Location',
+        areaLandmark: loc.areaLandmark || loc.shortAddress,
+        city: loc.city || 'Ahmedabad',
+        pincode: loc.pincode || '380015',
+        latitude: loc.latitude,
+        longitude: loc.longitude,
         isDefault: true,
       });
 
@@ -160,7 +117,7 @@ export const LocationPickerModal: React.FC = () => {
         StorageService.saveItem(StorageService.KEYS.USER, updatedProfile);
       }
     } catch (e) {
-      console.warn('[LocationPickerModal] Background address save warning:', e);
+      console.warn('[LocationPickerModal] Background save current address notice:', e);
     }
   };
 
@@ -269,15 +226,7 @@ export const LocationPickerModal: React.FC = () => {
           <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollList}>
             {/* 📍 1. REAL-TIME CURRENT GPS LOCATION CARD (3-STATE HONEST GPS) */}
             {(() => {
-              const isGpsApplied = Boolean(
-                deliveryLocation.startsWith('Current Location') ||
-                  selectedAddress?.type === 'Current' ||
-                  (currentLocation &&
-                    selectedAddress?.latitude != null &&
-                    selectedAddress?.longitude != null &&
-                    Math.abs(selectedAddress.latitude - currentLocation.latitude) < 0.001 &&
-                    Math.abs(selectedAddress.longitude - currentLocation.longitude) < 0.001)
-              );
+              const isGpsApplied = selectedAddressSource === 'GPS';
 
               const isGpsServiceable = gpsResolvedArea
                 ? gpsResolvedArea.serviceable !== false
@@ -289,9 +238,9 @@ export const LocationPickerModal: React.FC = () => {
                   gpsResolvedArea.distanceKm > 2.5
               );
 
-              const servingStore = gpsResolvedArea?.storeName || currentStoreName || 'Wom Up Dark Store';
+              const servingStore = gpsResolvedArea?.storeName || (isGpsApplied ? currentStoreName : (isDetecting ? 'Detecting store…' : 'Wom Up Dark Store'));
               const distanceDisplay = gpsResolvedArea?.distanceKm ? `${gpsResolvedArea.distanceKm} km` : null;
-              const etaMinutes = gpsResolvedArea?.deliveryMinutes || deliveryEtaMinutes || 9;
+              const etaMinutes = gpsResolvedArea?.deliveryMinutes || (isGpsApplied ? deliveryEtaMinutes : 9);
 
               return (
                 <View
@@ -404,7 +353,7 @@ export const LocationPickerModal: React.FC = () => {
                               >
                                 {isFarOrFallback
                                   ? `Serving Hub: ${servingStore}${distanceDisplay ? ` (${distanceDisplay} away)` : ''} · ETA ${etaMinutes} mins`
-                                  : `Serving Hub: ${servingStore} · Express 9-minute drop`}
+                                  : `Serving Hub: ${servingStore} · Delivery in ${etaMinutes} mins`}
                               </Text>
                             </View>
                           ) : null}
@@ -475,10 +424,16 @@ export const LocationPickerModal: React.FC = () => {
             {savedAddrs.length > 0 ? (
               savedAddrs.map((addr) => {
                 const label = addr.type;
+                const addrId = addr.id || (addr as any)._id;
                 const formatted = `${addr.houseFlat}, ${addr.areaLandmark ? addr.areaLandmark + ', ' : ''}${addr.city}`;
-                const isSelected =
-                  deliveryLocation.includes(formatted) ||
-                  (selectedAddress && selectedAddress.id === addr.id);
+                const isSelected = selectedAddressSource === 'SAVED' && Boolean(
+                  (selectedAddressId && addrId && (selectedAddressId === addrId || String(selectedAddressId) === String(addrId))) ||
+                  (selectedAddress && (
+                    (selectedAddress.id && (selectedAddress.id === addrId || String(selectedAddress.id) === String(addrId))) ||
+                    ((selectedAddress as any)._id && ((selectedAddress as any)._id === addrId || String((selectedAddress as any)._id) === String(addrId))) ||
+                    (selectedAddress.type === addr.type && selectedAddress.houseFlat === addr.houseFlat)
+                  ))
+                );
 
                 const getIconName = () => {
                   if (label === 'Home') return 'home';
@@ -488,55 +443,12 @@ export const LocationPickerModal: React.FC = () => {
 
                 return (
                   <TouchableOpacity
-                    key={addr.id || formatted}
+                    key={addrId || formatted}
                     activeOpacity={0.7}
-                    onPress={() => {
-                      const combined = `${addr.houseFlat || ''} ${addr.areaLandmark || ''} ${addr.city || ''}`.toLowerCase();
-                      const isThaltej = combined.includes('thaltej');
-
-                      const matched = matchAreaByName(`${addr.houseFlat} ${addr.areaLandmark || ''} ${addr.city || ''}`);
-                      const targetLat = isThaltej ? 23.0500 : (matched?.lat || addr.latitude || 23.1288);
-                      const targetLng = isThaltej ? 72.5160 : (matched?.lng || addr.longitude || 72.5507);
-                      const cleanH = isThaltej ? 'S S-202, Thaltej' : addr.houseFlat;
-                      const cleanArea = isThaltej ? 'Thaltej' : (addr.areaLandmark || 'Chandlodiya - Tragad');
-                      const cleanPin = isThaltej ? '380054' : (addr.pincode || '382481');
-
-                      const addrWithCoords = {
-                        ...addr,
-                        houseFlat: cleanH,
-                        areaLandmark: cleanArea,
-                        pincode: cleanPin,
-                        latitude: targetLat,
-                        longitude: targetLng,
-                      };
-
-                      setDeliveryLocation(`${label} — ${cleanH}, ${cleanArea}`);
-                      setSelectedAddress(addrWithCoords);
-
-                      if (isThaltej) {
-                        setCurrentArea('6aa11866c6c3e5984e2ef5e5', 'Thaltej');
-                        setCurrentStore('6aa277a8fc02997cbe281ac7', 'Wom Up Thaltej Dark Store');
-                        setCurrentCityName('Ahmedabad');
-                        setIsServiceable(true);
-                        setDeliveryEtaMinutes(8);
-                      }
-
-                      if (targetLat && targetLng) {
-                        LocationService.clearCache();
-                        LocationService.resolveArea(targetLat, targetLng, true).then((area) => {
-                          if (area) {
-                            setCurrentArea(area.areaId, area.areaName);
-                            if (area.storeId) {
-                              setCurrentStore(area.storeId, area.storeName || null);
-                            }
-                            setIsServiceable(area.serviceable === true);
-                            if (area.deliveryMinutes) {
-                              setDeliveryEtaMinutes(area.deliveryMinutes);
-                            }
-                          }
-                        });
-                      }
+                    onPress={async () => {
+                      console.log(`[LocationPickerModal] User selected saved address: id=${addrId}, label=${label}, coords=[${addr.latitude}, ${addr.longitude}]`);
                       setLocationModalVisible(false);
+                      await setActiveDeliveryAddress(addr);
                     }}
                     style={[styles.savedItem, isSelected && styles.savedItemActive]}
                   >

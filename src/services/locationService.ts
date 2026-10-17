@@ -30,13 +30,20 @@ export interface DetectedLocation {
 const AREA_CACHE_KEY = '@wormup_resolved_area';
 const AREA_CACHE_TTL_MS = 5 * 60 * 1000; // Fresh 5-minute TTL for hyperlocal routing
 
-let _cachedArea: ResolvedArea | null = null;
+interface CachedAreaEntry {
+  area: ResolvedArea;
+  lat?: number;
+  lng?: number;
+  ts: number;
+}
+
+const _areaMemoryCache = new Map<string, CachedAreaEntry>();
 const _inFlightAreaRequests = new Map<string, Promise<ResolvedArea | null>>();
 
 export const LocationService = {
   /**
    * Resolve GPS coordinates to a delivery area and dark store via the backend.
-   * Results are cached in memory + AsyncStorage. Pass forceRefresh = true to bypass cache.
+   * Results are coordinate-cached in memory + AsyncStorage. Pass forceRefresh = true to bypass cache.
    * Concurrent duplicate requests are automatically deduplicated in-flight.
    */
   async resolveArea(
@@ -44,34 +51,29 @@ export const LocationService = {
     lng?: number,
     forceRefresh = false,
   ): Promise<ResolvedArea | null> {
+    const cacheKey =
+      lat !== undefined && lng !== undefined
+        ? `${lat.toFixed(3)}_${lng.toFixed(3)}`
+        : 'default';
     const requestKey = `${lat !== undefined ? lat.toFixed(4) : 'default'}_${lng !== undefined ? lng.toFixed(4) : 'default'}`;
 
-    // 1. Always deduplicate concurrent in-flight requests for the exact same coordinates
+    // 1. Return in-memory cache if fresh and matching coordinates
+    if (!forceRefresh) {
+      const mem = _areaMemoryCache.get(cacheKey);
+      if (mem && Date.now() - mem.ts < AREA_CACHE_TTL_MS) {
+        return mem.area;
+      }
+    }
+
+    // 2. Always deduplicate concurrent in-flight requests for the exact same coordinates
     const inFlight = _inFlightAreaRequests.get(requestKey);
     if (inFlight) {
       return inFlight;
     }
 
-    if (!forceRefresh && _cachedArea) {
-      return _cachedArea;
-    }
-
-    // 2. Create deduplicated in-flight promise
+    // 3. Create deduplicated in-flight promise
     const promise = (async () => {
-      if (!forceRefresh) {
-        try {
-          const stored = await StorageService.getItem<{ area: ResolvedArea; ts: number } | null>(
-            AREA_CACHE_KEY,
-            null,
-          );
-          if (stored && Date.now() - stored.ts < AREA_CACHE_TTL_MS) {
-            _cachedArea = stored.area;
-            return stored.area;
-          }
-        } catch (_) {}
-      }
-
-      // 3. Call backend for authoritative live serviceability resolution
+      // Call backend for authoritative live serviceability resolution
       try {
         const res = await api.post<any>('/location/resolve', {
           latitude: lat ?? null,
@@ -87,7 +89,7 @@ export const LocationService = {
           const area: ResolvedArea = {
             areaId: resData.areaId || '',
             areaName: resData.areaName || 'Ahmedabad Hub',
-            city: resData.city || 'Ahmedabad',
+            city: resData.city || resData.cityName || 'Ahmedabad',
             deliveryMinutes: resData.deliveryMinutes ?? 9,
             serviceable,
             storeId: resData.storeId,
@@ -96,7 +98,8 @@ export const LocationService = {
             distanceKm: resData.distanceKm,
             message: resData.message,
           };
-          _cachedArea = area;
+
+          _areaMemoryCache.set(cacheKey, { area, lat, lng, ts: Date.now() });
           StorageService.saveItem(AREA_CACHE_KEY, { area, ts: Date.now() });
           return area;
         }
@@ -114,14 +117,18 @@ export const LocationService = {
 
   /** Invalidate cache (call when user changes delivery address or forces re-detection) */
   clearCache() {
-    _cachedArea = null;
+    _areaMemoryCache.clear();
     _inFlightAreaRequests.clear();
     StorageService.removeItem(AREA_CACHE_KEY);
   },
 
   /** Get currently cached area without making a network call */
-  getCached(): ResolvedArea | null {
-    return _cachedArea;
+  getCached(lat?: number, lng?: number): ResolvedArea | null {
+    const cacheKey =
+      lat !== undefined && lng !== undefined
+        ? `${lat.toFixed(3)}_${lng.toFixed(3)}`
+        : 'default';
+    return _areaMemoryCache.get(cacheKey)?.area || null;
   },
 
   /**

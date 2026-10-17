@@ -40,7 +40,7 @@ export type DocumentType =
   | 'AADHAAR_PAN'
   | 'PROFILE_PHOTO';
 
-export type DocumentStatus = 'PENDING' | 'VERIFIED' | 'REJECTED' | 'EXPIRED';
+export type DocumentStatus = 'PENDING' | 'VERIFIED' | 'REJECTED' | 'EXPIRED' | 'NOT_UPLOADED';
 
 export interface RiderDocument {
   id: string;
@@ -229,6 +229,7 @@ export type RiderSubScreenKey =
   | 'Documents'
   | 'VehicleDetails'
   | 'BankSettlement'
-  | 'Settings';
+  | 'Settings'
+  | 'Navigation';
 
 

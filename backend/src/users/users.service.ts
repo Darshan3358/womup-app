@@ -48,6 +48,7 @@ export class UsersService {
           $inc: {
             pendingIncome: -totalToMove,
             availableIncome: totalToMove,
+            walletBalance: totalToMove,
           },
         });
         await this.incomeTxModel.updateMany(
@@ -123,6 +124,24 @@ export class UsersService {
     return user;
   }
 
+  async registerPushToken(
+    userId: string,
+    token: string,
+    platform: 'android' | 'ios' | 'web' = 'android',
+    appVersion?: string,
+  ) {
+    const updateFields: any = { updatedAt: new Date() };
+    if (platform === 'android') {
+      updateFields.androidToken = token;
+    } else if (platform === 'ios') {
+      updateFields.iosToken = token;
+    } else {
+      updateFields.androidToken = token;
+    }
+    await this.userModel.findByIdAndUpdate(userId, { $set: updateFields }).exec();
+    return { success: true, message: 'Push token registered successfully' };
+  }
+
   async getWishlist(userId: string) {
     const user = await this.userModel.findById(userId).exec();
     if (!user) {
@@ -192,12 +211,22 @@ export class UsersService {
   async verifyAadhaar(
     userId: string,
     dto: {
-      aadhaarNumber: string;
-      fullNameAsPerAadhaar: string;
+      aadhaarNumber?: string;
+      fullNameAsPerAadhaar?: string;
       customer_image_aadhar_front?: string;
       customer_image_aadhar_back?: string;
       aadhaarFrontImage?: string;
       aadhaarBackImage?: string;
+      bankName?: string;
+      branchName?: string;
+      accountHolderName?: string;
+      accountNumber?: string;
+      ifscCode?: string;
+      upiId?: string;
+      passbookImage?: string;
+      bankProofImage?: string;
+      cancelledChequeImage?: string;
+      bankProofUrl?: string;
     },
   ) {
     const user = await this.userModel.findById(userId);
@@ -206,39 +235,19 @@ export class UsersService {
     }
 
     const cleanAadhaar = (dto.aadhaarNumber || '').replace(/\D/g, '');
-    if (cleanAadhaar.length !== 12) {
+    if (dto.aadhaarNumber && cleanAadhaar.length !== 12) {
       throw new BadRequestException('Please provide a valid 12-digit Aadhaar number');
     }
 
-    if (!dto.fullNameAsPerAadhaar || !dto.fullNameAsPerAadhaar.trim()) {
-      throw new BadRequestException('Please provide your full name as per Aadhaar card');
+    if (cleanAadhaar) {
+      user.aadhaarNumber = cleanAadhaar;
+      (user as any).customer_aadhar_no = cleanAadhaar;
     }
 
-    // ── Idempotency Guard: Prevent double verification and double referral payouts ──
-    if (user.aadhaarVerified && user.verificationStatus === 'VERIFIED') {
-      return {
-        success: true,
-        message: 'Aadhaar is already verified.',
-        user: {
-          id: user._id.toString(),
-          name: user.name,
-          verificationStatus: user.verificationStatus,
-          aadhaarVerified: user.aadhaarVerified,
-          fullNameAsPerAadhaar: user.fullNameAsPerAadhaar,
-          shoppingCoins: user.shoppingCoins,
-          availableIncome: user.availableIncome,
-          pendingIncome: user.pendingIncome,
-          customer_image_aadhar_front: user.customer_image_aadhar_front,
-          customer_image_aadhar_back: user.customer_image_aadhar_back,
-        },
-      };
+    if (dto.fullNameAsPerAadhaar && dto.fullNameAsPerAadhaar.trim()) {
+      user.fullNameAsPerAadhaar = dto.fullNameAsPerAadhaar.trim();
     }
 
-    user.aadhaarVerified = true;
-    user.verificationStatus = 'VERIFIED';
-    user.aadhaarNumber = cleanAadhaar;
-    user.fullNameAsPerAadhaar = dto.fullNameAsPerAadhaar.trim();
-    user.verifiedAt = new Date();
     if (dto.customer_image_aadhar_front || dto.aadhaarFrontImage) {
       const front = dto.customer_image_aadhar_front || dto.aadhaarFrontImage;
       user.customer_image_aadhar_front = front;
@@ -249,28 +258,74 @@ export class UsersService {
       user.customer_image_aadhar_back = back;
       user.aadharBackImage = back;
     }
+
+    // Save Bank Details
+    if (dto.bankName) user.bankName = dto.bankName.trim();
+    if (dto.branchName) user.branchName = dto.branchName.trim();
+    if (dto.accountHolderName) user.accountHolderName = dto.accountHolderName.trim();
+    if (dto.accountNumber) {
+      user.accountNumber = dto.accountNumber.trim();
+      (user as any).bankAccountNo = dto.accountNumber.trim();
+    }
+    if (dto.ifscCode) user.ifscCode = dto.ifscCode.trim().toUpperCase();
+    if (dto.upiId) user.upiId = dto.upiId.trim();
+
+    const bankProof =
+      dto.bankProofImage ||
+      dto.passbookImage ||
+      dto.cancelledChequeImage ||
+      dto.bankProofUrl ||
+      (dto as any).customer_image_bank;
+    if (bankProof) {
+      user.passbookImage = bankProof;
+      user.bankProofImage = bankProof;
+      user.cancelledChequeImage = bankProof;
+      (user as any).customer_image_bank = bankProof;
+    }
+
+    // Submit for Real Admin Review (Pending state)
+    user.aadhaarVerified = false;
+    user.verificationStatus = 'PENDING';
+    user.customerIsVerify = 2; // 2 = NO
+    user.customerKycStatus = 1; // 1 = PENDING
+    user.kycStatus = 'Pending';
+    user.kycSubmittedAt = new Date();
+
     await user.save();
 
-    // ── 3-Tier Multi-Level Distribution (App Download Income + Shopping Coin Income) ──
-    await this.distributeKycRewards(user);
-
-    // Emit live update for this user
+    // Live update app that verification is now pending admin approval
     this.trackingGateway.emitWalletUpdated(userId, {
-      shoppingCoins: user.shoppingCoins,
-      verificationStatus: 'VERIFIED',
-      aadhaarVerified: true,
+      verificationStatus: 'PENDING',
+      aadhaarVerified: false,
+      customerKycStatus: 1,
+      customerIsVerify: 2,
       fullNameAsPerAadhaar: user.fullNameAsPerAadhaar,
+      bankName: user.bankName,
+      accountNumber: user.accountNumber,
+      ifscCode: user.ifscCode,
     });
 
     return {
       success: true,
-      message: 'Aadhaar verified successfully! Referral & income benefits unlocked.',
+      message: 'KYC & Bank details submitted successfully. Account is pending admin verification.',
       user: {
         id: user._id.toString(),
         name: user.name,
-        verificationStatus: user.verificationStatus,
-        aadhaarVerified: user.aadhaarVerified,
+        verificationStatus: 'PENDING',
+        customerKycStatus: 1,
+        customerIsVerify: 2,
+        aadhaarVerified: false,
         fullNameAsPerAadhaar: user.fullNameAsPerAadhaar,
+        aadhaarNumber: user.aadhaarNumber,
+        customer_image_aadhar_front: user.customer_image_aadhar_front,
+        customer_image_aadhar_back: user.customer_image_aadhar_back,
+        bankName: user.bankName,
+        accountNumber: user.accountNumber,
+        ifscCode: user.ifscCode,
+        accountHolderName: user.accountHolderName,
+        upiId: user.upiId,
+        passbookImage: user.passbookImage,
+        bankProofImage: user.bankProofImage,
         shoppingCoins: user.shoppingCoins,
         availableIncome: user.availableIncome,
         pendingIncome: user.pendingIncome,
@@ -304,6 +359,7 @@ export class UsersService {
     const netPayout = Number((withdrawAmt - tdsDeduction).toFixed(2));
 
     user.availableIncome = Number(((user.availableIncome || 0) - withdrawAmt).toFixed(2));
+    user.walletBalance = Math.max(0, Number(((user.walletBalance || 0) - withdrawAmt).toFixed(2)));
     await user.save();
 
     await this.incomeTxModel.create({
@@ -320,6 +376,7 @@ export class UsersService {
     this.trackingGateway.emitWalletUpdated(userId, {
       availableIncome: user.availableIncome,
       pendingIncome: user.pendingIncome,
+      walletBalance: user.walletBalance,
     });
 
     return {
@@ -331,6 +388,93 @@ export class UsersService {
         netPayout,
         availableIncome: user.availableIncome,
       },
+    };
+  }
+
+  async getDashboardBanner(userId: string) {
+    const user = await this.userModel.findById(userId).lean();
+    if (!user) {
+      return {
+        bannerType: 'WARNING',
+        kycStatus: 0,
+        title: 'Complete KYC · Unlock ₹20 Bonus',
+        subtitle: 'Verify Aadhaar in 2 minutes',
+        ctaText: 'Verify Now',
+        ctaAction: 'OPEN_KYC',
+        icon: 'alert-circle',
+        backgroundColor: '#FEF3C7',
+        borderColor: '#FCD34D',
+        textColor: '#B45309',
+        isDismissible: false,
+      };
+    }
+
+    const kycStatus = user.customerKycStatus ?? (user.aadhaarVerified ? 2 : (user.verificationStatus === 'PENDING' ? 1 : 0));
+    const isVerified = user.customerIsVerify === 1 || user.aadhaarVerified || kycStatus === 2;
+
+    if (isVerified) {
+      return {
+        bannerType: 'SUCCESS',
+        kycStatus: 2,
+        title: 'KYC Verified · Income Unlocked',
+        subtitle: user.sponsorCode && user.sponsorCode !== 'WORMUP001' ? '₹20 bonus credited to sponsor' : 'All income features unlocked',
+        ctaText: 'View Wallet',
+        ctaAction: 'VIEW_WALLET',
+        icon: 'check-circle',
+        backgroundColor: '#DCFCE7',
+        borderColor: '#86EFAC',
+        textColor: '#166534',
+        isDismissible: true,
+        autoHideAfterDays: 3,
+        approvedAt: user.verifiedAt,
+      };
+    }
+
+    if (kycStatus === 1 || user.verificationStatus === 'PENDING') {
+      return {
+        bannerType: 'INFO',
+        kycStatus: 1,
+        title: 'KYC Under Review',
+        subtitle: 'Verification in 24 hours',
+        ctaText: 'View Status',
+        ctaAction: 'VIEW_STATUS',
+        icon: 'clock',
+        backgroundColor: '#DBEAFE',
+        borderColor: '#93C5FD',
+        textColor: '#1E40AF',
+        isDismissible: false,
+      };
+    }
+
+    if (kycStatus === 3 || user.verificationStatus === 'REJECTED') {
+      return {
+        bannerType: 'ERROR',
+        kycStatus: 3,
+        title: 'KYC Rejected · Resubmit',
+        subtitle: `Reason: ${user.kycRejectReason || (user as any).customerAadharRejectionReason || 'Document not clear'}`,
+        ctaText: 'Resubmit',
+        ctaAction: 'RESUBMIT',
+        icon: 'x-circle',
+        backgroundColor: '#FEE2E2',
+        borderColor: '#FCA5A5',
+        textColor: '#991B1B',
+        isDismissible: false,
+      };
+    }
+
+    // Default: Not submitted
+    return {
+      bannerType: 'WARNING',
+      kycStatus: 0,
+      title: 'Complete KYC · Unlock ₹20 Bonus',
+      subtitle: 'Verify Aadhaar in 2 minutes',
+      ctaText: 'Verify Now',
+      ctaAction: 'OPEN_KYC',
+      icon: 'alert-circle',
+      backgroundColor: '#FEF3C7',
+      borderColor: '#FCD34D',
+      textColor: '#B45309',
+      isDismissible: false,
     };
   }
 
@@ -361,6 +505,78 @@ export class UsersService {
       direct5ActiveCount: user.direct5ActiveCount ?? 0,
       teamSize: user.teamSize ?? 0,
       recentTransactions: transactions,
+    };
+  }
+
+  // ── Customer Income History with Breakdown ──
+  async getIncomeHistory(userId: string, page = 1, limit = 50) {
+    await this.settleUserPendingIncome(userId);
+    const uId = new Types.ObjectId(userId);
+    const skip = (page - 1) * limit;
+
+    const user = await this.userModel.findById(uId).select('availableIncome pendingIncome walletBalance name');
+    if (!user) throw new NotFoundException('User not found');
+
+    const [transactions, total] = await Promise.all([
+      this.incomeTxModel
+        .find({ userId: uId })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('sourceUserId', 'name fullNameAsPerAadhaar phone')
+        .lean(),
+      this.incomeTxModel.countDocuments({ userId: uId }),
+    ]);
+
+    // Compute verified ledger breakdown for available (unlocked) amounts
+    const availableTxs = await this.incomeTxModel.find({ userId: uId, status: 'AVAILABLE' }).lean();
+    let downloadIncomeTotal = 0;
+    let monthlyTeamIncomeTotal = 0;
+    let otherIncomeTotal = 0;
+    let withdrawalTotal = 0;
+
+    for (const tx of availableTxs) {
+      if (tx.type === 'APP_DOWNLOAD' || tx.type === 'REFERRAL') {
+        downloadIncomeTotal += tx.amount || 0;
+      } else if (tx.type === 'TEAM_PURCHASE') {
+        monthlyTeamIncomeTotal += tx.amount || 0;
+      } else if (tx.type === 'WITHDRAWAL') {
+        withdrawalTotal += Math.abs(tx.amount || 0);
+      } else {
+        otherIncomeTotal += tx.amount || 0;
+      }
+    }
+
+    return {
+      availableBalance: user.availableIncome || 0,
+      pendingBalance: user.pendingIncome || 0,
+      walletBalance: user.walletBalance || 0,
+      breakdown: {
+        downloadIncome: Number(downloadIncomeTotal.toFixed(2)),
+        monthlyTeamIncome: Number(monthlyTeamIncomeTotal.toFixed(2)),
+        withdrawals: Number(withdrawalTotal.toFixed(2)),
+        otherIncome: Number(otherIncomeTotal.toFixed(2)),
+        netAvailable: Number((user.availableIncome || 0).toFixed(2)),
+      },
+      transactions: transactions.map((t) => ({
+        id: t._id.toString(),
+        type: t.type,
+        amount: t.amount,
+        status: t.status,
+        description: t.description,
+        availableFrom: t.availableFrom,
+        earnedAt: t.earnedAt || (t as any).createdAt,
+        createdAt: (t as any).createdAt,
+        sourceUser: (t as any).sourceUserId ? {
+          name: (t as any).sourceUserId.fullNameAsPerAadhaar || (t as any).sourceUserId.name,
+        } : undefined,
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
     };
   }
 
@@ -450,6 +666,25 @@ export class UsersService {
       totalVegetableGMV += vegetableGMV;
       totalOtherGMV += otherGMV;
 
+      const detailedMembers = members.map((m) => {
+        const veg = Number((m.monthlyVegetablePurchase || 0).toFixed(2));
+        const other = Number((m.monthlyOtherPurchase || 0).toFixed(2));
+        const mIncome = Number(((veg * 0.03) + (other * 0.004)).toFixed(2));
+        const isActive = (m.monthlyPurchaseValue || 0) >= 2000;
+        const memberCode = m.referralCode || m.sponsorCode || (m.phone ? `WORM${m.phone.slice(-4)}` : `WORM${m._id.toString().slice(-4).toUpperCase()}`);
+        return {
+          id: m._id.toString(),
+          name: m.fullNameAsPerAadhaar || m.name || 'WormUp Member',
+          phone: m.phone ? `${m.phone.slice(0, 3)}****${m.phone.slice(-3)}` : undefined,
+          memberCode,
+          isActive,
+          monthlyPurchaseValue: Number((m.monthlyPurchaseValue || 0).toFixed(2)),
+          vegetableGMV: veg,
+          otherGMV: other,
+          incomeEarned: mIncome,
+        };
+      });
+
       return {
         level: levelNum,
         memberCount,
@@ -457,6 +692,7 @@ export class UsersService {
         vegetableGMV,
         otherGMV,
         incomeEarned,
+        members: detailedMembers,
       };
     });
 
@@ -559,28 +795,38 @@ export class UsersService {
         { upsert: true, new: true },
       );
 
-      // If eligible and has income, credit to pendingIncome with 24-hr lock
+      // If eligible and has income, credit to pendingIncome with 24-hr lock (idempotent per month)
       if (isEligible && totalIncome > 0) {
-        user.pendingIncome = Number(((user.pendingIncome || 0) + totalIncome).toFixed(2));
-        user.lastIncomeCreditedAt = new Date();
-        await user.save();
-
-        await this.incomeTxModel.create({
+        const existingTx = await this.incomeTxModel.findOne({
           userId: user._id,
           type: 'TEAM_PURCHASE',
-          amount: totalIncome,
-          earnedAt: new Date(),
-          availableFrom: nextMidnight,
-          isUsable: false,
-          status: 'PENDING',
-          description: `Team Purchase Income for ${month} (Veg 3%: ₹${teamSummary.vegetableIncome}, Other 0.4%: ₹${teamSummary.otherIncome})`,
+          description: { $regex: `for ${month}` },
         });
 
-        this.trackingGateway.emitWalletUpdated(user._id.toString(), {
-          pendingIncome: user.pendingIncome,
-          availableIncome: user.availableIncome,
-          walletBalance: user.walletBalance,
-        });
+        if (existingTx) {
+          console.log(`[TeamIncome] Skipping user ${user._id} (${user.name}): Already settled for ${month}.`);
+        } else {
+          user.pendingIncome = Number(((user.pendingIncome || 0) + totalIncome).toFixed(2));
+          user.lastIncomeCreditedAt = new Date();
+          await user.save();
+
+          await this.incomeTxModel.create({
+            userId: user._id,
+            type: 'TEAM_PURCHASE',
+            amount: totalIncome,
+            earnedAt: new Date(),
+            availableFrom: nextMidnight,
+            isUsable: false,
+            status: 'PENDING',
+            description: `Team Purchase Income for ${month} (Veg 3%: ₹${teamSummary.vegetableIncome}, Other 0.4%: ₹${teamSummary.otherIncome})`,
+          });
+
+          this.trackingGateway.emitWalletUpdated(user._id.toString(), {
+            pendingIncome: user.pendingIncome,
+            availableIncome: user.availableIncome,
+            walletBalance: user.walletBalance,
+          });
+        }
       }
 
       results.push({
@@ -848,6 +1094,14 @@ export class UsersService {
       verificationStatus: 'VERIFIED',
       aadhaarVerified: true,
       customerKycStatus: 2,
+      customerIsVerify: 1,
+    });
+
+    this.trackingGateway.emitCustomerKycApproved(customer._id.toString(), {
+      message: 'KYC approved! Income features unlocked.',
+      customerKycStatus: 2,
+      customerIsVerify: 1,
+      verifiedAt: customer.verifiedAt,
     });
 
     return {
@@ -865,13 +1119,20 @@ export class UsersService {
     customer.customerIsVerify = 2; // No
     customer.aadhaarVerified = false;
     customer.verificationStatus = 'NON_VERIFIED';
-    customer.kycRejectReason = reason || 'Documents could not be verified';
+    customer.kycRejectReason = reason || 'Aadhaar image not clear';
     await customer.save();
 
     this.trackingGateway.emitWalletUpdated(customer._id.toString(), {
       verificationStatus: 'NON_VERIFIED',
       aadhaarVerified: false,
       customerKycStatus: 3,
+      customerIsVerify: 2,
+    });
+
+    this.trackingGateway.emitKycRejected('user', customer._id.toString(), {
+      reason: customer.kycRejectReason,
+      customerKycStatus: 3,
+      message: `KYC rejected: ${customer.kycRejectReason}`,
     });
 
     return {
@@ -969,5 +1230,314 @@ export class UsersService {
       })),
     };
   }
+
+  async adminGetCustomerKyc(id: string): Promise<any> {
+    const customer = (await this.userModel.findById(id).lean()) as any;
+    if (!customer) throw new NotFoundException('Customer not found');
+
+    const rawAadhaar = customer.aadhaarNumber || customer.customer_aadhar_no || '';
+    const maskedAadhaar = rawAadhaar.length >= 4
+      ? `XXXX XXXX ${rawAadhaar.slice(-4)}`
+      : (rawAadhaar ? 'XXXX XXXX XXXX' : 'XXXX XXXX 1234');
+
+    const rawBankAcc = customer.accountNumber || customer.bankAccountNo || '';
+    const maskedAccount = rawBankAcc.length >= 4
+      ? `XXXX ${rawBankAcc.slice(-4)}`
+      : (rawBankAcc ? 'XXXX XXXX' : 'XXXX 9182');
+
+    const kycStatusNum = customer.customerKycStatus || (customer.verificationStatus === 'VERIFIED' ? 2 : 1);
+    const statusLabel = kycStatusNum === 2 ? 'Verified' : (kycStatusNum === 3 ? 'Rejected' : 'Pending');
+
+    const aadhaarFrontUrl = customer.customer_image_aadhar_front || customer.aadharFrontImage || '';
+    const aadhaarBackUrl = customer.customer_image_aadhar_back || customer.aadharBackImage || '';
+
+    return {
+      success: true,
+      data: {
+        kycStatus: kycStatusNum,
+        statusLabel,
+        submittedAt: customer.updatedAt || customer.createdAt || new Date().toISOString(),
+        aadhaarNumber: maskedAadhaar,
+        rawAadhaarNumber: rawAadhaar,
+        aadhaarFrontUrl,
+        aadhaarBackUrl,
+        bankDetails: {
+          bankName: customer.bankName || '',
+          branchName: customer.branchName || '',
+          accountHolderName: customer.accountHolderName || customer.name || '',
+          accountNumber: maskedAccount,
+          rawAccountNumber: rawBankAcc,
+          ifscCode: customer.ifscCode || '',
+          upiId: customer.upiId || '',
+        },
+        personalInfo: {
+          firstName: customer.firstName || (customer.name ? customer.name.split(' ')[0] : ''),
+          surname: customer.surname || (customer.name ? customer.name.split(' ').slice(1).join(' ') : ''),
+          fatherHusbandName: customer.fatherHusbandName || '',
+          gender: customer.gender || 'Not Specified',
+          birthdate: customer.birthDate || customer.birthday || '',
+        },
+        address: customer.address || '',
+        landmark: customer.landmark || '',
+        village: customer.village || '',
+        pincode: customer.customerPincode || customer.registrationPincode || '',
+        adminNotes: customer.adminNotes || '',
+        kycRejectReason: customer.kycRejectReason || '',
+      },
+    };
+  }
+
+  async adminUpdateCustomer(id: string, updateDto: any): Promise<any> {
+    const customer = await this.userModel.findById(id);
+    if (!customer) throw new NotFoundException('Customer not found');
+
+    if (updateDto.firstName !== undefined) customer.firstName = updateDto.firstName;
+    if (updateDto.surname !== undefined) customer.surname = updateDto.surname;
+    if (updateDto.fatherHusbandName !== undefined) customer.fatherHusbandName = updateDto.fatherHusbandName;
+    if (updateDto.gender !== undefined) customer.gender = updateDto.gender;
+    if (updateDto.birthdate !== undefined || updateDto.birthDate !== undefined) {
+      customer.birthDate = updateDto.birthdate || updateDto.birthDate;
+    }
+
+    if (customer.firstName || customer.surname) {
+      customer.name = `${customer.firstName || ''} ${customer.surname || ''}`.trim() || customer.name;
+    } else if (updateDto.name) {
+      customer.name = updateDto.name;
+    }
+
+    if (updateDto.mobile !== undefined || updateDto.phone !== undefined) {
+      customer.phone = updateDto.mobile || updateDto.phone;
+    }
+    if (updateDto.email !== undefined) customer.email = updateDto.email;
+
+    if (updateDto.address !== undefined) customer.address = updateDto.address;
+    if (updateDto.landmark !== undefined) customer.landmark = updateDto.landmark;
+    if (updateDto.village !== undefined) customer.village = updateDto.village;
+    if (updateDto.areaZone !== undefined || updateDto.zoneName !== undefined) {
+      customer.preferredCityName = updateDto.areaZone || updateDto.zoneName;
+    }
+    if (updateDto.pincode !== undefined || updateDto.customerPincode !== undefined) {
+      customer.customerPincode = updateDto.pincode || updateDto.customerPincode;
+      customer.registrationPincode = customer.customerPincode;
+    }
+
+    // Bank Details
+    if (updateDto.bankName !== undefined) customer.bankName = updateDto.bankName;
+    if (updateDto.branchName !== undefined) customer.branchName = updateDto.branchName;
+    if (updateDto.accountHolderName !== undefined) customer.accountHolderName = updateDto.accountHolderName;
+    if (updateDto.accountNumber !== undefined) customer.accountNumber = updateDto.accountNumber;
+    if (updateDto.ifscCode !== undefined) customer.ifscCode = updateDto.ifscCode;
+    if (updateDto.upiId !== undefined) customer.upiId = updateDto.upiId;
+
+    // Status Controls
+    if (updateDto.kycStatus !== undefined) {
+      const statusNum = Number(updateDto.kycStatus);
+      customer.customerKycStatus = statusNum;
+      if (statusNum === 2) {
+        customer.customerIsVerify = 1;
+        customer.aadhaarVerified = true;
+        customer.verificationStatus = 'VERIFIED';
+      } else if (statusNum === 3) {
+        customer.customerIsVerify = 2;
+        customer.aadhaarVerified = false;
+        customer.verificationStatus = 'NON_VERIFIED';
+      } else {
+        customer.customerIsVerify = 2;
+        customer.verificationStatus = 'NON_VERIFIED';
+      }
+    }
+
+    if (updateDto.paymentStatus !== undefined) {
+      customer.customerPaymentStatus = Number(updateDto.paymentStatus);
+    }
+    if (updateDto.isBlocked !== undefined) {
+      customer.isBlocked = Number(updateDto.isBlocked);
+      customer.isActive = customer.isBlocked === 0;
+    }
+    if (updateDto.isSuspended !== undefined) {
+      customer.isSuspended = Number(updateDto.isSuspended);
+    }
+    if (updateDto.adminNotes !== undefined) {
+      customer.adminNotes = updateDto.adminNotes;
+    }
+
+    await customer.save();
+
+    this.trackingGateway.emitWalletUpdated(customer._id.toString(), {
+      verificationStatus: customer.verificationStatus,
+      customerKycStatus: customer.customerKycStatus,
+      customerPaymentStatus: customer.customerPaymentStatus,
+      isBlocked: customer.isBlocked,
+      isSuspended: customer.isSuspended,
+    });
+
+    return {
+      success: true,
+      message: 'Customer profile updated successfully',
+      data: customer,
+    };
+  }
+
+  /**
+   * Submit Customer KYC (Aadhaar & Bank Details)
+   */
+  async submitCustomerKyc(userId: string, payload: any) {
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const aadharNum =
+      payload.aadhaarNumber ||
+      payload.aadharNumber ||
+      payload.customer_aadhar_no ||
+      user.aadhaarNumber ||
+      (user as any).aadharNumber;
+    if (aadharNum) {
+      user.aadhaarNumber = aadharNum;
+      (user as any).aadharNumber = aadharNum;
+      (user as any).customer_aadhar_no = aadharNum;
+    }
+
+    const frontImg =
+      payload.aadharFront ||
+      payload.aadhaarFront ||
+      payload.aadhaarFrontUrl ||
+      payload.aadharFrontUrl ||
+      payload.aadhaarFrontImage ||
+      payload.aadharFrontImage ||
+      payload.customer_image_aadhar_front ||
+      user.aadharFrontImage ||
+      user.customer_image_aadhar_front;
+    if (frontImg) {
+      user.aadharFrontImage = frontImg;
+      user.customer_image_aadhar_front = frontImg;
+    }
+
+    const backImg =
+      payload.aadharBack ||
+      payload.aadhaarBack ||
+      payload.aadhaarBackUrl ||
+      payload.aadharBackUrl ||
+      payload.aadhaarBackImage ||
+      payload.aadharBackImage ||
+      payload.customer_image_aadhar_back ||
+      user.aadharBackImage ||
+      user.customer_image_aadhar_back;
+    if (backImg) {
+      user.aadharBackImage = backImg;
+      user.customer_image_aadhar_back = backImg;
+    }
+
+    if (payload.fullNameAsPerAadhaar) {
+      user.fullNameAsPerAadhaar = payload.fullNameAsPerAadhaar.trim();
+    }
+
+    if (payload.bankName) user.bankName = payload.bankName;
+    if (payload.branchName) user.branchName = payload.branchName;
+    if (payload.accountHolderName) user.accountHolderName = payload.accountHolderName;
+    if (payload.accountNumber) {
+      user.accountNumber = payload.accountNumber;
+      (user as any).bankAccountNo = payload.accountNumber;
+    }
+    if (payload.ifscCode) user.ifscCode = payload.ifscCode;
+    if (payload.upiId) user.upiId = payload.upiId;
+
+    const bankProof =
+      payload.bankProof ||
+      payload.bankProofUrl ||
+      payload.bankProofImage ||
+      payload.passbookImage ||
+      payload.cancelledChequeImage ||
+      payload.customer_image_bank ||
+      user.passbookImage ||
+      user.bankProofImage ||
+      user.cancelledChequeImage;
+    if (bankProof) {
+      user.passbookImage = bankProof;
+      user.bankProofImage = bankProof;
+      user.cancelledChequeImage = bankProof;
+      (user as any).customer_image_bank = bankProof;
+    }
+
+    user.customerKycStatus = 1; // Pending
+    user.kycStatus = 'Pending';
+    user.kycSubmittedAt = new Date();
+    user.customerIsVerify = 2; // Pending / Non-verified
+
+    await user.save();
+
+    // Notify admin via WebSocket
+    this.trackingGateway.server?.emit('new_customer_kyc', {
+      userId: user._id.toString(),
+      name: user.name,
+      mobile: user.phone,
+      submittedAt: user.kycSubmittedAt,
+    });
+
+    return {
+      success: true,
+      message: 'KYC submitted successfully and is pending admin verification',
+      data: {
+        kycStatus: 1,
+        statusLabel: 'Pending',
+        submittedAt: user.kycSubmittedAt,
+      },
+    };
+  }
+
+  /**
+   * Get Current Customer KYC Status
+   */
+  async getCustomerKycStatus(userId: string) {
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const kycStatusNum =
+      user.customerKycStatus !== undefined && user.customerKycStatus !== null
+        ? user.customerKycStatus
+        : (user.kycStatus === 'Verified' ? 2 : user.kycStatus === 'Rejected' ? 3 : user.kycStatus === 'Pending' ? 1 : 0);
+    const statusLabel =
+      kycStatusNum === 2 ? 'Verified' : kycStatusNum === 3 ? 'Rejected' : kycStatusNum === 1 ? 'Pending' : 'Not Submitted';
+
+    const bankProofUrl =
+      user.passbookImage ||
+      user.bankProofImage ||
+      user.cancelledChequeImage ||
+      (user as any).customer_image_bank ||
+      '';
+
+    return {
+      success: true,
+      data: {
+        kycStatus: kycStatusNum,
+        statusLabel,
+        isVerified: kycStatusNum === 2,
+        submittedAt: user.kycSubmittedAt,
+        rejectionReason: user.kycRejectReason || '',
+        fullNameAsPerAadhaar: user.fullNameAsPerAadhaar || user.name || '',
+        aadhaarNumber: user.aadhaarNumber
+          ? `XXXX XXXX ${user.aadhaarNumber.slice(-4)}`
+          : '',
+        rawAadhaarNumber: user.aadhaarNumber || '',
+        aadhaarFrontUrl: user.customer_image_aadhar_front || user.aadharFrontImage || '',
+        aadhaarBackUrl: user.customer_image_aadhar_back || user.aadharBackImage || '',
+        bankProofUrl,
+        bankDetails: {
+          bankName: user.bankName || '',
+          branchName: user.branchName || '',
+          accountHolderName: user.accountHolderName || user.fullNameAsPerAadhaar || user.name || '',
+          accountNumber: user.accountNumber ? `XXXX ${user.accountNumber.slice(-4)}` : '',
+          rawAccountNumber: user.accountNumber || (user as any).bankAccountNo || '',
+          ifscCode: user.ifscCode || '',
+          upiId: user.upiId || '',
+          bankProofUrl,
+        },
+      },
+    };
+  }
 }
+
 

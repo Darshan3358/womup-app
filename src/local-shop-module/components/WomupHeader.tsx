@@ -11,7 +11,7 @@ interface WomupHeaderProps {
 }
 
 export const WomupHeader: React.FC<WomupHeaderProps> = ({
-  location = 'Mahesana',
+  location = 'Ahmedabad',
   onOpenMenu,
   onSelectLocation,
   onOpenNotifications,
@@ -88,11 +88,11 @@ export const WomupHeader: React.FC<WomupHeaderProps> = ({
             activeOpacity={0.7}
             onPress={onSelectLocation}
           >
-            <Ionicons name="location-sharp" size={16} color="#1E3A8A" />
+            <Ionicons name="location-sharp" size={15} color="#E11D48" />
             <Text style={styles.locationText} numberOfLines={1}>
               {location}
             </Text>
-            <Ionicons name="chevron-down" size={14} color="#1E3A8A" />
+            <Ionicons name="chevron-down" size={13} color="#E11D48" />
           </TouchableOpacity>
 
           {/* Notifications with badge "3" */}
@@ -252,19 +252,19 @@ const styles = StyleSheet.create({
   locationSelector: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
-    backgroundColor: '#F8FAFC',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    gap: 4,
+    backgroundColor: '#FFF1F2',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 16,
+    borderWidth: 1.2,
+    borderColor: '#FECDD3',
   },
   locationText: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#0F172A',
-    maxWidth: 70,
+    fontWeight: '800',
+    color: '#E11D48',
+    maxWidth: 110,
   },
   bellButton: {
     width: 36,

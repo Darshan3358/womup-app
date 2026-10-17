@@ -27,6 +27,8 @@ interface VendorAuthContextType {
   setIsQRModalVisible: (v: boolean) => void;
   isLoading: boolean;
   login: (loginId: string, pass?: string) => Promise<boolean>;
+  loginWithOtp: (mobile: string, otp: string) => Promise<boolean>;
+  setVendorProfile: (vendor: VendorProfile) => void;
   logout: () => Promise<void>;
   verifyCollectionRequest: (id: string) => Promise<void>;
   rejectCollectionRequest: (id: string, reason?: string) => Promise<void>;
@@ -174,6 +176,31 @@ export const VendorAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
+  const loginWithOtp = async (mobile: string, otp: string): Promise<boolean> => {
+    setIsLoading(true);
+    try {
+      const res = await VendorApi.loginWithOtp(mobile, otp);
+      if (res.success && res.vendor) {
+        setVendor(res.vendor);
+        setIsLoggedIn(true);
+        setActiveTab('Dashboard');
+        await AsyncStorage.setItem(VENDOR_LOGGED_IN_KEY, 'true');
+        await AsyncStorage.setItem(VENDOR_CODE_KEY, res.vendor.vendorCode);
+        return true;
+      }
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const setVendorProfile = (profile: VendorProfile) => {
+    setVendor(profile);
+    setIsLoggedIn(true);
+    AsyncStorage.setItem(VENDOR_LOGGED_IN_KEY, 'true');
+    AsyncStorage.setItem(VENDOR_CODE_KEY, profile.vendorCode);
+  };
+
   const logout = async (): Promise<void> => {
     console.log('[VendorAuthContext] Logging out vendor...');
     try {
@@ -232,6 +259,8 @@ export const VendorAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setIsQRModalVisible,
         isLoading,
         login,
+        loginWithOtp,
+        setVendorProfile,
         logout,
         verifyCollectionRequest,
         rejectCollectionRequest,

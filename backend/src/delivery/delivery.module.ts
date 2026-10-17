@@ -24,17 +24,20 @@ import {
   DeliveryLocationSchema,
 } from './schemas/delivery-partner.schema';
 import { RiderPayoutRate, RiderPayoutRateSchema } from './schemas/rider-payout-rate.schema';
+import { RiderOtpVerification, RiderOtpVerificationSchema } from './schemas/rider-otp.schema';
 
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { Order, OrderSchema } from '../orders/schemas/order.schema';
 import { Store, StoreSchema } from '../stores/schemas/store.schema';
 import { OtpVerification, OtpVerificationSchema } from '../auth/schemas/otp.schema';
 import { Fast2SmsService } from '../auth/fast2sms.service';
+import { EmailService } from '../auth/email.service';
 import { TrackingModule } from '../tracking/tracking.module';
 
 // Controllers
 import { DeliveryAuthController } from './auth/delivery-auth.controller';
 import { RiderController } from './rider/rider.controller';
+import { AdminRidersController } from './rider/admin-riders.controller';
 import { DeliveryOrderController } from './delivery-orders/delivery-order.controller';
 import { SettlementController } from './settlements/settlement.controller';
 import { DutyController } from './duty/duty.controller';
@@ -67,6 +70,7 @@ import { SupportService } from './support/support.service';
       { name: Store.name, schema: StoreSchema },
       { name: OtpVerification.name, schema: OtpVerificationSchema },
       { name: RiderPayoutRate.name, schema: RiderPayoutRateSchema },
+      { name: RiderOtpVerification.name, schema: RiderOtpVerificationSchema },
     ]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -86,6 +90,7 @@ import { SupportService } from './support/support.service';
   controllers: [
     DeliveryAuthController,
     RiderController,
+    AdminRidersController,
     DeliveryOrderController,
     SettlementController,
     DutyController,
@@ -101,6 +106,7 @@ import { SupportService } from './support/support.service';
     DocumentService,
     SupportService,
     Fast2SmsService,
+    EmailService,
   ],
   exports: [
     DeliveryAuthService,

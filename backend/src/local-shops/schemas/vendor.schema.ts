@@ -37,6 +37,12 @@ export class Vendor {
   @Prop({ required: true, default: '380015' })
   pincode: string;
 
+  @Prop({ default: 23.1288 })
+  latitude: number;
+
+  @Prop({ default: 72.5507 })
+  longitude: number;
+
   @Prop(
     raw({
       type: { type: String, enum: ['Point'], default: 'Point' },
@@ -44,6 +50,17 @@ export class Vendor {
     }),
   )
   coordinates: {
+    type: string;
+    coordinates: [number, number];
+  };
+
+  @Prop(
+    raw({
+      type: { type: String, enum: ['Point'], default: 'Point' },
+      coordinates: { type: [Number], default: [72.5507, 23.1288] }, // [lng, lat]
+    }),
+  )
+  location: {
     type: string;
     coordinates: [number, number];
   };
@@ -108,11 +125,11 @@ export class Vendor {
     bankName: string;
   };
 
-  // Status & KYC
-  @Prop({ default: true })
+  // Status & KYC (Defaults to Pending, requires Real Admin Approval)
+  @Prop({ default: false })
   isActive: boolean;
 
-  @Prop({ default: true })
+  @Prop({ default: false })
   isVerified: boolean;
 
   @Prop(
@@ -286,7 +303,7 @@ export class Vendor {
   vendorLong?: number;
 
   // Status Workflow: 1 = pending, 2 = active, 3 = reject
-  @Prop({ default: 2 })
+  @Prop({ default: 1 })
   vendorStatus: number;
 
   @Prop({ default: '' })
@@ -342,6 +359,7 @@ export class Vendor {
 export const VendorSchema = SchemaFactory.createForClass(Vendor);
 
 VendorSchema.index({ coordinates: '2dsphere' });
+VendorSchema.index({ location: '2dsphere' });
 VendorSchema.index({ city: 1, categoryName: 1, isActive: 1 });
 VendorSchema.index({ vendorCode: 1 }, { unique: true });
 VendorSchema.index({ vendorStatus: 1 });

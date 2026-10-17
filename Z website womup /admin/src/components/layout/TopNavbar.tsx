@@ -16,6 +16,7 @@ import { useAdmin } from '../../context/AdminContext';
 export const TopNavbar: React.FC = () => {
   const {
     activeTab,
+    setActiveTab,
     selectedStoreFilter,
     setSelectedStoreFilter,
     searchQuery,
@@ -30,6 +31,47 @@ export const TopNavbar: React.FC = () => {
   } = useAdmin();
 
   const [showQuickAddDropdown, setShowQuickAddDropdown] = useState(false);
+  const [showBellDropdown, setShowBellDropdown] = useState(false);
+  const [approvalsCount, setApprovalsCount] = useState({
+    customerKyc: 45,
+    riders: 8,
+    stores: 3,
+    vendors: 12,
+    withdrawals: 15,
+    staff: 5,
+    orders: 6,
+    rateChanges: 2,
+    total: 96,
+  });
+
+  React.useEffect(() => {
+    const fetchCounts = async () => {
+      try {
+        const res = await fetch('http://localhost:5050/api/v1/admin/approvals/summary');
+        if (res.ok) {
+          const json = await res.json();
+          if (json?.data) {
+            setApprovalsCount({
+              customerKyc: json.data.customerKyc,
+              riders: json.data.riders,
+              stores: json.data.stores,
+              vendors: json.data.vendors,
+              withdrawals: json.data.withdrawals,
+              staff: json.data.staff,
+              orders: json.data.orders,
+              rateChanges: json.data.rateChanges,
+              total: json.data.totalPending,
+            });
+          }
+        }
+      } catch (e) {
+        // keep defaults
+      }
+    };
+    fetchCounts();
+    const interval = setInterval(fetchCounts, 15000);
+    return () => clearInterval(interval);
+  }, []);
 
   const formatLastSync = () => {
     if (!lastSyncTime) return 'Connecting...';
@@ -176,6 +218,276 @@ export const TopNavbar: React.FC = () => {
             {formatLastSync()}
           </span>
         </button>
+
+        {/* Bell Notification Dropdown */}
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => setShowBellDropdown((prev) => !prev)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '38px',
+              height: '38px',
+              borderRadius: '10px',
+              border: '1px solid #E2E8F0',
+              backgroundColor: showBellDropdown ? '#EFF6FF' : '#FFFFFF',
+              color: '#071B52',
+              cursor: 'pointer',
+              position: 'relative',
+              transition: 'all 0.15s ease',
+            }}
+            title="Pending Approvals Queue"
+          >
+            <Bell size={18} color={showBellDropdown ? '#1D4ED8' : '#071B52'} />
+            {approvalsCount.total > 0 && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '-4px',
+                  right: '-4px',
+                  backgroundColor: '#DC2626',
+                  color: '#FFFFFF',
+                  fontSize: '0.65rem',
+                  fontWeight: 900,
+                  padding: '1px 5px',
+                  borderRadius: '10px',
+                  border: '2px solid #FFFFFF',
+                  minWidth: '18px',
+                  textAlign: 'center',
+                }}
+              >
+                {approvalsCount.total}
+              </span>
+            )}
+          </button>
+
+          {showBellDropdown && (
+            <div
+              style={{
+                position: 'absolute',
+                right: 0,
+                top: '46px',
+                width: '310px',
+                backgroundColor: '#FFFFFF',
+                borderRadius: '14px',
+                border: '1px solid #E2E8F0',
+                boxShadow: '0 16px 36px rgba(7, 27, 82, 0.15)',
+                padding: '12px',
+                zIndex: 100,
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingBottom: '8px',
+                  marginBottom: '8px',
+                  borderBottom: '1px solid #E2E8F0',
+                }}
+              >
+                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#071B52' }}>
+                  🔔 Approvals Queue ({approvalsCount.total})
+                </span>
+                <span style={{ fontSize: '0.70rem', color: '#10B981', fontWeight: 700 }}>
+                  Live Real-Time
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <button
+                  onClick={() => {
+                    setActiveTab('Customers');
+                    setShowBellDropdown(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.80rem',
+                    fontWeight: 700,
+                    color: '#071B52',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                >
+                  <span>👥 Customer KYC</span>
+                  <span style={{ background: '#EFF6FF', color: '#1D4ED8', padding: '2px 8px', borderRadius: '10px', fontSize: '0.74rem' }}>
+                    {approvalsCount.customerKyc} pending
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setActiveTab('Staff');
+                    setShowBellDropdown(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.80rem',
+                    fontWeight: 700,
+                    color: '#071B52',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                >
+                  <span>🛵 Rider Applications</span>
+                  <span style={{ background: '#F0FDFA', color: '#0D9488', padding: '2px 8px', borderRadius: '10px', fontSize: '0.74rem' }}>
+                    {approvalsCount.riders} pending
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setActiveTab('Stores');
+                    setShowBellDropdown(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.80rem',
+                    fontWeight: 700,
+                    color: '#071B52',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                >
+                  <span>🏪 Dark Stores</span>
+                  <span style={{ background: '#FFFBEB', color: '#D97706', padding: '2px 8px', borderRadius: '10px', fontSize: '0.74rem' }}>
+                    {approvalsCount.stores} pending
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setActiveTab('Vendors');
+                    setShowBellDropdown(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.80rem',
+                    fontWeight: 700,
+                    color: '#071B52',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                >
+                  <span>🏪 Local Vendors</span>
+                  <span style={{ background: '#F5F3FF', color: '#7C3AED', padding: '2px 8px', borderRadius: '10px', fontSize: '0.74rem' }}>
+                    {approvalsCount.vendors} pending
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setActiveTab('Wallets');
+                    setShowBellDropdown(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.80rem',
+                    fontWeight: 700,
+                    color: '#071B52',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                >
+                  <span>💰 Wallet Withdrawals</span>
+                  <span style={{ background: '#ECFDF5', color: '#059669', padding: '2px 8px', borderRadius: '10px', fontSize: '0.74rem' }}>
+                    {approvalsCount.withdrawals} pending
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setActiveTab('Orders');
+                    setShowBellDropdown(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.80rem',
+                    fontWeight: 700,
+                    color: '#071B52',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                >
+                  <span>📦 Order Cancellations</span>
+                  <span style={{ background: '#FEF2F2', color: '#DC2626', padding: '2px 8px', borderRadius: '10px', fontSize: '0.74rem' }}>
+                    {approvalsCount.orders} pending
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setActiveTab('PayoutRates');
+                    setShowBellDropdown(false);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 10px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'none',
+                    cursor: 'pointer',
+                    fontSize: '0.80rem',
+                    fontWeight: 700,
+                    color: '#071B52',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F8FAFC')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                >
+                  <span>📢 Payout Rate Changes</span>
+                  <span style={{ background: '#FFF0F7', color: '#FF3B98', padding: '2px 8px', borderRadius: '10px', fontSize: '0.74rem' }}>
+                    {approvalsCount.rateChanges} pending
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Quick Add Menu */}
         <div style={{ position: 'relative' }}>

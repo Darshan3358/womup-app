@@ -50,6 +50,12 @@ export class OrdersController {
     return this.ordersService.getOrderById(id, user?.id);
   }
 
+  @Get(':id/history')
+  @ApiOperation({ summary: 'Get order milestone timeline history' })
+  async getOrderStatusTimeline(@Param('id') id: string) {
+    return this.ordersService.getOrderStatusTimeline(id);
+  }
+
   @Post(':id/cancel')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Cancel order before packing/dispatch with automatic refund' })

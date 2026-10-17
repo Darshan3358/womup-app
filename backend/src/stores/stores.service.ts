@@ -4,6 +4,8 @@ import { Model } from 'mongoose';
 import { Store, StoreDocument } from './schemas/store.schema';
 import { Area, AreaDocument } from '../areas/schemas/area.schema';
 
+import { TrackingGateway } from '../tracking/tracking.gateway';
+
 function haversineDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371; // Earth's radius in km
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -23,10 +25,96 @@ export class StoresService {
   constructor(
     @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
     @InjectModel(Area.name) private areaModel: Model<AreaDocument>,
+    private readonly trackingGateway: TrackingGateway,
   ) {}
 
   async findAll() {
     return this.storeModel.find({ isActive: true }).exec();
+  }
+
+  async adminGetStores(query?: { status?: string; search?: string }) {
+    const filter: any = {};
+    if (query?.status && query.status !== 'All') {
+      filter.status = query.status.toUpperCase();
+    }
+    if (query?.search) {
+      filter.$or = [
+        { name: { $regex: query.search, $options: 'i' } },
+        { code: { $regex: query.search, $options: 'i' } },
+        { address: { $regex: query.search, $options: 'i' } },
+      ];
+    }
+    return this.storeModel.find(filter).sort({ createdAt: -1 }).exec();
+  }
+
+  async adminGetPendingStores() {
+    return this.storeModel.find({
+      $or: [{ status: 'PENDING' }, { status: '1' }, { isActive: false }],
+    }).sort({ createdAt: -1 }).exec();
+  }
+
+  async adminApproveStore(id: string, adminId?: string) {
+    const store = await this.storeModel.findById(id);
+    if (!store) throw new NotFoundException('Store not found');
+
+    store.status = 'ACTIVE';
+    store.isActive = true;
+    store.isOnShift = true;
+    store.approvedAt = new Date();
+    if (adminId) store.approvedBy = adminId;
+    store.rejectionReason = '';
+
+    const code = store.code || `STORE-${store.name.replace(/\s+/g, '_').toUpperCase()}`;
+    store.code = code;
+    store.qrLink = `womup://store/${code}`;
+    store.qrCodeImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=womup://store/${code}`;
+
+    await store.save();
+
+    if (this.trackingGateway) {
+      this.trackingGateway.emitStoreApproved(store._id.toString(), {
+        storeId: store._id.toString(),
+        name: store.name,
+        code: store.code,
+        status: 'ACTIVE',
+        isActive: true,
+        qrLink: store.qrLink,
+        qrCodeImageUrl: store.qrCodeImageUrl,
+      });
+    }
+
+    return {
+      success: true,
+      message: 'Dark store approved and activated successfully',
+      data: store,
+    };
+  }
+
+  async adminRejectStore(id: string, reason?: string, adminId?: string) {
+    const store = await this.storeModel.findById(id);
+    if (!store) throw new NotFoundException('Store not found');
+
+    store.status = 'REJECTED';
+    store.isActive = false;
+    store.isOnShift = false;
+    store.rejectionReason = reason || 'Incomplete or invalid documents';
+    if (adminId) store.approvedBy = adminId;
+
+    await store.save();
+
+    if (this.trackingGateway) {
+      this.trackingGateway.emitKycRejected('store', store._id.toString(), {
+        storeId: store._id.toString(),
+        status: 'REJECTED',
+        reason: store.rejectionReason,
+      });
+    }
+
+    return {
+      success: true,
+      message: `Store rejected: ${store.rejectionReason}`,
+      data: store,
+    };
   }
 
   async findById(id: string) {

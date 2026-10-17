@@ -7,7 +7,16 @@ import {
   Image,
   ActivityIndicator,
 } from 'react-native';
-import { Camera, Image as ImageIcon, CheckCircle2, RefreshCw, Trash2, AlertCircle } from 'lucide-react-native';
+import {
+  Camera,
+  Image as ImageIcon,
+  FileText,
+  CheckCircle2,
+  RefreshCw,
+  Trash2,
+  AlertCircle,
+  RotateCcw,
+} from 'lucide-react-native';
 import { useFileUpload } from '../hooks/useFileUpload';
 
 interface FileUploadFieldProps {
@@ -15,6 +24,8 @@ interface FileUploadFieldProps {
   required?: boolean;
   value?: string;
   folder?: string;
+  accept?: 'image' | 'pdf' | 'all';
+  maxSizeMB?: number;
   onUploadComplete: (url: string) => void;
   helperText?: string;
 }
@@ -24,24 +35,34 @@ export const FileUploadField: React.FC<FileUploadFieldProps> = ({
   required = false,
   value,
   folder = 'wormup/kyc/vendor',
+  accept = 'all',
+  maxSizeMB = 5,
   onUploadComplete,
   helperText,
 }) => {
   const {
+    state,
     isUploading,
     progress,
     uploadedUrl,
+    fileName,
     error,
     pickFromCamera,
     pickFromGallery,
+    pickDocument,
     uploadFile,
+    retry,
     reset,
-  } = useFileUpload({ folder });
+  } = useFileUpload({ folder, maxSizeMB });
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(value || null);
 
-  const handlePickAndUpload = async (source: 'camera' | 'gallery') => {
-    const uri = source === 'camera' ? await pickFromCamera() : await pickFromGallery();
+  const handlePickAndUpload = async (source: 'camera' | 'gallery' | 'document') => {
+    let uri: string | null = null;
+    if (source === 'camera') uri = await pickFromCamera();
+    else if (source === 'gallery') uri = await pickFromGallery();
+    else if (source === 'document') uri = await pickDocument();
+
     if (uri) {
       setPreviewUrl(uri);
       const res = await uploadFile(uri);
@@ -52,6 +73,14 @@ export const FileUploadField: React.FC<FileUploadFieldProps> = ({
     }
   };
 
+  const handleRetry = async () => {
+    const res = await retry();
+    if (res?.url) {
+      setPreviewUrl(res.url);
+      onUploadComplete(res.url);
+    }
+  };
+
   const handleRemove = () => {
     setPreviewUrl(null);
     reset();
@@ -59,6 +88,7 @@ export const FileUploadField: React.FC<FileUploadFieldProps> = ({
   };
 
   const activeImage = uploadedUrl || previewUrl || value;
+  const isPdf = activeImage?.toLowerCase().endsWith('.pdf') || fileName?.toLowerCase().endsWith('.pdf');
 
   return (
     <View style={styles.container}>
@@ -76,20 +106,41 @@ export const FileUploadField: React.FC<FileUploadFieldProps> = ({
 
       {helperText ? <Text style={styles.helperText}>{helperText}</Text> : null}
 
-      {/* UPLOADING STATE */}
+      {/* UPLOADING STATE WITH PROGRESS BAR */}
       {isUploading ? (
         <View style={styles.uploadingBox}>
-          <ActivityIndicator color="#3B82F6" size="small" />
-          <Text style={styles.uploadingText}>Uploading securely ({progress}%)...</Text>
+          <View style={styles.uploadHeader}>
+            <ActivityIndicator color="#3B82F6" size="small" />
+            <Text style={styles.uploadingText}>
+              {state === 'REQUESTING_SIGNATURE'
+                ? 'Securing signed token...'
+                : state === 'SAVING'
+                ? 'Finalizing record...'
+                : `Uploading securely (${progress}%)...`}
+            </Text>
+          </View>
+          <View style={styles.progressBarTrack}>
+            <View style={[styles.progressBarFill, { width: `${progress}%` }]} />
+          </View>
         </View>
       ) : activeImage ? (
         /* SUCCESS / PREVIEW STATE */
         <View style={styles.previewBox}>
-          <Image source={{ uri: activeImage }} style={styles.thumbnail} resizeMode="cover" />
+          {isPdf ? (
+            <View style={styles.pdfBadge}>
+              <FileText size={24} color="#EF4444" />
+              <Text style={styles.pdfText} numberOfLines={1}>
+                {fileName || 'PDF Document'}
+              </Text>
+            </View>
+          ) : (
+            <Image source={{ uri: activeImage }} style={styles.thumbnail} resizeMode="cover" />
+          )}
+
           <View style={styles.previewActions}>
             <TouchableOpacity
               style={styles.actionBtn}
-              onPress={() => handlePickAndUpload('gallery')}
+              onPress={() => handlePickAndUpload(accept === 'pdf' ? 'document' : 'gallery')}
             >
               <RefreshCw size={13} color="#94A3B8" />
               <Text style={styles.actionText}>Change</Text>
@@ -104,32 +155,58 @@ export const FileUploadField: React.FC<FileUploadFieldProps> = ({
         /* EMPTY STATE: Pick buttons */
         <View style={styles.emptyBox}>
           <View style={styles.btnRow}>
-            <TouchableOpacity
-              style={styles.pickBtn}
-              onPress={() => handlePickAndUpload('camera')}
-              activeOpacity={0.8}
-            >
-              <Camera size={16} color="#3B82F6" />
-              <Text style={styles.pickBtnText}>Camera</Text>
-            </TouchableOpacity>
+            {accept !== 'pdf' && (
+              <>
+                <TouchableOpacity
+                  style={styles.pickBtn}
+                  onPress={() => handlePickAndUpload('camera')}
+                  activeOpacity={0.8}
+                >
+                  <Camera size={16} color="#3B82F6" />
+                  <Text style={styles.pickBtnText}>Camera</Text>
+                </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.pickBtn}
-              onPress={() => handlePickAndUpload('gallery')}
-              activeOpacity={0.8}
-            >
-              <ImageIcon size={16} color="#93C5FD" />
-              <Text style={styles.pickBtnText}>Gallery</Text>
-            </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.pickBtn}
+                  onPress={() => handlePickAndUpload('gallery')}
+                  activeOpacity={0.8}
+                >
+                  <ImageIcon size={16} color="#93C5FD" />
+                  <Text style={styles.pickBtnText}>Gallery</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {(accept === 'pdf' || accept === 'all') && (
+              <TouchableOpacity
+                style={styles.pickBtn}
+                onPress={() => handlePickAndUpload('document')}
+                activeOpacity={0.8}
+              >
+                <FileText size={16} color="#F59E0B" />
+                <Text style={styles.pickBtnText}>PDF / Doc</Text>
+              </TouchableOpacity>
+            )}
           </View>
-          <Text style={styles.metaText}>Max 5MB • JPG, PNG, WebP supported</Text>
+          <Text style={styles.metaText}>
+            Max {maxSizeMB} MB • {accept === 'pdf' ? 'PDF only' : 'JPG, PNG, PDF supported'}
+          </Text>
         </View>
       )}
 
+      {/* ERROR STATE & RETRY */}
       {error ? (
-        <View style={styles.errorBox}>
-          <AlertCircle size={13} color="#EF4444" />
-          <Text style={styles.errorText}>{error}</Text>
+        <View style={styles.errorRow}>
+          <View style={styles.errorBox}>
+            <AlertCircle size={13} color="#EF4444" />
+            <Text style={styles.errorText} numberOfLines={2}>
+              {error}
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.retryBtn} onPress={handleRetry}>
+            <RotateCcw size={12} color="#F59E0B" />
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
         </View>
       ) : null}
     </View>
@@ -209,19 +286,34 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   uploadingBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    padding: 14,
+    padding: 12,
     borderRadius: 12,
     backgroundColor: '#1E293B',
     borderWidth: 1,
     borderColor: '#334155',
   },
+  uploadHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
   uploadingText: {
     fontSize: 12,
     color: '#94A3B8',
     fontWeight: '600',
+  },
+  progressBarTrack: {
+    width: '100%',
+    height: 6,
+    backgroundColor: '#0F172A',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#3B82F6',
+    borderRadius: 4,
   },
   previewBox: {
     flexDirection: 'row',
@@ -238,6 +330,18 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 8,
     backgroundColor: '#0F172A',
+  },
+  pdfBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 8,
+    maxWidth: '65%',
+  },
+  pdfText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#F1F5F9',
   },
   previewActions: {
     flexDirection: 'row',
@@ -259,14 +363,37 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#94A3B8',
   },
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 6,
+    gap: 8,
+  },
   errorBox: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginTop: 6,
   },
   errorText: {
     fontSize: 11,
     color: '#EF4444',
+  },
+  retryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#1E293B',
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  retryText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#F59E0B',
   },
 });

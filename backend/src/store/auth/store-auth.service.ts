@@ -156,18 +156,26 @@ export class StoreAuthService {
       cityId: city._id,
       areaId: area._id,
       areaName: area.name,
-      address: `${dto.storeName.trim()}, ${area.name}, ${city.name}`,
-      pincode: defaultPincode,
+      address: dto.fullAddress ? `${dto.fullAddress.trim()}${dto.landmark ? ', ' + dto.landmark.trim() : ''}` : `${dto.storeName.trim()}, ${area.name}, ${city.name}`,
+      pincode: dto.pincode ? dto.pincode.trim() : defaultPincode,
       location: {
         type: 'Point',
-        coordinates: [area.centerLng, area.centerLat],
+        coordinates: [
+          dto.longitude !== undefined ? dto.longitude : area.centerLng,
+          dto.latitude !== undefined ? dto.latitude : area.centerLat,
+        ],
       },
-      serviceRadiusKm: area.radiusKm || 4.5,
-      estimatedDeliveryMinutes: area.defaultDeliveryMinutes || 9,
+      serviceRadiusKm: dto.serviceRadius || area.radiusKm || 4.5,
+      estimatedDeliveryMinutes: dto.deliveryTime || area.defaultDeliveryMinutes || 9,
       isActive: true,
       status: 'ACTIVE',
-      openingTime: '07:00',
-      closingTime: '23:00',
+      openingTime: dto.openingTime || '07:00',
+      closingTime: dto.closingTime || '23:00',
+      storeLicense: dto.storeLicense,
+      ownerAadharFront: dto.ownerAadharFront,
+      ownerAadharBack: dto.ownerAadharBack,
+      shopPhoto: dto.shopPhoto,
+      initialStaffCount: dto.initialStaffCount,
     });
 
     // 9. Link area to this store

@@ -56,6 +56,45 @@ export class CreateOrderDto {
   @IsOptional()
   deliveryFee?: number;
 
+  @IsOptional()
+  handlingFee?: number;
+
+  @IsOptional()
+  convenienceFee?: number;
+
+  @IsOptional()
+  mrpSubtotal?: number;
+
+  @IsOptional()
+  deliveryDistanceKm?: number;
+
+  @IsOptional()
+  deliveryRatePerKm?: number;
+
+  @IsOptional()
+  deliveryMinFee?: number;
+
+  @IsOptional()
+  deliveryMaxFee?: number;
+
+  @IsOptional()
+  deliveryRateSource?: string;
+
+  @IsOptional()
+  deliveryDistanceMeters?: number;
+
+  @IsOptional()
+  rawDeliveryFee?: number;
+
+  @IsOptional()
+  floorApplied?: boolean;
+
+  @IsOptional()
+  capApplied?: boolean;
+
+  @IsOptional()
+  roundingPolicy?: string;
+
   @ApiProperty({ required: false, description: 'Client cart items to sync before checkout' })
   @IsOptional()
   items?: {

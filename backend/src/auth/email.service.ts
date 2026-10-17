@@ -167,4 +167,205 @@ export class EmailService {
     this.logger.warn(`[Email OTP] Dev mode fallback — OTP for ${email}: ${otp}`);
     return true;
   }
+
+  /** Send 6-digit verification OTP to Rider */
+  async sendRiderOtpEmail(email: string, otp: string, riderName?: string): Promise<boolean> {
+    const fromName = 'Worm Up Rider Team';
+    const fromEmail = this.configService.get<string>('EMAIL_USER');
+    const name = riderName || 'Rider';
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#F8FAFC;font-family:'Segoe UI',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#F8FAFC;padding:40px 0;">
+    <tr><td align="center">
+      <table width="480" cellpadding="0" cellspacing="0" style="background:#FFFFFF;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(7,27,82,0.08);border:1px solid #E2E8F0;">
+        <tr>
+          <td style="background:linear-gradient(135deg,#071B52,#0A2570);padding:30px;text-align:center;">
+            <h1 style="color:#FFFFFF;margin:0;font-size:26px;font-weight:900;">🛵 Worm Up Rider</h1>
+            <p style="color:rgba(255,255,255,0.85);margin:8px 0 0;font-size:14px;font-weight:600;">Email Verification Code</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:36px 32px;">
+            <p style="color:#071B52;font-size:16px;font-weight:700;margin:0 0 16px;">Hi ${name} 👋</p>
+            <p style="color:#64748B;font-size:14px;line-height:1.6;margin:0 0 24px;">
+              Your 6-digit verification code for <strong>Worm Up Delivery Partner</strong> registration & login is:
+            </p>
+            <div style="text-align:center;margin:0 0 28px;">
+              <div style="display:inline-block;background:#EEF2FF;border:2px solid #4F46E5;border-radius:12px;padding:16px 36px;">
+                <p style="margin:0;font-size:38px;font-weight:900;color:#4F46E5;letter-spacing:8px;">${otp}</p>
+              </div>
+            </div>
+            <p style="color:#047857;background:#ECFDF5;padding:10px 14px;border-radius:8px;font-size:12px;font-weight:600;margin:0 0 20px;text-align:center;">
+              ⏱️ This code is valid for 10 minutes.
+            </p>
+            <p style="color:#94A3B8;font-size:12px;text-align:center;margin:0;">
+              Do not share this code with anyone. If you didn't request this, you can safely ignore this email.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#F8FAFC;padding:16px 32px;text-align:center;border-top:1px solid #E2E8F0;">
+            <p style="color:#94A3B8;font-size:12px;margin:0;">— WormUp Rider Team • © 2026 Worm Up</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+    if (this.transporter) {
+      try {
+        await this.transporter.sendMail({
+          from: `"${fromName}" <${fromEmail}>`,
+          to: email,
+          subject: `${otp} is your Worm Up Rider verification code`,
+          text: `Hi ${name},\n\nYour verification code is: ${otp}\n\nThis code is valid for 10 minutes.\nDo not share this code with anyone.\n\n— WormUp Rider Team`,
+          html,
+        });
+        this.logger.log(`[Rider Email OTP] Dispatched successfully to ${email}`);
+        return true;
+      } catch (err: any) {
+        this.logger.error(`[Rider Email OTP] Transporter error: ${err.message}`);
+      }
+    }
+    this.logger.warn(`[Rider Email OTP] Dev mode fallback — OTP for ${email}: ${otp}`);
+    return true;
+  }
+
+  /** Send Welcome email after successful Rider registration */
+  async sendRiderWelcomeEmail(email: string, riderName: string, riderCode: string): Promise<boolean> {
+    const fromName = 'Worm Up Rider Team';
+    const fromEmail = this.configService.get<string>('EMAIL_USER');
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#F8FAFC;font-family:'Segoe UI',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#F8FAFC;padding:40px 0;">
+    <tr><td align="center">
+      <table width="480" cellpadding="0" cellspacing="0" style="background:#FFFFFF;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(7,27,82,0.08);border:1px solid #E2E8F0;">
+        <tr>
+          <td style="background:linear-gradient(135deg,#047857,#059669);padding:30px;text-align:center;">
+            <h1 style="color:#FFFFFF;margin:0;font-size:26px;font-weight:900;">🎉 Welcome to Worm Up!</h1>
+            <p style="color:rgba(255,255,255,0.9);margin:8px 0 0;font-size:14px;font-weight:600;">Rider Account Activated</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:32px;">
+            <p style="color:#071B52;font-size:16px;font-weight:700;margin:0 0 12px;">Hi ${riderName} 👋</p>
+            <p style="color:#64748B;font-size:14px;line-height:1.6;margin:0 0 20px;">
+              Congratulations on joining the <strong>Worm Up Delivery Fleet</strong>! Your rider account has been created successfully.
+            </p>
+            <div style="background:#F1F5F9;border-radius:10px;padding:16px;margin:0 0 24px;">
+              <p style="margin:0 0 6px;color:#64748B;font-size:12px;">Rider ID: <strong style="color:#071B52;font-size:15px;">${riderCode}</strong></p>
+              <p style="margin:0;color:#64748B;font-size:12px;">Registered Email: <strong style="color:#071B52;">${email}</strong></p>
+            </div>
+            <p style="color:#071B52;font-size:13px;font-weight:800;margin:0 0 8px;">What you can do now:</p>
+            <ul style="color:#475569;font-size:13px;line-height:1.8;margin:0 0 24px;padding-left:20px;">
+              <li>Go online to receive high-paying nearby orders</li>
+              <li>View pickup dark stores on live GPS map</li>
+              <li>Earn ₹45–₹85 per delivery with instant tips</li>
+              <li>Withdraw earnings anytime to your bank account</li>
+            </ul>
+            <div style="text-align:center;">
+              <span style="display:inline-block;background:#071B52;color:#FFFFFF;padding:12px 28px;border-radius:8px;font-size:13px;font-weight:800;">Open Worm Up Rider App</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#F8FAFC;padding:16px 32px;text-align:center;border-top:1px solid #E2E8F0;">
+            <p style="color:#94A3B8;font-size:12px;margin:0;">— WormUp Rider Team • Helpdesk: support@wormup.in</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+    if (this.transporter) {
+      try {
+        await this.transporter.sendMail({
+          from: `"${fromName}" <${fromEmail}>`,
+          to: email,
+          subject: 'Welcome to WormUp Rider Program! 🛵',
+          text: `Hi ${riderName},\n\nWelcome to WormUp!\n\nYour Rider ID: ${riderCode}\nRegistered Email: ${email}\n\nYou can now go online and start delivering!\n\n— WormUp Rider Team`,
+          html,
+        });
+        return true;
+      } catch (err: any) {
+        this.logger.error(`[Rider Welcome Email] Error: ${err.message}`);
+      }
+    }
+    return true;
+  }
+
+  /** Send Password Reset Email with OTP */
+  async sendRiderPasswordResetEmail(email: string, otp: string, riderName?: string): Promise<boolean> {
+    const fromName = 'Worm Up Security';
+    const fromEmail = this.configService.get<string>('EMAIL_USER');
+    const name = riderName || 'Rider';
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#F8FAFC;font-family:'Segoe UI',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#F8FAFC;padding:40px 0;">
+    <tr><td align="center">
+      <table width="480" cellpadding="0" cellspacing="0" style="background:#FFFFFF;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(7,27,82,0.08);border:1px solid #E2E8F0;">
+        <tr>
+          <td style="background:linear-gradient(135deg,#BE123C,#E11D48);padding:30px;text-align:center;">
+            <h1 style="color:#FFFFFF;margin:0;font-size:24px;font-weight:900;">🔒 Password Reset Code</h1>
+            <p style="color:rgba(255,255,255,0.9);margin:8px 0 0;font-size:13px;">Worm Up Rider Account</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:32px;">
+            <p style="color:#071B52;font-size:16px;font-weight:700;margin:0 0 12px;">Hi ${name} 👋</p>
+            <p style="color:#64748B;font-size:14px;line-height:1.6;margin:0 0 20px;">
+              We received a request to reset the password for your Worm Up Delivery Partner account. Use the code below:
+            </p>
+            <div style="text-align:center;margin:0 0 24px;">
+              <div style="display:inline-block;background:#FFF1F2;border:2px solid #E11D48;border-radius:12px;padding:16px 36px;">
+                <p style="margin:0;font-size:38px;font-weight:900;color:#E11D48;letter-spacing:8px;">${otp}</p>
+              </div>
+            </div>
+            <p style="color:#BE123C;background:#FFF1F2;padding:10px 14px;border-radius:8px;font-size:12px;font-weight:600;margin:0 0 16px;text-align:center;">
+              ⏱️ Valid for 10 minutes. Never share this code.
+            </p>
+            <p style="color:#94A3B8;font-size:12px;text-align:center;margin:0;">
+              If you didn't request a password reset, please contact support immediately.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+    if (this.transporter) {
+      try {
+        await this.transporter.sendMail({
+          from: `"${fromName}" <${fromEmail}>`,
+          to: email,
+          subject: `${otp} is your Worm Up Rider password reset code`,
+          text: `Hi ${name},\n\nYour password reset code is: ${otp}\n\nValid for 10 minutes.\n\n— WormUp Security Team`,
+          html,
+        });
+        return true;
+      } catch (err: any) {
+        this.logger.error(`[Rider Reset Email] Error: ${err.message}`);
+      }
+    }
+    return true;
+  }
 }
+

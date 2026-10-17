@@ -9,6 +9,7 @@ import {
   Image,
   Modal,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import {
   Search,
@@ -35,6 +36,8 @@ import {
   ChevronDown,
   Navigation,
   Check,
+  FileText,
+  Eye,
 } from 'lucide-react-native';
 import { COLORS, RADIUS, SPACING } from '../theme';
 import { useAdminState } from '../context/AdminStateContext';
@@ -134,7 +137,8 @@ export const CustomersScreen: React.FC = () => {
   };
 
   // Rider Detail & Edit Modal State
-  const [selectedRider, setSelectedRider] = useState<(DeliveryPartnerItem & { email?: string; bankAccount?: any }) | null>(null);
+  const [selectedRider, setSelectedRider] = useState<(DeliveryPartnerItem & { email?: string; bankAccount?: any; documents?: any }) | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<{ title: string; url: string } | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [isEditingRider, setIsEditingRider] = useState(false);
@@ -229,12 +233,23 @@ export const CustomersScreen: React.FC = () => {
 
     try {
       const res = await ApiService.fetchRiderDetail(rider.id);
-      if (res && res.success && res.data) {
+      const detail = res?.data || res;
+      if (detail && (detail.id || detail._id || detail.fullName || detail.name)) {
         const enriched = {
           ...rider,
-          ...res.data,
-          name: res.data.fullName || res.data.name || rider.name,
-          phone: res.data.phoneNumber || res.data.phone || rider.phone,
+          ...detail,
+          name: detail.fullName || detail.name || rider.name,
+          phone: detail.phoneNumber || detail.phone || rider.phone,
+          bankAccount: detail.bankAccount || detail.bankDetails || (detail.bankName ? {
+            bankName: detail.bankName,
+            accountNumber: detail.accountNumber,
+            ifscCode: detail.ifscCode,
+            accountHolderName: detail.accountHolderName || detail.fullName,
+            branchName: detail.bankBranch || detail.branchName,
+            upiId: detail.upiId,
+            isVerified: detail.verificationStatus === 'VERIFIED' || detail.status === 'APPROVED',
+          } : rider.bankAccount || null),
+          documents: detail.documents || rider.documents,
         };
         setSelectedRider(enriched);
         setEditForm({
@@ -294,6 +309,44 @@ export const CustomersScreen: React.FC = () => {
       }
     } catch (err: any) {
       alert(err.message || 'Error updating rider');
+    } finally {
+      setIsSavingRider(false);
+    }
+  };
+
+  const handleApproveRider = async () => {
+    if (!selectedRider) return;
+    try {
+      setIsSavingRider(true);
+      const res = await ApiService.approveRider(selectedRider.id);
+      if (res?.success) {
+        setSelectedRider((p) => p ? { ...p, status: 'APPROVED', isOnline: true } : null);
+        updateRider(selectedRider.id, { status: 'APPROVED', isOnline: true });
+        Alert.alert('Rider Approved', 'Rider account has been approved and dispatch has been unlocked.');
+      } else {
+        Alert.alert('Approval Failed', res?.error || res?.message || 'Could not approve rider');
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    } finally {
+      setIsSavingRider(false);
+    }
+  };
+
+  const handleRejectRider = async () => {
+    if (!selectedRider) return;
+    try {
+      setIsSavingRider(true);
+      const res = await ApiService.rejectRider(selectedRider.id, 'DL/RC documents could not be verified');
+      if (res?.success) {
+        setSelectedRider((p) => p ? { ...p, status: 'REJECTED', isOnline: false } : null);
+        updateRider(selectedRider.id, { status: 'REJECTED', isOnline: false });
+        Alert.alert('Rider Rejected', 'Rider registration has been rejected.');
+      } else {
+        Alert.alert('Rejection Failed', res?.error || res?.message || 'Could not reject rider');
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
     } finally {
       setIsSavingRider(false);
     }
@@ -440,7 +493,7 @@ export const CustomersScreen: React.FC = () => {
 
                 <View style={styles.infoCol}>
                   <View style={styles.nameRow}>
-                    <Text style={styles.customerName}>{c.name}</Text>
+                    <Text style={styles.customerName} numberOfLines={1} ellipsizeMode="tail">{c.name}</Text>
                     {c.type === 'Corporate' && (
                       <View style={styles.corpBadge}>
                         <Text style={styles.corpText}>CORP</Text>
@@ -449,8 +502,8 @@ export const CustomersScreen: React.FC = () => {
                   </View>
 
                   <View style={styles.metaRow}>
-                    <Phone size={12} color={COLORS.textMuted} style={{ marginRight: 4 }} />
-                    <Text style={styles.phoneText}>{c.phone}</Text>
+                    <Phone size={11} color={COLORS.textMuted} style={{ marginRight: 4, flexShrink: 0 }} />
+                    <Text style={styles.phoneText} numberOfLines={1}>{c.phone}</Text>
                   </View>
 
                   <View style={styles.statusRow}>
@@ -469,7 +522,7 @@ export const CustomersScreen: React.FC = () => {
                       {c.status}
                     </Text>
                     <Text style={styles.dotSeparator}>•</Text>
-                    <Text style={styles.zoneText}>
+                    <Text style={styles.zoneText} numberOfLines={1} ellipsizeMode="tail">
                       🏙️ {resolveCustomerHierarchy(c).cityName} • 📍 {resolveCustomerHierarchy(c).areaName}
                     </Text>
                   </View>
@@ -509,21 +562,28 @@ export const CustomersScreen: React.FC = () => {
 
                 <View style={styles.infoCol}>
                   <View style={styles.nameRow}>
-                    <Text style={styles.customerName}>{r.name}</Text>
+                    <Text style={styles.customerName} numberOfLines={1} ellipsizeMode="tail">
+                      {r.name}
+                    </Text>
                     <View style={styles.partnerCodeBadge}>
                       <Text style={styles.partnerCodeText}>{r.partnerCode}</Text>
                     </View>
                   </View>
 
                   <View style={styles.metaRow}>
-                    <Phone size={12} color={COLORS.textMuted} style={{ marginRight: 4 }} />
-                    <Text style={styles.phoneText}>{r.phone}</Text>
-                    {r.email ? <Text style={styles.emailText}> • {r.email}</Text> : null}
+                    <Phone size={11} color={COLORS.textMuted} style={{ marginRight: 4, flexShrink: 0 }} />
+                    <Text style={styles.phoneText} numberOfLines={1}>{r.phone}</Text>
                   </View>
 
+                  {r.email ? (
+                    <Text style={styles.emailText} numberOfLines={1} ellipsizeMode="tail">
+                      {r.email}
+                    </Text>
+                  ) : null}
+
                   <View style={styles.riderVehicleRow}>
-                    <Bike size={12} color={COLORS.primary} style={{ marginRight: 4 }} />
-                    <Text style={styles.vehicleText}>
+                    <Bike size={11} color={COLORS.primary} style={{ marginRight: 4, flexShrink: 0 }} />
+                    <Text style={styles.vehicleText} numberOfLines={1} ellipsizeMode="tail">
                       {r.vehicleType} • {r.vehicleNumber}
                     </Text>
                   </View>
@@ -544,8 +604,8 @@ export const CustomersScreen: React.FC = () => {
                       {r.isOnline ? 'ONLINE' : 'OFFLINE'}
                     </Text>
                     <Text style={styles.dotSeparator}>•</Text>
-                    <Text style={styles.zoneText}>
-                      📍 Hub: {resolveRiderHierarchy(r).areaName} • City: {resolveRiderHierarchy(r).cityName}
+                    <Text style={styles.zoneText} numberOfLines={1} ellipsizeMode="tail">
+                      📍 {resolveRiderHierarchy(r).areaName || 'Hub'}
                     </Text>
                   </View>
                 </View>
@@ -785,29 +845,29 @@ export const CustomersScreen: React.FC = () => {
                         <View style={styles.kycVerifiedBadge}>
                           <ShieldCheck size={12} color="#0D8A4E" style={{ marginRight: 3 }} />
                           <Text style={styles.kycVerifiedText}>
-                            {selectedRider.bankAccount?.isVerified ? 'VERIFIED' : 'ACTIVE'}
+                            {selectedRider.bankAccount?.isVerified || selectedRider.status === 'APPROVED' ? 'VERIFIED' : 'PENDING'}
                           </Text>
                         </View>
                       </View>
 
-                      {selectedRider.bankAccount ? (
+                      {selectedRider.bankAccount && (selectedRider.bankAccount.bankName || selectedRider.bankAccount.accountNumber) ? (
                         <View style={styles.bankDetailsCard}>
                           <View style={styles.bankFieldRow}>
                             <Text style={styles.bankFieldLabel}>Bank Name:</Text>
                             <Text style={styles.bankFieldValue}>
-                              {selectedRider.bankAccount.bankName || 'HDFC Bank'}
+                              {selectedRider.bankAccount.bankName || 'N/A'}
                             </Text>
                           </View>
                           <View style={styles.bankFieldRow}>
                             <Text style={styles.bankFieldLabel}>Account Number:</Text>
                             <Text style={styles.bankFieldValueMono}>
-                              {selectedRider.bankAccount.accountNumber || '•••• •••• 4920'}
+                              {selectedRider.bankAccount.accountNumber || 'N/A'}
                             </Text>
                           </View>
                           <View style={styles.bankFieldRow}>
                             <Text style={styles.bankFieldLabel}>IFSC Code:</Text>
                             <Text style={styles.bankFieldValueMono}>
-                              {selectedRider.bankAccount.ifscCode || 'HDFC0001048'}
+                              {selectedRider.bankAccount.ifscCode || 'N/A'}
                             </Text>
                           </View>
                           <View style={styles.bankFieldRow}>
@@ -816,6 +876,22 @@ export const CustomersScreen: React.FC = () => {
                               {selectedRider.bankAccount.accountHolderName || selectedRider.name}
                             </Text>
                           </View>
+                          {selectedRider.bankAccount.branchName ? (
+                            <View style={styles.bankFieldRow}>
+                              <Text style={styles.bankFieldLabel}>Branch:</Text>
+                              <Text style={styles.bankFieldValue}>
+                                {selectedRider.bankAccount.branchName}
+                              </Text>
+                            </View>
+                          ) : null}
+                          {selectedRider.bankAccount.upiId ? (
+                            <View style={styles.bankFieldRow}>
+                              <Text style={styles.bankFieldLabel}>UPI ID:</Text>
+                              <Text style={styles.bankFieldValueMono}>
+                                {selectedRider.bankAccount.upiId}
+                              </Text>
+                            </View>
+                          ) : null}
                         </View>
                       ) : (
                         <View style={styles.noBankCard}>
@@ -824,6 +900,220 @@ export const CustomersScreen: React.FC = () => {
                         </View>
                       )}
                     </View>
+
+                    {/* KYC Documents Inspection Card */}
+                    <View style={styles.sectionContainer}>
+                      <View style={styles.bankHeaderRow}>
+                        <FileText size={18} color="#7C3AED" style={{ marginRight: 6 }} />
+                        <Text style={styles.sectionHeader}>KYC & Fleet Legal Documents</Text>
+                        <View style={[styles.kycVerifiedBadge, { backgroundColor: selectedRider.status === 'APPROVED' ? '#E8F5E9' : '#FEF3C7' }]}>
+                          <ShieldCheck size={12} color={selectedRider.status === 'APPROVED' ? '#0D8A4E' : '#D97706'} style={{ marginRight: 3 }} />
+                          <Text style={[styles.kycVerifiedText, { color: selectedRider.status === 'APPROVED' ? '#0D8A4E' : '#D97706' }]}>
+                            {selectedRider.status === 'APPROVED' ? 'ALL VERIFIED' : selectedRider.status === 'REJECTED' ? 'REJECTED' : 'UNDER REVIEW'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.docCardsList}>
+                        {/* 1. Commercial DL */}
+                        <View style={styles.docItemCard}>
+                          <View style={styles.docItemHeader}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.docItemTitle}>Commercial Driving License (DL)</Text>
+                              <Text style={styles.docItemSubtitle}>
+                                {selectedRider.documents?.dlNumber || 'License on file'}
+                              </Text>
+                            </View>
+                            <View style={[styles.docBadge, { backgroundColor: (selectedRider.documents?.dlFront || selectedRider.documents?.dlFrontUrl) ? (selectedRider.status === 'APPROVED' ? '#E8F5E9' : '#FEF3C7') : '#FEE2E2' }]}>
+                              <Text style={[styles.docBadgeText, { color: (selectedRider.documents?.dlFront || selectedRider.documents?.dlFrontUrl) ? (selectedRider.status === 'APPROVED' ? '#0D8A4E' : '#D97706') : '#DC2626' }]}>
+                                {(selectedRider.documents?.dlFront || selectedRider.documents?.dlFrontUrl) ? (selectedRider.status === 'APPROVED' ? 'VERIFIED' : 'PENDING') : 'NOT UPLOADED'}
+                              </Text>
+                            </View>
+                          </View>
+                          {(selectedRider.documents?.dlFront || selectedRider.documents?.dlFrontUrl) ? (
+                            <View style={styles.docThumbsRow}>
+                              <TouchableOpacity
+                                style={styles.docThumbContainer}
+                                onPress={() => setPreviewDoc({ title: 'Driving License (Front)', url: selectedRider.documents?.dlFront || selectedRider.documents?.dlFrontUrl || '' })}
+                                activeOpacity={0.8}
+                              >
+                                <Image source={{ uri: selectedRider.documents?.dlFront || selectedRider.documents?.dlFrontUrl }} style={styles.docThumbImg} resizeMode="cover" />
+                                <View style={styles.docThumbOverlay}>
+                                  <Eye size={14} color="#FFF" />
+                                  <Text style={styles.docThumbText}>Front</Text>
+                                </View>
+                              </TouchableOpacity>
+                              {(selectedRider.documents?.dlBack || selectedRider.documents?.dlBackUrl) && (
+                                <TouchableOpacity
+                                  style={styles.docThumbContainer}
+                                  onPress={() => setPreviewDoc({ title: 'Driving License (Back)', url: selectedRider.documents?.dlBack || selectedRider.documents?.dlBackUrl || '' })}
+                                  activeOpacity={0.8}
+                                >
+                                  <Image source={{ uri: selectedRider.documents?.dlBack || selectedRider.documents?.dlBackUrl }} style={styles.docThumbImg} resizeMode="cover" />
+                                  <View style={styles.docThumbOverlay}>
+                                    <Eye size={14} color="#FFF" />
+                                    <Text style={styles.docThumbText}>Back</Text>
+                                  </View>
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                          ) : (
+                            <Text style={styles.docEmptyText}>No driving license uploaded yet</Text>
+                          )}
+                        </View>
+
+                        {/* 2. Vehicle RC */}
+                        <View style={styles.docItemCard}>
+                          <View style={styles.docItemHeader}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.docItemTitle}>Vehicle Registration Certificate (RC)</Text>
+                              <Text style={styles.docItemSubtitle}>
+                                {selectedRider.documents?.rcNumber || selectedRider.vehicleNumber || 'RC on file'}
+                              </Text>
+                            </View>
+                            <View style={[styles.docBadge, { backgroundColor: (selectedRider.documents?.rcFront || selectedRider.documents?.rcFrontUrl) ? (selectedRider.status === 'APPROVED' ? '#E8F5E9' : '#FEF3C7') : '#FEE2E2' }]}>
+                              <Text style={[styles.docBadgeText, { color: (selectedRider.documents?.rcFront || selectedRider.documents?.rcFrontUrl) ? (selectedRider.status === 'APPROVED' ? '#0D8A4E' : '#D97706') : '#DC2626' }]}>
+                                {(selectedRider.documents?.rcFront || selectedRider.documents?.rcFrontUrl) ? (selectedRider.status === 'APPROVED' ? 'VERIFIED' : 'PENDING') : 'NOT UPLOADED'}
+                              </Text>
+                            </View>
+                          </View>
+                          {(selectedRider.documents?.rcFront || selectedRider.documents?.rcFrontUrl) ? (
+                            <View style={styles.docThumbsRow}>
+                              <TouchableOpacity
+                                style={styles.docThumbContainer}
+                                onPress={() => setPreviewDoc({ title: 'Vehicle RC (Front)', url: selectedRider.documents?.rcFront || selectedRider.documents?.rcFrontUrl || '' })}
+                                activeOpacity={0.8}
+                              >
+                                <Image source={{ uri: selectedRider.documents?.rcFront || selectedRider.documents?.rcFrontUrl }} style={styles.docThumbImg} resizeMode="cover" />
+                                <View style={styles.docThumbOverlay}>
+                                  <Eye size={14} color="#FFF" />
+                                  <Text style={styles.docThumbText}>Front</Text>
+                                </View>
+                              </TouchableOpacity>
+                              {(selectedRider.documents?.rcBack || selectedRider.documents?.rcBackUrl) && (
+                                <TouchableOpacity
+                                  style={styles.docThumbContainer}
+                                  onPress={() => setPreviewDoc({ title: 'Vehicle RC (Back)', url: selectedRider.documents?.rcBack || selectedRider.documents?.rcBackUrl || '' })}
+                                  activeOpacity={0.8}
+                                >
+                                  <Image source={{ uri: selectedRider.documents?.rcBack || selectedRider.documents?.rcBackUrl }} style={styles.docThumbImg} resizeMode="cover" />
+                                  <View style={styles.docThumbOverlay}>
+                                    <Eye size={14} color="#FFF" />
+                                    <Text style={styles.docThumbText}>Back</Text>
+                                  </View>
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                          ) : (
+                            <Text style={styles.docEmptyText}>No vehicle RC uploaded yet</Text>
+                          )}
+                        </View>
+
+                        {/* 3. Insurance */}
+                        <View style={styles.docItemCard}>
+                          <View style={styles.docItemHeader}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.docItemTitle}>Two-Wheeler Insurance Policy</Text>
+                              <Text style={styles.docItemSubtitle}>
+                                {selectedRider.documents?.insuranceNumber || 'Comprehensive Policy'}
+                              </Text>
+                            </View>
+                            <View style={[styles.docBadge, { backgroundColor: (selectedRider.documents?.insurance || selectedRider.documents?.insuranceUrl) ? (selectedRider.status === 'APPROVED' ? '#E8F5E9' : '#FEF3C7') : '#FEE2E2' }]}>
+                              <Text style={[styles.docBadgeText, { color: (selectedRider.documents?.insurance || selectedRider.documents?.insuranceUrl) ? (selectedRider.status === 'APPROVED' ? '#0D8A4E' : '#D97706') : '#DC2626' }]}>
+                                {(selectedRider.documents?.insurance || selectedRider.documents?.insuranceUrl) ? (selectedRider.status === 'APPROVED' ? 'VERIFIED' : 'PENDING') : 'NOT UPLOADED'}
+                              </Text>
+                            </View>
+                          </View>
+                          {(selectedRider.documents?.insurance || selectedRider.documents?.insuranceUrl) ? (
+                            <View style={styles.docThumbsRow}>
+                              <TouchableOpacity
+                                style={styles.docThumbContainer}
+                                onPress={() => setPreviewDoc({ title: 'Insurance Policy', url: selectedRider.documents?.insurance || selectedRider.documents?.insuranceUrl || '' })}
+                                activeOpacity={0.8}
+                              >
+                                <Image source={{ uri: selectedRider.documents?.insurance || selectedRider.documents?.insuranceUrl }} style={styles.docThumbImg} resizeMode="cover" />
+                                <View style={styles.docThumbOverlay}>
+                                  <Eye size={14} color="#FFF" />
+                                  <Text style={styles.docThumbText}>Policy</Text>
+                                </View>
+                              </TouchableOpacity>
+                            </View>
+                          ) : (
+                            <Text style={styles.docEmptyText}>No insurance certificate uploaded yet</Text>
+                          )}
+                        </View>
+
+                        {/* 4. Aadhaar Card */}
+                        <View style={styles.docItemCard}>
+                          <View style={styles.docItemHeader}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.docItemTitle}>National Identity Proof (Aadhaar)</Text>
+                              <Text style={styles.docItemSubtitle}>
+                                {selectedRider.documents?.aadhaarNumber ? `UIDAI • ${selectedRider.documents.aadhaarNumber}` : 'Government ID Proof'}
+                              </Text>
+                            </View>
+                            <View style={[styles.docBadge, { backgroundColor: (selectedRider.documents?.aadhaarFront || selectedRider.documents?.aadhaarFrontUrl) ? (selectedRider.status === 'APPROVED' ? '#E8F5E9' : '#FEF3C7') : '#FEE2E2' }]}>
+                              <Text style={[styles.docBadgeText, { color: (selectedRider.documents?.aadhaarFront || selectedRider.documents?.aadhaarFrontUrl) ? (selectedRider.status === 'APPROVED' ? '#0D8A4E' : '#D97706') : '#DC2626' }]}>
+                                {(selectedRider.documents?.aadhaarFront || selectedRider.documents?.aadhaarFrontUrl) ? (selectedRider.status === 'APPROVED' ? 'VERIFIED' : 'PENDING') : 'NOT UPLOADED'}
+                              </Text>
+                            </View>
+                          </View>
+                          {(selectedRider.documents?.aadhaarFront || selectedRider.documents?.aadhaarFrontUrl) ? (
+                            <View style={styles.docThumbsRow}>
+                              <TouchableOpacity
+                                style={styles.docThumbContainer}
+                                onPress={() => setPreviewDoc({ title: 'Aadhaar Card (Front)', url: selectedRider.documents?.aadhaarFront || selectedRider.documents?.aadhaarFrontUrl || '' })}
+                                activeOpacity={0.8}
+                              >
+                                <Image source={{ uri: selectedRider.documents?.aadhaarFront || selectedRider.documents?.aadhaarFrontUrl }} style={styles.docThumbImg} resizeMode="cover" />
+                                <View style={styles.docThumbOverlay}>
+                                  <Eye size={14} color="#FFF" />
+                                  <Text style={styles.docThumbText}>Front</Text>
+                                </View>
+                              </TouchableOpacity>
+                              {(selectedRider.documents?.aadhaarBack || selectedRider.documents?.aadhaarBackUrl) && (
+                                <TouchableOpacity
+                                  style={styles.docThumbContainer}
+                                  onPress={() => setPreviewDoc({ title: 'Aadhaar Card (Back)', url: selectedRider.documents?.aadhaarBack || selectedRider.documents?.aadhaarBackUrl || '' })}
+                                  activeOpacity={0.8}
+                                >
+                                  <Image source={{ uri: selectedRider.documents?.aadhaarBack || selectedRider.documents?.aadhaarBackUrl }} style={styles.docThumbImg} resizeMode="cover" />
+                                  <View style={styles.docThumbOverlay}>
+                                    <Eye size={14} color="#FFF" />
+                                    <Text style={styles.docThumbText}>Back</Text>
+                                  </View>
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                          ) : (
+                            <Text style={styles.docEmptyText}>No Aadhaar proof uploaded yet</Text>
+                          )}
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* Action Buttons: If Pending, show Approve / Reject */}
+                    {selectedRider.status === 'PENDING' && (
+                      <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+                        <TouchableOpacity
+                          style={[styles.editActionBtn, { flex: 1, backgroundColor: '#10B981', marginBottom: 0 }]}
+                          onPress={handleApproveRider}
+                          activeOpacity={0.85}
+                        >
+                          <Check size={18} color={COLORS.white} style={{ marginRight: 6 }} />
+                          <Text style={styles.editActionBtnText}>Approve Rider</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.editActionBtn, { flex: 1, backgroundColor: '#EF4444', marginBottom: 0 }]}
+                          onPress={handleRejectRider}
+                          activeOpacity={0.85}
+                        >
+                          <X size={18} color={COLORS.white} style={{ marginRight: 6 }} />
+                          <Text style={styles.editActionBtnText}>Reject</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
 
                     {/* Edit Button */}
                     <TouchableOpacity
@@ -996,6 +1286,53 @@ export const CustomersScreen: React.FC = () => {
                 )}
               </ScrollView>
             ) : null}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ================= MODAL: KYC DOCUMENT PREVIEW ================= */}
+      <Modal
+        visible={!!previewDoc}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPreviewDoc(null)}
+      >
+        <View style={styles.previewDocBackdrop}>
+          <View style={styles.previewDocModal}>
+            <View style={styles.previewDocHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <FileText size={18} color={COLORS.purple} style={{ marginRight: 8 }} />
+                <Text style={styles.previewDocTitle} numberOfLines={1}>
+                  {previewDoc?.title || 'Document Inspection'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setPreviewDoc(null)}
+                style={styles.closeBtn}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <X size={20} color={COLORS.textPrimary} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.previewDocImageContainer}>
+              {previewDoc?.url ? (
+                <Image
+                  source={{ uri: previewDoc.url }}
+                  style={styles.previewDocImage}
+                  resizeMode="contain"
+                />
+              ) : (
+                <Text style={styles.docEmptyText}>Document image unavailable</Text>
+              )}
+            </View>
+            <View style={styles.previewDocFooter}>
+              <TouchableOpacity
+                style={styles.previewDocCloseBtn}
+                onPress={() => setPreviewDoc(null)}
+              >
+                <Text style={styles.previewDocCloseText}>Close Inspector</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1452,16 +1789,21 @@ const styles = StyleSheet.create({
   },
   infoCol: {
     flex: 1,
+    minWidth: 0,
+    marginRight: SPACING.sm,
   },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginBottom: 2,
   },
   customerName: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: COLORS.textPrimary,
-    marginRight: 6,
+    maxWidth: '75%',
   },
   corpBadge: {
     backgroundColor: COLORS.purple,
@@ -1477,7 +1819,7 @@ const styles = StyleSheet.create({
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 2,
+    marginVertical: 1,
   },
   phoneText: {
     fontSize: 12,
@@ -1506,9 +1848,12 @@ const styles = StyleSheet.create({
   zoneText: {
     fontSize: 11,
     color: COLORS.textMuted,
+    flexShrink: 1,
   },
   rightCol: {
     alignItems: 'flex-end',
+    flexShrink: 0,
+    minWidth: 84,
   },
   spendAmount: {
     fontSize: 15,
@@ -2051,5 +2396,140 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: COLORS.white,
+  },
+  docCardsList: {
+    gap: 10,
+  },
+  docItemCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: RADIUS.card,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 12,
+  },
+  docItemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  docItemTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  docItemSubtitle: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  docBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: RADIUS.pill,
+  },
+  docBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  docThumbsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  docThumbContainer: {
+    width: 90,
+    height: 65,
+    borderRadius: RADIUS.sm,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    position: 'relative',
+    backgroundColor: '#E2E8F0',
+  },
+  docThumbImg: {
+    width: '100%',
+    height: '100%',
+  },
+  docThumbOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 2,
+    gap: 4,
+  },
+  docThumbText: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  docEmptyText: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    fontStyle: 'italic',
+    marginTop: 2,
+  },
+  previewDocBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  previewDocModal: {
+    width: '100%',
+    maxWidth: 600,
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.card,
+    overflow: 'hidden',
+    maxHeight: '90%',
+  },
+  previewDocHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  previewDocTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  previewDocImageContainer: {
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 320,
+    backgroundColor: '#0F172A',
+  },
+  previewDocImage: {
+    width: '100%',
+    height: 380,
+  },
+  previewDocFooter: {
+    padding: 14,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    alignItems: 'flex-end',
+  },
+  previewDocCloseBtn: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: RADIUS.button,
+  },
+  previewDocCloseText: {
+    color: COLORS.white,
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

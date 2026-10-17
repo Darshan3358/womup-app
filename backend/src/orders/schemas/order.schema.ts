@@ -106,10 +106,46 @@ export class Order {
   coinsDiscount: number;
 
   @Prop({ default: 0 })
+  mrpSubtotal?: number;
+
+  @Prop({ default: 0 })
   deliveryFee: number;
 
   @Prop({ default: 5 })
   handlingFee: number;
+
+  @Prop({ default: 5 })
+  convenienceFee?: number;
+
+  @Prop({ default: 0 })
+  deliveryDistanceKm?: number;
+
+  @Prop({ default: 0 })
+  deliveryRatePerKm?: number;
+
+  @Prop({ default: 0 })
+  deliveryMinFee?: number;
+
+  @Prop({ default: 0 })
+  deliveryMaxFee?: number;
+
+  @Prop({ default: '' })
+  deliveryRateSource?: string;
+
+  @Prop()
+  deliveryDistanceMeters?: number;
+
+  @Prop()
+  rawDeliveryFee?: number;
+
+  @Prop({ type: Boolean })
+  floorApplied?: boolean;
+
+  @Prop({ type: Boolean })
+  capApplied?: boolean;
+
+  @Prop({ default: 'WHOLE_RUPEE' })
+  roundingPolicy?: string;
 
   @Prop({ default: 0 })
   tip: number;

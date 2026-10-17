@@ -246,6 +246,7 @@ export const BlinkitOrderAgainScreen: React.FC = () => {
       />
 
       <ScrollView
+        style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
@@ -427,9 +428,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F7F9FE', // SRS Section 6: background: #F7F9FE
+    minHeight: 0,
+  },
+  scrollView: {
+    flex: 1,
+    width: '100%',
   },
   scrollContent: {
-    paddingBottom: 24,
+    paddingBottom: 110,
   },
 
   // Order Type Tabs inside Navy Header (SRS Section 12)

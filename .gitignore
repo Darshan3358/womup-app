@@ -60,3 +60,5 @@ backend/.env
 **/.next/
 .gemini/
 *.log
+backend/uploads/
+**/uploads/

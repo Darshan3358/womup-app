@@ -17,6 +17,7 @@ import { MonthlyBenefitsBanner } from '../../components/common/MonthlyBenefitsBa
 import { ProductSection } from '../../components/common/ProductSection';
 import { WomupPopularBrands } from '../../components/common/WomupPopularBrands';
 import { FloatingCartPill } from '../../components/common/FloatingCartPill';
+import { KYCBanner } from '../../components/KYCBanner';
 
 import { useApp, mapProductToBlinkit } from '../../context/AppContext';
 import { ProductService } from '../../services/productService';
@@ -292,9 +293,13 @@ export const BlinkitHomeScreen: React.FC = () => {
 
       {/* Scrollable Homepage Body in Exact SRS Order */}
       <ScrollView
+        style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
+        {/* Prime Visibility KYC Status Banner (Variant 1-4) */}
+        <KYCBanner />
+
         {/* Section 1: Hero Carousel (Top) */}
         <HeroBannerCarousel onBannerPress={handleBannerPress} />
 
@@ -443,10 +448,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAFBFE',
     width: '100%',
     maxWidth: '100%',
+    minHeight: 0,
     overflow: 'hidden',
   },
+  scrollView: {
+    flex: 1,
+    width: '100%',
+  },
   scrollContent: {
-    paddingBottom: 24,
+    paddingBottom: 110,
     width: '100%',
     maxWidth: '100%',
   },

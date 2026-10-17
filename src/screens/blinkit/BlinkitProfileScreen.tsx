@@ -606,6 +606,7 @@ export const BlinkitProfileScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <ScrollView
+        style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
@@ -1830,9 +1831,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.cardBackground,
+    minHeight: 0,
+  },
+  scrollView: {
+    flex: 1,
+    width: '100%',
   },
   scrollContent: {
-    paddingBottom: 40,
+    paddingBottom: 110,
   },
   topHeaderGradient: {
     paddingHorizontal: 16,

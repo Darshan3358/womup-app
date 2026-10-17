@@ -16,6 +16,8 @@ import { useRider } from '../../context/RiderContext';
 import { RiderApiService } from '../../services/riderApi';
 import { COLORS } from '../../theme/colors';
 import { RiderChatModal } from '../../components/modals/RiderChatModal';
+import { RiderNavigationMap } from '../../components/RiderNavigationMap';
+import { NavigationScreen } from './NavigationScreen';
 
 const RIDER_STAGES = [
   { id: 'ACCEPTED', label: 'Order Accepted', desc: 'Job confirmed & active delivery' },
@@ -40,7 +42,11 @@ export const CurrentDeliveryScreen: React.FC = () => {
     refreshAvailableJobs,
     acceptDelivery,
     dismissJob,
+    currentLocation,
   } = useRider();
+
+  const [isNavScreenOpen, setIsNavScreenOpen] = useState(false);
+  const [navMode, setNavMode] = useState<'PICKUP' | 'DELIVERY'>('PICKUP');
 
   const hasActiveJob = Boolean(
     activeDelivery &&
@@ -195,6 +201,15 @@ export const CurrentDeliveryScreen: React.FC = () => {
   const progressPercent = Math.round(
     ((currentStageIndex + (stepStatus === 'DELIVERED' ? 1 : 0.5)) / RIDER_STAGES.length) * 100
   );
+
+  if (isNavScreenOpen && activeDelivery) {
+    return (
+      <NavigationScreen
+        modeOverride={navMode}
+        onBack={() => setIsNavScreenOpen(false)}
+      />
+    );
+  }
 
   return (
     <View style={styles.mainWrapper}>
@@ -452,19 +467,36 @@ export const CurrentDeliveryScreen: React.FC = () => {
                     )}
                   </View>
 
+                  {/* Live In-App Navigation Map (Rider -> Store) */}
+                  <View style={{ marginVertical: 12, borderRadius: 14, overflow: 'hidden' }}>
+                    <RiderNavigationMap
+                      mode="PICKUP"
+                      riderCoords={currentLocation ? {
+                        latitude: currentLocation.latitude,
+                        longitude: currentLocation.longitude,
+                      } : null}
+                      riderHeading={currentLocation?.heading || 0}
+                      targetCoords={activeDelivery.storeCoordinates ? {
+                        latitude: activeDelivery.storeCoordinates.latitude,
+                        longitude: activeDelivery.storeCoordinates.longitude,
+                      } : null}
+                      targetName={activeDelivery.storeName || 'Dark Store'}
+                      targetAddress={activeDelivery.storeAddress}
+                      distanceKm={activeDelivery.distanceKm || 1.2}
+                      height={240}
+                    />
+                  </View>
+
                   <TouchableOpacity
                     style={styles.actionNavBtn}
-                    onPress={() =>
-                      handleOpenMap(
-                        activeDelivery.storeName,
-                        activeDelivery.storeCoordinates,
-                        activeDelivery.storeAddress
-                      )
-                    }
+                    onPress={() => {
+                      setNavMode('PICKUP');
+                      setIsNavScreenOpen(true);
+                    }}
                     activeOpacity={0.8}
                   >
-                    <Ionicons name="navigate-outline" size={16} color="#1E293B" style={{ marginRight: 6 }} />
-                    <Text style={styles.actionNavBtnText}>OPEN NAVIGATION TO STORE</Text>
+                    <Ionicons name="navigate" size={16} color="#1E293B" style={{ marginRight: 6 }} />
+                    <Text style={styles.actionNavBtnText}>START TURN-BY-TURN NAVIGATION</Text>
                   </TouchableOpacity>
 
                   {/* Items breakdown when at store */}
@@ -515,19 +547,36 @@ export const CurrentDeliveryScreen: React.FC = () => {
                     </Text>
                   </View>
 
+                  {/* Live In-App Navigation Map (Store -> Customer) */}
+                  <View style={{ marginVertical: 12, borderRadius: 14, overflow: 'hidden' }}>
+                    <RiderNavigationMap
+                      mode="DELIVERY"
+                      riderCoords={currentLocation ? {
+                        latitude: currentLocation.latitude,
+                        longitude: currentLocation.longitude,
+                      } : null}
+                      riderHeading={currentLocation?.heading || 0}
+                      targetCoords={activeDelivery.customerCoordinates ? {
+                        latitude: activeDelivery.customerCoordinates.latitude,
+                        longitude: activeDelivery.customerCoordinates.longitude,
+                      } : null}
+                      targetName={activeDelivery.customerName || 'Customer'}
+                      targetAddress={activeDelivery.customerAddress}
+                      distanceKm={activeDelivery.distanceKm || 2.4}
+                      height={240}
+                    />
+                  </View>
+
                   <TouchableOpacity
                     style={styles.actionNavBtn}
-                    onPress={() =>
-                      handleOpenMap(
-                        activeDelivery.customerName,
-                        activeDelivery.customerCoordinates,
-                        activeDelivery.customerAddress
-                      )
-                    }
+                    onPress={() => {
+                      setNavMode('DELIVERY');
+                      setIsNavScreenOpen(true);
+                    }}
                     activeOpacity={0.8}
                   >
-                    <Ionicons name="navigate-outline" size={16} color="#1E293B" style={{ marginRight: 6 }} />
-                    <Text style={styles.actionNavBtnText}>OPEN NAVIGATION TO CUSTOMER</Text>
+                    <Ionicons name="navigate" size={16} color="#1E293B" style={{ marginRight: 6 }} />
+                    <Text style={styles.actionNavBtnText}>START TURN-BY-TURN NAVIGATION</Text>
                   </TouchableOpacity>
                 </View>
               )}

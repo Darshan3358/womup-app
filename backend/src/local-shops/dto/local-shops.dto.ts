@@ -448,3 +448,282 @@ export class WithdrawWalletDto {
   ifsc?: string;
 }
 
+export class SendVendorOtpDto {
+  @ApiProperty({ example: '+919876543210' })
+  @IsString()
+  @IsNotEmpty()
+  mobile: string;
+
+  @ApiPropertyOptional({ example: 'REGISTRATION', enum: ['REGISTRATION', 'LOGIN', 'FORGOT_PASSWORD'] })
+  @IsString()
+  @IsOptional()
+  purpose?: string;
+}
+
+export class VerifyVendorOtpDto {
+  @ApiProperty({ example: '+919876543210' })
+  @IsString()
+  @IsNotEmpty()
+  mobile: string;
+
+  @ApiProperty({ example: '123456' })
+  @IsString()
+  @IsNotEmpty()
+  otp: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  verificationId?: string;
+}
+
+export class VendorLoginDto {
+  @ApiProperty({ example: '+919876543210 or VND001' })
+  @IsString()
+  @IsNotEmpty()
+  loginId: string;
+
+  @ApiPropertyOptional({ example: 'secure123' })
+  @IsString()
+  @IsOptional()
+  password?: string;
+}
+
+export class VendorLoginOtpDto {
+  @ApiProperty({ example: '+919876543210' })
+  @IsString()
+  @IsNotEmpty()
+  mobile: string;
+
+  @ApiProperty({ example: '123456' })
+  @IsString()
+  @IsNotEmpty()
+  otp: string;
+}
+
+export class VendorForgotPasswordDto {
+  @ApiProperty({ example: '+919876543210' })
+  @IsString()
+  @IsNotEmpty()
+  mobile: string;
+}
+
+export class VendorResetPasswordDto {
+  @ApiProperty({ example: '+919876543210' })
+  @IsString()
+  @IsNotEmpty()
+  mobile: string;
+
+  @ApiProperty({ example: '123456' })
+  @IsString()
+  @IsNotEmpty()
+  otp: string;
+
+  @ApiProperty({ example: 'newPassword123' })
+  @IsString()
+  @IsNotEmpty()
+  newPassword: string;
+}
+
+export class RegisterVendorDto {
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  verificationId?: string;
+
+  // Step 1: Basic Info
+  @ApiProperty({ example: 'Gokul Vegetables' })
+  @IsString()
+  @IsNotEmpty()
+  firmName: string;
+
+  @ApiProperty({ example: 'Ramesh Patel' })
+  @IsString()
+  @IsNotEmpty()
+  ownerName: string;
+
+  @ApiProperty({ example: 'Kirana / Vegetables' })
+  @IsString()
+  @IsNotEmpty()
+  businessType: string;
+
+  @ApiPropertyOptional({ example: 'Vegetables' })
+  @IsString()
+  @IsOptional()
+  businessCategoryName?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  businessCategoryId?: string;
+
+  @ApiProperty({ example: '+919876543210' })
+  @IsString()
+  @IsNotEmpty()
+  mobile: string;
+
+  @ApiPropertyOptional({ example: '+919876543211' })
+  @IsString()
+  @IsOptional()
+  alternateMobile?: string;
+
+  @ApiProperty({ example: 'gokul@example.com' })
+  @IsString()
+  @IsNotEmpty()
+  email: string;
+
+  // Step 3: Location
+  @ApiProperty({ example: 'Shop 10-14, Ground Floor, Shukan Hub' })
+  @IsString()
+  @IsNotEmpty()
+  address: string;
+
+  @ApiPropertyOptional({ example: 'Near Chandlodiya Railway Station' })
+  @IsString()
+  @IsOptional()
+  landmark?: string;
+
+  @ApiPropertyOptional({ example: 'IN' })
+  @IsString()
+  @IsOptional()
+  countryId?: string;
+
+  @ApiPropertyOptional({ example: 'GJ' })
+  @IsString()
+  @IsOptional()
+  stateId?: string;
+
+  @ApiPropertyOptional({ example: 'AHM' })
+  @IsString()
+  @IsOptional()
+  districtId?: string;
+
+  @ApiPropertyOptional({ example: 'Daskroi' })
+  @IsString()
+  @IsOptional()
+  talukaId?: string;
+
+  @ApiPropertyOptional({ example: 'Ahmedabad' })
+  @IsString()
+  @IsOptional()
+  city?: string;
+
+  @ApiPropertyOptional({ example: 'Ahmedabad' })
+  @IsString()
+  @IsOptional()
+  cityName?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  cityId?: string;
+
+  @ApiProperty({ example: '382481' })
+  @IsString()
+  @IsNotEmpty()
+  pincode: string;
+
+  @ApiPropertyOptional({ example: 23.1288 })
+  @IsNumber()
+  @IsOptional()
+  latitude?: number;
+
+  @ApiPropertyOptional({ example: 72.5507 })
+  @IsNumber()
+  @IsOptional()
+  longitude?: number;
+
+  // Step 4: KYC Documents
+  @ApiProperty({ example: '123412341234' })
+  @IsString()
+  @IsNotEmpty()
+  aadhaarNumber: string;
+
+  @ApiProperty({ example: 'https://...' })
+  @IsString()
+  @IsNotEmpty()
+  aadhaarFrontUrl: string;
+
+  @ApiProperty({ example: 'https://...' })
+  @IsString()
+  @IsNotEmpty()
+  aadhaarBackUrl: string;
+
+  @ApiPropertyOptional({ example: '24ABCDE1234F1Z5' })
+  @IsString()
+  @IsOptional()
+  gstNumber?: string;
+
+  @ApiPropertyOptional({ example: 'https://...' })
+  @IsString()
+  @IsOptional()
+  gstCertificateUrl?: string;
+
+  @ApiProperty({ example: 'https://...' })
+  @IsString()
+  @IsNotEmpty()
+  panCardUrl: string;
+
+  @ApiProperty({ example: 'https://...' })
+  @IsString()
+  @IsNotEmpty()
+  tradeLicenseUrl: string;
+
+  @ApiProperty({ example: 'https://...' })
+  @IsString()
+  @IsNotEmpty()
+  cancelledChequeUrl: string;
+
+  @ApiPropertyOptional({ example: 'https://...' })
+  @IsString()
+  @IsOptional()
+  businessCardUrl?: string;
+
+  @ApiProperty({ example: 'https://...' })
+  @IsString()
+  @IsNotEmpty()
+  shopPhotoUrl: string;
+
+  @ApiProperty({ example: 'https://...' })
+  @IsString()
+  @IsNotEmpty()
+  ownerPhotoUrl: string;
+
+  // Step 5: Bank & Password
+  @ApiProperty({ example: 'HDFC Bank' })
+  @IsString()
+  @IsNotEmpty()
+  bankName: string;
+
+  @ApiProperty({ example: 'SG Highway' })
+  @IsString()
+  @IsNotEmpty()
+  bankBranch: string;
+
+  @ApiProperty({ example: 'Gokul Vegetables' })
+  @IsString()
+  @IsNotEmpty()
+  accountHolderName: string;
+
+  @ApiProperty({ example: '123456789012' })
+  @IsString()
+  @IsNotEmpty()
+  accountNumber: string;
+
+  @ApiProperty({ example: 'HDFC0000123' })
+  @IsString()
+  @IsNotEmpty()
+  ifscCode: string;
+
+  @ApiPropertyOptional({ example: 'gokul@okhdfcbank' })
+  @IsString()
+  @IsOptional()
+  upiId?: string;
+
+  @ApiProperty({ example: 'secure123' })
+  @IsString()
+  @IsNotEmpty()
+  password: string;
+}
+
+

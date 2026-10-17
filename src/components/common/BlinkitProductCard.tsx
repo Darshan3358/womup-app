@@ -59,7 +59,7 @@ export const BlinkitProductCard: React.FC<BlinkitProductCardProps> = ({
   const currentMrp = activeVariant ? activeVariant.mrp : product.mrp;
   const currentPackSize = activeVariant ? activeVariant.label : product.packSize;
 
-  const quantity = getBlinkitQty(product.id);
+  const quantity = getBlinkitQty(product.id, activeVariant?.id);
 
   const handleAdd = () => {
     setIsLoading(true);
@@ -69,8 +69,9 @@ export const BlinkitProductCard: React.FC<BlinkitProductCardProps> = ({
         sellingPrice: currentSellingPrice,
         mrp: currentMrp,
         packSize: currentPackSize,
+        selectedVariantId: activeVariant?.id,
       };
-      updateBlinkitQty(enrichedProd, 1);
+      updateBlinkitQty(enrichedProd, 1, activeVariant?.id);
       setIsLoading(false);
     }, 150);
   };
@@ -82,8 +83,9 @@ export const BlinkitProductCard: React.FC<BlinkitProductCardProps> = ({
       sellingPrice: currentSellingPrice,
       mrp: currentMrp,
       packSize: currentPackSize,
+      selectedVariantId: activeVariant?.id,
     };
-    updateBlinkitQty(enrichedProd, 1);
+    updateBlinkitQty(enrichedProd, 1, activeVariant?.id);
   };
 
   const handleDecrement = () => {
@@ -92,8 +94,9 @@ export const BlinkitProductCard: React.FC<BlinkitProductCardProps> = ({
       sellingPrice: currentSellingPrice,
       mrp: currentMrp,
       packSize: currentPackSize,
+      selectedVariantId: activeVariant?.id,
     };
-    updateBlinkitQty(enrichedProd, -1);
+    updateBlinkitQty(enrichedProd, -1, activeVariant?.id);
   };
 
   const handleCardPress = () => {
@@ -102,6 +105,7 @@ export const BlinkitProductCard: React.FC<BlinkitProductCardProps> = ({
       sellingPrice: currentSellingPrice,
       mrp: currentMrp,
       packSize: currentPackSize,
+      selectedVariantId: activeVariant?.id,
     };
     if (onPress) {
       onPress();

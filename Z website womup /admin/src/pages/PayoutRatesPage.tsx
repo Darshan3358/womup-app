@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useAdmin } from '../context/AdminContext';
 import { PayoutRateItem } from '../types/admin';
+import { AdminApiService } from '../services/api';
 
 export const PayoutRatesPage: React.FC = () => {
   const {
@@ -108,6 +109,28 @@ export const PayoutRatesPage: React.FC = () => {
     return true;
   });
 
+  // Live backend rates loader
+  const loadRates = async () => {
+    try {
+      const res = await AdminApiService.fetchPayoutRates();
+      if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
+        setRates(res.data);
+        const globalDoc = res.globalRate || res.data.find((r: any) => r.scope === 'GLOBAL');
+        if (globalDoc) {
+          setGlobalRateInput(String(globalDoc.ratePerKm || 12));
+          setGlobalMinInput(String(globalDoc.minimumPayout || 35));
+          setGlobalMaxInput(String(globalDoc.maximumPayout || 160));
+        }
+      }
+    } catch (e) {
+      console.warn('Could not load rates from backend:', e);
+    }
+  };
+
+  useEffect(() => {
+    loadRates();
+  }, []);
+
   // Simulator calculation
   const runSimulation = () => {
     const dist = parseFloat(simDistanceKm) || 4.5;
@@ -147,8 +170,8 @@ export const PayoutRatesPage: React.FC = () => {
       isActive: true,
       description: 'Universal fallback payout rate for all standard deliveries',
     };
-    setRates((prev) => prev.map((r) => (r.scope === 'GLOBAL' ? updated : r)));
     await savePayoutRate(updated);
+    await loadRates();
     setSavingGlobal(false);
     setIsEditingGlobal(false);
   };
@@ -169,21 +192,16 @@ export const PayoutRatesPage: React.FC = () => {
       isActive: true,
     };
 
-    if (editingItem) {
-      setRates((prev) => prev.map((r) => (r.id === editingItem.id ? payload : r)));
-    } else {
-      setRates((prev) => [...prev, payload]);
-    }
-
     await savePayoutRate(payload);
+    await loadRates();
     setModalSubmitting(false);
     setShowModal(false);
   };
 
   const handleDelete = async (rateId: string) => {
     if (window.confirm('Delete this payout rate override? Delivery calculations will fallback to city or global rate.')) {
-      setRates((prev) => prev.filter((r) => r.id !== rateId));
       await deletePayoutRate(rateId);
+      await loadRates();
     }
   };
 

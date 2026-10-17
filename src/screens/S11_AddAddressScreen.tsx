@@ -23,6 +23,7 @@ import { Address } from '../types';
 import { AddressService } from '../services/addressService';
 import { AuthService } from '../services/authService';
 import { api } from '../services/api';
+import { MapPicker } from '../components/MapPicker';
 
 interface CityOption {
   id: string;
@@ -104,6 +105,10 @@ export const S11_AddAddressScreen: React.FC = () => {
   const [selectedArea, setSelectedArea] = useState<AreaOption | null>(null);
   const [pincode, setPincode] = useState(selectedAddress.pincode || '382481');
   const [addressType, setAddressType] = useState<'Home' | 'Work' | 'Other'>('Home');
+  const [mapCoords, setMapCoords] = useState<{ latitude: number; longitude: number }>({
+    latitude: selectedAddress.latitude || 23.0805,
+    longitude: selectedAddress.longitude || 72.5480,
+  });
 
   // Modals state
   const [cities, setCities] = useState<CityOption[]>(FALLBACK_CITIES);
@@ -182,6 +187,87 @@ export const S11_AddAddressScreen: React.FC = () => {
     }
   };
 
+  const [detectedStoreInfo, setDetectedStoreInfo] = useState<{
+    areaName?: string;
+    storeName?: string;
+    storeCode?: string;
+    isDetecting?: boolean;
+    errorMessage?: string;
+  }>({});
+
+  const handleDetectArea = async (latitude: number, longitude: number) => {
+    if (!latitude || !longitude) return;
+    try {
+      setDetectedStoreInfo((prev) => ({ ...prev, isDetecting: true, errorMessage: undefined }));
+      const res: any = await api.post('/location/detect-area', {
+        cityId: selectedCity?.id,
+        lat: latitude,
+        lng: longitude,
+        latitude,
+        longitude,
+      });
+      const detected = res?.data?.areaName || res?.areaName ? (res.data || res) : res;
+      if (detected && detected.success && (detected.areaName || detected.area?.name)) {
+        const aName = detected.areaName || detected.area?.name;
+        const aId = detected.areaId || detected.area?.id;
+        setDetectedStoreInfo({
+          areaName: aName,
+          storeName: detected.storeName,
+          storeCode: detected.storeCode,
+          isDetecting: false,
+        });
+
+        // Auto-fill the Area dropdown
+        setAreas((currentAreas) => {
+          const matched = currentAreas.find(
+            (a) =>
+              a.name.toLowerCase() === aName.toLowerCase() ||
+              (aId && (a.id === aId || (a as any)._id === aId))
+          );
+          if (matched) {
+            setSelectedArea(matched);
+            if (matched.pincodes && matched.pincodes.length > 0) {
+              setPincode(matched.pincodes[0]);
+            }
+          } else {
+            const newAreaOpt: AreaOption = {
+              id: aId || `area_${Date.now()}`,
+              name: aName,
+              city: detected.city || selectedCity.name,
+              pincodes: ['380015'],
+              centerLat: latitude,
+              centerLng: longitude,
+            };
+            setSelectedArea(newAreaOpt);
+            return [newAreaOpt, ...currentAreas];
+          }
+          return currentAreas;
+        });
+
+        if (errors.area) setErrors((prev) => ({ ...prev, area: '' }));
+      } else {
+        const errorMsg = detected?.message || 'Sorry, WormUp delivery is not available at this location.';
+        setDetectedStoreInfo({
+          areaName: undefined,
+          storeName: undefined,
+          storeCode: undefined,
+          isDetecting: false,
+          errorMessage: errorMsg,
+        });
+        setErrors((prev) => ({ ...prev, area: errorMsg }));
+      }
+    } catch (err) {
+      console.warn('Backend GeoJSON area detection failed:', err);
+      setDetectedStoreInfo((prev) => ({ ...prev, isDetecting: false }));
+    }
+  };
+
+  useEffect(() => {
+    if (mapCoords.latitude && mapCoords.longitude) {
+      handleDetectArea(mapCoords.latitude, mapCoords.longitude);
+    }
+  }, []);
+
   const handleSelectCity = (cityItem: CityOption) => {
     if (cityItem.isServiceable === false) {
       // Show Change 9 unserviceable notification
@@ -227,8 +313,8 @@ export const S11_AddAddressScreen: React.FC = () => {
     }
 
     setSaving(true);
-    const resolvedLat = selectedArea?.centerLat || 23.0225;
-    const resolvedLng = selectedArea?.centerLng || 72.5714;
+    const resolvedLat = mapCoords.latitude || selectedArea?.centerLat || 23.0805;
+    const resolvedLng = mapCoords.longitude || selectedArea?.centerLng || 72.5480;
 
     const newAddress: Address = {
       id: `addr_${Date.now()}`,
@@ -387,6 +473,31 @@ export const S11_AddAddressScreen: React.FC = () => {
           </TouchableOpacity>
           {errors.area ? <Text style={styles.errorText}>{errors.area}</Text> : null}
 
+          {/* Auto-detected boundary badge or outside service area alert */}
+          {detectedStoreInfo.areaName ? (
+            <View style={styles.detectedBadge}>
+              <Ionicons name="checkmark-circle" size={14} color="#059669" />
+              <Text style={styles.detectedBadgeText}>
+                GeoJSON Boundary: <Text style={styles.detectedBold}>{detectedStoreInfo.areaName}</Text>
+                {detectedStoreInfo.storeName ? ` • ${detectedStoreInfo.storeName}` : ''}
+              </Text>
+            </View>
+          ) : detectedStoreInfo.isDetecting ? (
+            <View style={styles.detectedBadge}>
+              <Ionicons name="sync-outline" size={14} color="#2563EB" />
+              <Text style={[styles.detectedBadgeText, { color: '#2563EB' }]}>
+                Detecting zone from GeoJSON boundaries...
+              </Text>
+            </View>
+          ) : detectedStoreInfo.errorMessage ? (
+            <View style={[styles.detectedBadge, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}>
+              <Ionicons name="alert-circle" size={14} color="#DC2626" />
+              <Text style={[styles.detectedBadgeText, { color: '#B91C1C' }]}>
+                {detectedStoreInfo.errorMessage}
+              </Text>
+            </View>
+          ) : null}
+
           {/* Pincode (Auto-filled from selected Area) */}
           <Text style={styles.label}>Pincode</Text>
           <View style={styles.inputContainer}>
@@ -430,6 +541,24 @@ export const S11_AddAddressScreen: React.FC = () => {
               );
             })}
           </View>
+
+          {/* Interactive Map Pinning */}
+          <Text style={[styles.label, { marginTop: 16 }]}>
+            Pin Exact Delivery Location <Text style={styles.star}>*</Text>
+          </Text>
+          <MapPicker
+            initialLatitude={mapCoords.latitude}
+            initialLongitude={mapCoords.longitude}
+            onLocationSelect={(coords) => {
+              setMapCoords({ latitude: coords.latitude, longitude: coords.longitude });
+              if (coords.address && !streetArea) {
+                setStreetArea(coords.address);
+              }
+              handleDetectArea(coords.latitude, coords.longitude);
+            }}
+            confirmLabel="Confirm Pin Location"
+            pinTitle="Delivery Dropoff"
+          />
 
           {/* Save Address CTA */}
           <GradientButton
@@ -880,5 +1009,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.hotPink,
     fontWeight: '700',
+  },
+  detectedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginTop: -8,
+    marginBottom: 12,
+    gap: 6,
+  },
+  detectedBadgeText: {
+    fontSize: 12,
+    color: '#065F46',
+    flex: 1,
+  },
+  detectedBold: {
+    fontWeight: '700',
+    color: '#047857',
   },
 });

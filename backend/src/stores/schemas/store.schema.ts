@@ -48,10 +48,10 @@ export class Store {
   @Prop({ default: 9 }) // In Minutes
   estimatedDeliveryMinutes: number;
 
-  @Prop({ default: true })
+  @Prop({ default: false })
   isActive: boolean;
 
-  @Prop({ default: true })
+  @Prop({ default: false })
   isOnShift?: boolean;
 
   @Prop({ default: '07:00' })
@@ -81,8 +81,23 @@ export class Store {
   @Prop({ trim: true })
   phone?: string;
 
-  @Prop({ trim: true, default: 'ACTIVE' })
+  @Prop({ trim: true, default: 'PENDING' })
   status?: string;
+
+  @Prop()
+  approvedAt?: Date;
+
+  @Prop({ trim: true })
+  approvedBy?: string;
+
+  @Prop({ trim: true })
+  rejectionReason?: string;
+
+  @Prop({ trim: true })
+  qrCodeImageUrl?: string;
+
+  @Prop({ trim: true })
+  qrLink?: string;
 
   @Prop({ trim: true, lowercase: true, sparse: true })
   loginId?: string;
@@ -98,7 +113,24 @@ export class Store {
 
   @Prop({ trim: true })
   lastLoginBy?: string;
+
+  // KYC & Store Documents
+  @Prop({ trim: true })
+  storeLicenseUrl?: string;
+
+  @Prop({ trim: true })
+  ownerAadhaarFrontUrl?: string;
+
+  @Prop({ trim: true })
+  ownerAadhaarBackUrl?: string;
+
+  @Prop({ type: [String], default: [] })
+  shopPhotosUrls?: string[];
+
+  @Prop({ trim: true })
+  imageUrl?: string;
 }
+
 
 export const StoreSchema = SchemaFactory.createForClass(Store);
 StoreSchema.index({ location: '2dsphere' });

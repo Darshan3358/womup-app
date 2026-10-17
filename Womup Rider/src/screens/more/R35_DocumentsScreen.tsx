@@ -9,7 +9,10 @@ import {
   TextInput,
   RefreshControl,
   Alert,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../theme/colors';
 import { useRider } from '../../context/RiderContext';
@@ -26,6 +29,8 @@ export const DocumentsScreen: React.FC<{ isAuthOnboarding?: boolean }> = ({ isAu
   const [selectedDoc, setSelectedDoc] = useState<RiderDocument | null>(null);
   const [docNumber, setDocNumber] = useState('');
   const [expiry, setExpiry] = useState('');
+  const [uploadedUrl, setUploadedUrl] = useState('');
+  const [isPickingImage, setIsPickingImage] = useState(false);
 
   const loadDocs = async () => {
     const list = await RiderApiService.getDocuments();
@@ -44,24 +49,56 @@ export const DocumentsScreen: React.FC<{ isAuthOnboarding?: boolean }> = ({ isAu
 
   const handleOpenEdit = (doc: RiderDocument) => {
     setSelectedDoc(doc);
-    setDocNumber(doc.documentNumberMasked || '');
+    setDocNumber(doc.documentNumberMasked && !doc.documentNumberMasked.includes('****') ? doc.documentNumberMasked : '');
     setExpiry(doc.expiresAt || '');
+    setUploadedUrl(doc.fileUrl || '');
+  };
+
+  const pickImage = async (source: 'camera' | 'gallery') => {
+    setIsPickingImage(true);
+    try {
+      let res: ImagePicker.ImagePickerResult;
+      if (source === 'camera') {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission Denied', 'Camera access is required to photograph your document.');
+          setIsPickingImage(false);
+          return;
+        }
+        res = await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 0.8, base64: true });
+      } else {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission Denied', 'Gallery access is required.');
+          setIsPickingImage(false);
+          return;
+        }
+        res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, quality: 0.8, base64: true });
+      }
+
+      if (!res.canceled && res.assets && res.assets.length > 0) {
+        const asset = res.assets[0];
+        const uri = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
+        setUploadedUrl(uri);
+      }
+    } catch {
+      Alert.alert('Error', 'Unable to pick document image.');
+    } finally {
+      setIsPickingImage(false);
+    }
   };
 
   const handleSaveDoc = async () => {
     if (!selectedDoc) return;
-    if (!docNumber.trim()) {
-      Alert.alert('Required', 'Please provide the document number.');
-      return;
-    }
     try {
       const updated = await RiderApiService.updateDocument(selectedDoc.id, {
-        documentNumberMasked: docNumber.trim(),
+        documentNumberMasked: docNumber.trim() || undefined,
         expiresAt: expiry.trim() || undefined,
+        fileUrl: uploadedUrl || undefined,
       });
       setDocuments(updated);
       setSelectedDoc(null);
-      Alert.alert('Document Updated', `${selectedDoc.title} details saved and verified.`);
+      Alert.alert('Document Submitted', `${selectedDoc.title} updated and submitted for verification.`);
     } catch {
       Alert.alert('Error', 'Failed to update document details.');
     }
@@ -94,37 +131,63 @@ export const DocumentsScreen: React.FC<{ isAuthOnboarding?: boolean }> = ({ isAu
 
           <Text style={styles.screenTitle}>KYC & Fleet Legal Documents</Text>
           <Text style={styles.screenSubtitle}>
-            Documents verified by WormUp Super Admin compliance desk.
+            Live verification status synced with WormUp Super Admin compliance desk.
           </Text>
         </>
       )}
 
       <View style={styles.docsList}>
-        {documents.map((doc) => (
-          <View key={doc.id} style={styles.docCard}>
-            <View style={styles.docHeader}>
-              <View style={styles.docIconBox}>
-                <Ionicons name="document-text-outline" size={20} color="#059669" />
+        {documents.map((doc) => {
+          const isVerified = doc.status === 'VERIFIED';
+          const isPending = doc.status === 'PENDING';
+          return (
+            <View key={doc.id} style={styles.docCard}>
+              <View style={styles.docHeader}>
+                <View style={[styles.docIconBox, { backgroundColor: isVerified ? '#ECFDF5' : isPending ? '#FFFBEB' : '#FEF2F2' }]}>
+                  <Ionicons
+                    name="document-text-outline"
+                    size={20}
+                    color={isVerified ? '#059669' : isPending ? '#D97706' : '#DC2626'}
+                  />
+                </View>
+                <View style={styles.docInfo}>
+                  <Text style={styles.docTitle}>{doc.title}</Text>
+                  <Text style={styles.docNumber}>{doc.documentNumberMasked || 'Not provided'}</Text>
+                </View>
+                <View
+                  style={[
+                    styles.statusBadge,
+                    {
+                      backgroundColor: isVerified ? '#ECFDF5' : isPending ? '#FFFBEB' : '#FEF2F2',
+                      borderColor: isVerified ? '#A7F3D0' : isPending ? '#FDE68A' : '#FECACA',
+                      borderWidth: 1,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.statusText,
+                      { color: isVerified ? '#059669' : isPending ? '#D97706' : '#DC2626' },
+                    ]}
+                  >
+                    {isVerified ? 'VERIFIED' : isPending ? 'PENDING' : 'NOT UPLOADED'}
+                  </Text>
+                </View>
               </View>
-              <View style={styles.docInfo}>
-                <Text style={styles.docTitle}>{doc.title}</Text>
-                <Text style={styles.docNumber}>{doc.documentNumberMasked}</Text>
-              </View>
-              <View style={styles.statusBadge}>
-                <Text style={styles.statusText}>{doc.status}</Text>
-              </View>
-            </View>
 
-            <View style={styles.docFooter}>
-              <Text style={styles.expiryText}>
-                {doc.expiresAt ? `Valid till: ${doc.expiresAt}` : 'Government Verified'}
-              </Text>
-              <TouchableOpacity onPress={() => handleOpenEdit(doc)}>
-                <Text style={styles.uploadLink}>Update Copy</Text>
-              </TouchableOpacity>
+              <View style={styles.docFooter}>
+                <Text style={styles.expiryText}>
+                  {doc.expiresAt ? `Valid till: ${doc.expiresAt}` : isVerified ? 'Verified by Compliance' : 'Pending Verification'}
+                </Text>
+                <TouchableOpacity onPress={() => handleOpenEdit(doc)}>
+                  <Text style={styles.uploadLink}>
+                    {doc.fileUrl || doc.documentNumberMasked !== 'Not uploaded' ? 'Update Copy' : 'Upload Now →'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        ))}
+          );
+        })}
       </View>
 
       {isAuthOnboarding ? (

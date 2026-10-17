@@ -15,7 +15,9 @@
     "seed": "ts-node src/seed/seed.ts",
     "cron:daily-income": "ts-node src/scripts/cron-runner.ts daily",
     "cron:monthly-coins": "ts-node src/scripts/cron-runner.ts monthly",
+    "cron:monthly-level-income": "ts-node src/scripts/cron-runner.ts monthly_level_income",
     "cron:all": "ts-node src/scripts/cron-runner.ts all",
+    "cron:test-force-income": "ts-node src/scripts/cron-runner.ts test_force_income",
     "clean:users-orders": "ts-node src/scripts/clean-users-orders-riders.ts"
   },
   "dependencies": {

@@ -5,9 +5,11 @@ import * as path from 'path';
 // Load environment variables from .env
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
-const MONGODB_URI =
-  process.env.MONGODB_URI ||
-  'mongodb+srv://fanqie:fanqie123@cluster0.f8acy45.mongodb.net/wormup';
+const MONGODB_URI = process.env.MONGODB_URI;
+if (!MONGODB_URI) {
+  console.error('❌ MONGODB_URI environment variable is missing.');
+  process.exit(1);
+}
 
 interface IncomeTransactionDoc {
   _id: mongoose.Types.ObjectId;
@@ -64,18 +66,20 @@ const CoinTransaction = mongoose.model('CoinTransactionCron', CoinTransactionSch
  * CRON 1: Daily Midnight Income Rollover
  * Rule: Only moves records where status == 'PENDING' AND availableFrom <= currentTime
  */
-export async function runDailyIncomeRollover() {
+export async function runDailyIncomeRollover(forceUnlock = false) {
   console.log('----------------------------------------------------');
-  console.log('⏰ Starting Daily Midnight Income Rollover Cron Job...');
+  console.log(`⏰ Starting Daily Income Rollover Cron Job... ${forceUnlock ? '(TEST FORCE UNLOCK MODE - Ignoring 24h Lock)' : ''}`);
   const now = new Date();
   console.log(`Current Time: ${now.toISOString()}`);
 
-  const pendingTxs = (await IncomeTransaction.find({
-    status: 'PENDING',
-    availableFrom: { $lte: now },
-  }).lean()) as unknown as IncomeTransactionDoc[];
+  const filter: any = { status: 'PENDING' };
+  if (!forceUnlock) {
+    filter.availableFrom = { $lte: now };
+  }
 
-  console.log(`Found ${pendingTxs.length} pending transactions whose 24-hr lock period is complete.`);
+  const pendingTxs = (await IncomeTransaction.find(filter).lean()) as unknown as IncomeTransactionDoc[];
+
+  console.log(`Found ${pendingTxs.length} pending transactions ${forceUnlock ? 'for forced unlock.' : 'whose 24-hr lock period is complete.'}`);
 
   if (pendingTxs.length === 0) {
     console.log('✅ No transactions to rollover today.');
@@ -101,6 +105,7 @@ export async function runDailyIncomeRollover() {
       $inc: {
         pendingIncome: -data.total,
         availableIncome: data.total,
+        walletBalance: data.total,
       },
     });
 
@@ -174,25 +179,63 @@ export async function runMonthlyShoppingCoins() {
   return { creditedCount, skippedCount };
 }
 
+/**
+ * CRON 3: Monthly Level Income (7-Level Team Purchase GMV Calculation)
+ * Calculates Veg 3% + Other 0.4% GMV income across 7 downline levels for all eligible users.
+ * Credits PENDING income transaction with 24-hr lock and idempotency per month.
+ */
+export async function runMonthlyTeamIncome(targetMonth?: string) {
+  console.log('----------------------------------------------------');
+  console.log('👥 Starting Monthly 7-Level Team Purchase Income Calculation Engine...');
+  const { NestFactory } = await import('@nestjs/core');
+  const { AppModule } = await import('../app.module');
+  const { UsersService } = await import('../users/users.service');
+
+  const app = await NestFactory.createApplicationContext(AppModule, { logger: ['error', 'warn'] });
+  try {
+    const usersService = app.get(UsersService);
+    const result = await usersService.calculateMonthlyTeamPurchaseIncome(targetMonth);
+    console.log(`✅ Monthly Team Income Calculation Complete: Processed ${result.processedUsersCount} users, ${result.eligibleUsersCount} eligible, Total Distributed: ₹${result.totalIncomeDistributed}`);
+    return result;
+  } finally {
+    await app.close();
+  }
+}
+
 async function main() {
   const arg = process.argv[2] || 'daily';
-  console.log(`Connecting to MongoDB at: ${MONGODB_URI.replace(/:([^:@]+)@/, ':****@')}`);
-  await mongoose.connect(MONGODB_URI);
-  console.log('Connected to MongoDB.');
 
   try {
-    if (arg === 'daily' || arg === 'all') {
-      await runDailyIncomeRollover();
+    if (arg === 'monthly_level_income') {
+      await runMonthlyTeamIncome();
+      return;
     }
-    if (arg === 'monthly' || arg === 'all') {
+
+    console.log(`Connecting to MongoDB at: ${MONGODB_URI.replace(/:([^:@]+)@/, ':****@')}`);
+    await mongoose.connect(MONGODB_URI);
+    console.log('Connected to MongoDB.');
+
+    if (arg === 'daily') {
+      await runDailyIncomeRollover(false);
+    } else if (arg === 'test_force_income') {
+      await runDailyIncomeRollover(true);
+    } else if (arg === 'monthly' || arg === 'monthly_coins') {
       await runMonthlyShoppingCoins();
+    } else if (arg === 'all') {
+      await runDailyIncomeRollover(false);
+      await runMonthlyShoppingCoins();
+      await mongoose.disconnect();
+      await runMonthlyTeamIncome();
+      return;
     }
   } catch (err) {
     console.error('❌ Error executing cron job:', err);
     process.exit(1);
   } finally {
-    await mongoose.disconnect();
-    console.log('Disconnected from MongoDB. Done.');
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.disconnect();
+      console.log('Disconnected from MongoDB. Done.');
+    }
   }
 }
 

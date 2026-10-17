@@ -4,8 +4,8 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import { Model, Types, Connection } from 'mongoose';
 import {
   Inventory,
   InventoryDocument,
@@ -39,6 +39,7 @@ export class StoreInventoryService {
     @InjectModel(Product.name) private productModel: Model<ProductDocument>,
     @InjectModel(StoreStaff.name) private staffModel: Model<StoreStaffDocument>,
     @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
+    @InjectConnection() private connection: Connection,
     private readonly trackingGateway: TrackingGateway,
   ) {}
 
@@ -66,14 +67,36 @@ export class StoreInventoryService {
     search?: string,
     filter?: string,
     page = 1,
-    limit = 20,
+    limit = 50,
   ) {
     const staff = await this.getStaff(userId);
     const storeId = staff.storeId;
+    const store = storeId ? await this.storeModel.findById(storeId).exec() : null;
+    let areaId = store?.areaId;
+
+    // Dynamically resolve areaId if missing on store document (e.g. Chandlodiya - Tragad Dark Store)
+    if (!areaId && store) {
+      const area = await this.connection.collection('areas').findOne({
+        $or: [
+          { hubStoreId: store._id },
+          { code: 'AREA-CHANDLODIYA_TRAGAD' },
+          { name: new RegExp(store.areaName || '|Chandlodiya', 'i') },
+        ],
+      });
+      if (area) {
+        areaId = area._id;
+      }
+    }
 
     const query: any = {};
     if (search && search.trim()) {
-      query.name = { $regex: search.trim(), $options: 'i' };
+      const term = search.trim();
+      query.$or = [
+        { name: { $regex: term, $options: 'i' } },
+        { brand: { $regex: term, $options: 'i' } },
+        { category: { $regex: term, $options: 'i' } },
+        { sku: { $regex: term, $options: 'i' } },
+      ];
     }
 
     const products = await this.productModel
@@ -82,21 +105,77 @@ export class StoreInventoryService {
       .limit(limit)
       .exec();
 
+    // Query area_pricing for this store's areaId (supports both ObjectId and string format)
+    let areaPricings: any[] = [];
+    if (areaId) {
+      const areaIdStr = areaId.toString();
+      const areaIdObj = Types.ObjectId.isValid(areaIdStr) ? new Types.ObjectId(areaIdStr) : null;
+      const areaQuery = areaIdObj
+        ? { $or: [{ areaId: areaIdObj }, { areaId: areaIdStr }] }
+        : { areaId: areaIdStr };
+      areaPricings = await this.connection
+        .collection('area_pricing')
+        .find(areaQuery)
+        .toArray();
+    }
+
+    // Query product_variants
+    const productIds = products.map((p) => p._id);
+    const variants = await this.connection
+      .collection('product_variants')
+      .find({ productId: { $in: productIds } })
+      .toArray();
+
+    // Query inventories for this store
+    let storeInvs: any[] = [];
+    if (storeId) {
+      storeInvs = await this.inventoryModel.find({ storeId }).exec();
+    }
+
     const items = [];
     for (const prod of products) {
-      let inv = null;
-      if (storeId) {
-        inv = await this.inventoryModel.findOne({
-          storeId,
-          productId: prod._id,
-        });
-      }
+      const prodVariants = variants.filter(
+        (v) => v.productId && v.productId.toString() === prod._id.toString()
+      );
 
-      const availableQty = inv ? (inv.availableQty ?? 0) : (prod.stock ?? 0);
+      // Find store inventory record for this product
+      const inv = storeInvs.find((i) => i.productId && i.productId.toString() === prod._id.toString());
+
+      // Map each variant with store/area pricing and stock
+      const mappedVariants = prodVariants.map((v) => {
+        const ap = areaPricings.find(
+          (a) => a.variantId && a.variantId.toString() === v._id.toString()
+        );
+        const resolvedStock = ap?.stock !== undefined
+          ? ap.stock
+          : inv?.availableQty !== undefined
+          ? inv.availableQty
+          : (v.stock !== undefined ? v.stock : 50);
+
+        return {
+          id: v._id.toString(),
+          weightOrVolume: v.weightOrVolume || v.packSize || prod.quantityLabel || '1 unit',
+          sellingPrice: ap?.price !== undefined ? ap.price : (v.sellingPrice || prod.sellingPrice || 0),
+          mrp: ap?.mrp !== undefined && ap.mrp > 0 ? ap.mrp : (v.mrp || prod.mrp || v.sellingPrice || prod.sellingPrice || 0),
+          stock: resolvedStock,
+          isDefault: Boolean(v.isDefault),
+        };
+      });
+
+      // Default or primary variant stock
+      const defaultVar = mappedVariants.find((v) => v.isDefault) || mappedVariants[0];
+      const availableQty = defaultVar
+        ? defaultVar.stock
+        : inv?.availableQty !== undefined
+        ? inv.availableQty
+        : (prod.stock ?? 50);
+      const sellingPrice = defaultVar ? defaultVar.sellingPrice : (prod.sellingPrice ?? 0);
+      const mrp = defaultVar ? defaultVar.mrp : (prod.mrp || prod.sellingPrice || 0);
+
       const reservedQty = inv ? (inv.reservedQty ?? 0) : 0;
       const threshold = inv?.lowStockThreshold ?? 10;
-      const isLowStock = availableQty <= threshold;
-      const isOutOfStock = availableQty === 0;
+      const isLowStock = availableQty > 0 && availableQty <= threshold;
+      const isOutOfStock = availableQty <= 0;
 
       if (filter === 'low' && !isLowStock) continue;
       if (filter === 'oos' && !isOutOfStock) continue;
@@ -105,16 +184,19 @@ export class StoreInventoryService {
         productId: prod._id.toString(),
         name: prod.name,
         brand: prod.brand,
+        category: (prod as any).categoryName || (prod as any).category || 'Vegetables',
         imageUrl: prod.imageUrl,
-        quantityLabel: prod.quantityLabel,
-        sellingPrice: prod.sellingPrice,
+        quantityLabel: defaultVar ? defaultVar.weightOrVolume : (prod.quantityLabel || '1 unit'),
+        sellingPrice,
+        mrp,
         availableQty,
         reservedQty,
         threshold,
         isLowStock,
         isOutOfStock,
-        shelfLocation: inv?.shelfLocation || prod.shelfLocation || 'UNASSIGNED',
-        sku: (prod as any).sku || prod.slug || `SKU-${prod._id.toString().slice(-6)}`,
+        shelfLocation: inv?.shelfLocation || (prod as any).shelfLocation || 'A1-R2',
+        sku: (prod as any).sku || (prod as any).slug || `SKU-${prod._id.toString().slice(-6)}`,
+        variants: mappedVariants,
       });
     }
 
@@ -124,12 +206,81 @@ export class StoreInventoryService {
   async adjustStock(userId: string, productId: string, dto: StockAdjustmentDto) {
     const staff = await this.getStaff(userId);
     const storeId = staff.storeId;
+    const store = storeId ? await this.storeModel.findById(storeId).exec() : null;
+    let areaId = store?.areaId;
+
+    if (!areaId && store) {
+      const area = await this.connection.collection('areas').findOne({
+        $or: [
+          { hubStoreId: store._id },
+          { code: 'AREA-CHANDLODIYA_TRAGAD' },
+          { name: new RegExp(store.areaName || 'Tragad|Chandlodiya', 'i') },
+        ],
+      });
+      if (area) {
+        areaId = area._id;
+      }
+    }
 
     const product = await this.productModel.findById(productId);
     if (!product) {
       throw new NotFoundException('Product not found');
     }
 
+    let beforeQty = 50;
+    let afterQty = 50;
+
+    // 1. Update area_pricing if areaId is present
+    if (areaId) {
+      const areaPricingCol = this.connection.collection('area_pricing');
+      let targetVariantId: Types.ObjectId | null = null;
+
+      if (dto.variantId && Types.ObjectId.isValid(dto.variantId)) {
+        targetVariantId = new Types.ObjectId(dto.variantId);
+      } else {
+        // Resolve default variant
+        const defaultVar = await this.connection.collection('product_variants').findOne({
+          productId: product._id,
+          isDefault: true,
+        });
+        const firstVar = defaultVar || (await this.connection.collection('product_variants').findOne({ productId: product._id }));
+        if (firstVar) {
+          targetVariantId = firstVar._id;
+        }
+      }
+
+      if (targetVariantId) {
+        const areaIdStr = areaId.toString();
+        const areaIdObj = Types.ObjectId.isValid(areaIdStr) ? new Types.ObjectId(areaIdStr) : null;
+        const existingAp = await areaPricingCol.findOne({
+          productId: product._id,
+          variantId: targetVariantId,
+          $or: [{ areaId: areaIdObj }, { areaId: areaIdStr }],
+        });
+
+        beforeQty = existingAp?.stock !== undefined ? existingAp.stock : 50;
+        afterQty = Math.max(0, beforeQty + dto.delta);
+
+        await areaPricingCol.updateOne(
+          {
+            productId: product._id,
+            variantId: targetVariantId,
+            areaId: areaIdObj || areaIdStr,
+          },
+          {
+            $set: { stock: afterQty, isAvailable: afterQty > 0 },
+            $setOnInsert: {
+              price: product.sellingPrice || 0,
+              mrp: product.mrp || product.sellingPrice || 0,
+              discountPercent: 0,
+            },
+          },
+          { upsert: true }
+        );
+      }
+    }
+
+    // 2. Also keep inventory and productModel in sync
     let inv = await this.inventoryModel.findOne({
       storeId,
       productId: product._id,
@@ -139,20 +290,17 @@ export class StoreInventoryService {
       inv = await this.inventoryModel.create({
         storeId,
         productId: product._id,
-        availableQty: Math.max(0, (product.stock || 20) + dto.delta),
+        availableQty: afterQty,
         reservedQty: 0,
         soldQty: 0,
-        lowStockThreshold: 5,
+        lowStockThreshold: 10,
+        shelfLocation: (product as any).shelfLocation || 'A1-R2',
       });
+    } else {
+      inv.availableQty = afterQty;
+      await inv.save();
     }
 
-    const beforeQty = inv.availableQty;
-    const afterQty = Math.max(0, beforeQty + dto.delta);
-    inv.availableQty = afterQty;
-    inv.reservedQty = Math.max(0, inv.reservedQty || 0);
-    await inv.save();
-
-    // Update base product stock as well
     product.stock = afterQty;
     await product.save();
 

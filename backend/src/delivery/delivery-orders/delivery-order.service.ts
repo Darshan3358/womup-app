@@ -1044,6 +1044,81 @@ export class DeliveryOrderService implements OnModuleInit {
         }
       }
 
+      // 5b. Credit Veg & Other GMV to customer for 7-level team performance
+      if (order && order.userId && !(order as any).isGmvCredited) {
+        try {
+          let vegGmv = 0;
+          let otherGmv = 0;
+
+          const productCollection = this.connection.collection('products');
+          const categoryCollection = this.connection.collection('categories');
+
+          for (const item of (order as any).items || []) {
+            const itemSubtotal = item.subtotal || (Number(item.unitPrice || item.price || 0) * (item.quantity || 1));
+            let isVeg = false;
+
+            if (item.productId && Types.ObjectId.isValid(item.productId.toString())) {
+              const prod = await productCollection.findOne({ _id: new Types.ObjectId(item.productId.toString()) });
+              if (prod && prod.categoryId) {
+                const cat = await categoryCollection.findOne({ _id: prod.categoryId });
+                if (cat && (cat.slug === 'vegetables' || /veg/i.test(cat.name || ''))) {
+                  isVeg = true;
+                }
+              }
+            }
+
+            if (!isVeg && item.name && /(potato|tomato|onion|bhindi|carrot|cabbage|cauliflower|palak|coriander|chilli|ginger|garlic|vegetable|sabzi)/i.test(item.name)) {
+              isVeg = true;
+            }
+
+            if (isVeg) {
+              vegGmv += itemSubtotal;
+            } else {
+              otherGmv += itemSubtotal;
+            }
+          }
+
+          const customer = await this.connection.collection('users').findOne({ _id: new Types.ObjectId(order.userId.toString()) });
+          if (customer) {
+            const newVeg = Number(((customer.monthlyVegetablePurchase || 0) + vegGmv).toFixed(2));
+            const newOther = Number(((customer.monthlyOtherPurchase || 0) + otherGmv).toFixed(2));
+            const newTotal = Number(((customer.monthlyPurchaseValue || 0) + vegGmv + otherGmv).toFixed(2));
+
+            await this.connection.collection('users').updateOne(
+              { _id: customer._id },
+              {
+                $set: {
+                  monthlyVegetablePurchase: newVeg,
+                  monthlyOtherPurchase: newOther,
+                  monthlyPurchaseValue: newTotal,
+                  isActiveMember: newTotal >= 2000,
+                },
+              },
+              { session },
+            );
+
+            await this.connection.collection('orders').updateOne(
+              { _id: order._id },
+              { $set: { isGmvCredited: true, creditedGmvAmount: { veg: vegGmv, other: otherGmv } } },
+              { session },
+            );
+
+            this.logger.log(`[Delivery GMV] Credited order ${orderNumber} to customer ${customer.name || customer._id}: +₹${vegGmv} Veg GMV, +₹${otherGmv} Other GMV. Total Spend: ₹${newTotal}`);
+
+            if (this.trackingGateway) {
+              this.trackingGateway.emitProfileUpdated(customer._id.toString(), {
+                monthlyPurchaseValue: newTotal,
+                monthlyVegetablePurchase: newVeg,
+                monthlyOtherPurchase: newOther,
+                isActiveMember: newTotal >= 2000,
+              });
+            }
+          }
+        } catch (gmvErr: any) {
+          this.logger.error('Failed to credit customer GMV upon delivery', gmvErr);
+        }
+      }
+
       // 6. Release reserved stock and increment sold stock in inventory
       if (order && order.storeId && order.items && order.items.length > 0) {
         for (const item of order.items) {
@@ -1282,14 +1357,21 @@ export class DeliveryOrderService implements OnModuleInit {
       },
     ];
 
-    const riderLat = partner.currentLocation?.coordinates?.[1] ?? 23.0245;
-    const riderLng = partner.currentLocation?.coordinates?.[0] ?? 72.5298;
-    const storeLat = store?.location?.coordinates?.[1] ?? 23.0245;
-    const storeLng = store?.location?.coordinates?.[0] ?? 72.5298;
+    const pCoords = partner.currentLocation?.coordinates;
+    const riderLat = (pCoords && Array.isArray(pCoords) && !isNaN(pCoords[1]) && pCoords[1] !== 0) ? pCoords[1] : null;
+    const riderLng = (pCoords && Array.isArray(pCoords) && !isNaN(pCoords[0]) && pCoords[0] !== 0) ? pCoords[0] : null;
 
-    const distanceToStoreKm = hubInfo
-      ? hubInfo.distanceKm
-      : this.calculateHaversineDistanceKm(riderLat, riderLng, storeLat, storeLng);
+    const sCoords = store?.location?.coordinates;
+    const storeLat = (sCoords && Array.isArray(sCoords) && !isNaN(sCoords[1]) && sCoords[1] !== 0) ? sCoords[1] : null;
+    const storeLng = (sCoords && Array.isArray(sCoords) && !isNaN(sCoords[0]) && sCoords[0] !== 0) ? sCoords[0] : null;
+
+    const cCoords = deliveryAddress.location?.coordinates || deliveryAddress.coordinates;
+    const custLat = (cCoords && Array.isArray(cCoords) && !isNaN(cCoords[1]) && cCoords[1] !== 0) ? cCoords[1] : (typeof deliveryAddress.latitude === 'number' && !isNaN(deliveryAddress.latitude) && deliveryAddress.latitude !== 0 ? deliveryAddress.latitude : null);
+    const custLng = (cCoords && Array.isArray(cCoords) && !isNaN(cCoords[0]) && cCoords[0] !== 0) ? cCoords[0] : (typeof deliveryAddress.longitude === 'number' && !isNaN(deliveryAddress.longitude) && deliveryAddress.longitude !== 0 ? deliveryAddress.longitude : null);
+
+    const distanceToStoreKm = (riderLat !== null && riderLng !== null && storeLat !== null && storeLng !== null)
+      ? (hubInfo ? hubInfo.distanceKm : this.calculateHaversineDistanceKm(riderLat, riderLng, storeLat, storeLng))
+      : 0;
 
     const isFromOwnHub = hubInfo
       ? hubInfo.isOwnHub
@@ -1311,19 +1393,17 @@ export class DeliveryOrderService implements OnModuleInit {
       id: assignment._id.toString(),
       orderId: assignment.orderId.toString(),
       orderNumber,
-      storeId: store?.code || 'STR-SAT-01',
+      storeId: store?.code || 'STORE-HUB',
       storeName,
       storeAddress,
-      storeCoordinates: {
-        latitude: store?.location?.coordinates?.[1] ?? 23.0245,
-        longitude: store?.location?.coordinates?.[0] ?? 72.5298,
-      },
+      storeCoordinates: (storeLat !== null && storeLng !== null)
+        ? { latitude: storeLat, longitude: storeLng }
+        : null,
       customerName,
       customerAddress,
-      customerCoordinates: {
-        latitude: deliveryAddress.location?.coordinates?.[1] ?? deliveryAddress.coordinates?.[1] ?? 23.0312,
-        longitude: deliveryAddress.location?.coordinates?.[0] ?? deliveryAddress.coordinates?.[0] ?? 72.5342,
-      },
+      customerCoordinates: (custLat !== null && custLng !== null)
+        ? { latitude: custLat, longitude: custLng }
+        : null,
       customerPhone,
       deliveryInstructions: deliveryAddress.instructions || order?.deliveryInstructions || 'Leave at door. Ring doorbell once.',
       distanceKm: assignment.distanceKm ?? 0,

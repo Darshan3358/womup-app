@@ -8,10 +8,8 @@ import {
   TextInput,
   ScrollView,
   Image,
-  Alert,
   ActivityIndicator,
   Platform,
-  FlatList,
 } from 'react-native';
 import {
   PlusCircle,
@@ -20,19 +18,15 @@ import {
   Trash2,
   Plus,
   Check,
-  Package,
-  AlertCircle,
-  Info,
-  Camera,
+  Tag,
+  Warehouse,
+  Sparkles,
   Image as ImageIcon,
+  AlertCircle,
   ChevronDown,
-  Search,
-  Link as LinkIcon,
 } from 'lucide-react-native';
-import * as ImagePicker from 'expo-image-picker';
-import { COLORS, RADIUS, SPACING } from '../../theme';
 import { useAdminState } from '../../context/AdminStateContext';
-import { PricingCategory } from '../../types/admin';
+import { ProductVariantItem } from '../../types/admin';
 
 interface FormVariant {
   id: string;
@@ -40,70 +34,27 @@ interface FormVariant {
   weightOrVolume: string;
   mrp: string;
   sellingPrice: string;
+  stock: string;
   isDefault: boolean;
   isActive: boolean;
 }
 
-// Map categories to modern emojis for a polished presentation
-const CATEGORY_EMOJIS: Record<string, string> = {
-  vegetables: '🥬',
-  fruits: '🍎',
-  dairy: '🥛',
-  bakery: '🍞',
-  beverages: '🥤',
-  snacks: '🍿',
-  cooking: '🍳',
-  essentials: '🛒',
-  personal: '🧼',
-  cleaning: '🧹',
-  household: '🏠',
-  meat: '🍗',
-  seafood: '🐟',
-};
-
-const getCategoryEmoji = (name?: string) => {
-  if (!name) return '📦';
-  const lower = name.toLowerCase();
-  for (const [key, emoji] of Object.entries(CATEGORY_EMOJIS)) {
-    if (lower.includes(key)) return emoji;
-  }
-  return '📦';
-};
-
-const getBackendUploadUrl = () => {
-  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
-    const host = window.location.hostname;
-    if (host === 'localhost' || host === '127.0.0.1') {
-      return 'http://localhost:5050/api/v1/media/upload?folder=wormup/products';
-    }
-  }
-  return 'http://localhost:5050/api/v1/media/upload?folder=wormup/products';
-};
-
 export const AddProductModal: React.FC = () => {
-  const { activeModal, setActiveModal, addProductItem, categories } = useAdminState();
+  const { activeModal, setActiveModal, categories, addProductItem } = useAdminState();
 
+  // Basic Info
   const [name, setName] = useState('');
-  const [selectedCategoryId, setSelectedCategoryId] = useState('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState(categories[0]?.id || '');
   const [brand, setBrand] = useState('Womup Fresh');
+  const [shelfLocation, setShelfLocation] = useState('A1-R2');
   const [description, setDescription] = useState('');
-  const [shelfLocation, setShelfLocation] = useState('');
 
-  // Image Upload State
+  // Image Upload / URL
   const [imageUrl, setImageUrl] = useState('');
-  const [cloudinaryPublicId, setCloudinaryPublicId] = useState('');
   const [imagePreview, setImagePreview] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [showUrlInput, setShowUrlInput] = useState(false);
-  const [customUrl, setCustomUrl] = useState('');
 
-  // Category Dropdown Modal State
-  const [showCategoryModal, setShowCategoryModal] = useState(false);
-  const [categorySearchQuery, setCategorySearchQuery] = useState('');
-
-  const [saving, setSaving] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
+  // Multi-Variant Pack Size Matrix
   const [variants, setVariants] = useState<FormVariant[]>([
     {
       id: 'v_1',
@@ -111,6 +62,7 @@ export const AddProductModal: React.FC = () => {
       weightOrVolume: '250 g',
       mrp: '15',
       sellingPrice: '12',
+      stock: '50',
       isDefault: true,
       isActive: true,
     },
@@ -120,6 +72,7 @@ export const AddProductModal: React.FC = () => {
       weightOrVolume: '500 g',
       mrp: '28',
       sellingPrice: '22',
+      stock: '50',
       isDefault: false,
       isActive: true,
     },
@@ -129,158 +82,72 @@ export const AddProductModal: React.FC = () => {
       weightOrVolume: '1 kg',
       mrp: '50',
       sellingPrice: '40',
+      stock: '50',
       isDefault: false,
       isActive: true,
     },
   ]);
 
-  if (activeModal !== 'AddProduct') {
-    return null;
-  }
+  const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const activeCategory =
-    categories.find((c) => c.id === selectedCategoryId) ||
-    categories[0] || { id: 'default', name: 'Vegetables' };
+  if (activeModal !== 'AddProduct') return null;
 
   const handleClose = () => {
-    setName('');
-    setSelectedCategoryId(categories[0]?.id || '');
-    setBrand('Womup Fresh');
-    setDescription('');
-    setImageUrl('');
-    setCloudinaryPublicId('');
-    setImagePreview('');
-    setShowUrlInput(false);
-    setCustomUrl('');
-    setShowCategoryModal(false);
-    setErrorMsg(null);
-    setVariants([
-      {
-        id: 'v_1',
-        sku: '',
-        weightOrVolume: '250 g',
-        mrp: '15',
-        sellingPrice: '12',
-        isDefault: true,
-        isActive: true,
-      },
-    ]);
     setActiveModal('none');
-  };
-
-  // ── Native Image Picker Handlers (Works on Android APK, iOS, Web) ──
-  const uploadImageFile = async (asset: ImagePicker.ImagePickerAsset) => {
-    setImagePreview(asset.uri);
-    setUploadingImage(true);
     setErrorMsg(null);
+  };
 
-    try {
-      const formData = new FormData();
-      if (Platform.OS === 'web') {
-        const response = await fetch(asset.uri);
-        const blob = await response.blob();
-        formData.append('file', blob, asset.fileName || 'product.jpg');
-      } else {
-        // Native APK (Android/iOS)
-        formData.append('file', {
-          uri: asset.uri,
-          name: asset.fileName || `prod_${Date.now()}.jpg`,
-          type: asset.mimeType || 'image/jpeg',
-        } as any);
-      }
+  const handlePickImage = () => {
+    if (typeof document !== 'undefined') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/jpeg,image/png,image/webp,image/jpg';
+      input.onchange = async (e: any) => {
+        const file = e.target?.files?.[0];
+        if (!file) return;
 
-      const uploadUrl = getBackendUploadUrl();
-      const res = await fetch(uploadUrl, {
-        method: 'POST',
-        body: formData,
-      });
-      const json = await res.json();
-      if (json.success && json.data) {
-        const finalUrl = json.data.url || json.data.secureUrl;
-        setImageUrl(finalUrl);
-        setCloudinaryPublicId(json.data.publicId || '');
-        setErrorMsg(null);
-      } else {
-        // Fallback to local URI so admin can continue previewing
-        setImageUrl(asset.uri);
-      }
-    } catch (err: any) {
-      console.warn('Image upload error:', err);
-      // Keep local preview intact
-      setImageUrl(asset.uri);
-    } finally {
-      setUploadingImage(false);
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+        if (!allowedTypes.includes(file.type)) {
+          setErrorMsg('Only JPG, JPEG, PNG, and WEBP formats are allowed.');
+          return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+          setErrorMsg('Maximum allowed image size is 5MB.');
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = () => {
+          setImagePreview(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+
+        try {
+          setUploadingImage(true);
+          const formData = new FormData();
+          formData.append('file', file);
+          const res = await fetch('http://localhost:5050/api/v1/media/upload?folder=wormup/products', {
+            method: 'POST',
+            body: formData,
+          });
+          const json = await res.json();
+          if (json.success && json.data) {
+            const uploadedUrl = json.data.url || json.data.secureUrl;
+            setImageUrl(uploadedUrl);
+            setErrorMsg(null);
+          }
+        } catch (err) {
+          console.warn('Image upload error:', err);
+        } finally {
+          setUploadingImage(false);
+        }
+      };
+      input.click();
     }
   };
 
-  const handlePickFromGallery = async () => {
-    try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(
-          'Permission Needed',
-          'Photo gallery access is required to upload product images.'
-        );
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.85,
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        await uploadImageFile(result.assets[0]);
-      }
-    } catch (e: any) {
-      console.warn('Gallery pick error:', e);
-      setErrorMsg('Failed to open gallery. Please try again.');
-    }
-  };
-
-  const handleTakePhoto = async () => {
-    try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(
-          'Permission Needed',
-          'Camera access is required to take product photos.'
-        );
-        return;
-      }
-
-      const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.85,
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        await uploadImageFile(result.assets[0]);
-      }
-    } catch (e: any) {
-      console.warn('Camera error:', e);
-      setErrorMsg('Failed to open camera. Please try again.');
-    }
-  };
-
-  const handleApplyCustomUrl = () => {
-    if (!customUrl.trim()) return;
-    setImageUrl(customUrl.trim());
-    setImagePreview(customUrl.trim());
-    setShowUrlInput(false);
-  };
-
-  const handleRemoveImage = () => {
-    setImageUrl('');
-    setImagePreview('');
-    setCloudinaryPublicId('');
-    setCustomUrl('');
-  };
-
-  // ── Variant Helpers ──
   const handleAddVariant = () => {
     setVariants((prev) => [
       ...prev,
@@ -290,7 +157,8 @@ export const AddProductModal: React.FC = () => {
         weightOrVolume: '1 unit',
         mrp: '',
         sellingPrice: '',
-        isDefault: false,
+        stock: '50',
+        isDefault: prev.length === 0,
         isActive: true,
       },
     ]);
@@ -319,31 +187,29 @@ export const AddProductModal: React.FC = () => {
     );
   };
 
-  // ── Save Product ──
   const handleSave = async () => {
     setErrorMsg(null);
 
     if (!name.trim()) {
-      setErrorMsg('Please enter a product name in the Item Name field.');
+      setErrorMsg('Product title / item name is required.');
       return;
     }
 
     if (variants.length === 0) {
-      setErrorMsg('Please add at least one variant.');
+      setErrorMsg('Please configure at least one pack variant.');
       return;
     }
 
-    // Validate each variant
     for (let i = 0; i < variants.length; i++) {
       const v = variants[i];
       if (!v.weightOrVolume.trim()) {
-        setErrorMsg(`Variant #${i + 1} requires a pack size (e.g. 250 g).`);
+        setErrorMsg(`Variant #${i + 1} requires a pack size (e.g. 500 g).`);
         return;
       }
       const sPrice = parseFloat(v.sellingPrice);
       const mPrice = parseFloat(v.mrp);
       if (isNaN(sPrice) || sPrice <= 0) {
-        setErrorMsg(`Variant "${v.weightOrVolume}" requires a valid Default Selling Price.`);
+        setErrorMsg(`Variant "${v.weightOrVolume}" requires a valid Selling Price.`);
         return;
       }
       if (isNaN(mPrice) || mPrice <= 0) {
@@ -358,1134 +224,765 @@ export const AddProductModal: React.FC = () => {
 
     setSaving(true);
     try {
-      const formattedVariants = variants.map((v) => ({
-        sku: v.sku.trim() || `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${v.weightOrVolume.replace(/[^a-z0-9]+/gi, '').toLowerCase()}`,
+      const chosenCat = categories.find((c) => c.id === selectedCategoryId) || categories[0];
+      const formattedVariants: ProductVariantItem[] = variants.map((v) => ({
+        id: v.id.startsWith('v_') ? '' : v.id,
+        productId: '',
+        sku:
+          v.sku.trim() ||
+          `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${v.weightOrVolume
+            .replace(/[^a-z0-9]+/gi, '')
+            .toLowerCase()}`,
         weightOrVolume: v.weightOrVolume.trim(),
         mrp: parseFloat(v.mrp),
         sellingPrice: parseFloat(v.sellingPrice),
+        stock: parseInt(v.stock, 10) || 50,
         isDefault: v.isDefault,
         isActive: v.isActive,
       }));
 
       const defaultVar = formattedVariants.find((v) => v.isDefault) || formattedVariants[0];
-      const activeCat = categories.find((c) => c.id === selectedCategoryId) || categories[0];
 
       const success = await addProductItem({
         name: name.trim(),
-        category: activeCat?.name || 'Vegetables',
-        categoryId: activeCat?.id,
+        category: chosenCat?.name || 'Vegetables',
+        categoryId: chosenCat?.id || '',
         brand: brand.trim() || 'Womup Fresh',
         description: description.trim(),
-        imageUrl: imageUrl || imagePreview,
-        images: (imageUrl || imagePreview) ? [imageUrl || imagePreview] : [],
-        cloudinaryPublicId,
+        imageUrl: imageUrl || imagePreview || 'https://images.unsplash.com/photo-1546094096-0df4bcaaa337?w=400&q=80',
+        images: [imageUrl || imagePreview || 'https://images.unsplash.com/photo-1546094096-0df4bcaaa337?w=400&q=80'],
         sellingPrice: defaultVar.sellingPrice,
         mrp: defaultVar.mrp,
         basePrice: defaultVar.sellingPrice,
-        shelfLocation: shelfLocation.trim().toUpperCase() || undefined,
+        stockKg: defaultVar.stock || 50,
         isActive: true,
-        variants: formattedVariants as any,
-      });
+        variants: formattedVariants,
+        shelfLocation: shelfLocation.trim() || 'A1-R2',
+      } as any);
 
       if (success) {
         handleClose();
       } else {
-        setErrorMsg('Failed to save product in MongoDB. Please try again.');
+        setErrorMsg('Failed to add product. Please check your network and try again.');
       }
     } catch (err: any) {
-      setErrorMsg(err?.message || 'Failed to save product.');
+      setErrorMsg(err?.message || 'Error saving product.');
     } finally {
       setSaving(false);
     }
   };
 
-  const filteredCategories = categories.filter((c) =>
-    c.name.toLowerCase().includes(categorySearchQuery.toLowerCase())
-  );
-
   return (
     <Modal visible={true} transparent animationType="fade" onRequestClose={handleClose}>
-      <View style={styles.overlay}>
-        <View style={styles.card}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalCard}>
           {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.titleRow}>
-              <PlusCircle size={20} color={COLORS.purple} style={{ marginRight: 8 }} />
-              <Text style={styles.title}>Add New Item</Text>
+          <View style={styles.modalHeader}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <PlusCircle size={18} color="#4F46E5" />
+              <Text style={styles.modalTitle}>Add New Product Item</Text>
             </View>
-            <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
-              <X size={20} color={COLORS.textMuted} />
+            <TouchableOpacity onPress={handleClose} style={styles.closeBtn} activeOpacity={0.7}>
+              <X size={18} color="#94A3B8" />
             </TouchableOpacity>
           </View>
 
-          {/* Top Error Banner if any */}
+          {/* Top Error Banner */}
           {errorMsg && (
-            <View style={styles.topErrorBanner}>
-              <AlertCircle size={16} color={COLORS.error} style={{ marginRight: 8 }} />
+            <View style={styles.errorBanner}>
+              <AlertCircle size={15} color="#DC2626" style={{ marginRight: 6 }} />
               <Text style={styles.errorBannerText}>{errorMsg}</Text>
             </View>
           )}
 
-          <ScrollView style={styles.formScroll} contentContainerStyle={{ paddingBottom: 24 }}>
-            {/* Master Catalog Context Hint */}
-            <View style={styles.masterNoticeBox}>
-              <Info size={16} color={COLORS.purple} style={{ marginRight: 8, marginTop: 1 }} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.masterNoticeTitle}>Global Master Catalog Item</Text>
-                <Text style={styles.masterNoticeText}>
-                  This product will be added to the master catalog with default fallback prices. Configure area-specific selling prices after saving using the Area Pricing screen.
+          <ScrollView style={styles.modalBody} contentContainerStyle={{ paddingBottom: 20 }}>
+            {/* SECTION 1: PRODUCT CORE DETAILS */}
+            <View style={styles.sectionWrap}>
+              <Text style={styles.sectionHeading}>
+                <Tag size={13} color="#4F46E5" /> 1. PRODUCT CORE DETAILS
+              </Text>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>
+                  Product Title / Item Name <Text style={{ color: '#DC2626' }}>*</Text>
                 </Text>
-              </View>
-            </View>
-
-            {/* 📸 CHANGE 1: Product Image Upload (Native Gallery + Camera + Fallback) */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Product Image (Cloudinary)</Text>
-
-              {imageUrl || imagePreview ? (
-                /* Selected Image Preview with Actions */
-                <View style={styles.previewContainer}>
-                  <Image
-                    source={{ uri: imageUrl || imagePreview }}
-                    style={styles.previewImage}
-                    resizeMode="cover"
-                  />
-                  <View style={styles.previewDetails}>
-                    <Text style={styles.previewTitle} numberOfLines={1}>
-                      {imageUrl.startsWith('http') ? 'Cloudinary Hosted Image' : 'Local Image Selected'}
-                    </Text>
-                    <Text style={styles.previewSubtitle} numberOfLines={1}>
-                      {imageUrl || imagePreview}
-                    </Text>
-                    <View style={styles.previewActionsRow}>
-                      <TouchableOpacity
-                        style={styles.changeActionBtn}
-                        onPress={handlePickFromGallery}
-                        disabled={uploadingImage}
-                      >
-                        <Text style={styles.changeActionText}>Change Photo</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.removeActionBtn}
-                        onPress={handleRemoveImage}
-                      >
-                        <Trash2 size={14} color={COLORS.error} />
-                        <Text style={styles.removeActionText}>Remove</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </View>
-              ) : (
-                /* Native Upload Options Card */
-                <View style={styles.uploadCardContainer}>
-                  {uploadingImage ? (
-                    <View style={styles.uploadLoadingBox}>
-                      <ActivityIndicator size="small" color={COLORS.purple} />
-                      <Text style={styles.uploadLoadingText}>Uploading to Cloudinary...</Text>
-                    </View>
-                  ) : (
-                    <>
-                      <View style={styles.uploadButtonsGrid}>
-                        {/* 1. Choose from Gallery */}
-                        <TouchableOpacity
-                          style={styles.actionPickBtn}
-                          onPress={handlePickFromGallery}
-                          activeOpacity={0.8}
-                        >
-                          <ImageIcon size={20} color={COLORS.purple} />
-                          <Text style={styles.actionPickText}>Choose from Gallery</Text>
-                        </TouchableOpacity>
-
-                        {/* 2. Take Photo with Camera */}
-                        <TouchableOpacity
-                          style={styles.actionPickBtn}
-                          onPress={handleTakePhoto}
-                          activeOpacity={0.8}
-                        >
-                          <Camera size={20} color={COLORS.purple} />
-                          <Text style={styles.actionPickText}>Take Photo</Text>
-                        </TouchableOpacity>
-                      </View>
-
-                      {/* Divider with 'OR' */}
-                      <View style={styles.orDividerRow}>
-                        <View style={styles.dividerLine} />
-                        <Text style={styles.orText}>OR PASTE URL</Text>
-                        <View style={styles.dividerLine} />
-                      </View>
-
-                      {/* Paste URL Option */}
-                      {showUrlInput ? (
-                        <View style={styles.urlInputRow}>
-                          <TextInput
-                            style={styles.urlTextInput}
-                            placeholder="https://images.unsplash.com/..."
-                            placeholderTextColor={COLORS.textMuted}
-                            value={customUrl}
-                            onChangeText={setCustomUrl}
-                            autoCapitalize="none"
-                          />
-                          <TouchableOpacity
-                            style={styles.urlApplyBtn}
-                            onPress={handleApplyCustomUrl}
-                          >
-                            <Text style={styles.urlApplyBtnText}>Apply</Text>
-                          </TouchableOpacity>
-                        </View>
-                      ) : (
-                        <TouchableOpacity
-                          style={styles.showUrlBtn}
-                          onPress={() => setShowUrlInput(true)}
-                        >
-                          <LinkIcon size={14} color={COLORS.purple} style={{ marginRight: 6 }} />
-                          <Text style={styles.showUrlBtnText}>Enter Image Web URL directly</Text>
-                        </TouchableOpacity>
-                      )}
-                    </>
-                  )}
-                </View>
-              )}
-            </View>
-
-            {/* Item Name */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>
-                Item Name <Text style={{ color: COLORS.error }}>*</Text>
-              </Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  errorMsg && !name.trim() && styles.inputError,
-                ]}
-                placeholder="e.g. Fresh Tomato, Green Capsicum"
-                placeholderTextColor={COLORS.textMuted}
-                value={name}
-                onChangeText={(val) => {
-                  setName(val);
-                  setErrorMsg(null);
-                }}
-              />
-              {errorMsg && !name.trim() && (
-                <Text style={styles.inlineFieldHelp}>Product name is required.</Text>
-              )}
-            </View>
-
-            {/* 🥬 CHANGE 2: Category Dropdown (Redesigned from wrapping chips) */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>
-                Category <Text style={{ color: COLORS.error }}>*</Text>
-              </Text>
-              <TouchableOpacity
-                activeOpacity={0.8}
-                style={styles.categoryDropdownTrigger}
-                onPress={() => setShowCategoryModal(true)}
-              >
-                <View style={styles.categoryDropdownLeft}>
-                  <Text style={styles.categoryDropdownIcon}>
-                    {getCategoryEmoji(activeCategory?.name)}
-                  </Text>
-                  <Text style={styles.categoryDropdownText}>
-                    {activeCategory?.name || 'Select Category'}
-                  </Text>
-                </View>
-                <ChevronDown size={18} color={COLORS.textMuted} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Brand & Description */}
-            <View style={styles.rowTwoCols}>
-              <View style={[styles.inputGroup, { flex: 1 }]}>
-                <Text style={styles.inputLabel}>Brand</Text>
                 <TextInput
-                  style={styles.input}
-                  placeholder="e.g. Womup Fresh"
-                  placeholderTextColor={COLORS.textMuted}
-                  value={brand}
-                  onChangeText={setBrand}
+                  style={styles.formInput}
+                  placeholder="e.g. Fresh Tomato"
+                  placeholderTextColor="#94A3B8"
+                  value={name}
+                  onChangeText={(val) => {
+                    setName(val);
+                    setErrorMsg(null);
+                  }}
                 />
               </View>
-              <View style={[styles.inputGroup, { flex: 1 }]}>
-                <Text style={styles.inputLabel}>Description</Text>
+
+              <View style={styles.threeColRow}>
+                {/* Category Dropdown */}
+                <View style={styles.colOneThird}>
+                  <Text style={styles.formLabel}>
+                    Category <Text style={{ color: '#DC2626' }}>*</Text>
+                  </Text>
+                  {Platform.OS === 'web' ? (
+                    <select
+                      value={selectedCategoryId}
+                      onChange={(e: any) => setSelectedCategoryId(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '9px 12px',
+                        borderRadius: 8,
+                        border: '1px solid #CBD5E1',
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: '#071B52',
+                        backgroundColor: '#FFFFFF',
+                        cursor: 'pointer',
+                        outline: 'none',
+                      }}
+                    >
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.dropdownBtn}
+                      onPress={() => {
+                        const idx = categories.findIndex((c) => c.id === selectedCategoryId);
+                        const nextCat = categories[(idx + 1) % categories.length];
+                        if (nextCat) setSelectedCategoryId(nextCat.id);
+                      }}
+                    >
+                      <Text style={styles.dropdownBtnText} numberOfLines={1}>
+                        {categories.find((c) => c.id === selectedCategoryId)?.name || 'Category'}
+                      </Text>
+                      <ChevronDown size={14} color="#64748B" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* Brand Name */}
+                <View style={styles.colOneThird}>
+                  <Text style={styles.formLabel}>
+                    Brand Name <Text style={{ color: '#DC2626' }}>*</Text>
+                  </Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="e.g. Womup Fresh"
+                    placeholderTextColor="#94A3B8"
+                    value={brand}
+                    onChangeText={setBrand}
+                  />
+                </View>
+
+                {/* Shelf Location / Bin */}
+                <View style={styles.colOneThird}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 5 }}>
+                    <Warehouse size={12} color="#64748B" />
+                    <Text style={styles.formLabel}>
+                      Shelf Location / Bin (A1-R2) <Text style={{ color: '#DC2626' }}>*</Text>
+                    </Text>
+                  </View>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="e.g. A1-R2"
+                    placeholderTextColor="#94A3B8"
+                    value={shelfLocation}
+                    onChangeText={setShelfLocation}
+                  />
+                </View>
+              </View>
+
+              {/* Description */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Product Description</Text>
                 <TextInput
-                  style={styles.input}
-                  placeholder="Farm-fresh produce..."
-                  placeholderTextColor={COLORS.textMuted}
+                  style={[styles.formInput, { height: 60, textAlignVertical: 'top' }]}
+                  placeholder="Produce description, storage conditions, provenance..."
+                  placeholderTextColor="#94A3B8"
+                  multiline
                   value={description}
                   onChangeText={setDescription}
                 />
               </View>
             </View>
 
-            {/* Warehouse Shelf Location */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Shelf / Bin Coordinate (Optional)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. A3-R2 (Aisle 3, Rack 2), B1-04, COOLER-1"
-                placeholderTextColor={COLORS.textMuted}
-                value={shelfLocation}
-                onChangeText={(val) => setShelfLocation(val.toUpperCase())}
-                autoCapitalize="characters"
-              />
-              <Text style={styles.inlineFieldHelp}>Pickers in Dark Store will walk directly to this coordinate when fulfilling orders.</Text>
+            {/* SECTION 2: MEDIA & PRODUCT PHOTO */}
+            <View style={styles.sectionWrap}>
+              <Text style={styles.sectionHeading}>
+                <ImageIcon size={13} color="#4F46E5" /> 2. MEDIA & PRODUCT PHOTO
+              </Text>
+
+              <View style={styles.mediaRow}>
+                <View style={styles.photoPreviewBox}>
+                  {imagePreview || imageUrl ? (
+                    <>
+                      <Image
+                        source={{ uri: imagePreview || imageUrl }}
+                        style={styles.photoImg}
+                        resizeMode="cover"
+                      />
+                      <TouchableOpacity
+                        style={styles.photoDeleteBtn}
+                        onPress={() => {
+                          setImageUrl('');
+                          setImagePreview('');
+                        }}
+                      >
+                        <X size={11} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <View style={styles.noPhotoBox}>
+                      <ImageIcon size={26} color="#94A3B8" />
+                      <Text style={styles.noPhotoText}>No Image</Text>
+                    </View>
+                  )}
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <View style={{ marginBottom: 8 }}>
+                    <Text style={styles.formLabel}>Image Web URL</Text>
+                    <TextInput
+                      style={styles.formInput}
+                      placeholder="https://..."
+                      placeholderTextColor="#94A3B8"
+                      value={imageUrl}
+                      onChangeText={(val) => {
+                        setImageUrl(val);
+                        setImagePreview(val);
+                      }}
+                    />
+                  </View>
+
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <TouchableOpacity
+                      style={styles.replacePhotoBtn}
+                      onPress={handlePickImage}
+                      disabled={uploadingImage}
+                    >
+                      <Upload size={13} color="#071B52" />
+                      <Text style={styles.replacePhotoBtnText}>
+                        {uploadingImage ? 'Uploading...' : 'Upload Photo'}
+                      </Text>
+                    </TouchableOpacity>
+                    <Text style={styles.uploadInfoText}>JPG, PNG or WEBP up to 5MB</Text>
+                  </View>
+                </View>
+              </View>
             </View>
 
-            {/* Variants Section */}
-            <View style={styles.variantsHeaderRow}>
-              <View>
-                <Text style={styles.variantsHeading}>Weight & Pack Size Variants</Text>
-                <Text style={styles.variantsSubheading}>
-                  At least 1 variant required with base selling price
+            {/* SECTION 3: PACK SIZES & PRICING MATRIX */}
+            <View style={styles.sectionWrap}>
+              <View style={styles.matrixHeaderRow}>
+                <Text style={styles.sectionHeading}>
+                  <Sparkles size={13} color="#10B981" /> 3. PACK SIZES & PRICING MATRIX ({variants.length} VARIANTS)
                 </Text>
+
+                <TouchableOpacity
+                  style={styles.addPackSizeBtn}
+                  onPress={handleAddVariant}
+                  activeOpacity={0.8}
+                >
+                  <Plus size={13} color="#4F46E5" />
+                  <Text style={styles.addPackSizeBtnText}>+ Add Pack Size</Text>
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity style={styles.addVariantBtn} onPress={handleAddVariant}>
-                <Plus size={14} color={COLORS.purple} style={{ marginRight: 4 }} />
-                <Text style={styles.addVariantBtnText}>Add Pack Size</Text>
-              </TouchableOpacity>
+
+              <View style={styles.matrixTableCard}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+                  <View style={{ minWidth: 700 }}>
+                    {/* Header */}
+                    <View style={styles.matrixTableHeader}>
+                      <Text style={[styles.matrixHeaderCell, { width: 60, textAlign: 'center' }]}>Default</Text>
+                      <Text style={[styles.matrixHeaderCell, { width: 140 }]}>Pack Size / Weight *</Text>
+                      <Text style={[styles.matrixHeaderCell, { width: 140 }]}>SKU</Text>
+                      <Text style={[styles.matrixHeaderCell, { width: 110 }]}>Selling Price (₹) *</Text>
+                      <Text style={[styles.matrixHeaderCell, { width: 100 }]}>MRP (₹) *</Text>
+                      <Text style={[styles.matrixHeaderCell, { width: 85, textAlign: 'center' }]}>Discount</Text>
+                      <Text style={[styles.matrixHeaderCell, { width: 90 }]}>Stock</Text>
+                      <Text style={[styles.matrixHeaderCell, { width: 65, textAlign: 'center' }]}>Action</Text>
+                    </View>
+
+                    {/* Rows */}
+                    {variants.map((v) => {
+                      const sp = parseFloat(v.sellingPrice) || 0;
+                      const mrp = parseFloat(v.mrp) || 0;
+                      const discount = mrp > 0 && sp > 0 ? Math.round(((mrp - sp) / mrp) * 100) : 0;
+                      const isPriceInvalid = sp > mrp;
+
+                      return (
+                        <View
+                          key={v.id}
+                          style={[
+                            styles.matrixTableRow,
+                            v.isDefault && { backgroundColor: '#FFFDF5' },
+                          ]}
+                        >
+                          <View style={[styles.matrixCell, { width: 60, alignItems: 'center' }]}>
+                            <TouchableOpacity
+                              style={[
+                                styles.radioCircle,
+                                v.isDefault && styles.radioCircleActive,
+                              ]}
+                              onPress={() => handleUpdateVariant(v.id, 'isDefault', true)}
+                            >
+                              {v.isDefault && <View style={styles.radioDot} />}
+                            </TouchableOpacity>
+                          </View>
+
+                          <View style={[styles.matrixCell, { width: 140 }]}>
+                            <TextInput
+                              style={styles.matrixInput}
+                              value={v.weightOrVolume}
+                              placeholder="e.g. 500 g"
+                              placeholderTextColor="#94A3B8"
+                              onChangeText={(val) => handleUpdateVariant(v.id, 'weightOrVolume', val)}
+                            />
+                          </View>
+
+                          <View style={[styles.matrixCell, { width: 140 }]}>
+                            <TextInput
+                              style={[styles.matrixInput, { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 11 }]}
+                              value={v.sku}
+                              placeholder="SKU Code"
+                              placeholderTextColor="#94A3B8"
+                              onChangeText={(val) => handleUpdateVariant(v.id, 'sku', val)}
+                            />
+                          </View>
+
+                          <View style={[styles.matrixCell, { width: 110 }]}>
+                            <TextInput
+                              style={[
+                                styles.matrixInput,
+                                { fontWeight: '800', color: '#071B52' },
+                                isPriceInvalid && { borderColor: '#DC2626' },
+                              ]}
+                              keyboardType="numeric"
+                              value={v.sellingPrice}
+                              placeholder="₹0"
+                              placeholderTextColor="#94A3B8"
+                              onChangeText={(val) => handleUpdateVariant(v.id, 'sellingPrice', val)}
+                            />
+                          </View>
+
+                          <View style={[styles.matrixCell, { width: 100 }]}>
+                            <TextInput
+                              style={[styles.matrixInput, { color: '#64748B' }]}
+                              keyboardType="numeric"
+                              value={v.mrp}
+                              placeholder="₹0"
+                              placeholderTextColor="#94A3B8"
+                              onChangeText={(val) => handleUpdateVariant(v.id, 'mrp', val)}
+                            />
+                          </View>
+
+                          <View style={[styles.matrixCell, { width: 85, alignItems: 'center' }]}>
+                            <View
+                              style={[
+                                styles.discountBadge,
+                                isPriceInvalid
+                                  ? { backgroundColor: '#FEE2E2' }
+                                  : discount > 0
+                                  ? { backgroundColor: '#ECFDF5' }
+                                  : { backgroundColor: '#F1F5F9' },
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.discountBadgeText,
+                                  isPriceInvalid
+                                    ? { color: '#DC2626' }
+                                    : discount > 0
+                                    ? { color: '#059669' }
+                                    : { color: '#64748B' },
+                                ]}
+                              >
+                                {isPriceInvalid ? 'INVALID' : `${discount}% OFF`}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <View style={[styles.matrixCell, { width: 90 }]}>
+                            <TextInput
+                              style={styles.matrixInput}
+                              keyboardType="numeric"
+                              value={v.stock}
+                              placeholder="50"
+                              placeholderTextColor="#94A3B8"
+                              onChangeText={(val) => handleUpdateVariant(v.id, 'stock', val)}
+                            />
+                          </View>
+
+                          <View style={[styles.matrixCell, { width: 65, alignItems: 'center' }]}>
+                            <TouchableOpacity
+                              onPress={() => handleRemoveVariant(v.id)}
+                              disabled={variants.length <= 1}
+                              style={{ padding: 4 }}
+                            >
+                              <Trash2
+                                size={15}
+                                color={variants.length <= 1 ? '#CBD5E1' : '#DC2626'}
+                              />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
+              </View>
             </View>
-
-            {variants.map((v, index) => (
-              <View key={v.id} style={styles.variantCard}>
-                <View style={styles.variantCardHeader}>
-                  <View style={styles.variantBadgeRow}>
-                    <Text style={styles.variantBadgeText}>Variant #{index + 1}</Text>
-                    {v.isDefault && (
-                      <View style={styles.defaultBadge}>
-                        <Check size={10} color={COLORS.purple} style={{ marginRight: 2 }} />
-                        <Text style={styles.defaultBadgeText}>Default</Text>
-                      </View>
-                    )}
-                  </View>
-                  <View style={styles.variantHeaderActions}>
-                    {!v.isDefault && (
-                      <TouchableOpacity
-                        style={styles.setDefaultBtn}
-                        onPress={() => handleUpdateVariant(v.id, 'isDefault', true)}
-                      >
-                        <Text style={styles.setDefaultBtnText}>Set Default</Text>
-                      </TouchableOpacity>
-                    )}
-                    {variants.length > 1 && (
-                      <TouchableOpacity
-                        style={styles.deleteVariantBtn}
-                        onPress={() => handleRemoveVariant(v.id)}
-                      >
-                        <Trash2 size={14} color={COLORS.error} />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </View>
-
-                <View style={styles.variantFieldsContainer}>
-                  <View style={styles.variantRow}>
-                    <View style={styles.variantFieldHalf}>
-                      <Text style={styles.variantFieldLabel}>Pack Size *</Text>
-                      <TextInput
-                        style={styles.variantInput}
-                        placeholder="e.g. 500 g"
-                        placeholderTextColor={COLORS.textMuted}
-                        value={v.weightOrVolume}
-                        onChangeText={(val) => handleUpdateVariant(v.id, 'weightOrVolume', val)}
-                      />
-                    </View>
-
-                    <View style={styles.variantFieldHalf}>
-                      <Text style={styles.variantFieldLabel}>SKU Code</Text>
-                      <TextInput
-                        style={styles.variantInput}
-                        placeholder="Auto if empty"
-                        placeholderTextColor={COLORS.textMuted}
-                        value={v.sku}
-                        onChangeText={(val) => handleUpdateVariant(v.id, 'sku', val)}
-                      />
-                    </View>
-                  </View>
-
-                  <View style={styles.variantRow}>
-                    <View style={styles.variantFieldHalf}>
-                      <Text style={styles.variantFieldLabel}>Selling (₹) *</Text>
-                      <TextInput
-                        style={styles.variantInput}
-                        placeholder="e.g. 12"
-                        placeholderTextColor={COLORS.textMuted}
-                        keyboardType="numeric"
-                        value={v.sellingPrice}
-                        onChangeText={(val) => handleUpdateVariant(v.id, 'sellingPrice', val)}
-                      />
-                    </View>
-
-                    <View style={styles.variantFieldHalf}>
-                      <Text style={styles.variantFieldLabel}>MRP (₹) *</Text>
-                      <TextInput
-                        style={styles.variantInput}
-                        placeholder="e.g. 15"
-                        placeholderTextColor={COLORS.textMuted}
-                        keyboardType="numeric"
-                        value={v.mrp}
-                        onChangeText={(val) => handleUpdateVariant(v.id, 'mrp', val)}
-                      />
-                    </View>
-                  </View>
-                </View>
-              </View>
-            ))}
           </ScrollView>
 
-          {/* Bottom Error Banner if any */}
-          {errorMsg && (
-            <View style={styles.bottomErrorBanner}>
-              <AlertCircle size={15} color={COLORS.error} style={{ marginRight: 6 }} />
-              <Text style={styles.errorBannerText}>{errorMsg}</Text>
+          {/* Modal Footer */}
+          <View style={styles.modalFooter}>
+            <View />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                onPress={handleClose}
+                disabled={saving}
+              >
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.saveProdBtn}
+                onPress={handleSave}
+                disabled={saving}
+                activeOpacity={0.85}
+              >
+                {saving ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Check size={15} color="#FFFFFF" />
+                    <Text style={styles.saveProdBtnText}>Save Product Changes</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
-          )}
-
-          {/* Footer Actions */}
-          <View style={styles.footer}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={handleClose}>
-              <Text style={styles.cancelBtnText}>Cancel</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.saveBtn, saving && styles.disabledBtn]}
-              onPress={handleSave}
-              disabled={saving}
-            >
-              {saving ? (
-                <ActivityIndicator size="small" color={COLORS.white} />
-              ) : (
-                <Text style={styles.saveBtnText}>Save Product & Variants</Text>
-              )}
-            </TouchableOpacity>
           </View>
         </View>
       </View>
-
-      {/* 🥬 CATEGORY SELECTOR MODAL (Option A - Dropdown List with Search) */}
-      <Modal
-        visible={showCategoryModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowCategoryModal(false)}
-      >
-        <View style={styles.catModalOverlay}>
-          <View style={styles.catModalCard}>
-            {/* Modal Header */}
-            <View style={styles.catModalHeader}>
-              <View>
-                <Text style={styles.catModalTitle}>Select Category</Text>
-                <Text style={styles.catModalSubtitle}>Choose the product department</Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setShowCategoryModal(false)}
-                style={styles.catModalCloseBtn}
-              >
-                <X size={18} color={COLORS.textPrimary} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Search Input */}
-            <View style={styles.catSearchBox}>
-              <Search size={16} color={COLORS.textMuted} style={{ marginRight: 8 }} />
-              <TextInput
-                style={styles.catSearchInput}
-                placeholder="Search categories..."
-                placeholderTextColor={COLORS.textMuted}
-                value={categorySearchQuery}
-                onChangeText={setCategorySearchQuery}
-                autoCorrect={false}
-              />
-              {categorySearchQuery.length > 0 && (
-                <TouchableOpacity onPress={() => setCategorySearchQuery('')}>
-                  <X size={14} color={COLORS.textMuted} />
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {/* Category Items List */}
-            <FlatList
-              data={filteredCategories}
-              keyExtractor={(item) => item.id}
-              showsVerticalScrollIndicator={false}
-              style={{ maxHeight: 320 }}
-              renderItem={({ item }) => {
-                const isSelected = selectedCategoryId
-                  ? selectedCategoryId === item.id
-                  : categories[0]?.id === item.id;
-                return (
-                  <TouchableOpacity
-                    style={[
-                      styles.catListItem,
-                      isSelected && styles.catListItemSelected,
-                    ]}
-                    onPress={() => {
-                      setSelectedCategoryId(item.id);
-                      setShowCategoryModal(false);
-                      setCategorySearchQuery('');
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.catListItemLeft}>
-                      <Text style={styles.catListEmoji}>
-                        {getCategoryEmoji(item.name)}
-                      </Text>
-                      <View>
-                        <Text
-                          style={[
-                            styles.catListName,
-                            isSelected && styles.catListNameSelected,
-                          ]}
-                        >
-                          {item.name}
-                        </Text>
-                        {item.itemCount !== undefined && (
-                          <Text style={styles.catListItemCount}>
-                            {item.itemCount} items in catalog
-                          </Text>
-                        )}
-                      </View>
-                    </View>
-
-                    {isSelected ? (
-                      <View style={styles.catSelectedCheck}>
-                        <Check size={14} color={COLORS.purple} />
-                      </View>
-                    ) : (
-                      <View style={styles.catUnselectedCheck} />
-                    )}
-                  </TouchableOpacity>
-                );
-              }}
-              ListEmptyComponent={
-                <View style={styles.catEmptyState}>
-                  <Package size={32} color={COLORS.border} />
-                  <Text style={styles.catEmptyText}>
-                    No categories found matching "{categorySearchQuery}"
-                  </Text>
-                </View>
-              }
-            />
-
-            <View style={styles.catModalFooter}>
-              <TouchableOpacity
-                style={styles.catCancelBtn}
-                onPress={() => setShowCategoryModal(false)}
-              >
-                <Text style={styles.catCancelBtnText}>Close</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
+  modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 16,
+    padding: 16,
   },
-  card: {
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.card,
+  modalCard: {
     width: '100%',
-    maxWidth: 580,
+    maxWidth: 820,
     maxHeight: '92%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     overflow: 'hidden',
-    alignSelf: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: 8,
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: COLORS.textPrimary,
-    flexShrink: 1,
-  },
-  closeBtn: {
-    padding: 6,
-  },
-  topErrorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FEF2F2',
-    borderBottomWidth: 1,
-    borderBottomColor: '#FECACA',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 10,
-  },
-  bottomErrorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    borderRadius: RADIUS.sm,
-    marginHorizontal: SPACING.md,
-    marginBottom: SPACING.sm,
-    padding: 10,
-  },
-  errorBannerText: {
-    fontSize: 13,
-    color: COLORS.error,
-    fontWeight: '700',
-    flex: 1,
-  },
-  formScroll: {
-    padding: SPACING.md,
-  },
-  masterNoticeBox: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: '#FAF5FF',
-    borderWidth: 1,
-    borderColor: '#E9D5FF',
-    borderRadius: RADIUS.input,
-    padding: 10,
-    marginBottom: SPACING.md,
-  },
-  masterNoticeTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.purple,
-    marginBottom: 2,
-  },
-  masterNoticeText: {
-    fontSize: 11,
-    color: COLORS.textMuted,
-    lineHeight: 15,
-  },
-  inputGroup: {
-    marginBottom: SPACING.md,
-  },
-  rowTwoCols: {
-    flexDirection: 'row',
-    gap: SPACING.md,
-  },
-  inputLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    marginBottom: 6,
-  },
-  input: {
-    backgroundColor: COLORS.cardBackground,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: RADIUS.input,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 9,
-    fontSize: 13,
-    color: COLORS.textPrimary,
-  },
-  inputError: {
-    borderColor: COLORS.error,
-    borderWidth: 1.5,
-    backgroundColor: '#FFF5F5',
-  },
-  inlineFieldHelp: {
-    fontSize: 11,
-    color: COLORS.error,
-    fontWeight: '600',
-    marginTop: 4,
-  },
-
-  // 📸 Image Upload Styles
-  uploadCardContainer: {
-    backgroundColor: '#FAF5FF',
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: '#D8B4FE',
-    borderRadius: RADIUS.card,
-    padding: 14,
-  },
-  uploadButtonsGrid: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  actionPickBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: '#E9D5FF',
-    borderRadius: RADIUS.button,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    gap: 8,
-  },
-  actionPickText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.purple,
-  },
-  orDividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 10,
-    gap: 8,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#E9D5FF',
-  },
-  orText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#9333EA',
-    letterSpacing: 0.5,
-  },
-  showUrlBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 6,
-  },
-  showUrlBtnText: {
-    fontSize: 11.5,
-    fontWeight: '600',
-    color: COLORS.purple,
-    textDecorationLine: 'underline',
-  },
-  urlInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  urlTextInput: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: '#E9D5FF',
-    borderRadius: RADIUS.input,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    fontSize: 12,
-    color: COLORS.textPrimary,
-  },
-  urlApplyBtn: {
-    backgroundColor: COLORS.purple,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: RADIUS.button,
-  },
-  urlApplyBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.white,
-  },
-  uploadLoadingBox: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    gap: 8,
-  },
-  uploadLoadingText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.purple,
-  },
-  previewContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: COLORS.cardBackground,
-    padding: 10,
-    borderRadius: RADIUS.card,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  previewImage: {
-    width: 68,
-    height: 68,
-    borderRadius: RADIUS.sm,
-    backgroundColor: '#F3F4F6',
-  },
-  previewDetails: {
-    flex: 1,
-  },
-  previewTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-  },
-  previewSubtitle: {
-    fontSize: 11,
-    color: COLORS.textMuted,
-    marginTop: 2,
-  },
-  previewActionsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginTop: 8,
-  },
-  changeActionBtn: {
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    backgroundColor: '#FAF5FF',
-    borderWidth: 1,
-    borderColor: '#E9D5FF',
-    borderRadius: RADIUS.sm,
-  },
-  changeActionText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.purple,
-  },
-  removeActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  removeActionText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: COLORS.error,
-  },
-
-  // 🥬 Category Dropdown Styles
-  categoryDropdownTrigger: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: COLORS.cardBackground,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: RADIUS.input,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 10,
-  },
-  categoryDropdownLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  categoryDropdownIcon: {
-    fontSize: 16,
-  },
-  categoryDropdownText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-  },
-
-  // Category Modal Styles
-  catModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: SPACING.md,
-  },
-  catModalCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.card,
-    width: '100%',
-    maxWidth: 420,
-    padding: SPACING.md,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.25,
     shadowRadius: 16,
-    elevation: 8,
+    elevation: 10,
   },
-  catModalHeader: {
+  modalHeader: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
+    paddingHorizontal: 22,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
   },
-  catModalTitle: {
+  modalTitle: {
     fontSize: 16,
     fontWeight: '800',
-    color: COLORS.textPrimary,
+    color: '#071B52',
   },
-  catModalSubtitle: {
-    fontSize: 12,
-    color: COLORS.textMuted,
-    marginTop: 2,
-  },
-  catModalCloseBtn: {
+  closeBtn: {
     padding: 4,
   },
-  catSearchBox: {
+  errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.cardBackground,
-    borderRadius: RADIUS.input,
+    backgroundColor: '#FEE2E2',
     borderWidth: 1,
-    borderColor: COLORS.border,
-    paddingHorizontal: 10,
-    height: 38,
-    marginBottom: 10,
+    borderColor: '#FECACA',
+    marginHorizontal: 20,
+    marginTop: 12,
+    padding: 10,
+    borderRadius: 8,
   },
-  catSearchInput: {
+  errorBannerText: {
+    fontSize: 12,
+    color: '#DC2626',
+    fontWeight: '700',
     flex: 1,
-    fontSize: 13,
-    color: COLORS.textPrimary,
   },
-  catListItem: {
+  modalBody: {
+    paddingHorizontal: 22,
+    paddingTop: 16,
+  },
+  sectionWrap: {
+    marginBottom: 20,
+  },
+  sectionHeading: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#071B52',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  formGroup: {
+    marginBottom: 12,
+  },
+  formLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#334155',
+    marginBottom: 5,
+  },
+  formInput: {
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 13,
+    color: '#071B52',
+    backgroundColor: '#FFFFFF',
+  },
+  threeColRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+    flexWrap: 'wrap',
+  },
+  colOneThird: {
+    flex: 1,
+    minWidth: 200,
+  },
+  dropdownBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderRadius: RADIUS.sm,
-    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    backgroundColor: '#FFFFFF',
   },
-  catListItemSelected: {
-    backgroundColor: '#FAF5FF',
-  },
-  catListItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  catListEmoji: {
-    fontSize: 18,
-  },
-  catListName: {
+  dropdownBtnText: {
     fontSize: 13,
     fontWeight: '600',
-    color: COLORS.textPrimary,
+    color: '#071B52',
+    flex: 1,
   },
-  catListNameSelected: {
-    color: COLORS.purple,
-    fontWeight: '700',
+  mediaRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 14,
   },
-  catListItemCount: {
-    fontSize: 10.5,
-    color: COLORS.textMuted,
-  },
-  catSelectedCheck: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#F3E8FF',
+  photoPreviewBox: {
+    width: 90,
+    height: 90,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    overflow: 'hidden',
+    position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  catUnselectedCheck: {
+  photoImg: {
+    width: '100%',
+    height: '100%',
+  },
+  photoDeleteBtn: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    borderRadius: 10,
+    width: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noPhotoBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noPhotoText: {
+    fontSize: 10,
+    color: '#94A3B8',
+    marginTop: 3,
+  },
+  replacePhotoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 7,
+  },
+  replacePhotoBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#071B52',
+  },
+  uploadInfoText: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  matrixHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  addPackSizeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  addPackSizeBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#4F46E5',
+  },
+  matrixTableCard: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+  },
+  matrixTableHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+  },
+  matrixHeaderCell: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#64748B',
+    paddingHorizontal: 6,
+  },
+  matrixTableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+  matrixCell: {
+    paddingHorizontal: 6,
+    justifyContent: 'center',
+  },
+  matrixInput: {
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    fontSize: 12,
+    color: '#071B52',
+    backgroundColor: '#FFFFFF',
+  },
+  radioCircle: {
     width: 18,
     height: 18,
     borderRadius: 9,
-    borderWidth: 1.5,
-    borderColor: COLORS.border,
-  },
-  catEmptyState: {
+    borderWidth: 2,
+    borderColor: '#CBD5E1',
     alignItems: 'center',
-    paddingVertical: 24,
-    gap: 8,
+    justifyContent: 'center',
   },
-  catEmptyText: {
-    fontSize: 12,
-    color: COLORS.textMuted,
-    textAlign: 'center',
+  radioCircleActive: {
+    borderColor: '#FF3B98',
+    backgroundColor: '#FF3B98',
   },
-  catModalFooter: {
+  radioDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#FFFFFF',
+  },
+  discountBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  discountBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 22,
+    paddingVertical: 14,
     borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    paddingTop: 10,
-    marginTop: 8,
-    alignItems: 'flex-end',
+    borderTopColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
   },
-  catCancelBtn: {
-    paddingVertical: 6,
+  cancelBtn: {
     paddingHorizontal: 14,
-    backgroundColor: COLORS.cardBackground,
-    borderRadius: RADIUS.sm,
+    paddingVertical: 8,
+    borderRadius: 8,
   },
-  catCancelBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.textMuted,
-  },
-
-  // Variants Section
-  variantsHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: SPACING.sm,
-    marginBottom: SPACING.sm,
-    paddingTop: SPACING.sm,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-  },
-  variantsHeading: {
-    fontSize: 14,
+  cancelBtnText: {
+    fontSize: 13,
     fontWeight: '700',
-    color: COLORS.textPrimary,
+    color: '#64748B',
   },
-  variantsSubheading: {
-    fontSize: 11,
-    color: COLORS.textMuted,
-  },
-  addVariantBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: RADIUS.button,
-    backgroundColor: '#FAF5FF',
-    borderWidth: 1,
-    borderColor: '#E9D5FF',
-  },
-  addVariantBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.purple,
-  },
-  variantCard: {
-    backgroundColor: COLORS.cardBackground,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    padding: 10,
-    marginBottom: SPACING.sm,
-  },
-  variantCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  variantBadgeRow: {
+  saveProdBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    backgroundColor: '#FF3B98',
+    paddingHorizontal: 20,
+    paddingVertical: 9,
+    borderRadius: 8,
+    shadowColor: '#FF3B98',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  variantBadgeText: {
-    fontSize: 11,
+  saveProdBtnText: {
+    fontSize: 13,
     fontWeight: '800',
-    color: COLORS.textPrimary,
-  },
-  defaultBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FAF5FF',
-    borderWidth: 1,
-    borderColor: '#E9D5FF',
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: RADIUS.pill,
-  },
-  defaultBadgeText: {
-    fontSize: 10,
-    color: COLORS.purple,
-    fontWeight: '700',
-  },
-  variantHeaderActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  setDefaultBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  setDefaultBtnText: {
-    fontSize: 10,
-    color: COLORS.textMuted,
-    fontWeight: '600',
-  },
-  deleteVariantBtn: {
-    padding: 4,
-  },
-  variantFieldsContainer: {
-    gap: 8,
-  },
-  variantRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  variantFieldHalf: {
-    flex: 1,
-  },
-  variantFieldLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: COLORS.textMuted,
-    marginBottom: 4,
-  },
-  variantInput: {
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: RADIUS.input,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    fontSize: 12,
-    color: COLORS.textPrimary,
-  },
-
-  // Footer Actions
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    backgroundColor: COLORS.white,
-    flexWrap: 'wrap',
-  },
-  cancelBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: RADIUS.button,
-    backgroundColor: COLORS.cardBackground,
-  },
-  cancelBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.textMuted,
-  },
-  saveBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: RADIUS.button,
-    backgroundColor: COLORS.purple,
-    alignItems: 'center',
-  },
-  disabledBtn: {
-    opacity: 0.6,
-  },
-  saveBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.white,
+    color: '#FFFFFF',
   },
 });

@@ -2,11 +2,8 @@ name: Scheduled Cron Jobs
 
 on:
   schedule:
-    # Daily: Every day at 12:00 AM IST (18:30 UTC)
+    # Every day at 12:00 AM IST (18:30 UTC)
     - cron: '30 18 * * *'
-
-    # Monthly: 1st day of month at 12:00 AM IST (18:30 UTC)
-    - cron: '30 18 1 * *'
 
   workflow_dispatch:
     inputs:
@@ -17,12 +14,13 @@ on:
         type: choice
         options:
           - daily_income
+          - monthly_level_income
           - monthly_shopping_coins
-          - run_both
+          - run_all
 
 jobs:
   run-cron:
-    name: Execute Scheduled Wallet & Coin Maintenance
+    name: Execute Wallet and Coin Maintenance
     runs-on: ubuntu-latest
 
     steps:
@@ -33,38 +31,58 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          cache: npm
           cache-dependency-path: backend/package-lock.json
 
       - name: Install Dependencies
         working-directory: backend
         run: npm ci || npm install --legacy-peer-deps
 
-      # ---------------------------------------------------------------------
-      # 1. DAILY MIDNIGHT CRON
-      # Rule: Checks pendingIncome and moves amounts where availableFrom <= NOW
-      # ---------------------------------------------------------------------
+      - name: Verify MongoDB Secret
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        run: |
+          if [ -z "$MONGODB_URI" ]; then
+            echo "::error::Missing GitHub Secret: MONGODB_URI. Please set it in Repository Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+
+      - name: Check Current Day in India
+        id: india_date
+        run: |
+          echo "day=$(TZ=Asia/Kolkata date +%d)" >> "$GITHUB_OUTPUT"
+
+      # 1. Monthly 7-Level Team Income: runs on 1st of month in India (Calculates Veg 3% + Other 0.4%)
+      - name: Run Monthly Team Level Income Calculation
+        if: |
+          (github.event_name == 'schedule' &&
+           steps.india_date.outputs.day == '01') ||
+          inputs.cron_job == 'monthly_level_income' ||
+          inputs.cron_job == 'run_all'
+        working-directory: backend
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        run: npm run cron:monthly-level-income
+
+      # 2. Monthly Shopping Coins: runs on 1st of month in India (Credits ₹2,000 Shopping Coins)
+      - name: Run Monthly Shopping Coins
+        if: |
+          (github.event_name == 'schedule' &&
+           steps.india_date.outputs.day == '01') ||
+          inputs.cron_job == 'monthly_shopping_coins' ||
+          inputs.cron_job == 'run_all'
+        working-directory: backend
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        run: npm run cron:monthly-coins
+
+      # 3. Daily income rollover: unlocks 24-hr locked pending income to Normal Wallet
       - name: Run Daily Income Rollover
         if: |
           github.event_name == 'schedule' ||
           inputs.cron_job == 'daily_income' ||
-          inputs.cron_job == 'run_both'
+          inputs.cron_job == 'run_all'
         working-directory: backend
         env:
-          MONGODB_URI: ${{ secrets.MONGODB_URI || 'mongodb+srv://fanqie:fanqie123@cluster0.f8acy45.mongodb.net/wormup' }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
         run: npm run cron:daily-income
-
-      # ---------------------------------------------------------------------
-      # 2. MONTHLY 1ST CRON
-      # Rule: Credits ₹2,000 Shopping Coins to eligible users on 1st of month.
-      # Idempotency prevents duplicate credits. Never adds to income/wallet.
-      # ---------------------------------------------------------------------
-      - name: Run Monthly Shopping Coins
-        if: |
-          github.event.schedule == '30 18 1 * *' ||
-          inputs.cron_job == 'monthly_shopping_coins' ||
-          inputs.cron_job == 'run_both'
-        working-directory: backend
-        env:
-          MONGODB_URI: ${{ secrets.MONGODB_URI || 'mongodb+srv://fanqie:fanqie123@cluster0.f8acy45.mongodb.net/wormup' }}
-        run: npm run cron:monthly-coins

@@ -67,7 +67,8 @@ export class WalletService {
     if (!user) throw new NotFoundException('User not found');
 
     const before = user.walletBalance;
-    user.walletBalance += amount;
+    user.walletBalance = Number((user.walletBalance + amount).toFixed(2));
+    user.availableIncome = Number(((user.availableIncome || 0) + amount).toFixed(2));
     await user.save();
 
     const tx = await this.walletTxModel.create({

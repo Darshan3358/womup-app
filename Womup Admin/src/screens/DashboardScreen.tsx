@@ -30,6 +30,7 @@ import {
 } from 'lucide-react-native';
 import { COLORS, GRADIENTS, RADIUS, SPACING } from '../theme';
 import { KpiCard } from '../components/common/KpiCard';
+import { PendingApprovalsWidget } from '../components/common/PendingApprovalsWidget';
 import { useAdminState } from '../context/AdminStateContext';
 
 export const DashboardScreen: React.FC = () => {
@@ -201,6 +202,11 @@ export const DashboardScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       </LinearGradient>
+
+      {/* ========================================================================= */}
+      {/* PENDING APPROVALS WIDGET (8 APPROVAL WORKFLOWS)                           */}
+      {/* ========================================================================= */}
+      <PendingApprovalsWidget />
 
       {/* ========================================================================= */}
       {/* FILTERS (New — added above KPIs as per SRS)                                */}

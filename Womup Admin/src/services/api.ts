@@ -153,13 +153,13 @@ export const ApiService = {
               address: `${addr.houseNumber || ''} ${addr.street || ''} ${addr.city || 'Ahmedabad'} ${addr.pincode ? '- ' + addr.pincode : ''}`.trim(),
               zone: addr.city || 'Ahmedabad'
             })),
-            status: u.isActive !== false ? 'Active' : 'Blocked',
+            status: (u.isBlocked === 1 || u.isActive === false) ? 'Blocked' : 'Active',
             spend: totalSpend,
             totalOrders: userOrders.length,
             avatar: u.avatar || (idx === 0 ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&q=80' : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&q=80'),
             walletBalance: u.walletBalance || 0,
             shoppingCoinBalance: u.shoppingCoins || 0,
-            kycStatus: u.isPhoneVerified ? 'Verified' : 'Pending',
+            kycStatus: (u.customerKycStatus === 2 || u.verificationStatus === 'VERIFIED') ? 'Verified' : (u.customerKycStatus === 3 ? 'Rejected' : 'Pending'),
             createdAt: u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recently',
             level: u.level || 1,
             sponsorCode: u.sponsorCode || 'WORMUP001',
@@ -169,6 +169,35 @@ export const ApiService = {
             appDownloadIncome: u.appDownloadIncome || 0,
             pendingIncome: u.pendingIncome || 0,
             availableIncome: u.availableIncome || 0,
+            firstName: u.firstName || (u.name ? u.name.split(' ')[0] : ''),
+            surname: u.surname || (u.name ? u.name.split(' ').slice(1).join(' ') : ''),
+            fatherHusbandName: u.fatherHusbandName || '',
+            gender: u.gender || '',
+            birthdate: u.birthDate || u.birthday || '',
+            birthDate: u.birthDate || u.birthday || '',
+            landmark: u.landmark || '',
+            village: u.village || '',
+            pincode: u.customerPincode || u.registrationPincode || primary.pincode || '',
+            sponsorId: u.sponsorId ? (u.sponsorId.toString ? u.sponsorId.toString() : String(u.sponsorId)) : '',
+            sponsorName: u.sponsorName || '',
+            userCode: u.customerCode || u.referralCode || '',
+            bankName: u.bankName || '',
+            branchName: u.branchName || '',
+            accountHolderName: u.accountHolderName || u.name || '',
+            accountNumber: u.accountNumber || u.bankAccountNo || '',
+            ifscCode: u.ifscCode || '',
+            upiId: u.upiId || '',
+            paymentStatus: u.customerPaymentStatus !== undefined ? u.customerPaymentStatus : 1,
+            isBlocked: u.isBlocked !== undefined ? u.isBlocked : (u.isActive === false ? 1 : 0),
+            isSuspended: u.isSuspended || 0,
+            adminNotes: u.adminNotes || '',
+            aadhaarNumber: u.aadhaarNumber || u.customer_aadhar_no || '',
+            aadhaarFrontImage: u.customer_image_aadhar_front || u.aadharFrontImage || '',
+            customer_image_aadhar_front: u.customer_image_aadhar_front || u.aadharFrontImage || '',
+            aadhaarBackImage: u.customer_image_aadhar_back || u.aadharBackImage || '',
+            customer_image_aadhar_back: u.customer_image_aadhar_back || u.aadharBackImage || '',
+            kycSubmittedAt: u.updatedAt || u.createdAt || '',
+            kycRejectReason: u.kycRejectReason || '',
           };
         });
 
@@ -668,19 +697,51 @@ export const ApiService = {
   async updateCustomer(id: string, data: Partial<Customer>): Promise<boolean> {
     try {
       console.log(`[API] Updating customer ${id} in MongoDB:`, data);
-      const res = await fetch(`${API_BASE_URL}/api/admin/users/${id}`, {
+      const payload: any = {
+        name: data.name,
+        firstName: data.firstName,
+        surname: data.surname,
+        fatherHusbandName: data.fatherHusbandName,
+        gender: data.gender,
+        birthdate: data.birthdate || data.birthDate,
+        mobile: data.phone,
+        phone: data.phone,
+        email: data.email,
+        address: data.address,
+        landmark: data.landmark,
+        village: data.village,
+        areaZone: data.zoneName,
+        zoneName: data.zoneName,
+        pincode: data.pincode,
+        bankName: data.bankName,
+        branchName: data.branchName,
+        accountHolderName: data.accountHolderName,
+        accountNumber: data.accountNumber,
+        ifscCode: data.ifscCode,
+        upiId: data.upiId,
+        kycStatus: data.kycStatus === 'Verified' ? 2 : (data.kycStatus === 'Rejected' ? 3 : (data.kycStatus === 'Pending' ? 1 : undefined)),
+        paymentStatus: data.paymentStatus,
+        isBlocked: data.isBlocked !== undefined ? data.isBlocked : (data.status === 'Blocked' ? 1 : 0),
+        isSuspended: data.isSuspended,
+        adminNotes: data.adminNotes,
+        status: data.status,
+      };
+
+      // Call Nest API first
+      await fetch(`${NEST_API_BASE_URL}/admin/customers/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }).catch(() => null);
+
+      // Also sync to legacy admin backend if present
+      await fetch(`${API_BASE_URL}/api/admin/users/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: data.name,
-          phone: data.phone,
-          email: data.email,
-          status: data.status,
-          address: data.address,
-          zoneName: data.zoneName,
-        }),
-      });
-      return res.ok;
+        body: JSON.stringify(payload),
+      }).catch(() => null);
+
+      return true;
     } catch (err) {
       console.error("[API] Error updating customer in MongoDB:", err);
       return false;
@@ -1085,7 +1146,7 @@ export const ApiService = {
       const res = await fetch(`${API_BASE_URL}/api/admin/riders/${id}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
-      return json.data || null;
+      return { success: true, data: json.data || json };
     } catch (e) {
       console.warn(`[API] Failed to fetch rider detail ${id}:`, e);
       return null;
@@ -1102,12 +1163,13 @@ export const ApiService = {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
-      return json.data || null;
+      return { success: true, data: json.data || json };
     } catch (e) {
       console.warn(`[API] Failed to update rider ${id}:`, e);
       return null;
     }
   },
+
 
   // 17. FETCH ALL STORES ENRICHED
   async fetchStores(): Promise<DarkStoreItem[]> {
@@ -1771,6 +1833,15 @@ export const ApiService = {
   },
 
   // 55. CUSTOMER KYC REVIEW & APPROVALS
+  async getCustomerKyc(id: string): Promise<any> {
+    try {
+      const res = await fetch(`${NEST_API_BASE_URL}/admin/customers/${id}/kyc`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed fetching customer KYC details' };
+    }
+  },
+
   async getCustomerKycReview(id: string): Promise<any> {
     try {
       const res = await fetch(`${NEST_API_BASE_URL}/admin/customers/${id}/kyc-review`);
@@ -1816,6 +1887,76 @@ export const ApiService = {
       return await res.json();
     } catch (err: any) {
       return { success: false, error: err.message || 'Failed fetching pending customer KYC' };
+    }
+  },
+
+  // 56. DARK STORE ADMIN APPROVALS
+  async approveDarkStore(id: string): Promise<any> {
+    try {
+      const res = await fetch(`${NEST_API_BASE_URL}/admin/stores/${id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed approving dark store' };
+    }
+  },
+
+  async rejectDarkStore(id: string, reason?: string): Promise<any> {
+    try {
+      const res = await fetch(`${NEST_API_BASE_URL}/admin/stores/${id}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed rejecting dark store' };
+    }
+  },
+
+  async getPendingDarkStores(): Promise<any> {
+    try {
+      const res = await fetch(`${NEST_API_BASE_URL}/admin/stores/pending`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed fetching pending dark stores' };
+    }
+  },
+
+  // 57. RIDER / DELIVERY BOY ADMIN APPROVALS
+  async approveRider(id: string): Promise<any> {
+    try {
+      const res = await fetch(`${NEST_API_BASE_URL}/admin/riders/${id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed approving rider' };
+    }
+  },
+
+  async rejectRider(id: string, reason?: string): Promise<any> {
+    try {
+      const res = await fetch(`${NEST_API_BASE_URL}/admin/riders/${id}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed rejecting rider' };
+    }
+  },
+
+  async getPendingRiders(): Promise<any> {
+    try {
+      const res = await fetch(`${NEST_API_BASE_URL}/admin/riders/pending`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed fetching pending riders' };
     }
   },
 };

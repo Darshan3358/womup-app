@@ -29,9 +29,15 @@ interface RiderContextType {
   authPhone: string;
   authEmail: string;
   otpVerificationId: string | null;
+  registrationToken: string | null;
   debugOtp: string | null;
   setAuthStep: (step: AuthScreenState) => void;
+  setRegistrationToken: (token: string | null) => void;
   checkSession: () => Promise<void>;
+  loginWithPassword: (email: string, password: string) => Promise<void>;
+  loginWithEmailOtp: (email: string, otp: string) => Promise<void>;
+  forgotPassword: (email: string) => Promise<{ message: string; verificationId?: string }>;
+  resetPassword: (email: string, otp: string, newPassword: string) => Promise<{ message: string }>;
   requestOtp: (email: string) => Promise<void>;
   verifyOtpCode: (otp: string) => Promise<void>;
   resendOtp: () => Promise<void>;
@@ -41,13 +47,35 @@ interface RiderContextType {
     email?: string;
     phoneNumber?: string;
     phone?: string;
+    mobile?: string;
+    password?: string;
     city: string;
     cityId?: string;
     cityName?: string;
+    areaId?: string;
+    areaName?: string;
     vehicleType: 'EV_SCOOTER' | 'BIKE' | 'BICYCLE';
     vehicleNumber: string;
     drivingLicenseNumber?: string;
+    dlImageUrl?: string;
     address?: string;
+    aadharNumber?: string;
+    aadharFrontUrl?: string;
+    aadharBackUrl?: string;
+    profilePhotoUrl?: string;
+    rcNumber?: string;
+    rcImageUrl?: string;
+    vehicleInsuranceUrl?: string;
+    vehicleModelYear?: string;
+    hubId?: string;
+    shiftPreference?: string;
+    emergencyContact?: string;
+    bankName?: string;
+    bankBranch?: string;
+    accountHolderName?: string;
+    accountNumber?: string;
+    ifscCode?: string;
+    upiId?: string;
   }) => Promise<void>;
   // Rider Operational State (R07 - R29)
   profile: RiderProfile | null;
@@ -115,6 +143,7 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [authPhone, setAuthPhone] = useState<string>('');
   const [authEmail, setAuthEmail] = useState<string>('');
   const [otpVerificationId, setOtpVerificationId] = useState<string | null>(null);
+  const [registrationToken, setRegistrationToken] = useState<string | null>(null);
   const [debugOtp, setDebugOtp] = useState<string | null>(null);
 
   // Operational State
@@ -313,6 +342,54 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [refreshDashboard]);
 
+  const loginWithPassword = async (email: string, password: string) => {
+    const cleanEmail = email.trim().toLowerCase();
+    setAuthEmail(cleanEmail);
+    const res = await RiderApiService.loginWithPassword(cleanEmail, password);
+    if (res.rider) {
+      setProfile(res.rider);
+      if (res.rider.phone) setAuthPhone(res.rider.phone);
+      if (res.rider.status === 'UNDER_REVIEW') {
+        setAuthStep('APPROVAL_PENDING');
+      } else if (res.rider.status === 'KYC_PENDING') {
+        setAuthStep('KYC');
+      } else {
+        await refreshDashboard();
+        setAuthStep('AUTHENTICATED');
+      }
+    }
+  };
+
+  const loginWithEmailOtp = async (email: string, otp: string) => {
+    const cleanEmail = email.trim().toLowerCase();
+    setAuthEmail(cleanEmail);
+    const res = await RiderApiService.loginWithEmailOtp(cleanEmail, otp);
+    if (res.rider) {
+      setProfile(res.rider);
+      if (res.rider.phone) setAuthPhone(res.rider.phone);
+      if (res.rider.status === 'UNDER_REVIEW') {
+        setAuthStep('APPROVAL_PENDING');
+      } else if (res.rider.status === 'KYC_PENDING') {
+        setAuthStep('KYC');
+      } else {
+        await refreshDashboard();
+        setAuthStep('AUTHENTICATED');
+      }
+    }
+  };
+
+  const forgotPassword = async (email: string) => {
+    const cleanEmail = email.trim().toLowerCase();
+    setAuthEmail(cleanEmail);
+    const res = await RiderApiService.forgotPassword(cleanEmail);
+    if (res.verificationId) setOtpVerificationId(res.verificationId);
+    return res;
+  };
+
+  const resetPassword = async (email: string, otp: string, newPassword: string) => {
+    return await RiderApiService.resetPassword(email, otp, newPassword);
+  };
+
   const requestOtp = async (email: string) => {
     const cleanEmail = email.trim().toLowerCase();
     setAuthEmail(cleanEmail);
@@ -334,6 +411,7 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const res = await RiderApiService.verifyOtp(authEmail, otp, otpVerificationId || undefined);
     if (res.isNewRider) {
       if (res.verificationId) setOtpVerificationId(res.verificationId);
+      if (res.registrationToken) setRegistrationToken(res.registrationToken);
       setAuthStep('REGISTER');
       return;
     }
@@ -360,32 +438,55 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     email?: string;
     phoneNumber?: string;
     phone?: string;
+    password?: string;
     city: string;
     cityId?: string;
     cityName?: string;
+    areaId?: string;
+    areaName?: string;
     vehicleType: 'EV_SCOOTER' | 'BIKE' | 'BICYCLE';
     vehicleNumber: string;
     drivingLicenseNumber?: string;
+    dlImageUrl?: string;
     address?: string;
   }) => {
-    if (!otpVerificationId) {
-      throw new Error('Verification session expired. Please verify your email again.');
-    }
     const finalFullName = (data.fullName || data.name || '').trim();
     const finalPhone = (data.phoneNumber || data.phone || '').trim();
 
     const res = await RiderApiService.registerRider({
-      verificationId: otpVerificationId,
-      email: authEmail,
+      registrationToken: registrationToken || undefined,
+      verificationId: otpVerificationId || undefined,
+      email: data.email || authEmail,
       fullName: finalFullName,
       phoneNumber: finalPhone,
+      password: data.password,
       city: data.city,
       cityId: data.cityId,
       cityName: data.cityName,
+      areaId: data.areaId,
+      areaName: data.areaName,
       vehicleType: data.vehicleType,
       vehicleNumber: data.vehicleNumber,
       drivingLicenseNumber: data.drivingLicenseNumber,
+      dlImageUrl: data.dlImageUrl,
       address: data.address,
+      aadharNumber: (data as any).aadharNumber,
+      aadharFrontUrl: (data as any).aadharFrontUrl,
+      aadharBackUrl: (data as any).aadharBackUrl,
+      profilePhotoUrl: (data as any).profilePhotoUrl,
+      rcNumber: (data as any).rcNumber,
+      rcImageUrl: (data as any).rcImageUrl,
+      vehicleInsuranceUrl: (data as any).vehicleInsuranceUrl,
+      vehicleModelYear: (data as any).vehicleModelYear,
+      hubId: (data as any).hubId,
+      shiftPreference: (data as any).shiftPreference,
+      emergencyContact: (data as any).emergencyContact,
+      bankName: (data as any).bankName,
+      bankBranch: (data as any).bankBranch,
+      accountHolderName: (data as any).accountHolderName,
+      accountNumber: (data as any).accountNumber,
+      ifscCode: (data as any).ifscCode,
+      upiId: (data as any).upiId,
     });
 
     setProfile(res.rider);
@@ -664,9 +765,15 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         authPhone,
         authEmail,
         otpVerificationId,
+        registrationToken,
         debugOtp,
         setAuthStep,
+        setRegistrationToken,
         checkSession,
+        loginWithPassword,
+        loginWithEmailOtp,
+        forgotPassword,
+        resetPassword,
         requestOtp,
         verifyOtpCode,
         resendOtp,

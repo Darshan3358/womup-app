@@ -215,8 +215,24 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
   ) {
     if (!data?.orderId) return;
 
-    const lat = data.lat ?? data.latitude ?? 23.0245;
-    const lng = data.lng ?? data.longitude ?? 72.5298;
+    const lat = data.lat ?? data.latitude;
+    const lng = data.lng ?? data.longitude;
+
+    // Strict validation: Reject missing or non-numeric coordinates without manufacturing fallbacks
+    if (
+      typeof lat !== 'number' ||
+      typeof lng !== 'number' ||
+      isNaN(lat) ||
+      isNaN(lng) ||
+      lat < -90 ||
+      lat > 90 ||
+      lng < -180 ||
+      lng > 180 ||
+      (lat === 0 && lng === 0)
+    ) {
+      return;
+    }
+
     const orderId = String(data.orderId);
     const cleanOrderId = orderId.replace(/^#/, '');
 
@@ -227,8 +243,8 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
       longitude: lng,
       lat,
       lng,
-      speed: data.speed,
-      heading: data.heading,
+      speed: typeof data.speed === 'number' ? data.speed : 0,
+      heading: typeof data.heading === 'number' ? data.heading : 0,
       timestamp: new Date().toISOString(),
     };
 
@@ -292,7 +308,7 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
       const payload = {
         orderId: order._id?.toString() || order.id,
         orderNumber: order.orderNumber,
-        sxtatus: order.status,
+        status: order.status,
         totalAmount: order.totalAmount,
         itemCount: order.items?.length || 0,
         customerName: order.deliveryAddress?.label || 'Customer',
@@ -845,6 +861,81 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
       this.server.to(`vendor_${vendorId}`).emit('vendor_status_changed', payload);
       this.server.emit('admin_vendor_status_changed', { vendorId, ...payload });
       this.logger.log(`[WebSocket] Emitted vendor_status_changed to vendor_${vendorId}`);
+    }
+  }
+
+  emitCustomerKycApproved(userId: string, payload: any) {
+    if (this.server && userId) {
+      this.server.to(`user_${userId}`).emit('customer_kyc_approved', payload);
+      this.server.to(`user_${userId}`).emit('kyc_approved', payload);
+      this.server.emit('admin_customer_verified', { userId, ...payload });
+      this.logger.log(`[WebSocket] Emitted customer_kyc_approved to user_${userId}`);
+    }
+  }
+
+  emitVendorApproved(vendorId: string, payload: any) {
+    if (this.server && vendorId) {
+      this.server.to(`vendor_${vendorId}`).emit('vendor_approved', payload);
+      this.server.emit('new_vendor_available', { vendorId, ...payload });
+      this.logger.log(`[WebSocket] Emitted vendor_approved to vendor_${vendorId}`);
+    }
+  }
+
+  emitStoreApproved(storeId: string, payload: any) {
+    if (this.server && storeId) {
+      this.server.to(`store_${storeId}`).emit('store_approved', payload);
+      this.server.emit('new_store_available', { storeId, ...payload });
+      this.logger.log(`[WebSocket] Emitted store_approved to store_${storeId}`);
+    }
+  }
+
+  emitRiderApproved(riderId: string, payload: any) {
+    if (this.server && riderId) {
+      this.server.to(`rider_${riderId}`).emit('rider_approved', payload);
+      this.server.emit('new_rider_available', { riderId, ...payload });
+      this.logger.log(`[WebSocket] Emitted rider_approved to rider_${riderId}`);
+    }
+  }
+
+  emitKycRejected(entityType: string, entityId: string, payload: any) {
+    if (this.server && entityId) {
+      const room = `${entityType}_${entityId}`;
+      this.server.to(room).emit('kyc_rejected', payload);
+      this.server.emit('admin_kyc_rejected', { entityType, entityId, ...payload });
+      this.logger.log(`[WebSocket] Emitted kyc_rejected to ${room}`);
+    }
+  }
+
+  emitInAppNotification(userId: string, payload: any) {
+    if (this.server && userId) {
+      const data = {
+        userId: userId.toString(),
+        ...payload,
+        timestamp: new Date().toISOString(),
+      };
+      // 1. Emit to user personal room
+      this.server.to(`user_${userId}`).emit('in_app_notification', data);
+      this.server.to(`user_${userId}`).emit('notification', data);
+
+      // 2. Emit specific event name if present
+      if (payload.type) {
+        const eventName = payload.type.toLowerCase();
+        this.server.to(`user_${userId}`).emit(eventName, data);
+      }
+
+      // 3. Emit to role room if provided
+      if (payload.role === 'ADMIN') {
+        this.server.to('admin_room').emit('in_app_notification', data);
+        this.server.emit('admin_notification', data);
+      } else if (payload.role === 'VENDOR') {
+        this.server.to(`vendor_${userId}`).emit('in_app_notification', data);
+      } else if (payload.role === 'STORE') {
+        this.server.to(`store_${userId}`).emit('in_app_notification', data);
+      } else if (payload.role === 'RIDER') {
+        this.server.to(`rider_${userId}`).emit('in_app_notification', data);
+      }
+
+      this.logger.log(`[WebSocket] Emitted notification to user_${userId}: "${payload.title}" (${payload.type || 'DEFAULT'})`);
     }
   }
 }

@@ -11,11 +11,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../theme/colors';
 import { SPACING, RADIUS } from '../theme/spacing';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { AuthService } from '../services/authService';
 import { StorageService } from '../services/storageService';
 
 export const S07_OtpVerificationScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
+  const { login } = useAuth();
   const {
     setActiveScreen,
     user,
@@ -103,6 +105,9 @@ export const S07_OtpVerificationScreen: React.FC = () => {
             };
             setUser(updatedUser);
             StorageService.saveItem(StorageService.KEYS.USER, updatedUser);
+          }
+          if (res.token) {
+            await login(res.token, undefined, res.user);
           }
           StorageService.saveItem(StorageService.KEYS.ACTIVE_SCREEN, 'Blinkit_Home');
           setActiveScreen('Blinkit_Home');

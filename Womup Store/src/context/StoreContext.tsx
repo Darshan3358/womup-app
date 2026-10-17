@@ -82,7 +82,7 @@ interface StoreContextType {
   refreshReady: () => Promise<void>;
   refreshCompletedOrders: () => Promise<void>;
   refreshInventory: () => Promise<void>;
-  adjustStock: (productId: string, delta: number, reason: string, changeType?: string) => Promise<void>;
+  adjustStock: (productId: string, delta: number, reason: string, changeType?: string, variantId?: string) => Promise<void>;
   updateShelfLocation: (productId: string, shelfLocation: string) => Promise<void>;
   addNewProduct: (productData: any) => Promise<boolean>;
   setActiveOrder: React.Dispatch<React.SetStateAction<StoreOrder | null>>;
@@ -656,8 +656,29 @@ const enrichStore = (rawStore: any): StoreHub | null => {
     setSubScreen(null);
   };
 
-  const adjustStock = async (productId: string, delta: number, reason: string, changeType?: string) => {
-    await StoreApiService.adjustStock(productId, delta, reason, changeType);
+  const adjustStock = async (productId: string, delta: number, reason: string, changeType?: string, variantId?: string) => {
+    // Optimistic stock update for instant UI feedback
+    setInventory((prev) =>
+      prev.map((item) => {
+        if (item.productId !== productId) return item;
+        let newVariants = item.variants;
+        if (variantId && item.variants) {
+          newVariants = item.variants.map((v) =>
+            v.id === variantId ? { ...v, stock: Math.max(0, v.stock + delta) } : v
+          );
+        }
+        const newAvailable = Math.max(0, item.availableQty + delta);
+        return {
+          ...item,
+          availableQty: newAvailable,
+          isOutOfStock: newAvailable <= 0,
+          isLowStock: newAvailable > 0 && newAvailable <= item.threshold,
+          variants: newVariants,
+        };
+      })
+    );
+
+    await StoreApiService.adjustStock(productId, delta, reason, changeType, variantId);
     refreshInventory();
   };
 

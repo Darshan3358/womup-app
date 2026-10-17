@@ -14,6 +14,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { useAdmin } from '../context/AdminContext';
+import { PendingApprovalsWidget } from '../components/PendingApprovalsWidget';
 
 export const DashboardPage: React.FC = () => {
   const { orders, stores, products, customers, riders, setActiveTab, setSelectedOrderForModal } = useAdmin();
@@ -65,6 +66,9 @@ export const DashboardPage: React.FC = () => {
           </span>
         </div>
       </div>
+
+      {/* Unified Pending Approvals Widget (8 Approval Workflows) */}
+      <PendingApprovalsWidget />
 
       {/* KPI Cards Grid */}
       <div className="kpi-grid">

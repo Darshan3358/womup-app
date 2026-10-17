@@ -16,6 +16,11 @@ export class StockAdjustmentDto {
   @IsOptional()
   @IsString()
   changeType?: string;
+
+  @ApiPropertyOptional({ example: '6aa11866c6c3e5984e2ef5ef', description: 'Optional variant ID for variant-level stock adjustment' })
+  @IsOptional()
+  @IsString()
+  variantId?: string;
 }
 
 export class RestockDto {

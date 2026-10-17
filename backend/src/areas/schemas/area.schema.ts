@@ -56,6 +56,21 @@ export class Area {
     coordinates: number[][][];
   };
 
+  @Prop({
+    type: {
+      type: String,
+      enum: ['Polygon'],
+      default: 'Polygon',
+    },
+    coordinates: {
+      type: [[[Number]]],
+    },
+  })
+  geometry?: {
+    type: string;
+    coordinates: number[][][];
+  };
+
   @Prop({ default: 1 })
   maxStores: number;
 
@@ -73,3 +88,4 @@ export const AreaSchema = SchemaFactory.createForClass(Area);
 AreaSchema.index({ centerLat: 1, centerLng: 1 });
 AreaSchema.index({ pincodes: 1 });
 AreaSchema.index({ polygon: '2dsphere' });
+AreaSchema.index({ geometry: '2dsphere' });

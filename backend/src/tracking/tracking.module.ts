@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { TrackingGateway } from './tracking.gateway';
 import { ChatController } from './chat.controller';
+import { TrackingController } from './tracking.controller';
 import { ChatMessage, ChatMessageSchema } from './schemas/chat-message.schema';
 
 @Module({
@@ -10,7 +11,7 @@ import { ChatMessage, ChatMessageSchema } from './schemas/chat-message.schema';
       { name: ChatMessage.name, schema: ChatMessageSchema },
     ]),
   ],
-  controllers: [ChatController],
+  controllers: [ChatController, TrackingController],
   providers: [TrackingGateway],
   exports: [TrackingGateway],
 })

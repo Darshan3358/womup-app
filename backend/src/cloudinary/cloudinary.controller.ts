@@ -21,15 +21,21 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User, UserDocument } from '../users/schemas/user.schema';
+import { DeliveryPartner, DeliveryPartnerDocument } from '../delivery/schemas/delivery-partner.schema';
+import { Vendor, VendorDocument } from '../local-shops/schemas/vendor.schema';
+import { Store, StoreDocument } from '../stores/schemas/store.schema';
 
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @ApiTags('Cloudinary Media Storage')
-@Controller(['api/v1/media', 'api/v1/upload', 'api/v1/uploads'])
+@Controller(['api/v1/media', 'api/v1/upload', 'api/v1/uploads', 'media', 'upload', 'uploads'])
 export class CloudinaryController {
   constructor(
     private readonly cloudinaryService: CloudinaryService,
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+    @InjectModel(DeliveryPartner.name) private readonly partnerModel: Model<DeliveryPartnerDocument>,
+    @InjectModel(Vendor.name) private readonly vendorModel: Model<VendorDocument>,
+    @InjectModel(Store.name) private readonly storeModel: Model<StoreDocument>,
   ) {}
 
   @Post('signature')
@@ -89,6 +95,144 @@ export class CloudinaryController {
     return {
       success: true,
       message: 'Image uploaded successfully from URL to Cloudinary',
+      data: result,
+    };
+  }
+
+  @Post('save')
+  @ApiOperation({ summary: 'Save uploaded media metadata and persist URL to entity in MongoDB' })
+  async saveUploadRecord(@Body() body: {
+    resourceType?: string;
+    url: string;
+    publicId: string;
+    entityType?: 'customer' | 'user' | 'rider' | 'vendor' | 'store';
+    entityId?: string;
+    metadata?: any;
+  }) {
+    if (!body.url || !body.publicId) {
+      throw new BadRequestException('url and publicId are required to save upload record');
+    }
+
+    const { entityType, entityId, resourceType, url } = body;
+    let updatedEntity: any = null;
+
+    if (entityType && entityId) {
+      const type = (resourceType || '').toUpperCase();
+      if (entityType === 'customer' || entityType === 'user') {
+        const user = await this.userModel.findById(entityId);
+        if (user) {
+          if (type.includes('FRONT') || type === 'AADHAAR_FRONT') {
+            user.aadharFrontImage = url;
+            user.customer_image_aadhar_front = url;
+          } else if (type.includes('BACK') || type === 'AADHAAR_BACK') {
+            user.aadharBackImage = url;
+            user.customer_image_aadhar_back = url;
+          } else if (type.includes('PROFILE') || type.includes('AVATAR')) {
+            user.avatar = url;
+          }
+          await user.save();
+          updatedEntity = { id: user._id, role: user.role };
+        }
+      } else if (entityType === 'rider') {
+        const partner = await this.partnerModel.findById(entityId);
+        if (partner) {
+          if (type.includes('DL_FRONT') || type === 'DL_FRONT') {
+            partner.dlImageUrl = url;
+          } else if (type.includes('DL_BACK') || type === 'DL_BACK') {
+            partner.dlBackUrl = url;
+          } else if (type.includes('RC_FRONT') || type === 'RC_FRONT') {
+            partner.rcImageUrl = url;
+          } else if (type.includes('RC_BACK') || type === 'RC_BACK') {
+            partner.rcBackUrl = url;
+          } else if (type.includes('AADHAAR_FRONT') || type === 'AADHAAR_FRONT') {
+            partner.aadharFrontUrl = url;
+          } else if (type.includes('AADHAAR_BACK') || type === 'AADHAAR_BACK') {
+            partner.aadharBackUrl = url;
+          } else if (type.includes('INSURANCE')) {
+            partner.vehicleInsuranceUrl = url;
+          } else if (type.includes('PROFILE')) {
+            partner.profilePhotoUrl = url;
+          }
+          await partner.save();
+          updatedEntity = { id: partner._id, partnerCode: partner.partnerCode };
+        }
+      } else if (entityType === 'vendor') {
+        const vendor = await this.vendorModel.findById(entityId);
+        if (vendor) {
+          if (type.includes('AADHAAR_FRONT')) {
+            vendor.vendorAadharFrontImage = url;
+            if (!vendor.kycDocuments) vendor.kycDocuments = {} as any;
+            vendor.kycDocuments.aadhaarUrl = url;
+          } else if (type.includes('AADHAAR_BACK')) {
+            vendor.vendorAadharBackImage = url;
+          } else if (type.includes('PAN')) {
+            vendor.panCardImage = url;
+            if (!vendor.kycDocuments) vendor.kycDocuments = {} as any;
+            vendor.kycDocuments.panUrl = url;
+          } else if (type.includes('GST')) {
+            vendor.gstCertificateImage = url;
+            if (!vendor.kycDocuments) vendor.kycDocuments = {} as any;
+            vendor.kycDocuments.gstUrl = url;
+          } else if (type.includes('TRADE_LICENSE') || type.includes('LICENSE')) {
+            vendor.tradeLicenseImage = url;
+            if (!vendor.kycDocuments) vendor.kycDocuments = {} as any;
+            vendor.kycDocuments.shopLicenseUrl = url;
+          } else if (type.includes('CHEQUE')) {
+            vendor.cancelledChequeImage = url;
+          } else if (type.includes('CARD') || type.includes('BUSINESS_CARD')) {
+            vendor.businessCardImage = url;
+          } else if (type.includes('SHOP')) {
+            vendor.shopPhotoImage = url;
+            vendor.imageUrl = url;
+          } else if (type.includes('OWNER')) {
+            vendor.ownerPhotoImage = url;
+          }
+          await vendor.save();
+          updatedEntity = { id: vendor._id, vendorCode: vendor.vendorCodeNumber || vendor.loginId };
+        }
+      } else if (entityType === 'store') {
+        const store = await this.storeModel.findById(entityId);
+        if (store) {
+          if (type.includes('LICENSE')) {
+            store.storeLicenseUrl = url;
+          } else if (type.includes('AADHAAR_FRONT')) {
+            store.ownerAadhaarFrontUrl = url;
+          } else if (type.includes('AADHAAR_BACK')) {
+            store.ownerAadhaarBackUrl = url;
+          } else if (type.includes('SHOP') || type.includes('PHOTO')) {
+            if (!store.shopPhotosUrls) store.shopPhotosUrls = [];
+            store.shopPhotosUrls.push(url);
+            store.imageUrl = url;
+          }
+          await store.save();
+          updatedEntity = { id: store._id, code: store.code };
+        }
+      }
+    }
+
+    return {
+      success: true,
+      message: 'Upload record saved and entity updated successfully in MongoDB',
+      data: {
+        ...body,
+        updatedEntity,
+        savedAt: new Date().toISOString(),
+      },
+    };
+  }
+
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete media by ID or public ID' })
+  async deleteMediaById(@Query('publicId') publicIdQuery?: string, @Body('publicId') publicIdBody?: string) {
+    const targetPublicId = publicIdQuery || publicIdBody;
+    if (!targetPublicId) {
+      throw new BadRequestException('publicId is required to delete media');
+    }
+    const result = await this.cloudinaryService.deleteImage(targetPublicId);
+    return {
+      success: true,
+      message: 'Media deleted successfully',
       data: result,
     };
   }

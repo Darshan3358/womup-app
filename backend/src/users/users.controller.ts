@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -19,6 +19,13 @@ export class UsersController {
     return this.usersService.getProfile(user.id);
   }
 
+  @Get('dashboard-banner')
+  @ApiOperation({ summary: 'Get live Dashboard KYC Status banner payload based on user verification state' })
+  async getDashboardBanner(@CurrentUser() user: any) {
+    const banner = await this.usersService.getDashboardBanner(user.id);
+    return { success: true, data: banner };
+  }
+
   @Get('wallet-summary')
   @ApiOperation({ summary: 'Get 4 wallet balances: Shopping Coins, Today Income, Available Income, and Verification Status' })
   async getWalletSummary(@CurrentUser() user: any) {
@@ -26,20 +33,39 @@ export class UsersController {
     return { success: true, data: summary };
   }
 
+  @Get('income-history')
+  @ApiOperation({ summary: 'Get detailed income ledger history and available balance breakdown' })
+  async getIncomeHistory(
+    @CurrentUser() user: any,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    const history = await this.usersService.getIncomeHistory(user.id, page ? Number(page) : 1, limit ? Number(limit) : 50);
+    return { success: true, data: history };
+  }
+
   @Post('verify-aadhaar')
   @ApiOperation({ summary: 'Verify user Aadhaar number & full name, unlocking income and crediting referrer' })
   async verifyAadhaar(
     @CurrentUser() user: any,
-    @Body() body: {
-      aadhaarNumber: string;
-      fullNameAsPerAadhaar: string;
-      customer_image_aadhar_front?: string;
-      customer_image_aadhar_back?: string;
-      aadhaarFrontImage?: string;
-      aadhaarBackImage?: string;
-    },
+    @Body() body: any,
   ) {
     return this.usersService.verifyAadhaar(user.id, body);
+  }
+
+  @Post('kyc/submit')
+  @ApiOperation({ summary: 'Submit Customer KYC documents (Aadhaar & Bank) for admin approval' })
+  async submitKyc(
+    @CurrentUser() user: any,
+    @Body() body: any,
+  ) {
+    return this.usersService.submitCustomerKyc(user.id, body);
+  }
+
+  @Get('kyc/status')
+  @ApiOperation({ summary: 'Get current customer KYC verification status and review feedback' })
+  async getKycStatus(@CurrentUser() user: any) {
+    return this.usersService.getCustomerKycStatus(user.id);
   }
 
   @Post('income/withdraw')
@@ -96,5 +122,19 @@ export class UsersController {
   async clearWishlist(@CurrentUser() user: any) {
     const result = await this.usersService.clearWishlist(user.id);
     return { success: true, data: result };
+  }
+
+  @Post('push-token')
+  @ApiOperation({ summary: 'Register FCM device token for push notifications' })
+  async registerPushToken(
+    @CurrentUser() user: any,
+    @Body() body: { token: string; platform?: 'android' | 'ios' | 'web'; appVersion?: string },
+  ) {
+    return this.usersService.registerPushToken(
+      user.id,
+      body.token,
+      body.platform || 'android',
+      body.appVersion,
+    );
   }
 }

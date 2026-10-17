@@ -8,19 +8,24 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 
 export const S01_SplashScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { setActiveScreen } = useApp();
+  const { isAuthenticated, isLoading } = useAuth();
 
   const setActiveScreenRef = useRef(setActiveScreen);
   setActiveScreenRef.current = setActiveScreen;
 
+  const authStateRef = useRef({ isAuthenticated, isLoading });
+  authStateRef.current = { isAuthenticated, isLoading };
+
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasNavigatedRef = useRef<boolean>(false);
 
-  const navigateToHome = () => {
+  const navigateNext = () => {
     if (hasNavigatedRef.current) return;
     hasNavigatedRef.current = true;
 
@@ -30,15 +35,20 @@ export const S01_SplashScreen: React.FC = () => {
     }
 
     if (setActiveScreenRef.current) {
-      setActiveScreenRef.current('Blinkit_Home');
+      // Golden Rule: Authenticated -> Home Page, Not Authenticated -> Login Page
+      if (authStateRef.current.isAuthenticated) {
+        setActiveScreenRef.current('Blinkit_Home');
+      } else {
+        setActiveScreenRef.current('C06_MobileNumber');
+      }
     }
   };
 
   useEffect(() => {
-    // Exactly 2-second splash screen display, guaranteed to complete without restart
+    // 1.5-second splash screen display, guaranteed to complete auth check and route
     timerRef.current = setTimeout(() => {
-      navigateToHome();
-    }, 2000);
+      navigateNext();
+    }, 1500);
 
     return () => {
       if (timerRef.current) {
@@ -54,7 +64,7 @@ export const S01_SplashScreen: React.FC = () => {
 
   return (
     <Pressable
-      onPress={navigateToHome}
+      onPress={navigateNext}
       style={[
         styles.container,
         {

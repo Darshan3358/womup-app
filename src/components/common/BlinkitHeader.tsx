@@ -118,15 +118,11 @@ export const BlinkitHeader: React.FC<BlinkitHeaderProps> = ({
     );
   }
 
-  const isThaltej =
-    (currentAreaName || '').toLowerCase().includes('thaltej') ||
-    (currentStoreName || '').toLowerCase().includes('thaltej');
-  const areaName = isThaltej ? 'Thaltej' : (currentAreaName || 'Chandlodiya - Tragad');
+  const displayEta = deliveryEtaMinutes ? `${deliveryEtaMinutes} minutes` : etaTime;
+  const areaName = currentAreaName || 'Ahmedabad';
   const cityName = currentCityName || user?.preferredCityName || 'Ahmedabad';
   const cleanStoreName = (
-    isThaltej
-      ? 'Wom Up Thaltej Dark Store'
-      : (currentStoreName || 'Wom Up Chandlodiya - Tragad Dark Store')
+    currentStoreName || (isServiceable !== false ? 'Wom Up Dark Store' : 'Delivery Unavailable')
   )
     .replace(/^🟢\s*/, '')
     .trim();
@@ -160,7 +156,7 @@ export const BlinkitHeader: React.FC<BlinkitHeaderProps> = ({
             >
               <View style={styles.locationTextColumn}>
                 <Text style={styles.etaText} numberOfLines={1}>
-                  {etaLabel} {etaTime}
+                  {isServiceable !== false ? `${etaLabel} ${displayEta}` : 'Currently Unavailable'}
                 </Text>
 
                 <View style={styles.locationRow}>

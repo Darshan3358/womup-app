@@ -27,6 +27,38 @@ export interface Customer {
   shoppingCoinBalance?: number;
   kycStatus?: 'Verified' | 'Pending' | 'Rejected';
   createdAt?: string;
+  firstName?: string;
+  surname?: string;
+  fatherHusbandName?: string;
+  gender?: string;
+  birthdate?: string;
+  birthDate?: string;
+  landmark?: string;
+  village?: string;
+  pincode?: string;
+  sponsorId?: string;
+  sponsorName?: string;
+  referralCode?: string;
+  parentReferralCode?: string;
+  userCode?: string;
+  myReferralCode?: string;
+  bankName?: string;
+  branchName?: string;
+  accountHolderName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  upiId?: string;
+  paymentStatus?: number;
+  isBlocked?: number;
+  isSuspended?: number;
+  adminNotes?: string;
+  aadhaarNumber?: string;
+  aadhaarFrontImage?: string;
+  customer_image_aadhar_front?: string;
+  aadhaarBackImage?: string;
+  customer_image_aadhar_back?: string;
+  kycSubmittedAt?: string;
+  kycRejectReason?: string;
 }
 
 export interface DeliveryPartnerItem {
@@ -53,7 +85,48 @@ export interface DeliveryPartnerItem {
   completionRate?: number;
   avgDeliveryMinutes?: number;
   joinedDate?: string;
+  documents?: {
+    profilePhoto?: string | null;
+    profilePhotoUrl?: string | null;
+    dlNumber?: string | null;
+    dlFront?: string | null;
+    dlFrontUrl?: string | null;
+    dlBack?: string | null;
+    dlBackUrl?: string | null;
+    rcNumber?: string | null;
+    rcFront?: string | null;
+    rcFrontUrl?: string | null;
+    rcBack?: string | null;
+    rcBackUrl?: string | null;
+    aadhaarNumber?: string | null;
+    aadhaarFront?: string | null;
+    aadhaarFrontUrl?: string | null;
+    aadhaarBack?: string | null;
+    aadhaarBackUrl?: string | null;
+    insuranceNumber?: string | null;
+    insurance?: string | null;
+    insuranceUrl?: string | null;
+  };
+  bankAccount?: {
+    bankName?: string | null;
+    accountHolderName?: string | null;
+    accountNumber?: string | null;
+    ifscCode?: string | null;
+    branchName?: string | null;
+    upiId?: string | null;
+    isVerified?: boolean;
+  };
+  bankDetails?: {
+    bankName?: string | null;
+    accountHolderName?: string | null;
+    accountNumber?: string | null;
+    ifscCode?: string | null;
+    branchName?: string | null;
+    upiId?: string | null;
+    isVerified?: boolean;
+  };
 }
+
 
 export interface SubCategoryItem {
   id: string;

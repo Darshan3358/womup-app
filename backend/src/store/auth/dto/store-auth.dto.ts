@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsEmail, Length } from 'class-validator';
+import { IsNotEmpty, IsString, IsEmail, Length, IsOptional, IsNumber } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class StoreSendOtpDto {
@@ -66,5 +66,76 @@ export class RegisterStoreDto {
   @IsString()
   @Length(6, 64, { message: 'Password must be at least 6 characters' })
   password: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  fullAddress?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  landmark?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  pincode?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsNumber()
+  latitude?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsNumber()
+  longitude?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  storeLicense?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  ownerAadharFront?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  ownerAadharBack?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  shopPhoto?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  openingTime?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  closingTime?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsNumber()
+  serviceRadius?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsNumber()
+  deliveryTime?: number;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsNumber()
+  initialStaffCount?: number;
 }
+
 

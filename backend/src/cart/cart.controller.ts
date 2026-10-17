@@ -77,9 +77,9 @@ export class CartController {
     @Body() body: { productId: string; variantId?: string; quantity?: number; delta?: number },
   ) {
     if (typeof body.quantity === 'number') {
-      return this.cartService.setExactQuantity(user.id, body.productId, body.quantity);
+      return this.cartService.setExactQuantity(user.id, body.productId, body.quantity, body.variantId);
     }
-    return this.cartService.updateQuantity(user.id, body.productId, body.delta ?? 1);
+    return this.cartService.updateQuantity(user.id, body.productId, body.delta ?? 1, body.variantId);
   }
 
   @Patch('items/:productId')
@@ -90,8 +90,9 @@ export class CartController {
     @CurrentUser() user: any,
     @Param('productId') productId: string,
     @Body('delta') delta: number,
+    @Body('variantId') variantId?: string,
   ) {
-    return this.cartService.updateQuantity(user.id, productId, delta);
+    return this.cartService.updateQuantity(user.id, productId, delta, variantId);
   }
 
   // Standard SRS Cart Remove API
@@ -105,15 +106,20 @@ export class CartController {
     @Param() params: any,
   ) {
     const pId = body?.productId || params?.productId;
-    return this.cartService.removeItem(user.id, pId);
+    return this.cartService.removeItem(user.id, pId, body?.variantId);
   }
 
   @Delete('items/:productId')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Remove product item from cart completely' })
-  async removeItem(@CurrentUser() user: any, @Param('productId') productId: string) {
-    return this.cartService.removeItem(user.id, productId);
+  async removeItem(
+    @CurrentUser() user: any,
+    @Param('productId') productId: string,
+    @Body('variantId') variantId?: string,
+    @Query('variantId') queryVariantId?: string,
+  ) {
+    return this.cartService.removeItem(user.id, productId, variantId || queryVariantId);
   }
 
   // Standard SRS Cart Clear API
