@@ -59,7 +59,7 @@ jobs:
       - name: Install Admin Portal Dependencies
         run: |
           cd "Z website womup /admin"
-          npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+          npm ci --include=dev --legacy-peer-deps || npm install --include=dev --legacy-peer-deps
 
       - name: Build Vite Admin Portal
         run: |
