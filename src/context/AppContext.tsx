@@ -774,7 +774,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ? process.env.EXPO_PUBLIC_API_URL.replace(/\/api\/v1\/?$/, '')
         : isLocalWeb
         ? 'http://localhost:5050'
-        : 'https://womup-app.onrender.com') + '/tracking';
+        : 'https://womup-app-uquz.onrender.com') + '/tracking';
 
     const socket = io(wsUrl, {
       transports: ['websocket', 'polling'],

@@ -20,8 +20,8 @@ const isLocalWeb =
   typeof window !== 'undefined' &&
   (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1');
 
-const CHAT_SOCKET_URL = isLocalWeb ? 'http://localhost:5050/tracking' : 'https://womup-app.onrender.com/tracking';
-const CHAT_API_BASE = isLocalWeb ? 'http://localhost:5050/api/v1' : 'https://womup-app.onrender.com/api/v1';
+const CHAT_SOCKET_URL = isLocalWeb ? 'http://localhost:5050/tracking' : 'https://womup-app-uquz.onrender.com/tracking';
+const CHAT_API_BASE = isLocalWeb ? 'http://localhost:5050/api/v1' : 'https://womup-app-uquz.onrender.com/api/v1';
 
 export interface ChatMessageItem {
   _id: string;

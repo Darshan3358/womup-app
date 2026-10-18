@@ -156,7 +156,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     let socket: Socket | null = null;
     try {
-      const socketUrl = api.getToken() ? 'https://womup-app.onrender.com' : null;
+      const socketUrl = api.getToken() ? 'https://womup-app-uquz.onrender.com' : null;
       if (socketUrl) {
         socket = io(socketUrl, { transports: ['websocket'] });
         socket.on('force_logout', () => {

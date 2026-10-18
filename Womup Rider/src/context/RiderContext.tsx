@@ -21,7 +21,7 @@ const isLocalWeb =
   typeof window !== 'undefined' &&
   (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1');
 
-const SOCKET_URL = isLocalWeb ? 'http://localhost:5050/tracking' : 'https://womup-app.onrender.com/tracking';
+const SOCKET_URL = isLocalWeb ? 'http://localhost:5050/tracking' : 'https://womup-app-uquz.onrender.com/tracking';
 
 interface RiderContextType {
   // Auth & Onboarding State (R01 - R06)

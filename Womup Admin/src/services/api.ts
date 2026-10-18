@@ -48,7 +48,7 @@ const getNestApiBaseUrl = () => {
       return 'http://localhost:5050/api/v1';
     }
   }
-  return 'https://womup-app.onrender.com/api/v1';
+  return 'https://womup-app-uquz.onrender.com/api/v1';
 };
 
 const NEST_API_BASE_URL = getNestApiBaseUrl();

@@ -12,7 +12,7 @@ const getApiBaseUrl = () => {
       return 'http://localhost:5050/api/v1';
     }
   }
-  return 'https://womup-app.onrender.com/api/v1';
+  return 'https://womup-app-uquz.onrender.com/api/v1';
 };
 
 const API_BASE = getApiBaseUrl();

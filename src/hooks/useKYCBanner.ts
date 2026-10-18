@@ -156,7 +156,7 @@ export const useKYCBanner = () => {
 
     let socket: Socket | null = null;
     try {
-      socket = io('https://womup-app.onrender.com', { transports: ['websocket'] });
+      socket = io('https://womup-app-uquz.onrender.com', { transports: ['websocket'] });
       socket.on('customer_kyc_approved', () => {
         fetchBanner();
       });

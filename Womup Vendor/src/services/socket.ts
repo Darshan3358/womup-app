@@ -8,7 +8,7 @@ const getSocketUrl = () => {
       return 'http://localhost:5050';
     }
   }
-  return 'https://womup-app.onrender.com';
+  return 'https://womup-app-uquz.onrender.com';
 };
 
 class VendorSocketService {

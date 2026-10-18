@@ -8,11 +8,11 @@ const isLocal =
 
 export const API_BASE =
   (import.meta.env.VITE_API_BASE as string) ||
-  (isLocal ? 'http://localhost:5050/api/v1' : 'https://womup-app.onrender.com/api/v1');
+  (isLocal ? 'http://localhost:5050/api/v1' : 'https://womup-app-uquz.onrender.com/api/v1');
 
 export const TRACKING_WS_URL =
   (import.meta.env.VITE_TRACKING_WS as string) ||
-  (isLocal ? 'http://localhost:5050/tracking' : 'https://womup-app.onrender.com/tracking');
+  (isLocal ? 'http://localhost:5050/tracking' : 'https://womup-app-uquz.onrender.com/tracking');
 
 let tokenRefreshPromise: Promise<string | null> | null = null;
 

@@ -6,10 +6,10 @@ const isLocalWeb =
 
 const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_URL ||
-  (isLocalWeb ? 'http://localhost:5050/api/v1/store' : 'https://womup-app.onrender.com/api/v1/store');
+  (isLocalWeb ? 'http://localhost:5050/api/v1/store' : 'https://womup-app-uquz.onrender.com/api/v1/store');
 
 const LOCATION_API_BASE_URL =
-  isLocalWeb ? 'http://localhost:5050/api/v1/location' : 'https://womup-app.onrender.com/api/v1/location';
+  isLocalWeb ? 'http://localhost:5050/api/v1/location' : 'https://womup-app-uquz.onrender.com/api/v1/location';
 
 export const TOKEN_STORAGE_KEY = '@womup_store_access_token';
 export const STAFF_STORAGE_KEY = '@womup_store_staff';

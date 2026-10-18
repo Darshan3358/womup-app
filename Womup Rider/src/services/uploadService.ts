@@ -23,7 +23,7 @@ const isLocalWeb =
 
 const API_BASE_URL = isLocalWeb
   ? 'http://localhost:5050/api/v1'
-  : 'https://womup-app.onrender.com/api/v1';
+  : 'https://womup-app-uquz.onrender.com/api/v1';
 
 class RiderUploadService {
   private async getAuthToken(): Promise<string | null> {
