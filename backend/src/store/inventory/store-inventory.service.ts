@@ -76,11 +76,18 @@ export class StoreInventoryService {
 
     // Dynamically resolve areaId if missing on store document (e.g. Chandlodiya - Tragad Dark Store)
     if (!areaId && store) {
+      const storeIdStr = store._id?.toString();
+      const storeIdObj = Types.ObjectId.isValid(storeIdStr) ? new Types.ObjectId(storeIdStr) : store._id;
+      const cleanAreaName = (store.areaName || store.name || '')
+        .replace(/^Wom\s*Up\s*/i, '')
+        .replace(/\s*Dark\s*Store.*$/i, '')
+        .trim();
+
       const area = await this.connection.collection('areas').findOne({
         $or: [
-          { hubStoreId: store._id },
-          { code: 'AREA-CHANDLODIYA_TRAGAD' },
-          { name: new RegExp(store.areaName || '|Chandlodiya', 'i') },
+          { hubStoreId: storeIdObj },
+          { hubStoreId: storeIdStr },
+          ...(cleanAreaName ? [{ name: new RegExp(cleanAreaName.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&'), 'i') }] : []),
         ],
       });
       if (area) {
@@ -210,11 +217,18 @@ export class StoreInventoryService {
     let areaId = store?.areaId;
 
     if (!areaId && store) {
+      const storeIdStr = store._id?.toString();
+      const storeIdObj = Types.ObjectId.isValid(storeIdStr) ? new Types.ObjectId(storeIdStr) : store._id;
+      const cleanAreaName = (store.areaName || store.name || '')
+        .replace(/^Wom\s*Up\s*/i, '')
+        .replace(/\s*Dark\s*Store.*$/i, '')
+        .trim();
+
       const area = await this.connection.collection('areas').findOne({
         $or: [
-          { hubStoreId: store._id },
-          { code: 'AREA-CHANDLODIYA_TRAGAD' },
-          { name: new RegExp(store.areaName || 'Tragad|Chandlodiya', 'i') },
+          { hubStoreId: storeIdObj },
+          { hubStoreId: storeIdStr },
+          ...(cleanAreaName ? [{ name: new RegExp(cleanAreaName.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&'), 'i') }] : []),
         ],
       });
       if (area) {

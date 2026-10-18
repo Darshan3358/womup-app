@@ -97,7 +97,7 @@ export const ST05_StaffDashboardScreen: React.FC = () => {
             </View>
           </View>
           <Text style={styles.statNumber}>
-            {performance?.todayPicked ?? (incomingOrders.length + pickingOrders.length + 12)}
+            {performance?.todayPicked ?? (incomingOrders.length + pickingOrders.length)}
           </Text>
         </View>
 
@@ -106,10 +106,10 @@ export const ST05_StaffDashboardScreen: React.FC = () => {
           <View style={styles.statHeader}>
             <Text style={styles.statLabel}>Picking</Text>
             <View style={styles.pctBadge}>
-              <Text style={styles.pctText}>+8%</Text>
+              <Text style={styles.pctText}>Live</Text>
             </View>
           </View>
-          <Text style={styles.statNumber}>{pickingOrders.length || 36}</Text>
+          <Text style={styles.statNumber}>{pickingOrders.length}</Text>
         </View>
 
         {/* Card 3: Packing */}
@@ -117,10 +117,10 @@ export const ST05_StaffDashboardScreen: React.FC = () => {
           <View style={styles.statHeader}>
             <Text style={styles.statLabel}>Packing</Text>
             <View style={styles.pctBadge}>
-              <Text style={styles.pctText}>+6%</Text>
+              <Text style={styles.pctText}>Live</Text>
             </View>
           </View>
-          <Text style={styles.statNumber}>{readyOrders.length || 28}</Text>
+          <Text style={styles.statNumber}>{readyOrders.length}</Text>
         </View>
 
         {/* Card 4: Dispatched */}
@@ -128,10 +128,10 @@ export const ST05_StaffDashboardScreen: React.FC = () => {
           <View style={styles.statHeader}>
             <Text style={styles.statLabel}>Dispatched</Text>
             <View style={styles.pctBadge}>
-              <Text style={styles.pctText}>+5%</Text>
+              <Text style={styles.pctText}>Live</Text>
             </View>
           </View>
-          <Text style={styles.statNumber}>{completedOrders.length || 24}</Text>
+          <Text style={styles.statNumber}>{completedOrders.length}</Text>
         </View>
       </View>
 

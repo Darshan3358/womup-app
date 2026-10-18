@@ -469,12 +469,27 @@ const enrichStore = (rawStore: any): StoreHub | null => {
         });
       }
 
+      // Reset previous store's in-memory data to prevent cross-store data leakage
+      setIncomingOrders([]);
+      setPickingOrders([]);
+      setReadyOrders([]);
+      setCompletedOrders([]);
+      setInventory([]);
+
       setAuthStep('AUTHENTICATED');
       if (data.store?.id) {
         storeSocket.connect(data.store.id);
         console.log(`[StoreContext] Connected to dark store: ${data.store.name}`);
       }
       setIsLoading(false);
+
+      // Trigger immediate queue and inventory refresh for the newly logged in store
+      refreshIncoming();
+      refreshPicking();
+      refreshReady();
+      refreshCompletedOrders();
+      refreshInventory();
+
       return true;
     } catch (err: any) {
       setIsLoading(false);
@@ -542,6 +557,15 @@ const enrichStore = (rawStore: any): StoreHub | null => {
     storeSocket.disconnect();
     setStaff(null);
     setStore(null);
+    setPerformance(null);
+    setIncomingOrders([]);
+    setPickingOrders([]);
+    setReadyOrders([]);
+    setCompletedOrders([]);
+    setInventory([]);
+    setActiveOrder(null);
+    setActivePickList(null);
+    setRiderArrivalAlert(null);
     setAuthStep('LOGIN');
     setCurrentTab('Dashboard');
     setSubScreen(null);
