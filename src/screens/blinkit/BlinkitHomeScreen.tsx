@@ -49,6 +49,7 @@ export const BlinkitHomeScreen: React.FC = () => {
   } = useApp();
 
   const [activeTab, setActiveTab] = useState('Home');
+  const [isLoading, setIsLoading] = useState(true);
   const [dbProducts, setDbProducts] = useState<Product[]>([]);
   const [backendSections, setBackendSections] = useState<Record<string, BlinkitProduct[]>>({});
 
@@ -57,6 +58,7 @@ export const BlinkitHomeScreen: React.FC = () => {
     let isMounted = true;
     (async () => {
       try {
+        setIsLoading(true);
         const [homeData, prods] = await Promise.all([
           ProductService.fetchHomeSections({
             areaId: currentAreaId || undefined,
@@ -83,6 +85,10 @@ export const BlinkitHomeScreen: React.FC = () => {
         }
       } catch (e) {
         console.warn('Error loading home data:', e);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     })();
 
@@ -141,55 +147,47 @@ export const BlinkitHomeScreen: React.FC = () => {
     [dbProducts]
   );
 
-  // 1. Deals of the Day (combines backend section, live products with discount, and curated list)
+  // 1. Deals of the Day (combines backend section, live products with discount)
   const dealsList = useMemo(() => {
+    if (isLoading) return [];
     const fromApi = backendSections['deals'];
-    if (fromApi && fromApi.length >= 4) return fromApi;
+    if (fromApi && fromApi.length > 0) return fromApi;
     const liveDeals = liveBlinkitProducts.filter((p) => p.mrp > p.sellingPrice);
-    const combined = [...liveDeals, ...DEALS_OF_THE_DAY_PRODUCTS];
-    const seen = new Set<string>();
-    return combined.filter((p) => {
-      if (seen.has(p.id)) return false;
-      seen.add(p.id);
-      return true;
-    }).slice(0, 10);
-  }, [backendSections, liveBlinkitProducts]);
+    if (liveDeals.length > 0) return liveDeals.slice(0, 10);
+    if (liveBlinkitProducts.length > 0) return liveBlinkitProducts.slice(0, 10);
+    return DEALS_OF_THE_DAY_PRODUCTS.slice(0, 10);
+  }, [isLoading, backendSections, liveBlinkitProducts]);
 
   // 2. 9-Minute Delivery (Fast-Moving Items)
   const fastDeliveryList = useMemo(() => {
+    if (isLoading) return [];
     const fromApi = backendSections['fast_delivery'];
-    if (fromApi && fromApi.length >= 4) return fromApi;
+    if (fromApi && fromApi.length > 0) return fromApi;
     const liveFast = liveBlinkitProducts.filter((p) => p.stock > 15 && p.deliveryMinutes <= 10);
-    const combined = [...liveFast, ...FAST_DELIVERY_PRODUCTS];
-    const seen = new Set<string>();
-    return combined.filter((p) => {
-      if (seen.has(p.id)) return false;
-      seen.add(p.id);
-      return true;
-    }).slice(0, 10);
-  }, [backendSections, liveBlinkitProducts]);
+    if (liveFast.length > 0) return liveFast.slice(0, 10);
+    if (liveBlinkitProducts.length > 0) return liveBlinkitProducts.slice(0, 10);
+    return FAST_DELIVERY_PRODUCTS.slice(0, 10);
+  }, [isLoading, backendSections, liveBlinkitProducts]);
 
   // 3. Fresh Vegetables & Fruits
   const freshVegFruitsList = useMemo(() => {
+    if (isLoading) return [];
     const fromApi = backendSections['fresh_veggies'];
-    if (fromApi && fromApi.length >= 4) return fromApi;
+    if (fromApi && fromApi.length > 0) return fromApi;
     const liveVeg = liveBlinkitProducts.filter((p) => {
       const text = `${p.category || ''} ${p.name || ''}`.toLowerCase();
       return text.includes('veg') || text.includes('fruit') || text.includes('tomato') || text.includes('onion') || text.includes('banana');
     });
-    const combined = [...liveVeg, ...FRESH_VEG_FRUITS_PRODUCTS];
-    const seen = new Set<string>();
-    return combined.filter((p) => {
-      if (seen.has(p.id)) return false;
-      seen.add(p.id);
-      return true;
-    }).slice(0, 10);
-  }, [backendSections, liveBlinkitProducts]);
+    if (liveVeg.length > 0) return liveVeg.slice(0, 10);
+    if (liveBlinkitProducts.length > 0) return liveBlinkitProducts.slice(0, 10);
+    return FRESH_VEG_FRUITS_PRODUCTS.slice(0, 10);
+  }, [isLoading, backendSections, liveBlinkitProducts]);
 
   // 4. Dairy, Bread & Eggs
   const dairyBreadEggsList = useMemo(() => {
+    if (isLoading) return [];
     const fromApi = backendSections['dairy_bread'];
-    if (fromApi && fromApi.length >= 4) return fromApi;
+    if (fromApi && fromApi.length > 0) return fromApi;
     const liveDairy = liveBlinkitProducts.filter((p) => {
       const text = `${p.category || ''} ${p.name || ''}`.toLowerCase();
       return (
@@ -201,55 +199,41 @@ export const BlinkitHomeScreen: React.FC = () => {
         text.includes('butter')
       );
     });
-    const combined = [...liveDairy, ...DAIRY_BREAD_EGGS_PRODUCTS];
-    const seen = new Set<string>();
-    return combined.filter((p) => {
-      if (seen.has(p.id)) return false;
-      seen.add(p.id);
-      return true;
-    }).slice(0, 10);
-  }, [backendSections, liveBlinkitProducts]);
+    if (liveDairy.length > 0) return liveDairy.slice(0, 10);
+    if (liveBlinkitProducts.length > 0) return liveBlinkitProducts.slice(0, 10);
+    return DAIRY_BREAD_EGGS_PRODUCTS.slice(0, 10);
+  }, [isLoading, backendSections, liveBlinkitProducts]);
 
   // 5. Bestsellers (Rated 4.5+, high sales)
   const bestsellersList = useMemo(() => {
+    if (isLoading) return [];
     const fromApi = backendSections['bestsellers'];
-    if (fromApi && fromApi.length >= 4) return fromApi;
+    if (fromApi && fromApi.length > 0) return fromApi;
     const liveBs = liveBlinkitProducts.filter((p) => p.rating >= 4.5);
-    const combined = [...liveBs, ...BESTSELLERS_PRODUCTS];
-    const seen = new Set<string>();
-    return combined.filter((p) => {
-      if (seen.has(p.id)) return false;
-      seen.add(p.id);
-      return true;
-    }).slice(0, 10);
-  }, [backendSections, liveBlinkitProducts]);
+    if (liveBs.length > 0) return liveBs.slice(0, 10);
+    if (liveBlinkitProducts.length > 0) return liveBlinkitProducts.slice(0, 10);
+    return BESTSELLERS_PRODUCTS.slice(0, 10);
+  }, [isLoading, backendSections, liveBlinkitProducts]);
 
   // 6. New Arrivals
   const newArrivalsList = useMemo(() => {
+    if (isLoading) return [];
     const fromApi = backendSections['new_arrivals'];
-    if (fromApi && fromApi.length >= 4) return fromApi;
-    const combined = [...NEW_ARRIVALS_PRODUCTS, ...liveBlinkitProducts];
-    const seen = new Set<string>();
-    return combined.filter((p) => {
-      if (seen.has(p.id)) return false;
-      seen.add(p.id);
-      return true;
-    }).slice(0, 8);
-  }, [backendSections, liveBlinkitProducts]);
+    if (fromApi && fromApi.length > 0) return fromApi;
+    if (liveBlinkitProducts.length > 0) return liveBlinkitProducts.slice(0, 8);
+    return NEW_ARRIVALS_PRODUCTS.slice(0, 8);
+  }, [isLoading, backendSections, liveBlinkitProducts]);
 
   // 7. Under ₹50 (Everyday Savings)
   const under50List = useMemo(() => {
+    if (isLoading) return [];
     const fromApi = backendSections['under_50'];
-    if (fromApi && fromApi.length >= 4) return fromApi;
+    if (fromApi && fromApi.length > 0) return fromApi;
     const liveU50 = liveBlinkitProducts.filter((p) => p.sellingPrice <= 50);
-    const combined = [...liveU50, ...UNDER_50_PRODUCTS];
-    const seen = new Set<string>();
-    return combined.filter((p) => {
-      if (seen.has(p.id)) return false;
-      seen.add(p.id);
-      return true;
-    }).slice(0, 10);
-  }, [backendSections, liveBlinkitProducts]);
+    if (liveU50.length > 0) return liveU50.slice(0, 10);
+    if (liveBlinkitProducts.length > 0) return liveBlinkitProducts.slice(0, 10);
+    return UNDER_50_PRODUCTS.slice(0, 10);
+  }, [isLoading, backendSections, liveBlinkitProducts]);
 
   return (
     <View style={styles.mainContainer}>
@@ -324,6 +308,7 @@ export const BlinkitHomeScreen: React.FC = () => {
           onOpenProduct={handleOpenProductDetail}
           onViewAll={() => setActiveScreen('C15_ProductListing')}
           viewAllText="View All"
+          isLoading={isLoading}
         />
 
         {/* Section 4: 9-Minute Delivery (8 products) */}
@@ -335,6 +320,7 @@ export const BlinkitHomeScreen: React.FC = () => {
           onOpenProduct={handleOpenProductDetail}
           onViewAll={() => setActiveScreen('C15_ProductListing')}
           viewAllText="View All"
+          isLoading={isLoading}
         />
 
         {/* --- BANNER 1: Fresh Groceries (Delivered in 9 Minutes) --- */}
@@ -359,6 +345,7 @@ export const BlinkitHomeScreen: React.FC = () => {
           onOpenProduct={handleOpenProductDetail}
           onViewAll={() => handleSelectCategory('Vegetables & Fruits', 'c1')}
           viewAllText="View All"
+          isLoading={isLoading}
         />
 
         {/* Section 6: Bestsellers (8 products) */}
@@ -370,6 +357,7 @@ export const BlinkitHomeScreen: React.FC = () => {
           onOpenProduct={handleOpenProductDetail}
           onViewAll={() => setActiveScreen('C15_ProductListing')}
           viewAllText="View All"
+          isLoading={isLoading}
         />
 
         {/* --- BANNER 2: Dairy & Breakfast --- */}
@@ -394,6 +382,7 @@ export const BlinkitHomeScreen: React.FC = () => {
           onOpenProduct={handleOpenProductDetail}
           onViewAll={() => handleSelectCategory('Dairy, Bread & Eggs', 'c3')}
           viewAllText="View All"
+          isLoading={isLoading}
         />
 
         {/* Section 8: Popular Brands (Moved right above New Arrivals) */}
@@ -413,8 +402,8 @@ export const BlinkitHomeScreen: React.FC = () => {
           onOpenProduct={handleOpenProductDetail}
           onViewAll={() => setActiveScreen('C15_ProductListing')}
           viewAllText="View All"
+          isLoading={isLoading}
         />
-
 
         {/* Section 10: Under ₹50 (8 products) */}
         <ProductSection
@@ -425,6 +414,7 @@ export const BlinkitHomeScreen: React.FC = () => {
           onOpenProduct={handleOpenProductDetail}
           onViewAll={() => setActiveScreen('C15_ProductListing')}
           viewAllText="View All"
+          isLoading={isLoading}
         />
 
         {/* Section 11: 📢 Monthly Benefits Banner */}

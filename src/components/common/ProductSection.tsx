@@ -14,6 +14,7 @@ import { COLORS } from '../../theme/colors';
 import { SECTION_ICONS } from '../../theme/sectionIcons';
 import { BlinkitProduct } from '../../types';
 import { useApp } from '../../context/AppContext';
+import { ProductSectionSkeleton } from './Skeleton';
 
 export interface ProductSectionProps {
   id?: string;
@@ -26,6 +27,7 @@ export interface ProductSectionProps {
   onOpenProduct: (product: BlinkitProduct) => void;
   onViewAll?: () => void;
   viewAllText?: string;
+  isLoading?: boolean;
 }
 
 export const ProductSection: React.FC<ProductSectionProps> = ({
@@ -39,6 +41,7 @@ export const ProductSection: React.FC<ProductSectionProps> = ({
   onOpenProduct,
   onViewAll,
   viewAllText = 'View All',
+  isLoading = false,
 }) => {
   const { width } = useWindowDimensions();
   const { getBlinkitQty, updateBlinkitQty, isInWishlist, toggleWishlist, currentAreaName } = useApp();
@@ -76,6 +79,10 @@ export const ProductSection: React.FC<ProductSectionProps> = ({
     scrollRef.current?.scrollTo({ x: nextX, animated: true });
     setScrollX(nextX);
   };
+
+  if (isLoading) {
+    return <ProductSectionSkeleton title={title} subtitle={subtitle} />;
+  }
 
   if (!products || products.length === 0) {
     return null;
