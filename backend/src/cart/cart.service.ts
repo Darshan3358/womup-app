@@ -210,6 +210,24 @@ export class CartService {
         isActive: true,
       });
     }
+    if (!assignedStore && userAddress) {
+      const uArea = (userAddress.area || userAddress.areaLandmark || userAddress.areaName || '').trim();
+      if (uArea) {
+        const esc = uArea.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+        const terms = uArea.split(/[-–—,]/).map((t: string) => t.trim()).filter(Boolean);
+        const termRgx = terms.map((t: string) => new RegExp(t.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&'), 'i'));
+        assignedStore = await this.connection.collection('stores').findOne({
+          isActive: true,
+          $or: [
+            { areaName: new RegExp(`^${esc}$`, 'i') },
+            { area: new RegExp(`^${esc}$`, 'i') },
+            { name: new RegExp(esc, 'i') },
+            ...termRgx.map((r: RegExp) => ({ areaName: r })),
+            ...termRgx.map((r: RegExp) => ({ name: r })),
+          ],
+        });
+      }
+    }
     if (!assignedStore) {
       assignedStore = await this.connection.collection('stores').findOne({ isActive: true });
     }
@@ -550,17 +568,8 @@ export class CartService {
     if (storeId && Types.ObjectId.isValid(storeId)) {
       resolvedStore = await db.collection('stores').findOne({ _id: new Types.ObjectId(storeId) });
     }
-    if (!resolvedStore) {
-      resolvedStore = await db.collection('stores').findOne({
-        $or: [
-          { area: new RegExp(`^${effectiveArea}$`, 'i') },
-          { name: new RegExp(effectiveArea, 'i') },
-          { city: new RegExp(`^${effectiveCity}$`, 'i') },
-        ],
-      });
-    }
 
-    // 3. Compute Distance using Real OSRM Road Route (Customer Coordinates to Store Coordinates)
+    // Resolve Customer Coordinates early for geospatial nearest store routing
     const latValue =
       deliveryAddress.latitude ??
       deliveryAddress.lat ??
@@ -576,6 +585,57 @@ export class CartService {
     const custLat = Number(latValue);
     const custLng = Number(lngValue);
 
+    // Priority 1: Match by areaName or store name (case-insensitive substring)
+    if (!resolvedStore && effectiveArea) {
+      const escaped = effectiveArea.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+      const areaTerms = effectiveArea.split(/[-–—,]/).map((t: string) => t.trim()).filter(Boolean);
+      const termRegexes = areaTerms.map((t: string) => new RegExp(t.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&'), 'i'));
+
+      resolvedStore = await db.collection('stores').findOne({
+        isActive: true,
+        $or: [
+          { areaName: new RegExp(`^${escaped}$`, 'i') },
+          { area: new RegExp(`^${escaped}$`, 'i') },
+          { name: new RegExp(escaped, 'i') },
+          ...termRegexes.map((r: RegExp) => ({ areaName: r })),
+          ...termRegexes.map((r: RegExp) => ({ name: r })),
+        ],
+      });
+    }
+
+    // Priority 2: Geospatial nearest active store to customer coordinates
+    if (!resolvedStore && Number.isFinite(custLat) && Number.isFinite(custLng) && custLat !== 0 && custLng !== 0) {
+      const allStores = await db.collection('stores').find({ isActive: true }).toArray();
+      let closestStore: any = null;
+      let minDistance = Infinity;
+
+      for (const s of allStores) {
+        const sLat = Number(s.location?.coordinates?.[1] ?? s.latitude);
+        const sLng = Number(s.location?.coordinates?.[0] ?? s.longitude);
+        if (Number.isFinite(sLat) && Number.isFinite(sLng) && (sLat !== 0 || sLng !== 0)) {
+          const dLat = (sLat - custLat) * 111;
+          const dLng = (sLng - custLng) * 111 * Math.cos((custLat * Math.PI) / 180);
+          const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+          if (dist < minDistance) {
+            minDistance = dist;
+            closestStore = s;
+          }
+        }
+      }
+      if (closestStore) {
+        resolvedStore = closestStore;
+      }
+    }
+
+    // Priority 3: Fallback to city store
+    if (!resolvedStore) {
+      resolvedStore = await db.collection('stores').findOne({
+        city: new RegExp(`^${effectiveCity}$`, 'i'),
+        isActive: true,
+      });
+    }
+
+    // 3. Compute Distance using Real OSRM Road Route (Customer Coordinates to Store Coordinates)
     const storeCoords = resolvedStore?.location?.coordinates;
     const storeLng = Number(storeCoords?.[0]);
     const storeLat = Number(storeCoords?.[1]);
