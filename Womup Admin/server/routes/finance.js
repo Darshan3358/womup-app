@@ -265,12 +265,24 @@ router.get('/wallets/riders', async (req, res) => {
       
       const tipTotal = rSettlements.reduce((sum, s) => sum + (s.tip || 0), 0);
       const basePayTotal = rSettlements.reduce((sum, s) => sum + (s.basePay || 0), 0);
-      const calculatedEarnings = rSettlements.reduce((sum, s) => sum + (s.total || s.riderEarning || 0), 0);
-      const calculatedCod = rSettlements.filter(s => s.paymentMode === 'COD').reduce((sum, s) => sum + (s.totalAmount || 0), 0);
+      const totalEarn = rSettlements.length > 0
+        ? rSettlements.reduce((sum, s) => sum + (s.total || s.riderEarning || 0), 0)
+        : (r.totalEarnings || 0);
 
-      const totalCod = typeof r.totalCodCollected === 'number' && r.totalCodCollected > 0 ? r.totalCodCollected : calculatedCod;
-      const totalEarn = typeof r.totalEarnings === 'number' && r.totalEarnings > 0 ? r.totalEarnings : calculatedEarnings;
-      const netBalance = totalCod - totalEarn; // > 0: Rider owes Admin, < 0: Admin owes Rider
+      const totalCod = rSettlements.length > 0
+        ? rSettlements.filter(s => s.paymentMode === 'COD').reduce((sum, s) => sum + (s.totalAmount || 0), 0)
+        : (r.totalCodCollected || 0);
+
+      const codAdminShare = rSettlements.length > 0
+        ? rSettlements.filter(s => s.paymentMode === 'COD').reduce((sum, s) => sum + (s.adminShare ?? Math.max(0, (s.totalAmount || 0) - (s.riderEarning || 0))), 0)
+        : Math.max(0, totalCod - (totalEarn * 0.6));
+
+      const onlineRiderShare = rSettlements.length > 0
+        ? rSettlements.filter(s => s.paymentMode === 'ONLINE').reduce((sum, s) => sum + (s.riderEarning || s.total || 0), 0)
+        : (r.totalOnlineEarnings || 0);
+
+      // True Net Khata: COD Admin share (Rider owes Admin) - Online Rider share (Admin owes Rider)
+      const netBalance = codAdminShare - onlineRiderShare; // > 0: Rider owes Admin, < 0: Admin owes Rider
       const cashLimit = r.outstandingCashLimit || 500;
       const isBlocked = Boolean(r.isOrderBlocked || netBalance >= cashLimit);
 
@@ -281,11 +293,12 @@ router.get('/wallets/riders', async (req, res) => {
         riderName: r.fullName || 'Rider Partner',
         phoneNumber: r.phoneNumber || '',
         vehicleNumber: r.vehicleNumber || 'GJ-01-XX-0000',
-        totalDeliveries: r.completedDeliveries || r.totalDeliveries || rSettlements.length,
-        completedDeliveries: r.completedDeliveries || r.totalDeliveries || rSettlements.length,
+        totalDeliveries: rSettlements.length > 0 ? rSettlements.length : (r.completedDeliveries || r.totalDeliveries || 0),
+        completedDeliveries: rSettlements.length > 0 ? rSettlements.length : (r.completedDeliveries || r.totalDeliveries || 0),
         totalCodCollected: totalCod,
         totalEarnings: totalEarn,
-        totalOnlineEarnings: r.totalOnlineEarnings || (totalEarn - (rSettlements.filter(s => s.paymentMode === 'COD').reduce((sum, s) => sum + (s.riderEarning || 0), 0))),
+        totalOnlineEarnings: onlineRiderShare,
+        codAdminShare,
         netBalance,
         cashLimit,
         isBlocked,
@@ -563,16 +576,24 @@ router.get('/wallets/riders/:id/ledger', async (req, res) => {
       };
     });
 
+    const codAdminShare = settlements.filter(s => s.paymentMode === 'COD').reduce((sum, s) => sum + (s.adminShare ?? Math.max(0, (s.totalAmount || 0) - (s.riderEarning || 0))), 0);
+    const onlineRiderShare = settlements.filter(s => s.paymentMode === 'ONLINE').reduce((sum, s) => sum + (s.riderEarning || s.total || 0), 0);
+    const totalEarnings = settlements.reduce((sum, s) => sum + (s.riderEarning || s.total || 0), 0);
+    const totalCod = settlements.filter(s => s.paymentMode === 'COD').reduce((sum, s) => sum + (s.totalAmount || 0), 0);
+    const netBalance = codAdminShare - onlineRiderShare;
+
     res.json({
       success: true,
       partner: {
         id: partner._id.toString(),
         name: partner.fullName,
         partnerCode: partner.partnerCode,
-        totalCodCollected: partner.totalCodCollected || 0,
-        totalEarnings: partner.totalEarnings || 0,
-        netBalance: (partner.totalCodCollected || 0) - (partner.totalEarnings || 0),
-        isBlocked: Boolean(partner.isOrderBlocked || ((partner.totalCodCollected || 0) - (partner.totalEarnings || 0) >= (partner.outstandingCashLimit || 500))),
+        totalCodCollected: totalCod,
+        totalEarnings,
+        totalOnlineEarnings: onlineRiderShare,
+        codAdminShare,
+        netBalance,
+        isBlocked: Boolean(partner.isOrderBlocked || netBalance >= (partner.outstandingCashLimit || 500)),
         cashLimit: partner.outstandingCashLimit || 500,
       },
       count: formatted.length,
