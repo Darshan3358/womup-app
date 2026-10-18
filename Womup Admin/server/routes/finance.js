@@ -551,13 +551,14 @@ router.get('/wallets/riders/:id/ledger', async (req, res) => {
 
       return {
         id: s._id.toString(),
-        orderNumber: s.orderNumber || '#WUP-84920',
+        orderId: s.orderNumber || s.orderId || '#WUP-84920',
+        orderNumber: s.orderNumber || s.orderId || '#WUP-84920',
         date: s.settledAt ? new Date(s.settledAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Recent',
         paymentMode: isCod ? 'COD' : 'ONLINE',
         totalAmount: orderTotal,
         riderEarning: riderEarn,
         adminShare,
-        netImpact: isCod ? -adminShare : riderEarn,
+        netImpact: isCod ? `Rider owes Admin: ₹${adminShare}` : `Admin owes Rider: ₹${riderEarn}`,
         status: s.status || 'SETTLED',
       };
     });

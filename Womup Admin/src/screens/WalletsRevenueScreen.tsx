@@ -1601,12 +1601,12 @@ export const WalletsRevenueScreen: React.FC = () => {
               <View style={styles.ledgerTableContainer}>
                 {/* Header Row */}
                 <View style={styles.ledgerTableHeaderRow}>
-                  <Text style={[styles.ledgerTableColHeader, { width: 90 }]}>Order ID</Text>
+                  <Text style={[styles.ledgerTableColHeader, { width: 140 }]}>Order ID</Text>
                   <Text style={[styles.ledgerTableColHeader, { width: 75 }]}>Type</Text>
                   <Text style={[styles.ledgerTableColHeader, { width: 90, textAlign: 'right' }]}>Total Order</Text>
                   <Text style={[styles.ledgerTableColHeader, { width: 110, textAlign: 'right' }]}>Rider Share (+)</Text>
-                  <Text style={[styles.ledgerTableColHeader, { width: 110, textAlign: 'right' }]}>Admin Share (-)</Text>
-                  <Text style={[styles.ledgerTableColHeader, { width: 170, textAlign: 'right' }]}>Net Balance (Hisaab)</Text>
+                  <Text style={[styles.ledgerTableColHeader, { width: 110, textAlign: 'right' }]}>Admin Share (+)</Text>
+                  <Text style={[styles.ledgerTableColHeader, { width: 200, textAlign: 'right' }]}>Net Balance (Hisaab)</Text>
                 </View>
 
                 {/* Table Body */}
@@ -1622,14 +1622,14 @@ export const WalletsRevenueScreen: React.FC = () => {
                 ) : (
                   riderLedgerEntries.map((row, idx) => (
                     <View
-                      key={row.orderId || idx}
+                      key={row.orderId || row.orderNumber || idx}
                       style={[
                         styles.ledgerTableRow,
                         idx % 2 === 1 && { backgroundColor: '#F8FAFC' },
                       ]}
                     >
-                      <View style={{ width: 90 }}>
-                        <Text style={styles.ledgerColOrder}>{row.orderId}</Text>
+                      <View style={{ width: 140 }}>
+                        <Text style={styles.ledgerColOrder} numberOfLines={1}>{row.orderId || row.orderNumber || 'Order'}</Text>
                         <Text style={styles.ledgerColDate}>{row.date || 'Today'}</Text>
                       </View>
 
@@ -1659,12 +1659,16 @@ export const WalletsRevenueScreen: React.FC = () => {
                         +₹{(row.riderEarning || 0).toLocaleString()}
                       </Text>
 
-                      <Text style={[styles.ledgerColVal, { width: 110, textAlign: 'right', color: '#DC2626', fontWeight: '800' }]}>
-                        -₹{(row.adminShare || 0).toLocaleString()}
+                      <Text style={[styles.ledgerColVal, { width: 110, textAlign: 'right', color: '#0284C7', fontWeight: '800' }]}>
+                        +₹{(row.adminShare || 0).toLocaleString()}
                       </Text>
 
-                      <Text style={[styles.ledgerColVal, { width: 170, textAlign: 'right', fontWeight: '800', color: '#071B52' }]}>
-                        {row.netImpact || `Rider owes: ₹${row.adminShare || 0}`}
+                      <Text style={[styles.ledgerColVal, { width: 200, textAlign: 'right', fontWeight: '800', color: row.paymentMode === 'COD' ? '#DC2626' : '#059669' }]}>
+                        {typeof row.netImpact === 'string' && row.netImpact.includes('owes')
+                          ? row.netImpact
+                          : row.paymentMode === 'COD'
+                          ? `Rider owes Admin: ₹${row.adminShare || 0}`
+                          : `Admin owes Rider: ₹${row.riderEarning || 0}`}
                       </Text>
                     </View>
                   ))

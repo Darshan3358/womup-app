@@ -466,14 +466,14 @@ export const EarningsSettlementScreen: React.FC = () => {
                 </View>
 
                 <View style={styles.khataCalcCol}>
-                  <Text style={styles.khataCalcLabel}>ADMIN SHARE (-)</Text>
+                  <Text style={styles.khataCalcLabel}>ADMIN SHARE (+)</Text>
                   <Text
                     style={[
                       styles.khataCalcVal,
-                      { color: adminCut > 0 ? '#DC2626' : '#64748B', fontWeight: '800' },
+                      { color: '#0284C7', fontWeight: '800' },
                     ]}
                   >
-                    {adminCut > 0 ? `-₹${adminCut}` : '₹0'}
+                    +₹{adminCut}
                   </Text>
                 </View>
               </View>
