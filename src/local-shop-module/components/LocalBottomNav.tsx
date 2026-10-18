@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-export type LocalTabKey = 'Main App' | 'Home' | 'Shops' | 'My Orders' | 'My Coin' | 'My Profile';
+export type LocalTabKey = 'Home' | 'Shops' | 'My Orders' | 'My Coin' | 'My Profile';
 
 interface LocalBottomNavProps {
   currentTab: LocalTabKey;
@@ -26,7 +26,6 @@ export const LocalBottomNav: React.FC<LocalBottomNavProps> = ({
     iconType: 'ionicons' | 'material';
     isBackAction?: boolean;
   }[] = [
-    { key: 'Main App', label: 'Womup ⚡', icon: 'flash', iconType: 'ionicons', isBackAction: true },
     { key: 'Home', label: 'Home', icon: 'home', iconType: 'ionicons' },
     { key: 'Shops', label: 'Shops', icon: 'storefront-outline', iconType: 'ionicons' },
     { key: 'My Orders', label: 'My Orders', icon: 'cart-outline', iconType: 'ionicons' },

@@ -41,20 +41,8 @@ export const WomupHeader: React.FC<WomupHeaderProps> = ({
       )}
 
       <View style={styles.headerRow}>
-        {/* Left: Back to Main Womup App + Hamburger Menu */}
+        {/* Left: Hamburger Menu */}
         <View style={styles.leftActionsRow}>
-          {onBackToQuickCommerce && (
-            <TouchableOpacity
-              style={styles.backButton}
-              activeOpacity={0.7}
-              onPress={onBackToQuickCommerce}
-              accessibilityLabel="Back to Womup Express"
-            >
-              <Ionicons name="chevron-back" size={20} color="#E11D48" />
-              <Text style={styles.backButtonText}>Womup</Text>
-            </TouchableOpacity>
-          )}
-
           <TouchableOpacity
             style={styles.iconButton}
             activeOpacity={0.7}

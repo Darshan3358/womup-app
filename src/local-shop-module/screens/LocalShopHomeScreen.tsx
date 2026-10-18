@@ -152,10 +152,6 @@ export const LocalShopHomeScreen: React.FC = () => {
   }, [currentSubScreen, activeTab]);
 
   const handleSelectTab = (tab: LocalTabKey) => {
-    if (tab === 'Main App') {
-      handleBackToMainApp();
-      return;
-    }
     if (tab === 'Shops') {
       setSelectedCategory('');
       setSearchQuery('');
