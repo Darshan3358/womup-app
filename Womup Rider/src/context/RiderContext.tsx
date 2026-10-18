@@ -117,6 +117,7 @@ interface RiderContextType {
   advanceStep: (step: DeliveryStepStatus) => Promise<void>;
   pickupOrder: (code?: string) => Promise<void>;
   verifyOtp: (otp: string) => Promise<boolean>;
+  collectCash: (amount?: number) => Promise<boolean>;
   refreshDashboard: () => Promise<void>;
   refreshAvailableJobs: () => Promise<void>;
   fetchNewOrder: () => Promise<void>;
@@ -726,6 +727,22 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return false;
   };
 
+  const collectCash = async (amount?: number): Promise<boolean> => {
+    if (activeDelivery) {
+      const collAmount = amount !== undefined ? amount : (activeDelivery.cashToCollect || activeDelivery.orderAmount || 0);
+      const res = await RiderApiService.collectCash(activeDelivery.id, collAmount);
+      if (res) {
+        setActiveDelivery({
+          ...activeDelivery,
+          cashCollected: true,
+          cashCollectedAmount: collAmount,
+        });
+        return true;
+      }
+    }
+    return false;
+  };
+
   const fetchNewOrder = async () => {
     const newOffer = await RiderApiService.fetchAvailableOrders();
     if (newOffer) {
@@ -831,6 +848,7 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         advanceStep,
         pickupOrder,
         verifyOtp,
+        collectCash,
         refreshDashboard,
         refreshAvailableJobs,
         fetchNewOrder,

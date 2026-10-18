@@ -326,15 +326,7 @@ export const EarningsSettlementScreen: React.FC = () => {
             <Text style={[styles.breakdownLineValue, { color: '#13B978' }]}>+₹ {displayTips}</Text>
           </View>
 
-          <View style={styles.breakdownDivider} />
 
-          <View style={styles.breakdownLine}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <View style={[styles.dotMarker, { backgroundColor: '#F59E0B' }]} />
-              <Text style={styles.breakdownLineLabel}>Incentives</Text>
-            </View>
-            <Text style={[styles.breakdownLineValue, { color: '#F59E0B' }]}>+₹ {displayIncentives}</Text>
-          </View>
         </View>
 
         {/* Pink CTA Button (Wireframe Screen 11: View Details / Payout) */}

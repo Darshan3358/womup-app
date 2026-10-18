@@ -10,6 +10,7 @@ import {
   Modal,
   ActivityIndicator,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRider } from '../../context/RiderContext';
@@ -46,12 +47,23 @@ export const CurrentDeliveryScreen: React.FC = () => {
     settlementSummary,
     setCurrentTab,
     setSubScreen,
+    collectCash,
   } = useRider();
 
   const [isNavScreenOpen, setIsNavScreenOpen] = useState(false);
   const [navMode, setNavMode] = useState<'PICKUP' | 'DELIVERY'>('PICKUP');
 
-  const [cashCollectedConfirmed, setCashCollectedConfirmed] = useState(false);
+  const [cashCollectedConfirmed, setCashCollectedConfirmed] = useState(
+    Boolean(activeDelivery?.cashCollected)
+  );
+
+  useEffect(() => {
+    if (activeDelivery?.cashCollected) {
+      setCashCollectedConfirmed(true);
+    }
+  }, [activeDelivery?.cashCollected]);
+
+  const isCashCollected = Boolean(cashCollectedConfirmed || activeDelivery?.cashCollected);
 
   const netDueToAdmin = settlementSummary?.netBalance ?? settlementSummary?.riderOwesAdmin ?? 0;
   const cashLimit = settlementSummary?.cashLimit ?? 500;
@@ -637,34 +649,48 @@ export const CurrentDeliveryScreen: React.FC = () => {
                       <View
                         style={[
                           styles.codBadge,
-                          cashCollectedConfirmed ? styles.codBadgeSuccess : styles.codBadgePending,
+                          isCashCollected ? styles.codBadgeSuccess : styles.codBadgePending,
                         ]}
                       >
                         <Text
                           style={[
                             styles.codBadgeText,
-                            cashCollectedConfirmed ? styles.codBadgeSuccessText : styles.codBadgePendingText,
+                            isCashCollected ? styles.codBadgeSuccessText : styles.codBadgePendingText,
                           ]}
                         >
-                          {cashCollectedConfirmed ? 'CASH RECEIVED' : 'PENDING COLLECTION'}
+                          {isCashCollected ? 'CASH RECEIVED' : 'PENDING COLLECTION'}
                         </Text>
                       </View>
                     </View>
 
-                    <Text style={styles.codAmountBig}>
-                      ₹{activeDelivery.cashToCollect ?? activeDelivery.orderAmount ?? 100}
-                    </Text>
-                    <Text style={styles.codExplainerText}>
-                      Rider Earning: +₹{activeDelivery.riderEarning ?? 40} • Admin Share: ₹
-                      {(activeDelivery.cashToCollect ?? activeDelivery.orderAmount ?? 100) -
-                        (activeDelivery.riderEarning ?? 40)}
-                    </Text>
+                    {(() => {
+                      const cashAmt = activeDelivery.cashToCollect ?? activeDelivery.orderAmount ?? 100;
+                      const deliveryFee = typeof (activeDelivery as any).deliveryFee === 'number'
+                        ? (activeDelivery as any).deliveryFee
+                        : (activeDelivery.riderEarning && activeDelivery.riderEarning < cashAmt ? activeDelivery.riderEarning : 20);
+                      const riderEarningDisplay = deliveryFee;
+                      const adminShareDisplay = Math.max(0, cashAmt - riderEarningDisplay);
 
-                    {!cashCollectedConfirmed ? (
-                      <TouchableOpacity
-                        style={styles.collectCashActionBtn}
-                        onPress={() => {
-                          const cashAmt = activeDelivery.cashToCollect ?? activeDelivery.orderAmount ?? 100;
+                      const handleCollectCash = async () => {
+                        const execute = async () => {
+                          setCashCollectedConfirmed(true);
+                          try {
+                            if (collectCash) {
+                              await collectCash(cashAmt);
+                            }
+                          } catch (e) {
+                            console.warn('collectCash failed:', e);
+                          }
+                        };
+
+                        if (Platform.OS === 'web') {
+                          const confirmed = typeof window !== 'undefined' && typeof window.confirm === 'function'
+                            ? window.confirm(`Collect Cash: Did you receive ₹${cashAmt} in cash from the customer?`)
+                            : true;
+                          if (confirmed) {
+                            await execute();
+                          }
+                        } else {
                           Alert.alert(
                             'Collect Cash',
                             `Did you receive ₹${cashAmt} in cash from the customer?`,
@@ -673,32 +699,42 @@ export const CurrentDeliveryScreen: React.FC = () => {
                               {
                                 text: 'Yes, Cash Received',
                                 style: 'default',
-                                onPress: () => {
-                                  setCashCollectedConfirmed(true);
-                                  Alert.alert(
-                                    'Cash Collected',
-                                    `₹${cashAmt} cash confirmed! You can now verify customer OTP to complete delivery.`
-                                  );
-                                },
+                                onPress: execute,
                               },
                             ]
                           );
-                        }}
-                        activeOpacity={0.85}
-                      >
-                        <Ionicons name="hand-left" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                        <Text style={styles.collectCashActionBtnText}>
-                          COLLECT CASH ₹{activeDelivery.cashToCollect ?? activeDelivery.orderAmount ?? 100}
-                        </Text>
-                      </TouchableOpacity>
-                    ) : (
-                      <View style={styles.cashCollectedSuccessBox}>
-                        <Ionicons name="checkmark-circle" size={16} color="#059669" />
-                        <Text style={styles.cashCollectedSuccessText}>
-                          ₹{activeDelivery.cashToCollect ?? activeDelivery.orderAmount ?? 100} Cash in Hand Collected
-                        </Text>
-                      </View>
-                    )}
+                        }
+                      };
+
+                      return (
+                        <>
+                          <Text style={styles.codAmountBig}>₹{cashAmt}</Text>
+                          <Text style={styles.codExplainerText}>
+                            Rider Earning: +₹{riderEarningDisplay} • Admin Share: ₹{adminShareDisplay}
+                          </Text>
+
+                          {!isCashCollected ? (
+                            <TouchableOpacity
+                              style={styles.collectCashActionBtn}
+                              onPress={handleCollectCash}
+                              activeOpacity={0.85}
+                            >
+                              <Ionicons name="hand-left" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                              <Text style={styles.collectCashActionBtnText}>
+                                COLLECT CASH ₹{cashAmt}
+                              </Text>
+                            </TouchableOpacity>
+                          ) : (
+                            <View style={styles.cashCollectedSuccessBox}>
+                              <Ionicons name="checkmark-circle" size={16} color="#059669" />
+                              <Text style={styles.cashCollectedSuccessText}>
+                                ₹{cashAmt} Cash in Hand Collected
+                              </Text>
+                            </View>
+                          )}
+                        </>
+                      );
+                    })()}
                   </View>
                 )}
 
@@ -719,22 +755,40 @@ export const CurrentDeliveryScreen: React.FC = () => {
                     style={[styles.primaryActionBtn, { backgroundColor: '#7C3AED' }]}
                     onPress={() => {
                       const isCodOrder = activeDelivery.isCod || activeDelivery.paymentMode === 'COD';
-                      if (isCodOrder && !cashCollectedConfirmed) {
-                        const cashAmt = activeDelivery.cashToCollect ?? activeDelivery.orderAmount ?? 100;
-                        Alert.alert(
-                          'Cash Collection Required',
-                          `Please collect ₹${cashAmt} in cash from the customer before completing delivery!`,
-                          [
-                            { text: 'Cancel', style: 'cancel' },
-                            {
-                              text: 'Collect Cash Now',
-                              onPress: () => {
-                                setCashCollectedConfirmed(true);
-                                setShowOtpModal(true);
+                      const cashAmt = activeDelivery.cashToCollect ?? activeDelivery.orderAmount ?? 100;
+                      if (isCodOrder && !isCashCollected) {
+                        if (Platform.OS === 'web') {
+                          const ok = typeof window !== 'undefined' && typeof window.confirm === 'function'
+                            ? window.confirm(
+                                `Cash Collection Required: Did you collect ₹${cashAmt} cash from customer? Click OK if cash received to enter OTP.`
+                              )
+                            : true;
+                          if (ok) {
+                            setCashCollectedConfirmed(true);
+                            if (collectCash) {
+                              collectCash(cashAmt).catch(() => {});
+                            }
+                            setShowOtpModal(true);
+                          }
+                        } else {
+                          Alert.alert(
+                            'Cash Collection Required',
+                            `Please collect ₹${cashAmt} in cash from the customer before completing delivery!`,
+                            [
+                              { text: 'Cancel', style: 'cancel' },
+                              {
+                                text: 'Collect Cash Now',
+                                onPress: () => {
+                                  setCashCollectedConfirmed(true);
+                                  if (collectCash) {
+                                    collectCash(cashAmt).catch(() => {});
+                                  }
+                                  setShowOtpModal(true);
+                                },
                               },
-                            },
-                          ]
-                        );
+                            ]
+                          );
+                        }
                         return;
                       }
                       setShowOtpModal(true);
@@ -1275,24 +1329,21 @@ export const CurrentDeliveryScreen: React.FC = () => {
                   <Text style={styles.modalSectionHeader}>Rider Earnings Breakdown</Text>
                   <View style={styles.earningsBreakdownCard}>
                     {(() => {
-                      const base = Number(selectedPastOrder.earnings?.basePay ?? 48);
-                      const inc = Number(selectedPastOrder.earnings?.incentive ?? 15);
+                      const base = Number(selectedPastOrder.earnings?.basePay ?? selectedPastOrder.riderEarning ?? 20);
                       const tip = Number(selectedPastOrder.earnings?.tip ?? 0);
-                      const total = base + inc + tip;
+                      const total = Number(selectedPastOrder.earnings?.total ?? (base + tip));
                       return (
                         <>
                           <View style={styles.earningsRow}>
-                            <Text style={styles.earningsRowLabel}>Base Delivery Pay</Text>
+                            <Text style={styles.earningsRowLabel}>Base Delivery Fee</Text>
                             <Text style={styles.earningsRowVal}>₹{base}</Text>
                           </View>
-                          <View style={styles.earningsRow}>
-                            <Text style={styles.earningsRowLabel}>Peak / On-Time Incentive</Text>
-                            <Text style={styles.earningsRowVal}>+₹{inc}</Text>
-                          </View>
-                          <View style={styles.earningsRow}>
-                            <Text style={styles.earningsRowLabel}>Customer Doorstep Tip</Text>
-                            <Text style={styles.earningsRowVal}>+₹{tip}</Text>
-                          </View>
+                          {tip > 0 ? (
+                            <View style={styles.earningsRow}>
+                              <Text style={styles.earningsRowLabel}>Customer Doorstep Tip</Text>
+                              <Text style={styles.earningsRowVal}>+₹{tip}</Text>
+                            </View>
+                          ) : null}
                           <View style={[styles.earningsRow, styles.earningsTotalRow]}>
                             <Text style={styles.earningsTotalLabel}>Total Earned for Order</Text>
                             <Text style={styles.earningsTotalVal}>₹{total}</Text>

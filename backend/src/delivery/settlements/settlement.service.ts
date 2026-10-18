@@ -44,10 +44,10 @@ export class SettlementService {
     });
 
     const basePayout = settlements.reduce((sum, s) => sum + (s.basePay || 0), 0);
-    const incentives = settlements.reduce((sum, s) => sum + (s.incentive || 0), 0);
+    const incentives = 0; // Incentives removed completely as per business rule
     const tips = settlements.reduce((sum, s) => sum + (s.tip || 0), 0);
     const adjustments = settlements.reduce((sum, s) => sum + (s.adjustment || 0), 0);
-    const netPayableToday = basePayout + incentives + tips + adjustments;
+    const netPayableToday = basePayout + tips + adjustments;
 
     // Calculate real week and month earnings from database for this rider
     const allRiderSettlements = await this.settlementModel.find({ riderId: partner._id });
@@ -113,22 +113,28 @@ export class SettlementService {
       .sort({ createdAt: -1 })
       .limit(30);
 
-    return settlements.map((s) => ({
-      id: s._id.toString(),
-      date: s.settledAt ? new Date(s.settledAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'Today',
-      orderNumber: s.orderNumber || '#WUP-84920',
-      paymentMode: (s as any).paymentMode || 'ONLINE',
-      totalAmount: (s as any).totalAmount || (s.basePay + s.incentive + s.tip),
-      riderEarning: (s as any).riderEarning || s.total || (s.basePay + s.incentive + s.tip),
-      adminShare: (s as any).adminShare || 0,
-      cashCollected: (s as any).cashCollected || 0,
-      netImpact: (s as any).netImpact ?? ((s as any).paymentMode === 'COD' ? -((s as any).adminShare || 0) : ((s as any).riderEarning || s.total)),
-      baseAmount: s.basePay || 0,
-      tip: s.tip || 0,
-      bonus: s.incentive || 0,
-      total: s.total || 0,
-      status: s.status,
-    }));
+    return settlements.map((s) => {
+      const isCod = (s as any).paymentMode === 'COD';
+      const totalAmount = (s as any).totalAmount || (s.basePay + s.tip);
+      const riderEarning = (s as any).riderEarning || s.total || (s.basePay + s.tip);
+      const adminShare = (s as any).adminShare ?? Math.max(0, totalAmount - riderEarning);
+      return {
+        id: s._id.toString(),
+        date: s.settledAt ? new Date(s.settledAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'Today',
+        orderNumber: s.orderNumber || '#WUP-84920',
+        paymentMode: (s as any).paymentMode || 'ONLINE',
+        totalAmount,
+        riderEarning,
+        adminShare,
+        cashCollected: (s as any).cashCollected || 0,
+        netImpact: (s as any).netImpact ?? (isCod ? -adminShare : riderEarning),
+        baseAmount: s.basePay || 0,
+        tip: s.tip || 0,
+        bonus: 0,
+        total: s.total || riderEarning,
+        status: s.status,
+      };
+    });
   }
 
   async getBankAccount(userId: string) {

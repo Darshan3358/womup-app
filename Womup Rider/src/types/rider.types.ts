@@ -115,6 +115,8 @@ export interface DeliveryRequest {
   isOrderBlocked?: boolean;
   currentOutstandingCash?: number;
   outstandingCashLimit?: number;
+  cashCollected?: boolean;
+  cashCollectedAmount?: number;
 }
 
 export interface RiderProfile {

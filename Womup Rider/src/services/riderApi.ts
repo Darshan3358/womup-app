@@ -787,6 +787,35 @@ export class RiderApiService {
     throw new Error('Delivery not found');
   }
 
+  static async collectCash(orderId: string, amount?: number): Promise<boolean> {
+    try {
+      const headers = await this.getAuthHeader();
+      const res = await fetch(`${this.getApiBaseUrl()}/delivery/orders/${orderId}/collect-cash`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ amount }),
+      });
+      if (res.ok) {
+        const current = await this.getActiveDelivery();
+        if (current) {
+          current.cashCollected = true;
+          if (typeof amount === 'number') current.cashCollectedAmount = amount;
+          await this.setStorage(STORAGE_KEYS.ACTIVE_DELIVERY, current);
+        }
+        return true;
+      }
+    } catch (e) {
+      console.warn('Failed to call backend collect-cash:', e);
+    }
+    const current = await this.getActiveDelivery();
+    if (current) {
+      current.cashCollected = true;
+      if (typeof amount === 'number') current.cashCollectedAmount = amount;
+      await this.setStorage(STORAGE_KEYS.ACTIVE_DELIVERY, current);
+    }
+    return true;
+  }
+
   static async verifyDeliveryOtp(orderId: string, otp: string): Promise<boolean> {
     const headers = await this.getAuthHeader();
     let serverEarnings: number | null = null;
@@ -816,10 +845,10 @@ export class RiderApiService {
     if (backendSuccess || isOtpMatch) {
       // Mark as completed, add to settlement
       if (current) {
-        const base = serverBreakdown?.basePay ?? current.payoutAmount ?? 39;
-        const bonus = serverBreakdown?.incentive ?? 15;
+        const base = serverBreakdown?.basePay ?? current.payoutAmount ?? 20;
+        const bonus = 0; // Incentives removed completely
         const tip = typeof serverBreakdown?.tip === 'number' ? serverBreakdown.tip : (current.tip ?? 0);
-        const total = serverBreakdown?.total ?? (base + bonus + tip);
+        const total = serverBreakdown?.total ?? (base + tip);
 
         const history = await this.getSettlementHistory();
         history.unshift({
@@ -827,7 +856,7 @@ export class RiderApiService {
           date: 'Just Now',
           orderNumber: current.orderNumber,
           baseAmount: base,
-          bonus: bonus,
+          bonus: 0,
           tip: tip,
           total: total,
           status: 'SETTLED',
@@ -838,8 +867,8 @@ export class RiderApiService {
         const summary = await this.getSettlementSummary();
         summary.todayCompleted += 1;
         summary.basePayout = (summary.basePayout || 0) + base;
-        summary.incentives = (summary.incentives || 0) + bonus;
-        summary.incentivesEarned = summary.incentives;
+        summary.incentives = 0;
+        summary.incentivesEarned = 0;
         summary.tips = (summary.tips || 0) + tip;
         summary.tipsCollected = summary.tips;
         summary.netPayableToday = (summary.netPayableToday || 0) + total;

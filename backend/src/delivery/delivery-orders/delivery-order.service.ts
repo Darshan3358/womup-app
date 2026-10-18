@@ -411,7 +411,6 @@ export class DeliveryOrderService implements OnModuleInit {
         createdAt: { $gte: maxOrderAge },
         status: {
           $in: [
-            OrderStatus.PLACED,
             OrderStatus.PACKING,
             OrderStatus.PACKED,
           ],
@@ -572,12 +571,23 @@ export class DeliveryOrderService implements OnModuleInit {
   async resolvePayoutForOrder(order: any, totalDistanceKm: number = 3.5): Promise<{
     payoutAmount: number;
     ratePerKm: number;
-    rateSource: 'AREA' | 'CITY' | 'GLOBAL';
+    rateSource: 'AREA' | 'CITY' | 'GLOBAL' | 'ORDER_DELIVERY_FEE';
     minimumPayout: number;
     maximumPayout: number;
   }> {
     try {
       const db = this.orderModel.db;
+      // If order has an explicit delivery fee set, rider base payout matches the delivery fee
+      if (typeof (order as any)?.deliveryFee === 'number' && (order as any).deliveryFee > 0) {
+        return {
+          payoutAmount: (order as any).deliveryFee,
+          ratePerKm: 10,
+          rateSource: 'ORDER_DELIVERY_FEE',
+          minimumPayout: (order as any).deliveryFee,
+          maximumPayout: (order as any).deliveryFee,
+        };
+      }
+
       const ratesColl = db.collection('rider_payout_rates');
       const storeId = order.storeId?._id || order.storeId;
       const store = storeId
@@ -802,6 +812,72 @@ export class DeliveryOrderService implements OnModuleInit {
     return this.formatOrderDeliveryPayload(assignment, order, partner);
   }
 
+  async collectCash(userId: string, assignmentOrOrderId: string, amount?: number) {
+    const partner = await this.getPartner(userId);
+    const assignment = await this.findAssignment(partner._id, assignmentOrOrderId);
+    const order = await this.orderModel.findById(assignment.orderId);
+
+    const orderTotal = Math.round(Number(order?.totalAmount) || assignment.payoutAmount || 32);
+    const cashAmt = typeof amount === 'number' && amount > 0 ? amount : orderTotal;
+
+    if (order) {
+      order.cashCollected = true;
+      order.cashCollectedAt = new Date();
+      (order as any).cashCollectedAmount = cashAmt;
+      order.paymentStatus = 'PAID';
+      await order.save();
+    }
+
+    (assignment as any).cashCollected = true;
+    (assignment as any).cashCollectedAt = new Date();
+    (assignment as any).cashCollectedAmount = cashAmt;
+    await assignment.save();
+
+    // Increment partner totalCodCollected tracking
+    try {
+      await this.partnerModel.findByIdAndUpdate(partner._id, {
+        $inc: { totalCodCollected: cashAmt, cashCollected: cashAmt },
+      });
+    } catch (e) {
+      this.logger.warn(`Failed incrementing rider COD stats: ${e.message}`);
+    }
+
+    // Ledger transaction
+    try {
+      await this.connection.collection('wallet_transactions').insertOne({
+        walletType: 'RIDER',
+        walletId: partner._id,
+        orderId: assignment.orderId,
+        orderNumber: (order as any)?.orderNumber,
+        type: 'CASH_COLLECTED',
+        category: 'COD',
+        amount: cashAmt,
+        description: `Cash on Delivery (COD) of ₹${cashAmt} collected by rider for Order #${(order as any)?.orderNumber || assignment.orderId}`,
+        createdAt: new Date(),
+      });
+    } catch (err) {
+      this.logger.warn(`Failed logging cash collected ledger: ${err.message}`);
+    }
+
+    // Live broadcast via tracking gateway
+    if (this.trackingGateway?.server) {
+      this.trackingGateway.notifyOrderStatus(assignment.orderId.toString(), 'CASH_COLLECTED', {
+        orderId: assignment.orderId.toString(),
+        orderNumber: (order as any)?.orderNumber,
+        cashCollectedAmount: cashAmt,
+        paymentStatus: 'PAID',
+      });
+    }
+
+    return {
+      success: true,
+      message: `Cash of ₹${cashAmt} collected successfully`,
+      cashCollected: true,
+      cashCollectedAmount: cashAmt,
+      cashCollectedAt: new Date(),
+    };
+  }
+
   async verifyDelivery(userId: string, assignmentOrOrderId: string, deliveryPin: string) {
     const partner = await this.getPartner(userId);
     const assignment = await this.findAssignment(partner._id, assignmentOrOrderId);
@@ -814,10 +890,10 @@ export class DeliveryOrderService implements OnModuleInit {
         riderId: partner._id,
       });
       const orderTip = typeof (order as any)?.tip === 'number' ? (order as any).tip : 0;
-      const resolvedBase = existingSettlement?.basePay ?? (assignment.payoutAmount ?? 48);
-      const resolvedIncentive = existingSettlement?.incentive ?? 15;
+      const orderDeliveryFee = typeof (order as any)?.deliveryFee === 'number' && (order as any).deliveryFee > 0 ? (order as any).deliveryFee : null;
+      const resolvedBase = existingSettlement?.basePay ?? orderDeliveryFee ?? (assignment.payoutAmount ?? 20);
       const resolvedTip = existingSettlement?.tip ?? orderTip;
-      const resolvedTotal = existingSettlement?.total ?? (resolvedBase + resolvedIncentive + resolvedTip);
+      const resolvedTotal = existingSettlement?.total ?? (resolvedBase + resolvedTip);
 
       return {
         success: true,
@@ -826,7 +902,6 @@ export class DeliveryOrderService implements OnModuleInit {
         earnings: resolvedTotal,
         breakdown: {
           basePay: resolvedBase,
-          incentive: resolvedIncentive,
           tip: resolvedTip,
           total: resolvedTotal,
         },
@@ -934,12 +1009,17 @@ export class DeliveryOrderService implements OnModuleInit {
       const isCod = paymentMethod === 'COD';
       const orderTotal = Math.round(Number(order?.totalAmount) || 100);
 
-      const basePay = assignment.payoutAmount ?? ((order as any)?.deliveryFee || 15);
-      const incentive = 15;
+      // Rider earning is Delivery Fee (from order or assignment payout) + Customer Tip.
+      // Incentives are completely removed.
+      const basePay = typeof (order as any)?.deliveryFee === 'number' && (order as any).deliveryFee > 0
+        ? (order as any).deliveryFee
+        : (assignment.payoutAmount ?? 20);
+      const incentive = 0;
       const tip = typeof (order as any)?.tip === 'number' ? (order as any).tip : 0;
-      const riderEarning = basePay + incentive + tip; // Total earned by rider for this delivery
+      const riderEarning = basePay + tip; // Total earned by rider for this delivery
       const total = riderEarning;
-      const adminShare = isCod ? Math.max(0, orderTotal - riderEarning) : 0;
+      // Admin Share is the remainder of the customer payment (Product Price + Convenience Fee)
+      const adminShare = Math.max(0, orderTotal - riderEarning);
 
       // Update Order document with Authoritative Ledger Snapshot
       if (order) {
@@ -985,7 +1065,7 @@ export class DeliveryOrderService implements OnModuleInit {
             adminShare,
             cashCollected: isCod ? orderTotal : 0,
             basePay,
-            incentive,
+            incentive: 0,
             tip,
             total: riderEarning,
             netImpact: isCod ? -adminShare : riderEarning,
@@ -1008,8 +1088,8 @@ export class DeliveryOrderService implements OnModuleInit {
           amount: total,
           basePay,
           tip,
-          incentive,
-          description: `Delivery payout for order ${orderNumber} (₹${basePay} base + ₹${tip} tip [100%] + ₹${incentive} bonus)`,
+          incentive: 0,
+          description: `Delivery payout for order ${orderNumber} (₹${basePay} delivery fee + ₹${tip} tip [100%])`,
           createdAt: new Date(),
         },
         { session },
@@ -1210,7 +1290,6 @@ export class DeliveryOrderService implements OnModuleInit {
         earnings: total,
         breakdown: {
           basePay,
-          incentive,
           tip,
           total,
         },
@@ -1464,7 +1543,7 @@ export class DeliveryOrderService implements OnModuleInit {
       orderAmount: totalAmount,
       paymentMethod,
       paymentStatus,
-      payoutAmount: assignment.payoutAmount ?? 0,
+      payoutAmount: assignment.payoutAmount ?? ((order as any)?.deliveryFee || 20),
       stepStatus: assignment.status,
       stageIndex,
       statusHistory,
@@ -1475,7 +1554,10 @@ export class DeliveryOrderService implements OnModuleInit {
       bagBarcode: resolvedBagBarcode,
       isCod: paymentMethod === 'COD',
       cashToCollect: paymentMethod === 'COD' ? totalAmount : 0,
-      riderEarning: assignment.payoutAmount ?? 40,
+      cashCollected: Boolean((order as any)?.cashCollected || (assignment as any)?.cashCollected),
+      cashCollectedAmount: (order as any)?.cashCollectedAmount || (assignment as any)?.cashCollectedAmount || 0,
+      cashCollectedAt: (order as any)?.cashCollectedAt || (assignment as any)?.cashCollectedAt || null,
+      riderEarning: assignment.payoutAmount ?? ((order as any)?.deliveryFee || 20),
       isOrderBlocked: Boolean(partner.isOrderBlocked || (Math.max(0, (partner.totalCodCollected || 0) - (partner.totalEarnings || 0)) >= (partner.outstandingCashLimit || 500))),
       currentOutstandingCash: Math.max(0, (partner.totalCodCollected || 0) - (partner.totalEarnings || 0)),
       outstandingCashLimit: partner.outstandingCashLimit || 500,

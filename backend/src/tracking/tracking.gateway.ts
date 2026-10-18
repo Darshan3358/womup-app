@@ -305,6 +305,7 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
   broadcastNewOrder(order: any) {
     if (this.server) {
       const storeId = order.storeId?._id?.toString() || order.storeId?.toString();
+      const broadcastIds = (order.broadcastStoreIds || []).map((b: any) => b?._id?.toString() || b?.toString()).filter(Boolean);
       const payload = {
         orderId: order._id?.toString() || order.id,
         orderNumber: order.orderNumber,
@@ -314,18 +315,24 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
         customerName: order.deliveryAddress?.label || 'Customer',
         address: order.deliveryAddress,
         storeId,
+        broadcastStoreIds: broadcastIds,
         items: order.items,
         createdAt: order.createdAt || new Date().toISOString(),
         order,
       };
 
-      // Emit to targeted store room, admin console, and global broadcast fallback
+      // Emit to targeted store room, all broadcast candidate store rooms, admin console, and global broadcast fallback
       if (storeId) {
         this.server.to(`store_${storeId}`).emit('new_order', payload);
       }
+      for (const bId of broadcastIds) {
+        if (bId !== storeId) {
+          this.server.to(`store_${bId}`).emit('new_order', payload);
+        }
+      }
       this.server.to('admin').emit('new_order', payload);
       this.server.emit('new_order', payload);
-      this.logger.log(`[WebSocket] Dispatched new_order to store_${storeId}: ${order.orderNumber}`);
+      this.logger.log(`[WebSocket] Dispatched new_order to stores [${Array.from(new Set([storeId, ...broadcastIds].filter(Boolean))).join(', ')}]: ${order.orderNumber}`);
     }
   }
 

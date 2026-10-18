@@ -94,11 +94,22 @@ export class StoreOrdersService {
     if (!staff.storeId) {
       return [];
     }
-    const storeIdFilter = { storeId: staff.storeId };
+
+    const staffStore = await this.storeModel.findById(staff.storeId);
+    const storeObjId = Types.ObjectId.isValid(staff.storeId.toString())
+      ? new Types.ObjectId(staff.storeId.toString())
+      : staff.storeId;
+    const storeIdStr = staff.storeId.toString();
 
     const orders = await this.orderModel
       .find({
-        ...storeIdFilter,
+        $or: [
+          { storeId: storeObjId },
+          { storeId: storeIdStr },
+          { broadcastStoreIds: storeObjId },
+          { broadcastStoreIds: storeIdStr },
+          ...(staffStore?.areaId ? [{ areaId: staffStore.areaId }] : []),
+        ],
         status: OrderStatus.PLACED,
       })
       .sort({ createdAt: 1 }) // FIFO oldest first
@@ -364,15 +375,43 @@ export class StoreOrdersService {
       );
     }
 
-    const order = await this.orderModel.findById(orderId);
-    if (!order) {
-      throw new NotFoundException('Order not found');
-    }
+    const storeObjId = Types.ObjectId.isValid(staff.storeId.toString())
+      ? new Types.ObjectId(staff.storeId.toString())
+      : staff.storeId;
+    const storeIdStr = staff.storeId.toString();
 
-    if (order.storeId && order.storeId.toString() !== staff.storeId.toString()) {
-      throw new BadRequestException(
-        `This order belongs to a different dark store (${staffStore.name}).`
-      );
+    // Atomic FCFS Acceptance: First store to click accept wins!
+    const order = await this.orderModel.findOneAndUpdate(
+      {
+        _id: new Types.ObjectId(orderId),
+        status: OrderStatus.PLACED,
+        $or: [
+          { storeId: storeObjId },
+          { storeId: storeIdStr },
+          { broadcastStoreIds: storeObjId },
+          { broadcastStoreIds: storeIdStr },
+          ...(staffStore?.areaId ? [{ areaId: staffStore.areaId }] : []),
+        ],
+      },
+      {
+        $set: {
+          storeId: storeObjId,
+          status: OrderStatus.PACKING,
+          acceptedAt: new Date(),
+        },
+      },
+      { new: true }
+    );
+
+    if (!order) {
+      const existing = await this.orderModel.findById(orderId).populate('storeId', 'name');
+      if (existing && existing.status !== OrderStatus.PLACED) {
+        const assignedStoreName = (existing.storeId as any)?.name || 'another dark store';
+        throw new BadRequestException(
+          `Order #${existing.orderNumber} was already accepted by ${assignedStoreName}!`
+        );
+      }
+      throw new BadRequestException('Order not available for this dark store or already taken.');
     }
 
     let pickList = await this.pickListModel.findOne({ orderId: order._id });
@@ -385,9 +424,6 @@ export class StoreOrdersService {
       await pickList.save();
     }
 
-    order.status = OrderStatus.PACKING;
-    await order.save();
-
     staff.activeOrderId = order._id;
     if (typeof staff.save === 'function') {
       await staff.save();
@@ -399,11 +435,54 @@ export class StoreOrdersService {
       pickerName: staff.fullName,
     });
 
-    if (this.trackingGateway.server && order.storeId) {
-      this.trackingGateway.server.to(`store_${order.storeId}`).emit('order_status', {
+    if (this.trackingGateway.server) {
+      this.trackingGateway.server.to(`store_${storeIdStr}`).emit('order_status', {
         orderId: order._id.toString(),
         status: 'PACKING',
       });
+
+      // Notify other candidate stores in broadcast to remove this order from their incoming queue
+      const allBroadcastIds = (order.broadcastStoreIds || []).map((id: any) => id?.toString()).filter(Boolean);
+      for (const otherStoreId of allBroadcastIds) {
+        if (otherStoreId !== storeIdStr) {
+          this.trackingGateway.server.to(`store_${otherStoreId}`).emit('order_status', {
+            orderId: order._id.toString(),
+            orderNumber: order.orderNumber,
+            status: 'PACKING',
+            action: 'REMOVED_TAKEN_BY_ANOTHER_STORE',
+          });
+          this.trackingGateway.server.to(`store_${otherStoreId}`).emit('new_order', {
+            orderId: order._id.toString(),
+            action: 'REMOVE',
+          });
+        }
+      }
+    }
+
+    // Auto-offer to nearest online rider for pickup from the store that just accepted!
+    try {
+      const onlinePartner = await this.partnerModel.findOne({ isOnline: true }).sort({ updatedAt: -1 });
+      if (onlinePartner) {
+        const payoutAmount = typeof (order as any)?.deliveryFee === 'number' && (order as any).deliveryFee > 0
+          ? (order as any).deliveryFee
+          : 20;
+        await this.connection.collection('delivery_assignments').insertOne({
+          orderId: order._id,
+          partnerId: onlinePartner._id,
+          status: 'OFFERED',
+          payoutAmount,
+          distanceKm: 2.1,
+          etaMinutes: 12,
+          assignedAt: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+        this.logger.log(
+          `[Dispatch] Auto-offered Order #${order.orderNumber} to rider ${onlinePartner.fullName} for pickup at ${staffStore.name}`
+        );
+      }
+    } catch (dispatchErr: any) {
+      this.logger.warn(`Failed auto-offering to rider after store accept: ${dispatchErr.message}`);
     }
 
     return {

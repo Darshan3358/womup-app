@@ -66,8 +66,17 @@ export class Order {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true, index: true })
   userId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'Store', required: true, index: true })
+  @Prop({ type: Types.ObjectId, ref: 'Store', index: true })
   storeId: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, ref: 'Area', index: true })
+  areaId?: Types.ObjectId;
+
+  @Prop({ type: [{ type: Types.ObjectId, ref: 'Store' }], default: [] })
+  broadcastStoreIds?: Types.ObjectId[];
+
+  @Prop({ type: Date })
+  acceptedAt?: Date;
 
   @Prop({ type: Types.ObjectId, ref: 'DeliveryPartner' })
   deliveryPartnerId?: Types.ObjectId;

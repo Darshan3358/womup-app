@@ -709,10 +709,17 @@ export class OrdersService {
     const estimatedArrival = new Date(Date.now() + 9 * 60 * 1000); // 9 mins
     const deliveryOtp = Math.floor(1000 + Math.random() * 9000).toString();
 
+    const broadcastStoreIds = (eligibleStores || []).map((e) => e.store._id);
+    const resolvedAreaId = matchedArea
+      ? (Types.ObjectId.isValid(matchedArea._id.toString()) ? new Types.ObjectId(matchedArea._id.toString()) : matchedArea._id)
+      : undefined;
+
     const order = await this.orderModel.create({
       orderNumber,
       userId: uId,
       storeId: store._id,
+      areaId: resolvedAreaId,
+      broadcastStoreIds,
       status: OrderStatus.PLACED,
       deliveryOtp,
       items: orderItems,
@@ -781,25 +788,8 @@ export class OrdersService {
       description: `Earned 10% Shopping Coins reward on Order #${orderNumber}`,
     });
 
-    // 9. Automated Dispatch Engine: Assign to available online rider
-    try {
-      const onlinePartner = await this.partnerModel.findOne({ isOnline: true }).sort({ updatedAt: -1 });
-      if (onlinePartner) {
-        const payoutAmount = Math.max(35, Math.round((order.totalAmount || 50) * 0.15) + 25);
-        await this.assignmentModel.create({
-          orderId: order._id,
-          partnerId: onlinePartner._id,
-          status: RiderAssignmentStatus.OFFERED,
-          payoutAmount,
-          distanceKm: 2.1,
-          etaMinutes: 12,
-          assignedAt: new Date(),
-        });
-        this.logger.log(`[Dispatch] Auto-offered Order #${orderNumber} to rider ${onlinePartner.fullName} (${onlinePartner.partnerCode})`);
-      }
-    } catch (dispatchErr: any) {
-      this.logger.warn(`Failed to auto-dispatch order #${orderNumber}: ${dispatchErr.message}`);
-    }
+    // 9. Multi-Store FCFS Bidding: Rider dispatch is deferred until a dark store accepts the order.
+    this.logger.log(`[Order Broadcast] Broadcasted Order #${orderNumber} to ${broadcastStoreIds.length} candidate stores in ${matchedArea?.name || 'area'} for FCFS acceptance.`);
 
     // 9b. Real-Time Stock Management & Atomic Deduction
     if (order.items && order.items.length > 0) {

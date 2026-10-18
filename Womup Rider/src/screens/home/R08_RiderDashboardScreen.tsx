@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -72,17 +72,32 @@ export const RiderDashboardScreen: React.FC = () => {
   );
 
   const [refreshing, setRefreshing] = useState(false);
+  const [pendingSettlementRequest, setPendingSettlementRequest] = useState<any | null>(null);
+
+  const checkPendingSettlements = useCallback(async () => {
+    try {
+      const requests = await RiderApiService.getMySettlementRequests();
+      const pending = requests?.find((r: any) => r.status === 'PENDING') || null;
+      setPendingSettlementRequest(pending);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    checkPendingSettlements();
+  }, [checkPendingSettlements, settlementSummary]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await refreshDashboard();
+    await Promise.all([refreshDashboard(), checkPendingSettlements()]);
     setRefreshing(false);
   };
 
-    const netDueToAdmin = settlementSummary?.netBalance ?? settlementSummary?.riderOwesAdmin ?? 0;
-    const cashLimit = settlementSummary?.cashLimit ?? 500;
-    const isCashBlocked = Boolean(settlementSummary?.isOrderBlocked || netDueToAdmin >= cashLimit);
-    const isPendingApproval = Boolean(profile && profile.status !== 'APPROVED');
+  const netDueToAdmin = settlementSummary?.netBalance ?? settlementSummary?.riderOwesAdmin ?? 0;
+  const cashLimit = settlementSummary?.cashLimit ?? 500;
+  const isCashBlocked = Boolean(settlementSummary?.isOrderBlocked || netDueToAdmin >= cashLimit);
+  const isPendingApproval = Boolean(profile && profile.status !== 'APPROVED');
 
     return (
     <ScrollView
@@ -236,36 +251,77 @@ export const RiderDashboardScreen: React.FC = () => {
         </View>
       </View>
 
+      {/* 🟡 PAYMENT VERIFICATION PENDING BANNER (SRS Step 3) */}
+      {pendingSettlementRequest && (
+        <View style={styles.pendingVerifCard}>
+          <View style={styles.pendingVerifLeft}>
+            <View style={styles.pendingVerifIconCircle}>
+              <Ionicons name="time" size={20} color="#D97706" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.pendingVerifTitle}>Payment Verification Pending</Text>
+              <Text style={styles.pendingVerifSubtitle}>
+                ₹{pendingSettlementRequest.amount} (UTR: {pendingSettlementRequest.utrNumber}) submitted. Admin will verify and unlock your account.
+              </Text>
+            </View>
+          </View>
+          <View style={styles.pendingVerifBadge}>
+            <Text style={styles.pendingVerifBadgeText}>IN REVIEW</Text>
+          </View>
+        </View>
+      )}
+
       {/* 🔴 ONLINE RIDER SETTLEMENT ACTION BUTTON (When Net Due > 0) */}
       {netDueToAdmin > 0 && (
         <TouchableOpacity
           style={[
             styles.payAdminActionBtn,
             isCashBlocked && styles.payAdminActionBtnBlocked,
+            pendingSettlementRequest && { shadowColor: '#F59E0B' },
           ]}
           onPress={() => setShowPayAdminModal(true)}
           activeOpacity={0.88}
         >
           <LinearGradient
-            colors={isCashBlocked ? ['#DC2626', '#B91C1C'] : ['#EF4444', '#DC2626']}
+            colors={
+              pendingSettlementRequest
+                ? ['#F59E0B', '#D97706']
+                : isCashBlocked
+                ? ['#DC2626', '#B91C1C']
+                : ['#EF4444', '#DC2626']
+            }
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.payAdminGradient}
           >
             <View style={styles.payAdminLeft}>
-              <View style={styles.payAdminIconCircle}>
-                <Ionicons name="card-outline" size={20} color="#FFFFFF" />
+              <View style={[styles.payAdminIconCircle, pendingSettlementRequest && { backgroundColor: 'rgba(255,255,255,0.25)' }]}>
+                <Ionicons
+                  name={pendingSettlementRequest ? 'time-outline' : 'card-outline'}
+                  size={20}
+                  color="#FFFFFF"
+                />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.payAdminTitle}>Pay ₹{netDueToAdmin} to Admin</Text>
+                <Text style={styles.payAdminTitle}>
+                  {pendingSettlementRequest
+                    ? `Verification Pending (₹${pendingSettlementRequest.amount})`
+                    : `Pay ₹${netDueToAdmin} to Admin`}
+                </Text>
                 <Text style={styles.payAdminSubtitle}>
-                  {isCashBlocked ? 'Account Locked • Pay via UPI to Instant Unlock' : 'Settle Cash in Hand (COD) via UPI'}
+                  {pendingSettlementRequest
+                    ? `UTR: ${pendingSettlementRequest.utrNumber} • Waiting for Admin approval`
+                    : isCashBlocked
+                    ? 'Account Locked • Pay via UPI to Instant Unlock'
+                    : 'Settle Cash in Hand (COD) via UPI'}
                 </Text>
               </View>
             </View>
             <View style={styles.payAdminRight}>
-              <View style={styles.payAdminBadge}>
-                <Text style={styles.payAdminBadgeText}>PAY NOW</Text>
+              <View style={[styles.payAdminBadge, pendingSettlementRequest && { backgroundColor: 'rgba(255,255,255,0.25)' }]}>
+                <Text style={styles.payAdminBadgeText}>
+                  {pendingSettlementRequest ? 'IN REVIEW' : 'PAY NOW'}
+                </Text>
               </View>
               <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
             </View>
@@ -919,6 +975,7 @@ export const RiderDashboardScreen: React.FC = () => {
         dueAmount={netDueToAdmin}
         onPaymentSuccess={() => {
           refreshDashboard();
+          checkPendingSettlements();
         }}
       />
     </ScrollView>
@@ -930,6 +987,60 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
     padding: 16,
+  },
+  pendingVerifCard: {
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1.5,
+    borderColor: '#FCD34D',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  pendingVerifLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+    marginRight: 8,
+  },
+  pendingVerifIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pendingVerifTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#92400E',
+    marginBottom: 2,
+  },
+  pendingVerifSubtitle: {
+    fontSize: 11,
+    color: '#B45309',
+    lineHeight: 15,
+  },
+  pendingVerifBadge: {
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  pendingVerifBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
   payAdminActionBtn: {
     borderRadius: 16,

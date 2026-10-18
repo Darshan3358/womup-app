@@ -75,12 +75,12 @@ export const BankSettlementScreen: React.FC = () => {
   useEffect(() => {
     if (bankAccount) {
       setBankName(bankAccount.bankName || '');
-      const acc = bankAccount.accountNumberFull || '';
+      const acc = bankAccount.accountNumberFull || (bankAccount as any).accountNumber || '';
       setAccountNumber(acc);
       setConfirmAccount(acc);
-      setIfsc(bankAccount.ifscCode || '');
+      setIfsc(bankAccount.ifscCode || (bankAccount as any).ifsc || '');
       setHolderName(bankAccount.accountHolderName || '');
-      setUpi(bankAccount.upiId || '');
+      setUpi(bankAccount.upiId || (bankAccount as any).upi || '');
     }
   }, [bankAccount]);
 
@@ -279,12 +279,12 @@ export const BankSettlementScreen: React.FC = () => {
             onPress={() => {
               if (bankAccount) {
                 setBankName(bankAccount.bankName || '');
-                const acc = bankAccount.accountNumberFull || '';
+                const acc = bankAccount.accountNumberFull || (bankAccount as any).accountNumber || '';
                 setAccountNumber(acc);
                 setConfirmAccount(acc);
-                setIfsc(bankAccount.ifscCode || '');
+                setIfsc(bankAccount.ifscCode || (bankAccount as any).ifsc || '');
                 setHolderName(bankAccount.accountHolderName || '');
-                setUpi(bankAccount.upiId || '');
+                setUpi(bankAccount.upiId || (bankAccount as any).upi || '');
               }
               setIsEditing(true);
             }}

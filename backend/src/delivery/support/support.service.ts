@@ -73,9 +73,9 @@ export class SupportService {
       },
       {
         id: 'NOTIF-2',
-        title: 'Peak Hour Incentive Active',
-        message: 'Earn extra ₹20 per delivery during 7 PM - 10 PM rush hours!',
-        type: 'INCENTIVE',
+        title: 'On-Time Performance',
+        message: 'Great job maintaining your high on-time delivery track record today!',
+        type: 'PERFORMANCE',
         createdAt: new Date(Date.now() - 3600000).toISOString(),
       },
     ];

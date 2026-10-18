@@ -23,6 +23,11 @@ class VerifyDeliveryDto {
   otp: string;
 }
 
+class CollectCashDto {
+  @IsOptional()
+  amount?: number;
+}
+
 @ApiTags('Delivery Partner Order Lifecycle')
 @Controller('api/v1/delivery')
 @UseGuards(JwtAuthGuard)
@@ -88,6 +93,16 @@ export class DeliveryOrderController {
   @ApiOperation({ summary: 'Mark arrival at customer delivery location' })
   async arrivedCustomer(@CurrentUser() user: any, @Param('id') id: string) {
     return this.orderService.arrivedAtCustomer(user.id, id);
+  }
+
+  @Post('orders/:id/collect-cash')
+  @ApiOperation({ summary: 'Rider confirms physical cash collected for COD delivery' })
+  async collectCash(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Body() body: CollectCashDto,
+  ) {
+    return this.orderService.collectCash(user.id, id, body?.amount);
   }
 
   @Post('orders/:id/verify-delivery')

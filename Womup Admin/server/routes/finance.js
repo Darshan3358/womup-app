@@ -545,9 +545,9 @@ router.get('/wallets/riders/:id/ledger', async (req, res) => {
 
     const formatted = settlements.map(s => {
       const isCod = s.paymentMode === 'COD';
-      const orderTotal = s.totalAmount || (s.basePay + s.incentive + s.tip);
-      const riderEarn = s.riderEarning || s.total || (s.basePay + s.incentive + s.tip);
-      const adminShare = s.adminShare ?? (isCod ? Math.max(0, orderTotal - riderEarn) : 0);
+      const orderTotal = s.totalAmount || (s.basePay + (s.tip || 0));
+      const riderEarn = s.riderEarning || s.total || (s.basePay + (s.tip || 0));
+      const adminShare = s.adminShare ?? Math.max(0, orderTotal - riderEarn);
 
       return {
         id: s._id.toString(),

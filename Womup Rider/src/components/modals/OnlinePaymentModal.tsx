@@ -126,21 +126,33 @@ export const OnlinePaymentModal: React.FC<OnlinePaymentModalProps> = ({
     try {
       const res = await RiderApiService.submitSettlementProof(amountToPay, cleanUtr);
       if (res.success) {
-        Alert.alert(
-          'Proof Submitted Successfully! ✅',
-          `Your payment of ₹${amountToPay} with UTR: ${cleanUtr} has been sent to Admin for verification. Your account will automatically unlock once approved.`,
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                if (onPaymentSuccess) onPaymentSuccess();
-                onClose();
+        if (Platform.OS === 'web') {
+          window.alert(
+            `Proof Submitted Successfully! ✅\n\nYour payment of ₹${amountToPay} with UTR: ${cleanUtr} has been sent to Admin for verification. Your account will automatically unlock once approved.`
+          );
+          if (onPaymentSuccess) onPaymentSuccess();
+          onClose();
+        } else {
+          Alert.alert(
+            'Proof Submitted Successfully! ✅',
+            `Your payment of ₹${amountToPay} with UTR: ${cleanUtr} has been sent to Admin for verification. Your account will automatically unlock once approved.`,
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  if (onPaymentSuccess) onPaymentSuccess();
+                  onClose();
+                },
               },
-            },
-          ]
-        );
+            ]
+          );
+        }
       } else {
-        Alert.alert('Submission Failed', res.message);
+        if (Platform.OS === 'web') {
+          window.alert(`Submission Failed: ${res.message}`);
+        } else {
+          Alert.alert('Submission Failed', res.message);
+        }
       }
     } catch (err: any) {
       Alert.alert('Error', err?.message || 'Something went wrong while submitting proof.');
