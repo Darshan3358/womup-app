@@ -208,6 +208,21 @@ export class Order {
     stars: number;
     reviewedAt?: Date;
   };
+
+  @Prop({ default: 0 })
+  riderEarning?: number;
+
+  @Prop({ default: 0 })
+  platformShare?: number;
+
+  @Prop({ default: false })
+  cashCollected?: boolean;
+
+  @Prop({ type: Date })
+  cashCollectedAt?: Date;
+
+  @Prop({ default: 'PENDING', enum: ['PENDING', 'SETTLED'] })
+  settlementStatus?: string;
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);

@@ -268,7 +268,14 @@ export class DeliveryOrderService implements OnModuleInit {
 
   async getAvailableOrdersList(userId: string): Promise<any[]> {
     const partner = await this.getPartner(userId);
-    if (!partner.isOnline) {
+    if (!partner.isOnline || partner.status !== 'APPROVED') {
+      return [];
+    }
+
+    // ── ₹500 CASH LIMIT: Block new available orders if limit exceeded ──
+    const cashLimit = partner.outstandingCashLimit || 500;
+    const netCashOwed = Math.max(0, (partner.totalCodCollected || 0) - (partner.totalEarnings || 0));
+    if (partner.isOrderBlocked || netCashOwed >= cashLimit) {
       return [];
     }
 
@@ -488,6 +495,21 @@ export class DeliveryOrderService implements OnModuleInit {
 
   async acceptOrder(userId: string, assignmentOrOrderId: string) {
     const partner = await this.getPartner(userId);
+
+    // ── ADMIN APPROVAL CHECK ──
+    if (partner.status !== 'APPROVED' || !partner.isActive) {
+      throw new BadRequestException('Account Pending Approval: You cannot accept orders until your account is approved by Admin.');
+    }
+
+    // ── ₹500 CASH LIMIT RULE CHECK ──
+    const cashLimit = partner.outstandingCashLimit || 500;
+    const netCashOwed = Math.max(0, (partner.totalCodCollected || 0) - (partner.totalEarnings || 0));
+    if (partner.isOrderBlocked || netCashOwed >= cashLimit) {
+      throw new BadRequestException(
+        `Order Acceptance Locked: You have reached the maximum cash limit of ₹${cashLimit}. Current pending cash to deposit: ₹${netCashOwed}. Please settle your dues with the admin to continue accepting orders.`
+      );
+    }
+
     const assignment = await this.findAssignment(partner._id, assignmentOrOrderId);
 
     assignment.status = RiderAssignmentStatus.GOING_TO_STORE;
@@ -907,52 +929,72 @@ export class DeliveryOrderService implements OnModuleInit {
         }
       }
 
-      // ── SPLIT 2: RIDER WALLET ──
-      // Delivery fee (e.g. ₹15) + Customer tip (100% to rider) + bonuses
+      // ── NEW FINANCIAL ARCHITECTURE: ORDER LEDGER & NET SETTLEMENT (NO AUTO-SPLIT) ──
+      const paymentMethod = (order?.paymentMethod || 'ONLINE').toUpperCase();
+      const isCod = paymentMethod === 'COD';
+      const orderTotal = Math.round(Number(order?.totalAmount) || 100);
+
       const basePay = assignment.payoutAmount ?? ((order as any)?.deliveryFee || 15);
       const incentive = 15;
       const tip = typeof (order as any)?.tip === 'number' ? (order as any).tip : 0;
-      const total = basePay + incentive + tip;
+      const riderEarning = basePay + incentive + tip; // Total earned by rider for this delivery
+      const total = riderEarning;
+      const adminShare = isCod ? Math.max(0, orderTotal - riderEarning) : 0;
 
-      // Update rider settlement record
+      // Update Order document with Authoritative Ledger Snapshot
+      if (order) {
+        order.riderEarning = riderEarning;
+        order.platformShare = isCod ? adminShare : orderTotal;
+        order.settlementStatus = 'PENDING';
+        if (isCod) {
+          order.cashCollected = true;
+          order.cashCollectedAt = new Date();
+        }
+        await order.save({ session });
+      }
+
+      // Update Delivery Partner's Khata (Ledger)
+      if (isCod) {
+        partner.totalCodCollected = (partner.totalCodCollected || 0) + orderTotal;
+      } else {
+        partner.totalOnlineEarnings = (partner.totalOnlineEarnings || 0) + riderEarning;
+      }
+      partner.totalEarnings = (partner.totalEarnings || 0) + riderEarning;
+
+      // Net Hisaab: total COD collected minus total Rider Earnings
+      const netCashOwed = Math.max(0, (partner.totalCodCollected || 0) - (partner.totalEarnings || 0));
+      partner.currentOutstandingCash = netCashOwed;
+
+      // ₹500 Limit Check:
+      const cashLimit = partner.outstandingCashLimit || 500;
+      if (netCashOwed >= cashLimit) {
+        partner.isOrderBlocked = true;
+      }
+      await partner.save({ session });
+
+      // Create detailed order ledger entry in rider_settlements
       await this.settlementModel.create(
         [
           {
             riderId: partner._id,
             orderId: assignment.orderId,
             orderNumber,
+            paymentMode: isCod ? 'COD' : 'ONLINE',
+            totalAmount: orderTotal,
+            riderEarning,
+            adminShare,
+            cashCollected: isCod ? orderTotal : 0,
             basePay,
             incentive,
             tip,
-            total,
-            status: 'SETTLED',
+            total: riderEarning,
+            netImpact: isCod ? -adminShare : riderEarning,
+            status: 'PENDING',
             period: 'TODAY',
             settledAt: new Date(),
           },
         ],
         { session },
-      );
-
-      // Credit rider wallet collection & partner document
-      await this.connection.collection('rider_wallets').updateOne(
-        { riderId: partner._id },
-        {
-          $inc: {
-            balance: total,
-            lifetimeEarnings: total,
-            todayEarnings: total,
-          },
-          $setOnInsert: {
-            partnerCode: partner.partnerCode || 'WUP-RIDER',
-            fullName: partner.fullName,
-            phoneNumber: partner.phoneNumber,
-            settlementCycle: 'DAILY',
-            isActive: true,
-            createdAt: new Date(),
-          },
-          $set: { updatedAt: new Date() },
-        },
-        { upsert: true, session },
       );
 
       await this.connection.collection('wallet_transactions').insertOne(
@@ -1431,6 +1473,12 @@ export class DeliveryOrderService implements OnModuleInit {
       // Security: never leak OTP to rider; only indicate requirement
       deliveryOtpRequired: true,
       bagBarcode: resolvedBagBarcode,
+      isCod: paymentMethod === 'COD',
+      cashToCollect: paymentMethod === 'COD' ? totalAmount : 0,
+      riderEarning: assignment.payoutAmount ?? 40,
+      isOrderBlocked: Boolean(partner.isOrderBlocked || (Math.max(0, (partner.totalCodCollected || 0) - (partner.totalEarnings || 0)) >= (partner.outstandingCashLimit || 500))),
+      currentOutstandingCash: Math.max(0, (partner.totalCodCollected || 0) - (partner.totalEarnings || 0)),
+      outstandingCashLimit: partner.outstandingCashLimit || 500,
     };
   }
 }

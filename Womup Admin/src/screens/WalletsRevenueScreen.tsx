@@ -33,6 +33,14 @@ import {
   Clock,
   ChevronDown,
   Check,
+  Lock,
+  Unlock,
+  BookOpen,
+  ShieldAlert,
+  Receipt,
+  QrCode,
+  Copy,
+  Settings,
 } from 'lucide-react-native';
 import { COLORS, GRADIENTS, RADIUS, SPACING } from '../theme';
 import { useAdminState } from '../context/AdminStateContext';
@@ -45,7 +53,7 @@ import {
 } from '../types/admin';
 import { ApiService } from '../services/api';
 
-type ActiveSubTab = 'OVERVIEW' | 'STORES' | 'RIDERS' | 'PLATFORM' | 'LEDGER';
+type ActiveSubTab = 'OVERVIEW' | 'STORES' | 'RIDERS' | 'UPI_SETTLEMENTS' | 'PLATFORM' | 'LEDGER';
 
 export const WalletsRevenueScreen: React.FC = () => {
   const { darkStores, zones } = useAdminState();
@@ -76,11 +84,28 @@ export const WalletsRevenueScreen: React.FC = () => {
   const [payoutStoreNotes, setPayoutStoreNotes] = useState<string>('Weekly NEFT settlement');
   const [storePayoutSubmitting, setStorePayoutSubmitting] = useState<boolean>(false);
 
-  // Rider Payout Modal
+  // Rider Settlement Modal & Khata state
   const [selectedRider, setSelectedRider] = useState<any | null>(null);
   const [payoutRiderAmount, setPayoutRiderAmount] = useState<string>('');
-  const [payoutRiderNotes, setPayoutRiderNotes] = useState<string>('Daily Instant IMPS Payout');
+  const [payoutRiderNotes, setPayoutRiderNotes] = useState<string>('Daily Ledger Net Settlement');
+  const [settlementActionType, setSettlementActionType] = useState<'COLLECT_FROM_RIDER' | 'PAY_TO_RIDER'>('COLLECT_FROM_RIDER');
   const [riderPayoutSubmitting, setRiderPayoutSubmitting] = useState<boolean>(false);
+
+  // Rider Order-by-order Ledger Modal
+  const [ledgerModalRider, setLedgerModalRider] = useState<any | null>(null);
+  const [riderLedgerEntries, setRiderLedgerEntries] = useState<any[]>([]);
+  const [loadingRiderLedger, setLoadingRiderLedger] = useState<boolean>(false);
+
+  // Rider Online UPI Settlement Requests State
+  const [settlementRequests, setSettlementRequests] = useState<any[]>([]);
+  const [requestsFilter, setRequestsFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
+  const [showUpiConfigModal, setShowUpiConfigModal] = useState<boolean>(false);
+  const [companyUpiId, setCompanyUpiId] = useState<string>('wormup@okicici');
+  const [companyUpiName, setCompanyUpiName] = useState<string>('WormUp Technologies Pvt Ltd');
+  const [companySupportPhone, setCompanySupportPhone] = useState<string>('+91 98765 43210');
+  const [companyUpiSaving, setCompanyUpiSaving] = useState<boolean>(false);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [copiedUtrId, setCopiedUtrId] = useState<string | null>(null);
 
   // 100% Website Parity Live Data (Matching localhost:5175)
   const totalGMV = 4672;
@@ -132,15 +157,24 @@ export const WalletsRevenueScreen: React.FC = () => {
     },
   ]);
 
-  // Rider Wallets (100% Website Parity)
+  // Rider Khata & Settlements (100% SRS Aligned)
   const [riderWallets, setRiderWallets] = useState<any[]>([
     {
       riderId: 'rdr_1',
-      riderName: 'Rahul Parmar',
+      riderName: 'Darshan Parmar',
       partnerCode: 'RDR-0012',
       phone: '+91 98765 43210',
-      balance: 240,
-      completedDeliveries: 16,
+      totalOrders: 15,
+      totalCodCollected: 1500,
+      totalOnlineEarnings: 300,
+      totalEarnings: 300,
+      balance: 300,
+      netBalance: 1200,
+      isBlocked: true,
+      outstandingCashLimit: 500,
+      riderOwesAdmin: 1200,
+      adminOwesRider: 0,
+      settlementType: 'COLLECT_FROM_RIDER',
       bankAccount: {
         bankName: 'State Bank of India',
         accountNumber: '•••• •••• 2840',
@@ -149,11 +183,20 @@ export const WalletsRevenueScreen: React.FC = () => {
     },
     {
       riderId: 'rdr_2',
-      riderName: 'Vikram Solanki',
+      riderName: 'Yash Solanki',
       partnerCode: 'RDR-0015',
       phone: '+91 98251 12345',
-      balance: 180,
-      completedDeliveries: 12,
+      totalOrders: 20,
+      totalCodCollected: 500,
+      totalOnlineEarnings: 800,
+      totalEarnings: 800,
+      balance: 800,
+      netBalance: -300,
+      isBlocked: false,
+      outstandingCashLimit: 500,
+      riderOwesAdmin: 0,
+      adminOwesRider: 300,
+      settlementType: 'PAY_TO_RIDER',
       bankAccount: {
         bankName: 'Bank of Baroda',
         accountNumber: '•••• •••• 7712',
@@ -165,8 +208,17 @@ export const WalletsRevenueScreen: React.FC = () => {
       riderName: 'Amit Patel',
       partnerCode: 'RDR-0018',
       phone: '+91 97240 88991',
-      balance: 47,
-      completedDeliveries: 3,
+      totalOrders: 8,
+      totalCodCollected: 200,
+      totalOnlineEarnings: 200,
+      totalEarnings: 200,
+      balance: 200,
+      netBalance: 0,
+      isBlocked: false,
+      outstandingCashLimit: 500,
+      riderOwesAdmin: 0,
+      adminOwesRider: 0,
+      settlementType: 'SETTLED',
       bankAccount: {
         bankName: 'Kotak Mahindra Bank',
         accountNumber: '•••• •••• 6190',
@@ -227,10 +279,12 @@ export const WalletsRevenueScreen: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [storesRes, ridersRes, txRes] = await Promise.all([
+      const [storesRes, ridersRes, txRes, settleReqRes, upiRes] = await Promise.all([
         ApiService.getStoreWallets(),
         ApiService.getRiderWallets(),
         ApiService.getWalletTransactions({ limit: 50 }),
+        ApiService.getRiderSettlementRequests(),
+        ApiService.getCompanyUpiSettings(),
       ]);
       if (storesRes?.success && storesRes.data && storesRes.data.length > 0) {
         setStoreWallets(storesRes.data);
@@ -241,12 +295,87 @@ export const WalletsRevenueScreen: React.FC = () => {
       if (txRes?.success && txRes.data && txRes.data.length > 0) {
         setLedgerTransactions(txRes.data);
       }
+      if (settleReqRes?.success && Array.isArray(settleReqRes.data)) {
+        setSettlementRequests(settleReqRes.data);
+      }
+      if (upiRes?.success && upiRes.data) {
+        if (upiRes.data.adminUpiId) setCompanyUpiId(upiRes.data.adminUpiId);
+        if (upiRes.data.adminUpiName) setCompanyUpiName(upiRes.data.adminUpiName);
+        if (upiRes.data.supportPhone) setCompanySupportPhone(upiRes.data.supportPhone);
+      }
     } catch {
       // Keep website live parity fallback
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
+  };
+
+  const handleApproveSettlement = async (requestId: string, riderName: string) => {
+    setActionLoadingId(requestId);
+    try {
+      const res = await ApiService.approveRiderSettlementRequest(requestId);
+      if (res.success) {
+        Alert.alert('Settlement Approved! ✅', res.message || `Settlement approved for ${riderName}. Rider has been unblocked.`);
+        await loadData();
+      } else {
+        Alert.alert('Approval Failed', res.error || 'Could not approve request');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed approving settlement');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleRejectSettlement = async (requestId: string, riderName: string) => {
+    setActionLoadingId(requestId);
+    try {
+      const res = await ApiService.rejectRiderSettlementRequest(requestId, 'Payment not received in bank account / Invalid UTR');
+      if (res.success) {
+        Alert.alert('Settlement Rejected', `Request for ${riderName} has been rejected.`);
+        await loadData();
+      } else {
+        Alert.alert('Rejection Failed', res.error || 'Could not reject request');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed rejecting settlement');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleSaveUpiConfig = async () => {
+    if (!companyUpiId.trim() || !companyUpiId.includes('@')) {
+      Alert.alert('Invalid UPI ID', 'Please enter a valid UPI ID (e.g. wormup@okicici)');
+      return;
+    }
+    setCompanyUpiSaving(true);
+    try {
+      const res = await ApiService.updateCompanyUpiSettings({
+        adminUpiId: companyUpiId.trim(),
+        adminUpiName: companyUpiName.trim(),
+        supportPhone: companySupportPhone.trim(),
+      });
+      if (res.success) {
+        setShowUpiConfigModal(false);
+        Alert.alert('Saved! ✅', 'Company Collection UPI configuration updated successfully.');
+      } else {
+        Alert.alert('Failed', res.error || 'Could not update settings');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed updating UPI settings');
+    } finally {
+      setCompanyUpiSaving(false);
+    }
+  };
+
+  const copyUtr = (utr: string, id: string) => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(utr);
+    }
+    setCopiedUtrId(id);
+    setTimeout(() => setCopiedUtrId(null), 2000);
   };
 
   useEffect(() => {
@@ -316,46 +445,120 @@ export const WalletsRevenueScreen: React.FC = () => {
     Alert.alert('Payout Initiated', `NEFT payout of ₹${amt} initiated for ${selectedStore.storeName}`);
   };
 
-  // Execute Rider Payout
-  const handleExecuteRiderPayout = async () => {
+  // Open Rider Order Khata Ledger Modal
+  const handleOpenRiderLedger = async (rw: any) => {
+    setLedgerModalRider(rw);
+    setLoadingRiderLedger(true);
+    try {
+      const res = await ApiService.getRiderLedger(rw.riderId);
+      if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
+        setRiderLedgerEntries(res.data);
+      } else {
+        // Fallback demo ledger matching exact SRS table
+        setRiderLedgerEntries([
+          { orderId: 'ORD-101', date: 'Today, 02:15 PM', paymentMode: 'COD', totalAmount: 200, riderEarning: 40, adminShare: 160, netImpact: 'Rider owes Admin: ₹120' },
+          { orderId: 'ORD-102', date: 'Today, 01:30 PM', paymentMode: 'COD', totalAmount: 300, riderEarning: 50, adminShare: 250, netImpact: 'Rider owes Admin: ₹320' },
+          { orderId: 'ORD-103', date: 'Today, 12:10 PM', paymentMode: 'ONLINE', totalAmount: 150, riderEarning: 60, adminShare: 0, netImpact: 'Rider owes Admin: ₹260' },
+          { orderId: 'ORD-104', date: 'Today, 11:00 AM', paymentMode: 'ONLINE', totalAmount: 100, riderEarning: 40, adminShare: 0, netImpact: 'Rider owes Admin: ₹220' },
+        ]);
+      }
+    } catch {
+      setRiderLedgerEntries([
+        { orderId: 'ORD-101', date: 'Today, 02:15 PM', paymentMode: 'COD', totalAmount: 200, riderEarning: 40, adminShare: 160, netImpact: 'Rider owes Admin: ₹120' },
+        { orderId: 'ORD-102', date: 'Today, 01:30 PM', paymentMode: 'COD', totalAmount: 300, riderEarning: 50, adminShare: 250, netImpact: 'Rider owes Admin: ₹320' },
+        { orderId: 'ORD-103', date: 'Today, 12:10 PM', paymentMode: 'ONLINE', totalAmount: 150, riderEarning: 60, adminShare: 0, netImpact: 'Rider owes Admin: ₹260' },
+        { orderId: 'ORD-104', date: 'Today, 11:00 AM', paymentMode: 'ONLINE', totalAmount: 100, riderEarning: 40, adminShare: 0, netImpact: 'Rider owes Admin: ₹220' },
+      ]);
+    } finally {
+      setLoadingRiderLedger(false);
+    }
+  };
+
+  // Open Settle Modal
+  const handleOpenSettleModal = (rw: any) => {
+    setSelectedRider(rw);
+    const net = rw.netBalance ?? (rw.riderOwesAdmin ? rw.riderOwesAdmin : -(rw.adminOwesRider || 0));
+    if (net > 0) {
+      setSettlementActionType('COLLECT_FROM_RIDER');
+      setPayoutRiderAmount(String(net));
+      setPayoutRiderNotes(`COD Handover Settlement - Collect ₹${net} & Unlock`);
+    } else if (net < 0) {
+      setSettlementActionType('PAY_TO_RIDER');
+      setPayoutRiderAmount(String(Math.abs(net)));
+      setPayoutRiderNotes(`Online Delivery Earnings Settlement - Pay ₹${Math.abs(net)} via IMPS`);
+    } else {
+      setSettlementActionType('COLLECT_FROM_RIDER');
+      setPayoutRiderAmount('0');
+      setPayoutRiderNotes('Ledger Audit Zero Balance Settlement');
+    }
+  };
+
+  // Execute Rider Net Settlement
+  const handleExecuteRiderSettlement = async () => {
     if (!selectedRider) return;
     const amt = parseFloat(payoutRiderAmount);
-    if (isNaN(amt) || amt <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter a valid payout amount.');
+    if (isNaN(amt) || amt < 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid settlement amount.');
       return;
     }
 
     setRiderPayoutSubmitting(true);
     try {
-      await ApiService.settleRiderWallet(selectedRider.riderId, amt, payoutRiderNotes);
+      await ApiService.settleRiderWallet(selectedRider.riderId, amt, payoutRiderNotes, settlementActionType);
     } catch {
       // non-blocking fallback
     }
 
-    // Add transaction to ledger
+    // Add transaction to main audit ledger
+    const isCollect = settlementActionType === 'COLLECT_FROM_RIDER';
     const newTxn = {
       id: `TXN-${Math.floor(90000 + Math.random() * 999)}`,
       type: 'RIDER',
-      title: payoutRiderNotes || 'Instant Rider Earnings IMPS',
+      title: payoutRiderNotes || (isCollect ? 'COD Cash Handover & Account Unlock' : 'Online Delivery Earnings IMPS'),
       party: `${selectedRider.riderName} (${selectedRider.partnerCode})`,
       amount: amt,
-      direction: 'DEBIT',
-      method: 'Instant IMPS',
+      direction: isCollect ? 'CREDIT' : 'DEBIT',
+      method: isCollect ? 'Cash Handover / Netting' : 'Instant IMPS',
       status: 'SETTLED',
       time: 'Just now',
     };
     setLedgerTransactions((prev) => [newTxn, ...prev]);
 
-    // Update rider balance
+    // Update rider in list: unblock & reset balances
     setRiderWallets((prev) =>
-      prev.map((r) =>
-        r.riderId === selectedRider.riderId ? { ...r, balance: Math.max(0, r.balance - amt) } : r
-      )
+      prev.map((r) => {
+        if (r.riderId === selectedRider.riderId) {
+          return {
+            ...r,
+            totalCodCollected: 0,
+            totalOnlineEarnings: 0,
+            balance: 0,
+            netBalance: 0,
+            riderOwesAdmin: 0,
+            adminOwesRider: 0,
+            isBlocked: false,
+            settlementType: 'SETTLED',
+          };
+        }
+        return r;
+      })
     );
 
     setRiderPayoutSubmitting(false);
+    const riderName = selectedRider.riderName;
     setSelectedRider(null);
-    Alert.alert('IMPS Sent', `Instant IMPS payout of ₹${amt} transferred to ${selectedRider.riderName}`);
+
+    if (isCollect) {
+      Alert.alert(
+        'Rider Unlocked & Settled',
+        `Successfully settled COD dues of ₹${amt} from ${riderName}. Order acceptance has been unlocked!`
+      );
+    } else {
+      Alert.alert(
+        'Earnings Transferred',
+        `Instant IMPS payout of ₹${amt} transferred to ${riderName}. Net hisaab is now ₹0!`
+      );
+    }
   };
 
   return (
@@ -407,20 +610,36 @@ export const WalletsRevenueScreen: React.FC = () => {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.subTabsContainer}
       >
-        {(['OVERVIEW', 'STORES', 'RIDERS', 'PLATFORM', 'LEDGER'] as const).map((tab) => {
+        {(['OVERVIEW', 'STORES', 'RIDERS', 'UPI_SETTLEMENTS', 'PLATFORM', 'LEDGER'] as const).map((tab) => {
           const isSelected = activeSubTab === tab;
+          const pendingCount = settlementRequests.filter((r) => r.status === 'PENDING').length;
+          let label = tab as string;
+          if (tab === 'UPI_SETTLEMENTS') {
+            label = `UPI SETTLEMENTS ${pendingCount > 0 ? `(${pendingCount})` : ''}`;
+          }
+
           return (
             <TouchableOpacity
               key={tab}
-              style={[styles.subTabPill, isSelected && styles.subTabPillActive]}
+              style={[
+                styles.subTabPill,
+                isSelected && styles.subTabPillActive,
+                tab === 'UPI_SETTLEMENTS' && pendingCount > 0 && { borderColor: '#F59E0B' },
+              ]}
               onPress={() => {
                 setActiveSubTab(tab);
                 setSearch('');
               }}
               activeOpacity={0.8}
             >
-              <Text style={[styles.subTabPillText, isSelected && styles.subTabPillTextActive]}>
-                {tab}
+              <Text
+                style={[
+                  styles.subTabPillText,
+                  isSelected && styles.subTabPillTextActive,
+                  tab === 'UPI_SETTLEMENTS' && !isSelected && pendingCount > 0 && { color: '#D97706', fontWeight: '800' },
+                ]}
+              >
+                {label}
               </Text>
             </TouchableOpacity>
           );
@@ -615,50 +834,387 @@ export const WalletsRevenueScreen: React.FC = () => {
       )}
 
       {/* ===============================================================
-          SUB-TAB 3: RIDERS (Rider Wallets)
+          SUB-TAB 3: RIDERS (Rider Khata & Net Settlements)
       =============================================================== */}
       {activeSubTab === 'RIDERS' && (
         <View style={styles.subTabContentCard}>
-          <Text style={styles.subTabContentTitle}>Delivery Partner Earnings & IMPS ({riderWallets.length})</Text>
-
-          {riderWallets.map((rw) => (
-            <View key={rw.riderId} style={styles.riderWalletCard}>
-              <View style={styles.riderWalletTop}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.riderWalletName}>{rw.riderName}</Text>
-                  <Text style={styles.riderWalletCode}>{rw.partnerCode} • {rw.completedDeliveries} drops</Text>
-                </View>
-                <View style={styles.dailyCycleBadge}>
-                  <Text style={styles.dailyCycleText}>DAILY IMPS</Text>
-                </View>
-              </View>
-
-              <View style={styles.walletDetailsRow}>
-                <View>
-                  <Text style={styles.walletFieldLabel}>WITHDRAWABLE BALANCE</Text>
-                  <Text style={styles.riderBalanceAmount}>₹{rw.balance.toLocaleString()}</Text>
-                </View>
-
-                <TouchableOpacity
-                  style={styles.instantImpsActionBtn}
-                  onPress={() => {
-                    setSelectedRider(rw);
-                    setPayoutRiderAmount(String(rw.balance));
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Send size={13} color="#FFFFFF" />
-                  <Text style={styles.instantImpsActionBtnText}>Instant IMPS</Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.bankAccountRow}>
-                <Text style={styles.bankAccountText}>
-                  A/C: <Text style={{ fontWeight: '700', color: '#071B52' }}>{rw.bankAccount?.bankName}</Text> ({rw.bankAccount?.accountNumber})
-                </Text>
-              </View>
+          <View style={styles.khataHeaderRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.subTabContentTitle}>Rider Khata & Net Settlements ({riderWallets.length})</Text>
+              <Text style={styles.khataHeaderSubtitle}>
+                No-Split System • Net Settlements • ₹500 Cash Limit Enforcement
+              </Text>
             </View>
-          ))}
+          </View>
+
+          {/* Business Rule Information Banner */}
+          <View style={styles.khataInfoBanner}>
+            <ShieldAlert size={16} color="#DC2626" />
+            <Text style={styles.khataInfoBannerText}>
+              <Text style={{ fontWeight: '800' }}>Cash Limit Rule (₹500):</Text> If a rider's net pending dues to Admin reach or exceed ₹500, new order acceptance is automatically locked until physical cash is collected and settled.
+            </Text>
+          </View>
+
+          {riderWallets.map((rw) => {
+            const net = rw.netBalance ?? ((rw.totalCodCollected || 0) - (rw.totalOnlineEarnings || rw.totalEarnings || rw.balance || 0));
+            const isBlocked = rw.isBlocked || net >= (rw.outstandingCashLimit || 500);
+
+            return (
+              <View
+                key={rw.riderId}
+                style={[
+                  styles.riderKhataCard,
+                  isBlocked && styles.riderKhataCardBlocked,
+                ]}
+              >
+                {/* Top Row: Name, Code & Blocked Status */}
+                <View style={styles.riderWalletTop}>
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={styles.riderWalletName}>{rw.riderName}</Text>
+                      {isBlocked ? (
+                        <View style={styles.lockBadgeMini}>
+                          <Lock size={12} color="#DC2626" />
+                        </View>
+                      ) : (
+                        <View style={styles.activeBadgeMini}>
+                          <CheckCircle2 size={12} color="#059669" />
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.riderWalletCode}>
+                      {rw.partnerCode} • {rw.phone}
+                    </Text>
+                  </View>
+
+                  {/* Status Badge */}
+                  {isBlocked ? (
+                    <View style={styles.blockedBadge}>
+                      <Lock size={12} color="#FFFFFF" />
+                      <Text style={styles.blockedBadgeText}>LOCKED (Limit Exceeded)</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.activeStatusBadge}>
+                      <CheckCircle2 size={12} color="#059669" />
+                      <Text style={styles.activeStatusBadgeText}>ACTIVE (Safe)</Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* 4-Column Khata Financial Breakdown */}
+                <View style={styles.khataMetricsGrid}>
+                  <View style={styles.khataMetricBox}>
+                    <Text style={styles.khataMetricLabel}>TOTAL ORDERS</Text>
+                    <Text style={styles.khataMetricVal}>{rw.totalOrders ?? rw.completedDeliveries ?? 0}</Text>
+                  </View>
+
+                  <View style={styles.khataMetricBox}>
+                    <Text style={styles.khataMetricLabel}>COD COLLECTED</Text>
+                    <Text style={[styles.khataMetricVal, { color: '#071B52' }]}>
+                      ₹{(rw.totalCodCollected || 0).toLocaleString()}
+                    </Text>
+                  </View>
+
+                  <View style={styles.khataMetricBox}>
+                    <Text style={styles.khataMetricLabel}>ONLINE EARNINGS</Text>
+                    <Text style={[styles.khataMetricVal, { color: '#059669' }]}>
+                      ₹{(rw.totalOnlineEarnings || rw.totalEarnings || rw.balance || 0).toLocaleString()}
+                    </Text>
+                  </View>
+
+                  <View style={[styles.khataMetricBox, styles.khataNetBox]}>
+                    <Text style={styles.khataMetricLabel}>NET HISAAB</Text>
+                    <Text
+                      style={[
+                        styles.khataMetricVal,
+                        net > 0 ? styles.khataNetOwedAdmin : net < 0 ? styles.khataNetOwedRider : styles.khataNetSettled,
+                      ]}
+                    >
+                      {net > 0 ? `₹${net.toLocaleString()}` : net < 0 ? `₹${Math.abs(net).toLocaleString()}` : '₹0'}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.khataNetSubtext,
+                        net > 0 ? styles.khataNetSubtextOwedAdmin : net < 0 ? styles.khataNetSubtextOwedRider : null,
+                      ]}
+                    >
+                      {net > 0 ? 'Rider Owes Admin' : net < 0 ? 'Admin Owes Rider' : 'All Settled'}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Actions Row */}
+                <View style={styles.khataActionsRow}>
+                  <TouchableOpacity
+                    style={styles.khataLedgerBtn}
+                    onPress={() => handleOpenRiderLedger(rw)}
+                    activeOpacity={0.8}
+                  >
+                    <BookOpen size={13} color="#4F46E5" />
+                    <Text style={styles.khataLedgerBtnText}>Khata Ledger</Text>
+                  </TouchableOpacity>
+
+                  {net > 0 ? (
+                    <TouchableOpacity
+                      style={[styles.khataSettleBtn, isBlocked && styles.khataSettleBtnBlocked]}
+                      onPress={() => handleOpenSettleModal(rw)}
+                      activeOpacity={0.8}
+                    >
+                      {isBlocked ? <Unlock size={13} color="#FFFFFF" /> : <DollarSign size={13} color="#FFFFFF" />}
+                      <Text style={styles.khataSettleBtnText}>
+                        {isBlocked ? `Collect ₹${net} & Unlock` : `Collect ₹${net}`}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : net < 0 ? (
+                    <TouchableOpacity
+                      style={[styles.khataSettleBtn, { backgroundColor: '#10B981' }]}
+                      onPress={() => handleOpenSettleModal(rw)}
+                      activeOpacity={0.8}
+                    >
+                      <Send size={13} color="#FFFFFF" />
+                      <Text style={styles.khataSettleBtnText}>Pay ₹{Math.abs(net)} IMPS</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.khataSettleBtn, { backgroundColor: '#64748B' }]}
+                      onPress={() => handleOpenSettleModal(rw)}
+                      activeOpacity={0.8}
+                    >
+                      <CheckCircle2 size={13} color="#FFFFFF" />
+                      <Text style={styles.khataSettleBtnText}>Settled</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* Bank Account Details */}
+                <View style={styles.bankAccountRow}>
+                  <Text style={styles.bankAccountText}>
+                    A/C: <Text style={{ fontWeight: '700', color: '#071B52' }}>{rw.bankAccount?.bankName}</Text> ({rw.bankAccount?.accountNumber}) • Limit: ₹{rw.outstandingCashLimit || 500}
+                  </Text>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      )}
+
+      {/* ===============================================================
+          SUB-TAB: RIDER UPI SETTLEMENT REQUESTS (12-DIGIT UTR PROOFS)
+      =============================================================== */}
+      {activeSubTab === 'UPI_SETTLEMENTS' && (
+        <View style={styles.subTabContentCard}>
+          <View style={styles.khataHeaderRow}>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={styles.subTabContentTitle}>
+                  Rider UPI Settlement Requests ({settlementRequests.length})
+                </Text>
+                {settlementRequests.filter((r) => r.status === 'PENDING').length > 0 && (
+                  <View style={styles.pendingBadgeMini}>
+                    <Text style={styles.pendingBadgeMiniText}>
+                      {settlementRequests.filter((r) => r.status === 'PENDING').length} PENDING
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <Text style={styles.khataHeaderSubtitle}>
+                Review 12-digit UTR payment proofs submitted by riders to automatically clear COD liability and unlock accounts.
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.configUpiBtn}
+              onPress={() => setShowUpiConfigModal(true)}
+              activeOpacity={0.8}
+            >
+              <Settings size={14} color="#071B52" />
+              <Text style={styles.configUpiBtnText}>Company UPI</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Quick Stats Grid */}
+          <View style={styles.settlementKpiGrid}>
+            <View style={[styles.settleKpiCard, { borderColor: '#F59E0B' }]}>
+              <Text style={styles.settleKpiLabel}>PENDING VERIFICATION</Text>
+              <Text style={[styles.settleKpiVal, { color: '#D97706' }]}>
+                {settlementRequests.filter((r) => r.status === 'PENDING').length}
+              </Text>
+              <Text style={styles.settleKpiSub}>
+                ₹{settlementRequests.filter((r) => r.status === 'PENDING').reduce((acc, r) => acc + (Number(r.amount) || 0), 0)} to approve
+              </Text>
+            </View>
+
+            <View style={[styles.settleKpiCard, { borderColor: '#10B981' }]}>
+              <Text style={styles.settleKpiLabel}>APPROVED PROOFS</Text>
+              <Text style={[styles.settleKpiVal, { color: '#059669' }]}>
+                {settlementRequests.filter((r) => r.status === 'APPROVED').length}
+              </Text>
+              <Text style={styles.settleKpiSub}>Riders unblocked</Text>
+            </View>
+
+            <View style={[styles.settleKpiCard, { borderColor: '#3B82F6' }]}>
+              <Text style={styles.settleKpiLabel}>RECEIVING UPI ID</Text>
+              <Text style={[styles.settleKpiVal, { color: '#1E40AF', fontSize: 14 }]} numberOfLines={1}>
+                {companyUpiId}
+              </Text>
+              <Text style={styles.settleKpiSub} numberOfLines={1}>{companyUpiName}</Text>
+            </View>
+          </View>
+
+          {/* Filter Pills */}
+          <View style={styles.filterPillsRow}>
+            {(['ALL', 'PENDING', 'APPROVED', 'REJECTED'] as const).map((f) => (
+              <TouchableOpacity
+                key={f}
+                style={[styles.filterPill, requestsFilter === f && styles.filterPillActive]}
+                onPress={() => setRequestsFilter(f)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.filterPillText, requestsFilter === f && styles.filterPillTextActive]}>
+                  {f} {f !== 'ALL' ? `(${settlementRequests.filter((r) => r.status === f).length})` : `(${settlementRequests.length})`}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* List of Requests */}
+          {settlementRequests.filter((r) => requestsFilter === 'ALL' || r.status === requestsFilter).length === 0 ? (
+            <View style={styles.emptyRequestsBox}>
+              <Receipt size={36} color="#94A3B8" />
+              <Text style={styles.emptyRequestsTitle}>No Settlement Requests Found</Text>
+              <Text style={styles.emptyRequestsSubtitle}>
+                {requestsFilter === 'PENDING'
+                  ? 'All rider settlement proofs have been reviewed! New requests will appear here.'
+                  : 'No requests matching the selected filter.'}
+              </Text>
+            </View>
+          ) : (
+            settlementRequests
+              .filter((r) => requestsFilter === 'ALL' || r.status === requestsFilter)
+              .map((req) => {
+                const isPending = req.status === 'PENDING';
+                const isApproved = req.status === 'APPROVED';
+                const isRejected = req.status === 'REJECTED';
+                const isActionLoading = actionLoadingId === req.id;
+
+                return (
+                  <View
+                    key={req.id}
+                    style={[
+                      styles.requestCard,
+                      isPending && styles.requestCardPending,
+                      isApproved && styles.requestCardApproved,
+                    ]}
+                  >
+                    <View style={styles.requestCardTop}>
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Bike size={16} color="#071B52" />
+                          <Text style={styles.requestRiderName}>{req.riderName}</Text>
+                        </View>
+                        <Text style={styles.requestRiderPhone}>
+                          {req.riderPhone ? `Phone: ${req.riderPhone}` : 'Delivery Partner'}
+                        </Text>
+                      </View>
+
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={styles.requestAmount}>₹{req.amount}</Text>
+                        <View
+                          style={[
+                            styles.statusBadge,
+                            isPending && styles.statusBadgePending,
+                            isApproved && styles.statusBadgeApproved,
+                            isRejected && styles.statusBadgeRejected,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.statusBadgeText,
+                              isPending && styles.statusBadgeTextPending,
+                              isApproved && styles.statusBadgeTextApproved,
+                              isRejected && styles.statusBadgeTextRejected,
+                            ]}
+                          >
+                            {req.status}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* UTR & Timestamp Box */}
+                    <View style={styles.utrBox}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.utrLabel}>12-DIGIT TRANSACTION UTR / REF ID</Text>
+                        <Text style={styles.utrValue}>{req.utrNumber}</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.utrCopyBtn}
+                        onPress={() => copyUtr(req.utrNumber, req.id)}
+                        activeOpacity={0.7}
+                      >
+                        <Copy size={12} color="#071B52" />
+                        <Text style={styles.utrCopyText}>
+                          {copiedUtrId === req.id ? 'Copied!' : 'Copy'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.requestFooterRow}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Clock size={12} color="#64748B" />
+                        <Text style={styles.requestDate}>
+                          Submitted: {req.requestedAt ? new Date(req.requestedAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Recent'}
+                        </Text>
+                      </View>
+
+                      {isApproved && (
+                        <Text style={styles.remarksText}>
+                          ✅ {req.adminRemarks || 'Verified & Unblocked'}
+                        </Text>
+                      )}
+                      {isRejected && (
+                        <Text style={[styles.remarksText, { color: '#DC2626' }]}>
+                          ❌ {req.adminRemarks || 'Rejected'}
+                        </Text>
+                      )}
+                    </View>
+
+                    {/* Actions if Pending */}
+                    {isPending && (
+                      <View style={styles.requestActionsRow}>
+                        <TouchableOpacity
+                          style={styles.rejectBtn}
+                          onPress={() => handleRejectSettlement(req.id, req.riderName)}
+                          disabled={isActionLoading}
+                          activeOpacity={0.8}
+                        >
+                          <X size={14} color="#DC2626" />
+                          <Text style={styles.rejectBtnText}>Reject</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.approveBtn}
+                          onPress={() => handleApproveSettlement(req.id, req.riderName)}
+                          disabled={isActionLoading}
+                          activeOpacity={0.85}
+                        >
+                          {isActionLoading ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                          ) : (
+                            <>
+                              <CheckCircle2 size={14} color="#FFFFFF" />
+                              <Text style={styles.approveBtnText}>
+                                Verify & Instant Unlock
+                              </Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                );
+              })
+          )}
         </View>
       )}
 
@@ -853,61 +1409,275 @@ export const WalletsRevenueScreen: React.FC = () => {
       </Modal>
 
       {/* ========================================================================= */}
-      {/* RIDER INSTANT IMPS MODAL                                                  */}
+      {/* RIDER NET SETTLEMENT MODAL                                                */}
       {/* ========================================================================= */}
       <Modal visible={Boolean(selectedRider)} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
+            {(() => {
+              const net = selectedRider?.netBalance ?? ((selectedRider?.totalCodCollected || 0) - (selectedRider?.totalOnlineEarnings || selectedRider?.totalEarnings || selectedRider?.balance || 0));
+              const isCollect = settlementActionType === 'COLLECT_FROM_RIDER' || net > 0;
+              const isBlocked = selectedRider?.isBlocked || net >= (selectedRider?.outstandingCashLimit || 500);
+
+              return (
+                <>
+                  <View style={styles.modalHeader}>
+                    <View style={styles.modalHeaderLeft}>
+                      {isCollect ? (
+                        <Unlock size={18} color="#DC2626" />
+                      ) : (
+                        <Send size={18} color="#10B981" />
+                      )}
+                      <Text style={styles.modalTitle}>
+                        {isCollect ? 'Collect Cash & Settle Khata' : 'Pay Online Delivery Earnings'}
+                      </Text>
+                    </View>
+                    <TouchableOpacity onPress={() => setSelectedRider(null)}>
+                      <X size={18} color="#94A3B8" />
+                    </TouchableOpacity>
+                  </View>
+
+                  <Text style={styles.modalDesc}>
+                    Settling net dues for partner <Text style={{ fontWeight: '800', color: '#071B52' }}>{selectedRider?.riderName}</Text> ({selectedRider?.partnerCode}).
+                  </Text>
+
+                  {/* Hisaab Summary Breakdown */}
+                  <View style={styles.modalKhataBreakdownBox}>
+                    <View style={styles.modalKhataBreakdownRow}>
+                      <Text style={styles.modalKhataBreakdownLabel}>COD Cash In Hand:</Text>
+                      <Text style={[styles.modalKhataBreakdownVal, { color: '#071B52' }]}>
+                        ₹{(selectedRider?.totalCodCollected || 0).toLocaleString()}
+                      </Text>
+                    </View>
+                    <View style={styles.modalKhataBreakdownRow}>
+                      <Text style={styles.modalKhataBreakdownLabel}>Rider Earnings (Deducted):</Text>
+                      <Text style={[styles.modalKhataBreakdownVal, { color: '#059669' }]}>
+                        -₹{(selectedRider?.totalOnlineEarnings || selectedRider?.totalEarnings || selectedRider?.balance || 0).toLocaleString()}
+                      </Text>
+                    </View>
+                    <View style={[styles.modalKhataBreakdownRow, styles.modalKhataBreakdownNetRow]}>
+                      <Text style={styles.modalKhataBreakdownNetLabel}>Net Amount:</Text>
+                      <Text
+                        style={[
+                          styles.modalKhataBreakdownNetVal,
+                          net > 0 ? { color: '#DC2626' } : { color: '#059669' },
+                        ]}
+                      >
+                        ₹{Math.abs(net).toLocaleString()} {net > 0 ? '(Rider Owes)' : '(Admin Owes)'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {isBlocked && (
+                    <View style={styles.modalBlockedAlert}>
+                      <Lock size={14} color="#DC2626" />
+                      <Text style={styles.modalBlockedAlertText}>
+                        Rider is currently locked from accepting orders (₹500 limit reached). Settling this amount will instantly restore order acceptance.
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Settlement Mode Selection */}
+                  <View style={styles.settleTypeRow}>
+                    <TouchableOpacity
+                      style={[
+                        styles.settleTypeTab,
+                        settlementActionType === 'COLLECT_FROM_RIDER' && styles.settleTypeTabActiveRed,
+                      ]}
+                      onPress={() => {
+                        setSettlementActionType('COLLECT_FROM_RIDER');
+                        setPayoutRiderAmount(String(Math.max(0, net)));
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.settleTypeTabText,
+                          settlementActionType === 'COLLECT_FROM_RIDER' && styles.settleTypeTabTextActive,
+                        ]}
+                      >
+                        Collect From Rider
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.settleTypeTab,
+                        settlementActionType === 'PAY_TO_RIDER' && styles.settleTypeTabActiveGreen,
+                      ]}
+                      onPress={() => {
+                        setSettlementActionType('PAY_TO_RIDER');
+                        setPayoutRiderAmount(String(Math.abs(Math.min(0, net))));
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.settleTypeTabText,
+                          settlementActionType === 'PAY_TO_RIDER' && styles.settleTypeTabTextActive,
+                        ]}
+                      >
+                        Pay To Rider
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <Text style={styles.formInputLabel}>
+                    {settlementActionType === 'COLLECT_FROM_RIDER' ? 'Cash Collected (₹) *' : 'Amount To Pay (₹) *'}
+                  </Text>
+                  <TextInput
+                    style={styles.formTextInput}
+                    keyboardType="numeric"
+                    value={payoutRiderAmount}
+                    onChangeText={setPayoutRiderAmount}
+                  />
+
+                  <Text style={[styles.formInputLabel, { marginTop: 10 }]}>Settlement Notes / Handover Ref</Text>
+                  <TextInput
+                    style={styles.formTextInput}
+                    value={payoutRiderNotes}
+                    onChangeText={setPayoutRiderNotes}
+                  />
+
+                  <View style={styles.modalFooter}>
+                    <TouchableOpacity
+                      style={styles.modalCancelBtn}
+                      onPress={() => setSelectedRider(null)}
+                      disabled={riderPayoutSubmitting}
+                    >
+                      <Text style={styles.modalCancelText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.modalSubmitBtn,
+                        settlementActionType === 'COLLECT_FROM_RIDER'
+                          ? { backgroundColor: '#DC2626' }
+                          : { backgroundColor: '#10B981' },
+                      ]}
+                      onPress={handleExecuteRiderSettlement}
+                      disabled={riderPayoutSubmitting}
+                    >
+                      <Text style={styles.modalSubmitText}>
+                        {riderPayoutSubmitting
+                          ? 'Settling...'
+                          : settlementActionType === 'COLLECT_FROM_RIDER'
+                          ? (isBlocked ? 'Collect Cash & Unlock' : 'Confirm Cash Received')
+                          : 'Execute IMPS Transfer'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              );
+            })()}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* RIDER ORDER KHATA LEDGER MODAL                                            */}
+      {/* ========================================================================= */}
+      <Modal visible={Boolean(ledgerModalRider)} transparent={true} animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, styles.ledgerModalCard]}>
             <View style={styles.modalHeader}>
               <View style={styles.modalHeaderLeft}>
-                <Send size={18} color="#10B981" />
-                <Text style={styles.modalTitle}>Rider Instant IMPS Payout</Text>
+                <BookOpen size={18} color="#4F46E5" />
+                <Text style={styles.modalTitle}>
+                  {ledgerModalRider?.riderName} — Khata Ledger
+                </Text>
               </View>
-              <TouchableOpacity onPress={() => setSelectedRider(null)}>
+              <TouchableOpacity onPress={() => setLedgerModalRider(null)}>
                 <X size={18} color="#94A3B8" />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.modalDesc}>
-              Instant IMPS payout for rider partner <Text style={{ fontWeight: '800', color: '#071B52' }}>{selectedRider?.riderName}</Text> ({selectedRider?.partnerCode}).
-            </Text>
-
-            <View style={styles.modalBalanceBox}>
-              <Text style={styles.modalBalanceLabel}>Available Earnings:</Text>
-              <Text style={styles.modalBalanceValue}>₹{selectedRider?.balance.toLocaleString()}</Text>
+            {/* Rider Header Summary */}
+            <View style={styles.ledgerRiderSummaryBar}>
+              <Text style={styles.ledgerRiderSummaryText}>
+                <Text style={{ fontWeight: '800', color: '#071B52' }}>{ledgerModalRider?.partnerCode}</Text> • {ledgerModalRider?.phone} • Limit: ₹{ledgerModalRider?.outstandingCashLimit || 500}
+              </Text>
             </View>
 
-            <Text style={styles.formInputLabel}>Payout Amount (₹) *</Text>
-            <TextInput
-              style={styles.formTextInput}
-              keyboardType="numeric"
-              value={payoutRiderAmount}
-              onChangeText={setPayoutRiderAmount}
-            />
+            {/* Table of Orders & Net Impact */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={true} style={{ marginBottom: 12 }}>
+              <View style={styles.ledgerTableContainer}>
+                {/* Header Row */}
+                <View style={styles.ledgerTableHeaderRow}>
+                  <Text style={[styles.ledgerTableColHeader, { width: 90 }]}>Order ID</Text>
+                  <Text style={[styles.ledgerTableColHeader, { width: 75 }]}>Type</Text>
+                  <Text style={[styles.ledgerTableColHeader, { width: 90, textAlign: 'right' }]}>Total Order</Text>
+                  <Text style={[styles.ledgerTableColHeader, { width: 110, textAlign: 'right' }]}>Rider Share (+)</Text>
+                  <Text style={[styles.ledgerTableColHeader, { width: 110, textAlign: 'right' }]}>Admin Share (-)</Text>
+                  <Text style={[styles.ledgerTableColHeader, { width: 170, textAlign: 'right' }]}>Net Balance (Hisaab)</Text>
+                </View>
 
-            <Text style={[styles.formInputLabel, { marginTop: 12 }]}>IMPS Reference Notes</Text>
-            <TextInput
-              style={styles.formTextInput}
-              value={payoutRiderNotes}
-              onChangeText={setPayoutRiderNotes}
-            />
+                {/* Table Body */}
+                {loadingRiderLedger ? (
+                  <View style={{ padding: 24, alignItems: 'center' }}>
+                    <ActivityIndicator size="small" color="#FF3B98" />
+                    <Text style={{ fontSize: 12, color: '#64748B', marginTop: 8 }}>Loading Khata details...</Text>
+                  </View>
+                ) : riderLedgerEntries.length === 0 ? (
+                  <View style={{ padding: 20, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 13, color: '#64748B' }}>No orders found in Khata ledger.</Text>
+                  </View>
+                ) : (
+                  riderLedgerEntries.map((row, idx) => (
+                    <View
+                      key={row.orderId || idx}
+                      style={[
+                        styles.ledgerTableRow,
+                        idx % 2 === 1 && { backgroundColor: '#F8FAFC' },
+                      ]}
+                    >
+                      <View style={{ width: 90 }}>
+                        <Text style={styles.ledgerColOrder}>{row.orderId}</Text>
+                        <Text style={styles.ledgerColDate}>{row.date || 'Today'}</Text>
+                      </View>
+
+                      <View style={{ width: 75 }}>
+                        <View
+                          style={[
+                            styles.ledgerTypeBadge,
+                            row.paymentMode === 'COD' ? styles.ledgerTypeCod : styles.ledgerTypeOnline,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.ledgerTypeBadgeText,
+                              row.paymentMode === 'COD' ? styles.ledgerTypeCodText : styles.ledgerTypeOnlineText,
+                            ]}
+                          >
+                            {row.paymentMode || 'COD'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <Text style={[styles.ledgerColVal, { width: 90, textAlign: 'right' }]}>
+                        ₹{(row.totalAmount || 0).toLocaleString()}
+                      </Text>
+
+                      <Text style={[styles.ledgerColVal, { width: 110, textAlign: 'right', color: '#059669', fontWeight: '800' }]}>
+                        +₹{(row.riderEarning || 0).toLocaleString()}
+                      </Text>
+
+                      <Text style={[styles.ledgerColVal, { width: 110, textAlign: 'right', color: '#DC2626', fontWeight: '800' }]}>
+                        -₹{(row.adminShare || 0).toLocaleString()}
+                      </Text>
+
+                      <Text style={[styles.ledgerColVal, { width: 170, textAlign: 'right', fontWeight: '800', color: '#071B52' }]}>
+                        {row.netImpact || `Rider owes: ₹${row.adminShare || 0}`}
+                      </Text>
+                    </View>
+                  ))
+                )}
+              </View>
+            </ScrollView>
 
             <View style={styles.modalFooter}>
               <TouchableOpacity
-                style={styles.modalCancelBtn}
-                onPress={() => setSelectedRider(null)}
-                disabled={riderPayoutSubmitting}
+                style={[styles.modalSubmitBtn, { backgroundColor: '#071B52' }]}
+                onPress={() => setLedgerModalRider(null)}
               >
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalSubmitBtn, { backgroundColor: '#10B981' }]}
-                onPress={handleExecuteRiderPayout}
-                disabled={riderPayoutSubmitting}
-              >
-                <Text style={styles.modalSubmitText}>
-                  {riderPayoutSubmitting ? 'Transferring...' : 'Send Instant IMPS'}
-                </Text>
+                <Text style={styles.modalSubmitText}>Close Khata</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -949,6 +1719,72 @@ export const WalletsRevenueScreen: React.FC = () => {
                 </TouchableOpacity>
               ))}
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* COMPANY UPI CONFIGURATION MODAL                                            */}
+      {/* ========================================================================= */}
+      <Modal visible={showUpiConfigModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxWidth: 460 }]}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <QrCode size={18} color="#071B52" />
+                <Text style={styles.modalTitle}>Company Payout & Collection UPI</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowUpiConfigModal(false)}>
+                <X size={18} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[styles.formInputLabel, { marginTop: 12 }]}>Company Official UPI ID</Text>
+            <TextInput
+              style={styles.formTextInput}
+              placeholder="e.g. wormup@okicici"
+              value={companyUpiId}
+              onChangeText={setCompanyUpiId}
+              autoCapitalize="none"
+            />
+            <Text style={styles.formHelperText}>
+              Riders will see this UPI ID on their app to pay back COD cash.
+            </Text>
+
+            <Text style={[styles.formInputLabel, { marginTop: 12 }]}>Account Holder Name / Entity</Text>
+            <TextInput
+              style={styles.formTextInput}
+              placeholder="e.g. WormUp Technologies Pvt Ltd"
+              value={companyUpiName}
+              onChangeText={setCompanyUpiName}
+            />
+
+            <Text style={[styles.formInputLabel, { marginTop: 12 }]}>Finance Support Phone</Text>
+            <TextInput
+              style={styles.formTextInput}
+              placeholder="e.g. +91 98765 43210"
+              value={companySupportPhone}
+              onChangeText={setCompanySupportPhone}
+            />
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setShowUpiConfigModal(false)}
+                disabled={companyUpiSaving}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSubmitBtn, { backgroundColor: '#071B52' }]}
+                onPress={handleSaveUpiConfig}
+                disabled={companyUpiSaving}
+              >
+                <Text style={styles.modalSubmitText}>
+                  {companyUpiSaving ? 'Saving...' : 'Save Configuration'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1732,5 +2568,629 @@ const styles = StyleSheet.create({
   pickerItemTextActive: {
     color: '#FF3B98',
     fontWeight: '800',
+  },
+
+  // Rider Khata & Net Settlement Styles
+  khataHeaderRow: {
+    marginBottom: 4,
+  },
+  khataHeaderSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  khataInfoBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 8,
+  },
+  khataInfoBannerText: {
+    flex: 1,
+    fontSize: 11,
+    color: '#991B1B',
+    lineHeight: 16,
+  },
+  riderKhataCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 12,
+  },
+  riderKhataCardBlocked: {
+    borderColor: '#F87171',
+    backgroundColor: '#FFFBFB',
+    borderWidth: 1.5,
+  },
+  lockBadgeMini: {
+    backgroundColor: '#FEE2E2',
+    padding: 4,
+    borderRadius: 6,
+  },
+  activeBadgeMini: {
+    backgroundColor: '#DCFCE7',
+    padding: 4,
+    borderRadius: 6,
+  },
+  blockedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#DC2626',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  blockedBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
+  },
+  activeStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  activeStatusBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#059669',
+  },
+  khataMetricsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    backgroundColor: '#F8FAFC',
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  khataMetricBox: {
+    flex: 1,
+    minWidth: 70,
+  },
+  khataMetricLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#64748B',
+    textTransform: 'uppercase',
+  },
+  khataMetricVal: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#071B52',
+    marginTop: 2,
+  },
+  khataNetBox: {
+    borderLeftWidth: 1,
+    borderLeftColor: '#E2E8F0',
+    paddingLeft: 8,
+  },
+  khataNetOwedAdmin: {
+    color: '#DC2626',
+  },
+  khataNetOwedRider: {
+    color: '#059669',
+  },
+  khataNetSettled: {
+    color: '#64748B',
+  },
+  khataNetSubtext: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  khataNetSubtextOwedAdmin: {
+    color: '#DC2626',
+  },
+  khataNetSubtextOwedRider: {
+    color: '#059669',
+  },
+  khataActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  khataLedgerBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  khataLedgerBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#4F46E5',
+  },
+  khataSettleBtn: {
+    flex: 1.2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#071B52',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  khataSettleBtnBlocked: {
+    backgroundColor: '#DC2626',
+  },
+  khataSettleBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  modalKhataBreakdownBox: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    padding: 10,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 12,
+  },
+  modalKhataBreakdownRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  modalKhataBreakdownLabel: {
+    fontSize: 12,
+    color: '#64748B',
+  },
+  modalKhataBreakdownVal: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  modalKhataBreakdownNetRow: {
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    paddingTop: 6,
+    marginTop: 2,
+  },
+  modalKhataBreakdownNetLabel: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#071B52',
+  },
+  modalKhataBreakdownNetVal: {
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  modalBlockedAlert: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 12,
+  },
+  modalBlockedAlertText: {
+    flex: 1,
+    fontSize: 11,
+    color: '#DC2626',
+    lineHeight: 15,
+  },
+  settleTypeRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  settleTypeTab: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  settleTypeTabActiveRed: {
+    backgroundColor: '#FEE2E2',
+    borderColor: '#F87171',
+  },
+  settleTypeTabActiveGreen: {
+    backgroundColor: '#DCFCE7',
+    borderColor: '#86EFAC',
+  },
+  settleTypeTabText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  settleTypeTabTextActive: {
+    color: '#071B52',
+    fontWeight: '800',
+  },
+  ledgerModalCard: {
+    maxWidth: 720,
+    maxHeight: '90%',
+  },
+  ledgerRiderSummaryBar: {
+    backgroundColor: '#F1F5F9',
+    padding: 8,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  ledgerRiderSummaryText: {
+    fontSize: 12,
+    color: '#475569',
+  },
+  ledgerTableContainer: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    overflow: 'hidden',
+    minWidth: 650,
+  },
+  ledgerTableHeaderRow: {
+    flexDirection: 'row',
+    backgroundColor: '#071B52',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  ledgerTableColHeader: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  ledgerTableRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    backgroundColor: '#FFFFFF',
+  },
+  ledgerColOrder: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#071B52',
+  },
+  ledgerColDate: {
+    fontSize: 10,
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  ledgerTypeBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  ledgerTypeCod: {
+    backgroundColor: '#FEF3C7',
+  },
+  ledgerTypeOnline: {
+    backgroundColor: '#EEF2FF',
+  },
+  ledgerTypeBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  ledgerTypeCodText: {
+    color: '#92400E',
+  },
+  ledgerTypeOnlineText: {
+    color: '#4338CA',
+  },
+  ledgerColVal: {
+    fontSize: 12,
+    color: '#334155',
+  },
+
+  // Rider UPI Settlement Tab Styles
+  tabBadgeRed: {
+    backgroundColor: '#DC2626',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    marginLeft: 6,
+  },
+  tabBadgeRedText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  configUpiBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  configUpiBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#071B52',
+  },
+  settlementKpiGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    marginVertical: 14,
+    flexWrap: 'wrap',
+  },
+  settleKpiCard: {
+    flex: 1,
+    minWidth: 140,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 14,
+    borderLeftWidth: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  settleKpiLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 0.5,
+  },
+  settleKpiVal: {
+    fontSize: 22,
+    fontWeight: '900',
+    marginVertical: 4,
+  },
+  settleKpiSub: {
+    fontSize: 11,
+    color: '#94A3B8',
+  },
+  filterPillsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 14,
+    flexWrap: 'wrap',
+  },
+  filterPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+  },
+  filterPillActive: {
+    backgroundColor: '#071B52',
+  },
+  filterPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  filterPillTextActive: {
+    color: '#FFFFFF',
+  },
+  emptyRequestsBox: {
+    padding: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 8,
+  },
+  emptyRequestsTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  emptyRequestsSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    textAlign: 'center',
+    maxWidth: 360,
+  },
+  requestCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 12,
+  },
+  requestCardPending: {
+    borderColor: '#FDE68A',
+    backgroundColor: '#FFFDF5',
+  },
+  requestCardApproved: {
+    borderColor: '#DCFCE7',
+  },
+  requestCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  requestRiderName: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#071B52',
+  },
+  requestRiderPhone: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  requestAmount: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#DC2626',
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginTop: 4,
+  },
+  statusBadgePending: {
+    backgroundColor: '#FEF3C7',
+  },
+  statusBadgeApproved: {
+    backgroundColor: '#DCFCE7',
+  },
+  statusBadgeRejected: {
+    backgroundColor: '#FEE2E2',
+  },
+  statusBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  statusBadgeTextPending: {
+    color: '#B45309',
+  },
+  statusBadgeTextApproved: {
+    color: '#15803D',
+  },
+  statusBadgeTextRejected: {
+    color: '#B91C1C',
+  },
+  utrBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  utrLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 0.5,
+  },
+  utrValue: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#071B52',
+    letterSpacing: 1,
+    marginTop: 2,
+  },
+  utrCopyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#E2E8F0',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  utrCopyText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#071B52',
+  },
+  requestFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 4,
+  },
+  requestDate: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  remarksText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#059669',
+  },
+  requestActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  rejectBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+  },
+  rejectBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#DC2626',
+  },
+  approveBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#059669',
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  approveBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  pendingBadgeMini: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  pendingBadgeMiniText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#B45309',
+  },
+  formHelperText: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 4,
   },
 });

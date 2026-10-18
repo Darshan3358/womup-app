@@ -241,12 +241,7 @@ router.get('/wallets/stores', async (req, res) => {
         commissionRate: 10,
         settlementCycle: w.settlementCycle || 'WEEKLY',
         lastSettlementAt: w.lastSettlementAt || null,
-        bankAccount: w.bankAccount || {
-          accountNumber: '•••• •••• ' + (st.phone ? st.phone.slice(-4) : '4821'),
-          ifsc: 'HDFC0001024',
-          bankName: 'HDFC Bank Ltd',
-          verified: true,
-        },
+        bankAccount: w.bankAccount || null,
         isActive: st.isActive !== false,
       };
     });
@@ -257,43 +252,58 @@ router.get('/wallets/stores', async (req, res) => {
   }
 });
 
-// 3. All Rider Wallets
+// 3. All Rider Settlements (Khata & Net Settlement)
 router.get('/wallets/riders', async (req, res) => {
   try {
     const db = getDB();
     const riders = await db.collection('delivery_partners').find({}).toArray();
-    const riderWallets = await db.collection('rider_wallets').find({}).toArray();
     const settlements = await db.collection('rider_settlements').find({}).toArray();
 
-    const walletMap = {};
-    riderWallets.forEach(w => {
-      walletMap[w.riderId ? w.riderId.toString() : ''] = w;
-    });
-
     const result = riders.map(r => {
-      const w = walletMap[r._id.toString()] || {};
-      const rSettlements = settlements.filter(s => s.riderId && s.riderId.toString() === r._id.toString());
+      const rIdStr = r._id.toString();
+      const rSettlements = settlements.filter(s => s.riderId && s.riderId.toString() === rIdStr);
+      
       const tipTotal = rSettlements.reduce((sum, s) => sum + (s.tip || 0), 0);
       const basePayTotal = rSettlements.reduce((sum, s) => sum + (s.basePay || 0), 0);
+      const calculatedEarnings = rSettlements.reduce((sum, s) => sum + (s.total || s.riderEarning || 0), 0);
+      const calculatedCod = rSettlements.filter(s => s.paymentMode === 'COD').reduce((sum, s) => sum + (s.totalAmount || 0), 0);
+
+      const totalCod = typeof r.totalCodCollected === 'number' && r.totalCodCollected > 0 ? r.totalCodCollected : calculatedCod;
+      const totalEarn = typeof r.totalEarnings === 'number' && r.totalEarnings > 0 ? r.totalEarnings : calculatedEarnings;
+      const netBalance = totalCod - totalEarn; // > 0: Rider owes Admin, < 0: Admin owes Rider
+      const cashLimit = r.outstandingCashLimit || 500;
+      const isBlocked = Boolean(r.isOrderBlocked || netBalance >= cashLimit);
 
       return {
-        riderId: r._id.toString(),
+        riderId: rIdStr,
         partnerCode: r.partnerCode || 'WUP-RIDER',
         fullName: r.fullName || 'Rider Partner',
+        riderName: r.fullName || 'Rider Partner',
         phoneNumber: r.phoneNumber || '',
         vehicleNumber: r.vehicleNumber || 'GJ-01-XX-0000',
-        balance: w.balance || r.walletBalance || 0,
-        lifetimeEarnings: w.lifetimeEarnings || (tipTotal + basePayTotal) || 0,
-        totalDeliveries: r.completedDeliveries || r.totalDeliveries || 0,
+        totalDeliveries: r.completedDeliveries || r.totalDeliveries || rSettlements.length,
+        completedDeliveries: r.completedDeliveries || r.totalDeliveries || rSettlements.length,
+        totalCodCollected: totalCod,
+        totalEarnings: totalEarn,
+        totalOnlineEarnings: r.totalOnlineEarnings || (totalEarn - (rSettlements.filter(s => s.paymentMode === 'COD').reduce((sum, s) => sum + (s.riderEarning || 0), 0))),
+        netBalance,
+        cashLimit,
+        isBlocked,
+        isOrderBlocked: isBlocked,
+        riderOwesAdmin: Math.max(0, netBalance),
+        adminOwesRider: Math.max(0, -netBalance),
+        settlementType: netBalance >= 0 ? 'RIDER_OWES_ADMIN' : 'ADMIN_OWES_RIDER',
+        balance: Math.abs(netBalance),
+        lifetimeEarnings: totalEarn,
         totalTips: tipTotal,
         totalBasePay: basePayTotal,
-        bankAccount: {
-          accountNumber: '•••• •••• ' + (r.phoneNumber ? r.phoneNumber.slice(-4) : '9988'),
-          ifsc: 'ICIC0000412',
-          bankName: 'ICICI Bank Ltd',
-          verified: true,
-        },
-        isOnline: r.isOnline !== false,
+        bankAccount: (r.bankName || r.accountNumber) ? {
+          bankName: r.bankName || 'Not Provided',
+          accountNumber: r.accountNumber ? '•••• •••• ' + r.accountNumber.slice(-4) : 'N/A',
+          ifsc: r.ifscCode || 'N/A',
+          verified: r.verificationStatus === 'APPROVED' || r.verificationStatus === 'VERIFIED',
+        } : null,
+        isOnline: Boolean(r.isOnline),
         isActive: r.status === 'APPROVED',
       };
     });
@@ -422,51 +432,385 @@ router.post('/wallets/settle-store', async (req, res) => {
   }
 });
 
-// 7. Manual Instant IMPS Payout for Rider
+// 7. Settle Rider Khata (Collect Cash or Pay Rider, and Unblock)
 router.post('/wallets/settle-rider', async (req, res) => {
   try {
     const db = getDB();
-    const { riderId, amount, referenceNotes } = req.body;
-    if (!riderId || !amount) {
+    const { riderId, amount, referenceNotes, actionType = 'COLLECT_FROM_RIDER' } = req.body;
+    if (!riderId || amount === undefined) {
       return res.status(400).json({ success: false, error: 'riderId and amount are required' });
     }
 
-    const rId = new ObjectId(riderId);
-    const riderWallet = await db.collection('rider_wallets').findOne({ riderId: rId });
-    if (!riderWallet) {
-      return res.status(404).json({ success: false, error: 'Rider wallet not found' });
+    let rId;
+    try {
+      rId = new ObjectId(riderId);
+    } catch {
+      rId = riderId;
     }
 
-    const payoutVal = Number(amount);
-    const currentBal = riderWallet.balance || 0;
-    if (currentBal < payoutVal) {
-      return res.status(400).json({ success: false, error: 'Payout amount exceeds rider wallet balance' });
+    const partner = await db.collection('delivery_partners').findOne({
+      $or: [{ _id: rId }, { _id: riderId }, { partnerCode: riderId }, { riderCode: riderId }],
+    });
+
+    if (!partner) {
+      return res.status(404).json({ success: false, error: 'Delivery partner not found' });
     }
 
-    const newBalance = Math.max(0, currentBal - payoutVal);
-    await db.collection('rider_wallets').updateOne(
-      { riderId: rId },
+    const settleAmt = Math.abs(Number(amount));
+    const currentCod = partner.totalCodCollected || 0;
+    const currentEarnings = partner.totalEarnings || 0;
+    const previousNet = currentCod - currentEarnings;
+
+    let updatedCod = currentCod;
+    let updatedEarnings = currentEarnings;
+
+    if (actionType === 'COLLECT_FROM_RIDER' || previousNet >= 0) {
+      // Admin collected cash from rider -> reduce COD cash liability
+      updatedCod = Math.max(0, currentCod - settleAmt);
+    } else {
+      // Admin paid rider -> record that rider has received payout
+      updatedEarnings = Math.max(0, currentEarnings - settleAmt);
+    }
+
+    const newNet = updatedCod - updatedEarnings;
+
+    await db.collection('delivery_partners').updateOne(
+      { _id: partner._id },
       {
-        $set: { balance: newBalance, lastSettlementAt: new Date(), updatedAt: new Date() },
+        $set: {
+          totalCodCollected: updatedCod,
+          totalEarnings: updatedEarnings,
+          currentOutstandingCash: Math.max(0, newNet),
+          isOrderBlocked: false, // Explicitly unblock rider
+          lastSettledAt: new Date(),
+          updatedAt: new Date(),
+        },
       }
     );
 
+    // Also mark pending settlements as SETTLED
+    await db.collection('rider_settlements').updateMany(
+      { riderId: partner._id, status: 'PENDING' },
+      { $set: { status: 'SETTLED', settledAt: new Date() } }
+    );
+
+    // Record in wallet transactions ledger
     await db.collection('wallet_transactions').insertOne({
       walletType: 'RIDER',
-      walletId: rId,
-      type: 'DEBIT',
-      category: 'INSTANT_IMPS',
-      amount: payoutVal,
-      balanceBefore: currentBal,
-      balanceAfter: newBalance,
-      description: `Instant IMPS bank payout: ₹${payoutVal} (${referenceNotes || 'IMPS Transfer'})`,
+      walletId: partner._id,
+      type: actionType === 'COLLECT_FROM_RIDER' ? 'CREDIT' : 'DEBIT',
+      category: 'NET_SETTLEMENT',
+      amount: settleAmt,
+      balanceBefore: previousNet,
+      balanceAfter: newNet,
+      description: `Rider Net Settlement: ₹${settleAmt} (${referenceNotes || 'Physical Cash / IMPS'}) - Rider Unblocked`,
       createdAt: new Date(),
     });
 
     res.json({
       success: true,
-      message: `Transferred ₹${payoutVal} instantly via IMPS to rider`,
-      newBalance,
+      message: `Successfully settled ₹${settleAmt} with ${partner.fullName || 'Rider'}. Rider is now UNBLOCKED.`,
+      newNetBalance: newNet,
+      isBlocked: false,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 8. Rider Order-by-Order Khata Ledger
+router.get('/wallets/riders/:id/ledger', async (req, res) => {
+  try {
+    const db = getDB();
+    const { id } = req.params;
+    let rId;
+    try {
+      rId = new ObjectId(id);
+    } catch {
+      rId = id;
+    }
+
+    const partner = await db.collection('delivery_partners').findOne({
+      $or: [{ _id: rId }, { _id: id }, { partnerCode: id }, { riderCode: id }],
+    });
+
+    if (!partner) {
+      return res.status(404).json({ success: false, error: 'Rider not found' });
+    }
+
+    const settlements = await db.collection('rider_settlements')
+      .find({ riderId: partner._id })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    const formatted = settlements.map(s => {
+      const isCod = s.paymentMode === 'COD';
+      const orderTotal = s.totalAmount || (s.basePay + s.incentive + s.tip);
+      const riderEarn = s.riderEarning || s.total || (s.basePay + s.incentive + s.tip);
+      const adminShare = s.adminShare ?? (isCod ? Math.max(0, orderTotal - riderEarn) : 0);
+
+      return {
+        id: s._id.toString(),
+        orderNumber: s.orderNumber || '#WUP-84920',
+        date: s.settledAt ? new Date(s.settledAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Recent',
+        paymentMode: isCod ? 'COD' : 'ONLINE',
+        totalAmount: orderTotal,
+        riderEarning: riderEarn,
+        adminShare,
+        netImpact: isCod ? -adminShare : riderEarn,
+        status: s.status || 'SETTLED',
+      };
+    });
+
+    res.json({
+      success: true,
+      partner: {
+        id: partner._id.toString(),
+        name: partner.fullName,
+        partnerCode: partner.partnerCode,
+        totalCodCollected: partner.totalCodCollected || 0,
+        totalEarnings: partner.totalEarnings || 0,
+        netBalance: (partner.totalCodCollected || 0) - (partner.totalEarnings || 0),
+        isBlocked: Boolean(partner.isOrderBlocked || ((partner.totalCodCollected || 0) - (partner.totalEarnings || 0) >= (partner.outstandingCashLimit || 500))),
+        cashLimit: partner.outstandingCashLimit || 500,
+      },
+      count: formatted.length,
+      data: formatted,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 9. Rider Settlement Requests (Online UPI Payment with UTR)
+router.get('/settlements/requests', async (req, res) => {
+  try {
+    const db = getDB();
+    const { status } = req.query;
+    const query = {};
+    if (status && status !== 'ALL') {
+      query.status = status.toUpperCase();
+    }
+    const requests = await db.collection('rider_settlement_requests')
+      .find(query)
+      .sort({ requestedAt: -1 })
+      .toArray();
+
+    const formatted = requests.map(r => ({
+      id: r._id.toString(),
+      riderId: r.riderId ? r.riderId.toString() : '',
+      riderName: r.riderName || 'Rider',
+      riderPhone: r.riderPhone || '',
+      amount: r.amount || 0,
+      utrNumber: r.utrNumber || '',
+      paymentMethod: r.paymentMethod || 'UPI',
+      status: r.status || 'PENDING',
+      adminRemarks: r.adminRemarks || '',
+      requestedAt: r.requestedAt,
+      approvedAt: r.approvedAt,
+      rejectedAt: r.rejectedAt,
+    }));
+
+    res.json({
+      success: true,
+      count: formatted.length,
+      data: formatted,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Approve Settlement Request (Unblock Rider & Reset Balance)
+router.post('/settlements/requests/:id/approve', async (req, res) => {
+  try {
+    const db = getDB();
+    const { id } = req.params;
+    const { adminRemarks } = req.body;
+
+    let reqObjId;
+    try {
+      reqObjId = new ObjectId(id);
+    } catch {
+      reqObjId = id;
+    }
+
+    const request = await db.collection('rider_settlement_requests').findOne({ _id: reqObjId });
+    if (!request) {
+      return res.status(404).json({ success: false, error: 'Settlement request not found' });
+    }
+    if (request.status === 'APPROVED') {
+      return res.status(400).json({ success: false, error: 'Settlement request already approved' });
+    }
+
+    // 1. Update request status
+    await db.collection('rider_settlement_requests').updateOne(
+      { _id: reqObjId },
+      {
+        $set: {
+          status: 'APPROVED',
+          approvedAt: new Date(),
+          adminRemarks: adminRemarks || 'Verified and approved via Admin Panel',
+          updatedAt: new Date(),
+        },
+      }
+    );
+
+    // 2. Update delivery partner balance and unblock
+    let partnerObjId;
+    try {
+      partnerObjId = new ObjectId(request.riderId);
+    } catch {
+      partnerObjId = request.riderId;
+    }
+
+    const partner = await db.collection('delivery_partners').findOne({
+      $or: [{ _id: partnerObjId }, { _id: request.riderId }],
+    });
+
+    if (partner) {
+      const settleAmt = Number(request.amount) || 0;
+      const currentCod = partner.totalCodCollected || 0;
+      const currentEarnings = partner.totalEarnings || 0;
+      const updatedCod = Math.max(0, currentCod - settleAmt);
+      const newNet = updatedCod - currentEarnings;
+
+      await db.collection('delivery_partners').updateOne(
+        { _id: partner._id },
+        {
+          $set: {
+            totalCodCollected: updatedCod,
+            currentOutstandingCash: Math.max(0, newNet),
+            isOrderBlocked: false, // UNBLOCK RIDER!
+            lastSettledAt: new Date(),
+            updatedAt: new Date(),
+          },
+        }
+      );
+
+      // Mark pending rider settlements as SETTLED
+      await db.collection('rider_settlements').updateMany(
+        { riderId: partner._id, status: 'PENDING' },
+        { $set: { status: 'SETTLED', settledAt: new Date() } }
+      );
+
+      // Record in wallet transactions ledger
+      await db.collection('wallet_transactions').insertOne({
+        walletType: 'RIDER',
+        walletId: partner._id,
+        type: 'CREDIT',
+        category: 'UPI_ONLINE_SETTLEMENT',
+        amount: settleAmt,
+        balanceBefore: currentCod - currentEarnings,
+        balanceAfter: newNet,
+        description: `Online UPI Settlement: ₹${settleAmt} (UTR: ${request.utrNumber}) - Rider Unblocked`,
+        createdAt: new Date(),
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Settlement request approved! ₹${request.amount} verified and rider ${request.riderName || ''} is now UNBLOCKED.`,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Reject Settlement Request
+router.post('/settlements/requests/:id/reject', async (req, res) => {
+  try {
+    const db = getDB();
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    let reqObjId;
+    try {
+      reqObjId = new ObjectId(id);
+    } catch {
+      reqObjId = id;
+    }
+
+    const request = await db.collection('rider_settlement_requests').findOne({ _id: reqObjId });
+    if (!request) {
+      return res.status(404).json({ success: false, error: 'Settlement request not found' });
+    }
+    if (request.status !== 'PENDING') {
+      return res.status(400).json({ success: false, error: `Cannot reject request with status ${request.status}` });
+    }
+
+    await db.collection('rider_settlement_requests').updateOne(
+      { _id: reqObjId },
+      {
+        $set: {
+          status: 'REJECTED',
+          rejectedAt: new Date(),
+          adminRemarks: reason || 'Invalid UTR or transaction proof could not be verified',
+          updatedAt: new Date(),
+        },
+      }
+    );
+
+    res.json({
+      success: true,
+      message: 'Settlement request rejected',
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Company UPI Settings
+router.get('/settings/upi', async (req, res) => {
+  try {
+    const db = getDB();
+    const config = await db.collection('admin_settings').findOne({ settingName: 'PAYMENT_CONFIG' });
+    res.json({
+      success: true,
+      data: {
+        adminUpiId: config?.adminUpiId || 'wormup@okicici',
+        adminUpiName: config?.adminUpiName || 'WormUp Technologies Pvt Ltd',
+        supportPhone: config?.supportPhone || '+91 98765 43210',
+        qrCodeUrl: config?.qrCodeUrl || '',
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/settings/upi', async (req, res) => {
+  try {
+    const db = getDB();
+    const { adminUpiId, adminUpiName, supportPhone, qrCodeUrl } = req.body;
+    if (!adminUpiId || !adminUpiId.includes('@')) {
+      return res.status(400).json({ success: false, error: 'Valid UPI ID required (e.g. username@bank)' });
+    }
+
+    await db.collection('admin_settings').updateOne(
+      { settingName: 'PAYMENT_CONFIG' },
+      {
+        $set: {
+          settingName: 'PAYMENT_CONFIG',
+          adminUpiId: adminUpiId.trim(),
+          adminUpiName: (adminUpiName || 'WormUp Technologies Pvt Ltd').trim(),
+          supportPhone: (supportPhone || '+91 98765 43210').trim(),
+          qrCodeUrl: (qrCodeUrl || '').trim(),
+          updatedAt: new Date(),
+        },
+      },
+      { upsert: true }
+    );
+
+    res.json({
+      success: true,
+      message: 'Company UPI settings updated successfully',
+      data: {
+        adminUpiId: adminUpiId.trim(),
+        adminUpiName: (adminUpiName || 'WormUp Technologies Pvt Ltd').trim(),
+        supportPhone: (supportPhone || '+91 98765 43210').trim(),
+        qrCodeUrl: (qrCodeUrl || '').trim(),
+      },
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

@@ -38,6 +38,7 @@ import {
   Check,
   FileText,
   Eye,
+  Trash2,
 } from 'lucide-react-native';
 import { COLORS, RADIUS, SPACING } from '../theme';
 import { useAdminState } from '../context/AdminStateContext';
@@ -66,6 +67,8 @@ export const CustomersScreen: React.FC = () => {
     setSubView,
     setActiveModal,
     updateRider,
+    deleteCustomer,
+    deleteRider,
   } = useAdminState();
 
   const [activeTabMode, setActiveTabMode] = useState<'CUSTOMERS' | 'RIDERS'>('CUSTOMERS');
@@ -240,16 +243,36 @@ export const CustomersScreen: React.FC = () => {
           ...detail,
           name: detail.fullName || detail.name || rider.name,
           phone: detail.phoneNumber || detail.phone || rider.phone,
-          bankAccount: detail.bankAccount || detail.bankDetails || (detail.bankName ? {
-            bankName: detail.bankName,
-            accountNumber: detail.accountNumber,
-            ifscCode: detail.ifscCode,
-            accountHolderName: detail.accountHolderName || detail.fullName,
-            branchName: detail.bankBranch || detail.branchName,
-            upiId: detail.upiId,
-            isVerified: detail.verificationStatus === 'VERIFIED' || detail.status === 'APPROVED',
-          } : rider.bankAccount || null),
-          documents: detail.documents || rider.documents,
+          bankAccount: {
+            bankName: detail.bankAccount?.bankName || detail.bankName || (rider as any).bankName || 'N/A',
+            accountNumber: detail.bankAccount?.accountNumber || detail.bankAccount?.accountNumberFull || detail.accountNumber || (rider as any).accountNumber || 'N/A',
+            ifscCode: detail.bankAccount?.ifscCode || detail.bankAccount?.ifsc || detail.ifscCode || (rider as any).ifscCode || 'N/A',
+            accountHolderName: detail.bankAccount?.accountHolderName || detail.accountHolderName || detail.fullName || (rider as any).fullName || rider.name || 'N/A',
+            branchName: detail.bankAccount?.branchName || detail.bankBranch || (rider as any).bankBranch || '',
+            upiId: detail.bankAccount?.upiId || detail.upiId || (rider as any).upiId || '',
+            isVerified: detail.bankAccount?.isVerified || detail.verificationStatus === 'VERIFIED' || detail.status === 'APPROVED',
+          },
+          documents: {
+            dlFront: detail.documents?.dlFront || detail.documents?.dlFrontUrl || detail.dlImageUrl || rider.documents?.dlFront || (rider as any).dlImageUrl || null,
+            dlFrontUrl: detail.documents?.dlFrontUrl || detail.documents?.dlFront || detail.dlImageUrl || rider.documents?.dlFrontUrl || (rider as any).dlImageUrl || null,
+            dlBack: detail.documents?.dlBack || detail.documents?.dlBackUrl || detail.dlBackUrl || rider.documents?.dlBack || null,
+            dlBackUrl: detail.documents?.dlBackUrl || detail.documents?.dlBack || detail.dlBackUrl || rider.documents?.dlBackUrl || null,
+            dlNumber: detail.documents?.dlNumber || detail.drivingLicense || detail.dlNumber || rider.documents?.dlNumber || (rider as any).drivingLicense || null,
+            rcFront: detail.documents?.rcFront || detail.documents?.rcFrontUrl || detail.rcImageUrl || rider.documents?.rcFront || (rider as any).rcImageUrl || null,
+            rcFrontUrl: detail.documents?.rcFrontUrl || detail.documents?.rcFront || detail.rcImageUrl || rider.documents?.rcFrontUrl || (rider as any).rcImageUrl || null,
+            rcBack: detail.documents?.rcBack || detail.documents?.rcBackUrl || detail.rcBackUrl || rider.documents?.rcBack || null,
+            rcBackUrl: detail.documents?.rcBackUrl || detail.documents?.rcBack || detail.rcBackUrl || rider.documents?.rcBackUrl || null,
+            rcNumber: detail.documents?.rcNumber || detail.rcNumber || rider.documents?.rcNumber || (rider as any).rcNumber || null,
+            insurance: detail.documents?.insurance || detail.documents?.insuranceUrl || detail.vehicleInsuranceUrl || rider.documents?.insurance || (rider as any).vehicleInsuranceUrl || null,
+            insuranceUrl: detail.documents?.insuranceUrl || detail.documents?.insurance || detail.vehicleInsuranceUrl || rider.documents?.insuranceUrl || (rider as any).vehicleInsuranceUrl || null,
+            aadhaarFront: detail.documents?.aadhaarFront || detail.documents?.aadhaarFrontUrl || detail.aadharFrontUrl || rider.documents?.aadhaarFront || (rider as any).aadharFrontUrl || null,
+            aadhaarFrontUrl: detail.documents?.aadhaarFrontUrl || detail.documents?.aadhaarFront || detail.aadharFrontUrl || rider.documents?.aadhaarFrontUrl || (rider as any).aadharFrontUrl || null,
+            aadhaarBack: detail.documents?.aadhaarBack || detail.documents?.aadhaarBackUrl || detail.aadharBackUrl || rider.documents?.aadhaarBack || (rider as any).aadharBackUrl || null,
+            aadhaarBackUrl: detail.documents?.aadhaarBackUrl || detail.documents?.aadhaarBack || detail.aadharBackUrl || rider.documents?.aadhaarBackUrl || (rider as any).aadharBackUrl || null,
+            aadhaarNumber: detail.documents?.aadhaarNumber || detail.aadharNumber || rider.documents?.aadhaarNumber || (rider as any).aadharNumber || null,
+            profilePhoto: detail.documents?.profilePhoto || detail.documents?.profilePhotoUrl || detail.profilePhotoUrl || rider.documents?.profilePhoto || null,
+            profilePhotoUrl: detail.documents?.profilePhotoUrl || detail.documents?.profilePhoto || detail.profilePhotoUrl || rider.documents?.profilePhotoUrl || null,
+          },
         };
         setSelectedRider(enriched);
         setEditForm({
@@ -349,6 +372,59 @@ export const CustomersScreen: React.FC = () => {
       Alert.alert('Error', e.message);
     } finally {
       setIsSavingRider(false);
+    }
+  };
+
+  const [isDeletingRider, setIsDeletingRider] = useState(false);
+
+  const handleDeleteRider = async (riderId?: string, riderName?: string) => {
+    const targetId = riderId || selectedRider?.id;
+    const targetName = riderName || selectedRider?.name || 'this delivery partner';
+    if (!targetId || isDeletingRider) return;
+
+    const confirmed = typeof window !== 'undefined' && window.confirm
+      ? window.confirm(`Are you sure you want to permanently delete delivery partner "${targetName}"?\n\nThis will remove their profile, bank accounts, and wallet data from MongoDB. This action cannot be undone.`)
+      : true;
+
+    if (!confirmed) return;
+
+    setIsDeletingRider(true);
+    try {
+      const ok = await deleteRider(targetId);
+      if (ok) {
+        setIsDetailModalOpen(false);
+        setSelectedRider(null);
+        if (typeof window !== 'undefined' && window.alert) {
+          window.alert(`Delivery partner "${targetName}" has been permanently deleted.`);
+        }
+      } else {
+        if (typeof window !== 'undefined' && window.alert) {
+          window.alert(`Failed to delete delivery partner. Please try again.`);
+        }
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to delete delivery partner');
+    } finally {
+      setIsDeletingRider(false);
+    }
+  };
+
+  const handleDeleteCustomerFromList = async (customerId: string, customerName: string) => {
+    const confirmed = typeof window !== 'undefined' && window.confirm
+      ? window.confirm(`Are you sure you want to permanently delete customer "${customerName}"?\n\nThis action cannot be undone.`)
+      : true;
+
+    if (!confirmed) return;
+
+    const ok = await deleteCustomer(customerId);
+    if (ok) {
+      if (typeof window !== 'undefined' && window.alert) {
+        window.alert(`Customer "${customerName}" deleted successfully.`);
+      }
+    } else {
+      if (typeof window !== 'undefined' && window.alert) {
+        window.alert(`Failed to delete customer. Please try again.`);
+      }
     }
   };
 
@@ -540,7 +616,20 @@ export const CustomersScreen: React.FC = () => {
                   >
                     <Text style={styles.reviewKycPillText}>Review KYC</Text>
                   </TouchableOpacity>
-                  <ChevronRight size={18} color={COLORS.secondaryText} style={{ marginTop: 4 }} />
+                  <View style={styles.cardActionsRow}>
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleDeleteCustomerFromList(c.id, c.name);
+                      }}
+                      style={styles.listDeleteBtn}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      accessibilityLabel="Delete Customer"
+                    >
+                      <Trash2 size={15} color="#EF4444" />
+                    </TouchableOpacity>
+                    <ChevronRight size={18} color={COLORS.secondaryText} />
+                  </View>
                 </View>
               </TouchableOpacity>
             ))
@@ -621,7 +710,20 @@ export const CustomersScreen: React.FC = () => {
                       {r.status}
                     </Text>
                   </View>
-                  <ChevronRight size={18} color={COLORS.secondaryText} style={{ marginTop: 6 }} />
+                  <View style={styles.cardActionsRow}>
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleDeleteRider(r.id, r.name);
+                      }}
+                      style={styles.listDeleteBtn}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      accessibilityLabel="Delete Partner"
+                    >
+                      <Trash2 size={15} color="#EF4444" />
+                    </TouchableOpacity>
+                    <ChevronRight size={18} color={COLORS.secondaryText} />
+                  </View>
                 </View>
               </TouchableOpacity>
             ))
@@ -661,13 +763,13 @@ export const CustomersScreen: React.FC = () => {
                     style={styles.backBtn}
                     activeOpacity={0.7}
                   >
-                    <ArrowLeft size={20} color={COLORS.textPrimary} />
+                    <ArrowLeft size={18} color={COLORS.textPrimary} />
                   </TouchableOpacity>
                 ) : (
-                  <Bike size={22} color={COLORS.primary} style={{ marginRight: 8 }} />
+                  <Bike size={20} color={COLORS.primary} style={{ marginRight: 6, flexShrink: 0 }} />
                 )}
-                <Text style={styles.modalHeaderTitle}>
-                  {isEditingRider ? 'Edit Partner Details' : 'Delivery Partner Profile'}
+                <Text style={styles.modalHeaderTitle} numberOfLines={1} ellipsizeMode="tail">
+                  {isEditingRider ? 'Edit Partner Details' : 'Partner Profile'}
                 </Text>
                 {selectedRider?.partnerCode && !isEditingRider && (
                   <View style={styles.partnerCodeBadgeHeader}>
@@ -680,8 +782,9 @@ export const CustomersScreen: React.FC = () => {
                 onPress={() => setIsDetailModalOpen(false)}
                 style={styles.closeBtn}
                 activeOpacity={0.7}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <X size={20} color={COLORS.textMuted} />
+                <X size={18} color="#0F172A" strokeWidth={2.5} />
               </TouchableOpacity>
             </View>
 
@@ -1124,6 +1227,19 @@ export const CustomersScreen: React.FC = () => {
                       <Edit3 size={18} color={COLORS.white} style={{ marginRight: 8 }} />
                       <Text style={styles.editActionBtnText}>Edit Partner Details</Text>
                     </TouchableOpacity>
+
+                    {/* Delete Partner Button */}
+                    <TouchableOpacity
+                      style={[styles.editActionBtn, styles.deletePartnerBtn]}
+                      onPress={() => handleDeleteRider()}
+                      disabled={isDeletingRider}
+                      activeOpacity={0.85}
+                    >
+                      <Trash2 size={18} color="#DC2626" style={{ marginRight: 8 }} />
+                      <Text style={styles.deletePartnerBtnText}>
+                        {isDeletingRider ? 'Deleting Partner...' : 'Delete Delivery Partner'}
+                      </Text>
+                    </TouchableOpacity>
                   </>
                 ) : (
                   /* ========================================================= */
@@ -1282,6 +1398,19 @@ export const CustomersScreen: React.FC = () => {
                         )}
                       </TouchableOpacity>
                     </View>
+
+                    {/* Delete Partner Button in Edit Form */}
+                    <TouchableOpacity
+                      style={[styles.editActionBtn, styles.deletePartnerBtn, { marginTop: 14 }]}
+                      onPress={() => handleDeleteRider()}
+                      disabled={isDeletingRider || isSavingRider}
+                      activeOpacity={0.85}
+                    >
+                      <Trash2 size={18} color="#DC2626" style={{ marginRight: 8 }} />
+                      <Text style={styles.deletePartnerBtnText}>
+                        {isDeletingRider ? 'Deleting Partner...' : 'Delete Delivery Partner'}
+                      </Text>
+                    </TouchableOpacity>
                   </View>
                 )}
               </ScrollView>
@@ -1755,7 +1884,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: SPACING.md,
-    paddingBottom: 80,
+    paddingBottom: 110,
   },
   emptyState: {
     padding: SPACING.xxl,
@@ -1795,15 +1924,16 @@ const styles = StyleSheet.create({
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
     gap: 4,
     marginBottom: 2,
   },
   customerName: {
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: '700',
     color: COLORS.textPrimary,
-    maxWidth: '75%',
+    flex: 1,
+    minWidth: 0,
   },
   corpBadge: {
     backgroundColor: COLORS.purple,
@@ -2023,13 +2153,16 @@ const styles = StyleSheet.create({
   modalHeaderTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
+    overflow: 'hidden',
   },
   backBtn: {
     marginRight: 8,
     padding: 4,
   },
   modalHeaderTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
     color: COLORS.textPrimary,
   },
@@ -2041,6 +2174,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#C7D2FE',
     marginLeft: 10,
+    flexShrink: 0,
   },
   partnerCodeTextHeader: {
     color: '#4338CA',
@@ -2050,7 +2184,13 @@ const styles = StyleSheet.create({
   closeBtn: {
     padding: 6,
     borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.cardBackground,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    marginLeft: 8,
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   loadingContainer: {
     padding: 40,
@@ -2285,6 +2425,32 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontWeight: '700',
     fontSize: 14,
+  },
+  deletePartnerBtn: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1.5,
+    borderColor: '#F87171',
+    marginTop: 8,
+    elevation: 0,
+  },
+  deletePartnerBtnText: {
+    color: '#DC2626',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  cardActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: 6,
+    gap: 8,
+  },
+  listDeleteBtn: {
+    padding: 5,
+    borderRadius: RADIUS.sm,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
   },
 
   /* Edit Form Styles */

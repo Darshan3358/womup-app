@@ -8,12 +8,14 @@ import {
   RefreshControl,
   Modal,
   Image,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRider } from '../../context/RiderContext';
 import { RiderApiService } from '../../services/riderApi';
 import { COLORS } from '../../theme/colors';
+import { OnlinePaymentModal } from '../../components/modals/OnlinePaymentModal';
 
 export const RiderDashboardScreen: React.FC = () => {
   const {
@@ -42,6 +44,7 @@ export const RiderDashboardScreen: React.FC = () => {
 
   const [showHubModal, setShowHubModal] = useState(false);
   const [isDetecting, setIsDetecting] = useState(false);
+  const [showPayAdminModal, setShowPayAdminModal] = useState(false);
 
   // Automatically auto-detect GPS location every 1 second continuously
   useEffect(() => {
@@ -76,12 +79,66 @@ export const RiderDashboardScreen: React.FC = () => {
     setRefreshing(false);
   };
 
-  return (
+    const netDueToAdmin = settlementSummary?.netBalance ?? settlementSummary?.riderOwesAdmin ?? 0;
+    const cashLimit = settlementSummary?.cashLimit ?? 500;
+    const isCashBlocked = Boolean(settlementSummary?.isOrderBlocked || netDueToAdmin >= cashLimit);
+    const isPendingApproval = Boolean(profile && profile.status !== 'APPROVED');
+
+    return (
     <ScrollView
       style={styles.container}
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
+      {/* 🟠 ACCOUNT UNDER REVIEW / PENDING ADMIN APPROVAL BANNER */}
+      {isPendingApproval && (
+        <View style={styles.pendingReviewBanner}>
+          <View style={styles.pendingReviewContent}>
+            <View style={styles.pendingIconCircle}>
+              <Ionicons name="time" size={18} color="#FFFFFF" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.pendingAlertTitle}>
+                Account Under Review
+              </Text>
+              <Text style={styles.pendingAlertSubtitle}>
+                Admin approval is pending. You cannot go online or accept orders yet.
+              </Text>
+            </View>
+          </View>
+          <View style={styles.pendingBadgePill}>
+            <Text style={styles.pendingBadgeText}>PENDING</Text>
+          </View>
+        </View>
+      )}
+
+      {/* 🚨 ACCOUNT LOCKED RED BANNER (₹500 Cash Limit Rule) */}
+      {isCashBlocked && (
+        <View style={styles.redLockAlertBanner}>
+          <View style={styles.redLockAlertContent}>
+            <View style={styles.redLockIconCircle}>
+              <Ionicons name="lock-closed" size={20} color="#FFFFFF" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.redLockAlertTitle}>
+                ⚠️ Account Locked: ₹{cashLimit} Cash Limit Exceeded
+              </Text>
+              <Text style={styles.redLockAlertSubtitle}>
+                Please deposit ₹{netDueToAdmin} to Admin to unlock new orders.
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={styles.redLockSettleBtn}
+            onPress={() => setShowPayAdminModal(true)}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="card" size={13} color="#DC2626" />
+            <Text style={styles.redLockSettleBtnText}>Pay Online</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* 1. Header Greeting Bar (Wireframe Screen 4) */}
       <View style={styles.topHeaderRow}>
         <View style={styles.topGreetingLeft}>
@@ -115,13 +172,13 @@ export const RiderDashboardScreen: React.FC = () => {
         <View style={styles.earningLeft}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Ionicons name="cash-outline" size={16} color="#FFF" />
-            <Text style={styles.todayEarningLabel}>Today's Earning</Text>
+            <Text style={styles.todayEarningLabel}>Today's Total Earning</Text>
           </View>
           <Text style={styles.todayEarningAmount}>
-            ₹ {settlementSummary?.netPayableToday ?? 520}
+            ₹ {settlementSummary?.totalEarnings ?? settlementSummary?.netPayableToday ?? 0}
           </Text>
           <Text style={styles.todayOrdersCount}>
-            {settlementSummary?.todayCompleted ?? 3} Orders
+            {settlementSummary?.todayCompleted ?? 0} Orders Delivered
           </Text>
         </View>
 
@@ -130,14 +187,43 @@ export const RiderDashboardScreen: React.FC = () => {
           onPress={() => setCurrentTab('Earnings')}
           activeOpacity={0.85}
         >
-          <Text style={styles.viewDetailsPillText}>View Details</Text>
+          <Text style={styles.viewDetailsPillText}>Khata Details</Text>
         </TouchableOpacity>
       </LinearGradient>
 
-      {/* 3. 3-Column Stats Row (Wireframe Screen 4) */}
+      {/* 3. Rider Khata 3-Metric Summary (SRS Flow) */}
+      <View style={styles.khataThreeColRow}>
+        <View style={styles.khataColCard}>
+          <Text style={styles.khataColLabel}>TODAY'S EARNING</Text>
+          <Text style={[styles.khataColValue, { color: '#059669' }]}>
+            ₹{settlementSummary?.totalEarnings ?? settlementSummary?.netPayableToday ?? 0}
+          </Text>
+          <Text style={styles.khataColSub}>Online + COD</Text>
+        </View>
+        <View style={styles.khataColCard}>
+          <Text style={styles.khataColLabel}>CASH IN HAND (COD)</Text>
+          <Text style={[styles.khataColValue, { color: '#071B52' }]}>
+            ₹{settlementSummary?.totalCodCollected ?? settlementSummary?.todayCod ?? 0}
+          </Text>
+          <Text style={styles.khataColSub}>Collected</Text>
+        </View>
+        <View style={[styles.khataColCard, isCashBlocked && styles.khataColCardAlert]}>
+          <Text style={[styles.khataColLabel, isCashBlocked && { color: '#DC2626' }]}>
+            {netDueToAdmin > 0 ? 'PENDING TO PAY' : 'ADMIN OWES'}
+          </Text>
+          <Text style={[styles.khataColValue, netDueToAdmin > 0 ? { color: '#DC2626' } : { color: '#059669' }]}>
+            ₹{Math.abs(netDueToAdmin)}
+          </Text>
+          <Text style={[styles.khataColSub, isCashBlocked && { color: '#DC2626', fontWeight: '700' }]}>
+            {isCashBlocked ? 'Locked (>= ₹500)' : 'Net Hisaab'}
+          </Text>
+        </View>
+      </View>
+
+      {/* 4. 3-Column Stats Row (Wireframe Screen 4) */}
       <View style={styles.statsThreeColRow}>
         <View style={styles.statColCard}>
-          <Text style={styles.statColValue}>{settlementSummary?.todayCompleted ?? 4}</Text>
+          <Text style={styles.statColValue}>{settlementSummary?.todayCompleted ?? 0}</Text>
           <Text style={styles.statColLabel}>Completed</Text>
         </View>
         <View style={styles.statColCard}>
@@ -150,18 +236,73 @@ export const RiderDashboardScreen: React.FC = () => {
         </View>
       </View>
 
+      {/* 🔴 ONLINE RIDER SETTLEMENT ACTION BUTTON (When Net Due > 0) */}
+      {netDueToAdmin > 0 && (
+        <TouchableOpacity
+          style={[
+            styles.payAdminActionBtn,
+            isCashBlocked && styles.payAdminActionBtnBlocked,
+          ]}
+          onPress={() => setShowPayAdminModal(true)}
+          activeOpacity={0.88}
+        >
+          <LinearGradient
+            colors={isCashBlocked ? ['#DC2626', '#B91C1C'] : ['#EF4444', '#DC2626']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.payAdminGradient}
+          >
+            <View style={styles.payAdminLeft}>
+              <View style={styles.payAdminIconCircle}>
+                <Ionicons name="card-outline" size={20} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.payAdminTitle}>Pay ₹{netDueToAdmin} to Admin</Text>
+                <Text style={styles.payAdminSubtitle}>
+                  {isCashBlocked ? 'Account Locked • Pay via UPI to Instant Unlock' : 'Settle Cash in Hand (COD) via UPI'}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.payAdminRight}>
+              <View style={styles.payAdminBadge}>
+                <Text style={styles.payAdminBadgeText}>PAY NOW</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
+            </View>
+          </LinearGradient>
+        </TouchableOpacity>
+      )}
+
       {/* 4. Two Large Action Buttons: Go Online + Order History (Wireframe Screen 4) */}
       <View style={styles.twoActionButtonsRow}>
         <TouchableOpacity
-          style={[styles.bigActionBtn, { backgroundColor: isOnline ? '#13B978' : '#059669' }]}
-          onPress={toggleDutyStatus}
+          style={[
+            styles.bigActionBtn,
+            isPendingApproval
+              ? { backgroundColor: '#94A3B8' }
+              : { backgroundColor: isOnline ? '#13B978' : '#059669' },
+          ]}
+          onPress={() => {
+            if (isPendingApproval) {
+              Alert.alert(
+                'Account Pending Approval',
+                'Your account and documents are currently under review by Admin. You cannot go online until approved.'
+              );
+              return;
+            }
+            toggleDutyStatus();
+          }}
           activeOpacity={0.85}
         >
           <View style={styles.bigActionIconCircle}>
-            <Ionicons name={isOnline ? "pause" : "play"} size={20} color={isOnline ? "#13B978" : "#059669"} />
+            <Ionicons
+              name={isPendingApproval ? 'lock-closed' : isOnline ? 'pause' : 'play'}
+              size={20}
+              color={isPendingApproval ? '#94A3B8' : isOnline ? '#13B978' : '#059669'}
+            />
           </View>
           <Text style={styles.bigActionBtnText}>
-            {isOnline ? 'Go Offline' : 'Go Online'}
+            {isPendingApproval ? 'Approval Pending' : isOnline ? 'Go Offline' : 'Go Online'}
           </Text>
         </TouchableOpacity>
 
@@ -547,12 +688,21 @@ export const RiderDashboardScreen: React.FC = () => {
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity
-                  style={styles.goOnlineBtn}
-                  onPress={toggleDutyStatus}
+                  style={[styles.goOnlineBtn, isPendingApproval && { backgroundColor: '#94A3B8' }]}
+                  onPress={() => {
+                    if (isPendingApproval) {
+                      Alert.alert(
+                        'Account Pending Approval',
+                        'Your account is currently under review by Admin. Please wait for verification.'
+                      );
+                      return;
+                    }
+                    toggleDutyStatus();
+                  }}
                   activeOpacity={0.8}
                 >
-                  <Ionicons name="power" size={14} color="#fff" style={{ marginRight: 6 }} />
-                  <Text style={styles.goOnlineText}>Go Online Now</Text>
+                  <Ionicons name={isPendingApproval ? 'lock-closed' : 'power'} size={14} color="#fff" style={{ marginRight: 6 }} />
+                  <Text style={styles.goOnlineText}>{isPendingApproval ? 'Approval Pending' : 'Go Online Now'}</Text>
                 </TouchableOpacity>
               )}
             </>
@@ -561,7 +711,7 @@ export const RiderDashboardScreen: React.FC = () => {
       ) : null}
 
       {/* Available Jobs Board Notification Banner */}
-      {availableJobs && availableJobs.length > 0 && (
+      {availableJobs && availableJobs.length > 0 && !isPendingApproval && (
         <TouchableOpacity
           style={styles.availableJobsCard}
           onPress={() => setCurrentTab('Deliveries')}
@@ -761,6 +911,16 @@ export const RiderDashboardScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Online UPI Settlement to Admin Modal */}
+      <OnlinePaymentModal
+        visible={showPayAdminModal}
+        onClose={() => setShowPayAdminModal(false)}
+        dueAmount={netDueToAdmin}
+        onPaymentSuccess={() => {
+          refreshDashboard();
+        }}
+      />
     </ScrollView>
   );
 };
@@ -770,6 +930,74 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
     padding: 16,
+  },
+  payAdminActionBtn: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 14,
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  payAdminActionBtnBlocked: {
+    shadowColor: '#991B1B',
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    elevation: 6,
+    borderWidth: 1.5,
+    borderColor: '#FCA5A5',
+  },
+  payAdminGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  payAdminLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  payAdminIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  payAdminTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -0.2,
+  },
+  payAdminSubtitle: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  payAdminRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  payAdminBadge: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  payAdminBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#DC2626',
+    letterSpacing: 0.5,
   },
   topHeaderRow: {
     flexDirection: 'row',
@@ -1643,19 +1871,19 @@ const styles = StyleSheet.create({
   promoBannerCard: {
     marginHorizontal: 0,
     marginTop: 0,
-    marginBottom: 16,
-    borderRadius: 20,
+    marginBottom: 14,
+    borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: '#071B52',
-    height: 140,
+    height: 94,
     position: 'relative',
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: 'rgba(255, 59, 152, 0.35)',
     shadowColor: '#071B52',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
   },
   promoBannerImage: {
     width: '100%',
@@ -1669,19 +1897,172 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    padding: 12,
-    backgroundColor: 'rgba(7, 27, 82, 0.78)',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(7, 27, 82, 0.82)',
   },
   promoBannerTitle: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '800',
     color: '#FFFFFF',
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
   },
   promoBannerSubtitle: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
     color: '#F472B6',
+    marginTop: 1,
+  },
+
+  // Red Lock & Khata Styles
+  redLockAlertBanner: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1.5,
+    borderColor: '#DC2626',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  redLockAlertContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  redLockIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#DC2626',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  redLockAlertTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#991B1B',
+  },
+  redLockAlertSubtitle: {
+    fontSize: 11,
+    color: '#B91C1C',
     marginTop: 2,
+    lineHeight: 15,
+  },
+  redLockSettleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#DC2626',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  redLockSettleBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#DC2626',
+  },
+
+  khataThreeColRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  khataColCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+  },
+  khataColCardAlert: {
+    borderColor: '#F87171',
+    backgroundColor: '#FFF5F5',
+  },
+  khataColLabel: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: '#64748B',
+    textTransform: 'uppercase',
+    textAlign: 'center',
+  },
+  khataColValue: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#071B52',
+    marginTop: 3,
+  },
+  khataColSub: {
+    fontSize: 9,
+    color: '#94A3B8',
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  pendingReviewBanner: {
+    backgroundColor: '#FFFBEB',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#FCD34D',
+    padding: 14,
+    marginHorizontal: 16,
+    marginTop: 14,
+    marginBottom: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    shadowColor: '#D97706',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  pendingReviewContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  pendingIconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#D97706',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pendingAlertTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#92400E',
+  },
+  pendingAlertSubtitle: {
+    fontSize: 11,
+    color: '#B45309',
+    marginTop: 2,
+    lineHeight: 15,
+  },
+  pendingBadgePill: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  pendingBadgeText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#D97706',
+    letterSpacing: 0.5,
   },
 });

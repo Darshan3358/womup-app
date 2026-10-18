@@ -322,6 +322,64 @@ router.put('/:id', async (req, res) => {
 
     const storeId = ObjectId.isValid(id) ? new ObjectId(id) : id;
 
+    // Sanitize and handle coordinates
+    if (body.latitude !== undefined && body.longitude !== undefined) {
+      const lat = parseFloat(body.latitude);
+      const lng = parseFloat(body.longitude);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        body.location = { type: 'Point', coordinates: [lng, lat] };
+        body.coordinates = [lng, lat];
+        body.latitude = lat;
+        body.longitude = lng;
+      }
+    } else if (body.coordinates && Array.isArray(body.coordinates) && body.coordinates.length === 2) {
+      const lng = parseFloat(body.coordinates[0]);
+      const lat = parseFloat(body.coordinates[1]);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        body.location = { type: 'Point', coordinates: [lng, lat] };
+        body.coordinates = [lng, lat];
+        body.latitude = lat;
+        body.longitude = lng;
+      }
+    }
+
+    // Sanitize numbers
+    if (body.serviceRadiusKm !== undefined) {
+      body.serviceRadiusKm = Number(body.serviceRadiusKm) || 4.5;
+    }
+    if (body.estimatedDeliveryMinutes !== undefined) {
+      body.estimatedDeliveryMinutes = Number(body.estimatedDeliveryMinutes) || 9;
+    }
+
+    // Check duplicate code or loginId against other stores
+    if (body.code || body.loginId) {
+      const orClauses = [];
+      if (body.code) {
+        body.code = String(body.code).trim().toUpperCase();
+        orClauses.push({ code: body.code });
+      }
+      if (body.loginId) {
+        body.loginId = String(body.loginId).trim();
+        orClauses.push({ loginId: { $regex: new RegExp(`^${body.loginId}$`, 'i') } });
+      }
+
+      const duplicate = await db.collection('stores').findOne({
+        _id: { $ne: storeId },
+        deletedAt: { $exists: false },
+        $or: orClauses,
+      });
+
+      if (duplicate) {
+        const isCodeDuplicate = body.code && duplicate.code === body.code;
+        return res.status(409).json({
+          success: false,
+          error: isCodeDuplicate
+            ? `Store code "${body.code}" is already in use by another dark store (${duplicate.name}).`
+            : `Login ID "${body.loginId}" is already taken by another store.`,
+        });
+      }
+    }
+
     // If updating areaId, enforce 1-store-per-area rule!
     if (body.areaId) {
       const areaQuery = ObjectId.isValid(body.areaId)
@@ -355,8 +413,12 @@ router.put('/:id', async (req, res) => {
       body.city = resolvedArea.cityName || resolvedArea.city || body.city;
     }
 
-    await db.collection('stores').updateOne({ _id: storeId }, { $set: body });
-    const updated = await db.collection('stores').findOne({ _id: storeId });
+    const storeQuery = ObjectId.isValid(id)
+      ? { $or: [{ _id: new ObjectId(id) }, { _id: String(id) }, { id: String(id) }] }
+      : { $or: [{ _id: String(id) }, { id: String(id) }] };
+
+    await db.collection('stores').updateOne(storeQuery, { $set: body });
+    const updated = await db.collection('stores').findOne(storeQuery);
     res.json({ success: true, message: 'Store updated successfully', data: updated });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -455,8 +517,14 @@ router.get('/inventory', async (req, res) => {
     const { storeId, productId, lowStockOnly } = req.query;
 
     const query = {};
-    if (storeId) query.storeId = new ObjectId(storeId);
-    if (productId) query.productId = new ObjectId(productId);
+    if (storeId) {
+      const sId = ObjectId.isValid(storeId) ? new ObjectId(storeId) : storeId;
+      query.storeId = { $in: [sId, storeId.toString()] };
+    }
+    if (productId) {
+      const pId = ObjectId.isValid(productId) ? new ObjectId(productId) : productId;
+      query.productId = { $in: [pId, productId.toString()] };
+    }
 
     const inventory = await db.collection('inventory').find(query).toArray();
     const products = await db.collection('products').find({}).toArray();
@@ -508,10 +576,15 @@ router.post('/inventory/shelf', async (req, res) => {
     const cleanShelf = (shelfLocation || '').trim().toUpperCase();
 
     let filter = {};
-    if (inventoryId) {
+    if (inventoryId && ObjectId.isValid(inventoryId)) {
       filter = { _id: new ObjectId(inventoryId) };
     } else if (storeId && productId) {
-      filter = { storeId: new ObjectId(storeId), productId: new ObjectId(productId) };
+      const sId = ObjectId.isValid(storeId) ? new ObjectId(storeId) : storeId;
+      const pId = ObjectId.isValid(productId) ? new ObjectId(productId) : productId;
+      filter = {
+        storeId: { $in: [sId, storeId.toString()] },
+        productId: { $in: [pId, productId.toString()] },
+      };
     } else {
       return res.status(400).json({ success: false, error: 'inventoryId or (storeId and productId) required' });
     }
@@ -521,8 +594,9 @@ router.post('/inventory/shelf', async (req, res) => {
     });
 
     if (productId) {
+      const pId = ObjectId.isValid(productId) ? new ObjectId(productId) : productId;
       await db.collection('products').updateOne(
-        { _id: new ObjectId(productId) },
+        { _id: pId },
         { $set: { shelfLocation: cleanShelf } }
       ).catch(() => {});
     }
@@ -540,20 +614,44 @@ router.post('/inventory/adjust', async (req, res) => {
     const { inventoryId, storeId, productId, deltaQty, reason, adminName } = req.body;
 
     let filter = {};
-    if (inventoryId) {
+    if (inventoryId && ObjectId.isValid(inventoryId)) {
       filter = { _id: new ObjectId(inventoryId) };
     } else if (storeId && productId) {
-      filter = { storeId: new ObjectId(storeId), productId: new ObjectId(productId) };
+      const sId = ObjectId.isValid(storeId) ? new ObjectId(storeId) : storeId;
+      const pId = ObjectId.isValid(productId) ? new ObjectId(productId) : productId;
+      filter = {
+        storeId: { $in: [sId, storeId.toString()] },
+        productId: { $in: [pId, productId.toString()] },
+      };
     } else {
       return res.status(400).json({ success: false, error: 'inventoryId or (storeId and productId) required' });
     }
 
     const delta = Number(deltaQty) || 0;
-    const inv = await db.collection('inventory').findOne(filter);
+    let inv = await db.collection('inventory').findOne(filter);
+    
+    // If not found but storeId and productId are present, initialize record for this store
+    if (!inv && storeId && productId) {
+      const sId = ObjectId.isValid(storeId) ? new ObjectId(storeId) : storeId;
+      const pId = ObjectId.isValid(productId) ? new ObjectId(productId) : productId;
+      const newDoc = {
+        storeId: sId,
+        productId: pId,
+        availableQty: Math.max(0, 50 + delta),
+        reservedQty: 0,
+        soldQty: 0,
+        lowStockThreshold: 10,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const insertRes = await db.collection('inventory').insertOne(newDoc);
+      inv = { ...newDoc, _id: insertRes.insertedId };
+    }
+
     if (!inv) return res.status(404).json({ success: false, error: 'Inventory record not found' });
 
     const newAvailable = Math.max(0, (inv.availableQty || 0) + delta);
-    await db.collection('inventory').updateOne(filter, {
+    await db.collection('inventory').updateOne({ _id: inv._id }, {
       $set: { availableQty: newAvailable, updatedAt: new Date() }
     });
 

@@ -626,15 +626,33 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [authStep, isOnline, refreshDashboard, refreshAvailableJobs]);
 
   const toggleDutyStatus = async () => {
+    if (profile && profile.status !== 'APPROVED') {
+      Alert.alert(
+        'Account Under Review',
+        'Your account and documents are currently pending Admin verification. You will be able to go online once approved.'
+      );
+      return;
+    }
     const nextStatus = !isOnline;
-    await RiderApiService.updateDutyStatus(nextStatus);
-    setIsOnline(nextStatus);
-    if (profile) {
-      setProfile({ ...profile, isOnline: nextStatus });
+    try {
+      await RiderApiService.updateDutyStatus(nextStatus);
+      setIsOnline(nextStatus);
+      if (profile) {
+        setProfile({ ...profile, isOnline: nextStatus });
+      }
+    } catch (err: any) {
+      Alert.alert('Notice', err.message || 'Cannot update duty status right now.');
     }
   };
 
   const acceptDelivery = async (targetJob?: DeliveryRequest) => {
+    if (profile && profile.status !== 'APPROVED') {
+      Alert.alert(
+        'Account Under Review',
+        'You cannot accept delivery orders until your account has been approved by Admin.'
+      );
+      return;
+    }
     const target = targetJob || incomingJobOffer || activeDelivery;
     if (target) {
       const updated = await RiderApiService.acceptDelivery(target.id);

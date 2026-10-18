@@ -43,10 +43,20 @@ export const CurrentDeliveryScreen: React.FC = () => {
     acceptDelivery,
     dismissJob,
     currentLocation,
+    settlementSummary,
+    setCurrentTab,
+    setSubScreen,
   } = useRider();
 
   const [isNavScreenOpen, setIsNavScreenOpen] = useState(false);
   const [navMode, setNavMode] = useState<'PICKUP' | 'DELIVERY'>('PICKUP');
+
+  const [cashCollectedConfirmed, setCashCollectedConfirmed] = useState(false);
+
+  const netDueToAdmin = settlementSummary?.netBalance ?? settlementSummary?.riderOwesAdmin ?? 0;
+  const cashLimit = settlementSummary?.cashLimit ?? 500;
+  const isCashBlocked = Boolean(settlementSummary?.isOrderBlocked || netDueToAdmin >= cashLimit);
+  const isPendingApproval = Boolean(profile && profile.status !== 'APPROVED');
 
   const hasActiveJob = Boolean(
     activeDelivery &&
@@ -615,6 +625,83 @@ export const CurrentDeliveryScreen: React.FC = () => {
                 </TouchableOpacity>
               )}
 
+              {/* Cash on Delivery (COD) Collection Card if COD Order */}
+              {(stepStatus === 'OUT_FOR_DELIVERY' || stepStatus === 'ARRIVED_AT_CUSTOMER') &&
+                (activeDelivery.isCod || activeDelivery.paymentMode === 'COD') && (
+                  <View style={styles.codCashCollectCard}>
+                    <View style={styles.codCashCollectTop}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Ionicons name="cash" size={18} color="#D97706" />
+                        <Text style={styles.codCashCollectTitle}>Cash on Delivery (COD)</Text>
+                      </View>
+                      <View
+                        style={[
+                          styles.codBadge,
+                          cashCollectedConfirmed ? styles.codBadgeSuccess : styles.codBadgePending,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.codBadgeText,
+                            cashCollectedConfirmed ? styles.codBadgeSuccessText : styles.codBadgePendingText,
+                          ]}
+                        >
+                          {cashCollectedConfirmed ? 'CASH RECEIVED' : 'PENDING COLLECTION'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text style={styles.codAmountBig}>
+                      ₹{activeDelivery.cashToCollect ?? activeDelivery.orderAmount ?? 100}
+                    </Text>
+                    <Text style={styles.codExplainerText}>
+                      Rider Earning: +₹{activeDelivery.riderEarning ?? 40} • Admin Share: ₹
+                      {(activeDelivery.cashToCollect ?? activeDelivery.orderAmount ?? 100) -
+                        (activeDelivery.riderEarning ?? 40)}
+                    </Text>
+
+                    {!cashCollectedConfirmed ? (
+                      <TouchableOpacity
+                        style={styles.collectCashActionBtn}
+                        onPress={() => {
+                          const cashAmt = activeDelivery.cashToCollect ?? activeDelivery.orderAmount ?? 100;
+                          Alert.alert(
+                            'Collect Cash',
+                            `Did you receive ₹${cashAmt} in cash from the customer?`,
+                            [
+                              { text: 'No, Not Yet', style: 'cancel' },
+                              {
+                                text: 'Yes, Cash Received',
+                                style: 'default',
+                                onPress: () => {
+                                  setCashCollectedConfirmed(true);
+                                  Alert.alert(
+                                    'Cash Collected',
+                                    `₹${cashAmt} cash confirmed! You can now verify customer OTP to complete delivery.`
+                                  );
+                                },
+                              },
+                            ]
+                          );
+                        }}
+                        activeOpacity={0.85}
+                      >
+                        <Ionicons name="hand-left" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                        <Text style={styles.collectCashActionBtnText}>
+                          COLLECT CASH ₹{activeDelivery.cashToCollect ?? activeDelivery.orderAmount ?? 100}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={styles.cashCollectedSuccessBox}>
+                        <Ionicons name="checkmark-circle" size={16} color="#059669" />
+                        <Text style={styles.cashCollectedSuccessText}>
+                          ₹{activeDelivery.cashToCollect ?? activeDelivery.orderAmount ?? 100} Cash in Hand Collected
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+
               {stepStatus === 'OUT_FOR_DELIVERY' && (
                 <TouchableOpacity
                   style={styles.primaryActionBtn}
@@ -630,7 +717,28 @@ export const CurrentDeliveryScreen: React.FC = () => {
                 <>
                   <TouchableOpacity
                     style={[styles.primaryActionBtn, { backgroundColor: '#7C3AED' }]}
-                    onPress={() => setShowOtpModal(true)}
+                    onPress={() => {
+                      const isCodOrder = activeDelivery.isCod || activeDelivery.paymentMode === 'COD';
+                      if (isCodOrder && !cashCollectedConfirmed) {
+                        const cashAmt = activeDelivery.cashToCollect ?? activeDelivery.orderAmount ?? 100;
+                        Alert.alert(
+                          'Cash Collection Required',
+                          `Please collect ₹${cashAmt} in cash from the customer before completing delivery!`,
+                          [
+                            { text: 'Cancel', style: 'cancel' },
+                            {
+                              text: 'Collect Cash Now',
+                              onPress: () => {
+                                setCashCollectedConfirmed(true);
+                                setShowOtpModal(true);
+                              },
+                            },
+                          ]
+                        );
+                        return;
+                      }
+                      setShowOtpModal(true);
+                    }}
                     activeOpacity={0.85}
                   >
                     <Ionicons name="key" size={18} color="#FFF" style={{ marginRight: 8 }} />
@@ -708,6 +816,71 @@ export const CurrentDeliveryScreen: React.FC = () => {
       {/* TAB 2: AVAILABLE JOBS BOARD VIEW                                      */}
       {/* ===================================================================== */}
       {activeTab === 'AVAILABLE' && (
+        isPendingApproval ? (
+          <ScrollView
+            style={styles.container}
+            contentContainerStyle={{ paddingBottom: 60 }}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.giantRedLockContainer}>
+              <View style={[styles.giantRedLockCircle, { backgroundColor: '#D97706' }]}>
+                <Ionicons name="time" size={54} color="#FFFFFF" />
+              </View>
+              <Text style={[styles.giantRedLockTitle, { color: '#92400E' }]}>Account Under Review</Text>
+              <Text style={styles.giantRedLockSubtitle}>
+                Your profile, vehicle details, and legal KYC documents are currently being verified by the Wom Up Admin team.
+              </Text>
+              <View style={styles.giantRedLockInstructionsCard}>
+                <Text style={styles.giantRedLockInstructionsTitle}>Verification Process</Text>
+                <Text style={styles.giantRedLockInstructionsText}>
+                  1. Admin verifies your Driving License, RC, and Bank details.{'\n'}
+                  2. Once approved, your status will change to VERIFIED.{'\n'}
+                  3. You will immediately be able to toggle duty Online and accept delivery orders!
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.giantRedLockActionBtn, { backgroundColor: '#D97706' }]}
+                onPress={() => setSubScreen('BankSettlement')}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="document-text-outline" size={18} color="#FFFFFF" />
+                <Text style={styles.giantRedLockActionBtnText}>Check KYC & Bank Details</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        ) : isCashBlocked ? (
+          <ScrollView
+            style={styles.container}
+            contentContainerStyle={{ paddingBottom: 60 }}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.giantRedLockContainer}>
+              <View style={styles.giantRedLockCircle}>
+                <Ionicons name="lock-closed" size={54} color="#FFFFFF" />
+              </View>
+              <Text style={styles.giantRedLockTitle}>Order Acceptance Locked</Text>
+              <Text style={styles.giantRedLockSubtitle}>
+                You have reached the maximum cash limit of ₹{cashLimit}. You currently hold ₹{netDueToAdmin} in pending dues owed to Admin.
+              </Text>
+              <View style={styles.giantRedLockInstructionsCard}>
+                <Text style={styles.giantRedLockInstructionsTitle}>How to Unlock Orders?</Text>
+                <Text style={styles.giantRedLockInstructionsText}>
+                  1. Handover ₹{netDueToAdmin} collected cash to your Admin or Hub manager.{'\n'}
+                  2. Admin will record the settlement on the Admin Portal.{'\n'}
+                  3. Your account will automatically unlock to accept high-earning orders!
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.giantRedLockActionBtn}
+                onPress={() => setCurrentTab('Earnings')}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="receipt-outline" size={18} color="#FFFFFF" />
+                <Text style={styles.giantRedLockActionBtnText}>View Net Hisaab & Khata</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        ) : (
         <ScrollView
           style={styles.container}
           contentContainerStyle={{ paddingBottom: 60 }}
@@ -855,13 +1028,50 @@ export const CurrentDeliveryScreen: React.FC = () => {
 
                 {/* 5. Full Width Action Button */}
                 <TouchableOpacity
-                  style={styles.jobAcceptBtnFull}
-                  onPress={() => acceptDelivery(job)}
+                  style={[
+                    styles.jobAcceptBtnFull,
+                    isPendingApproval
+                      ? { backgroundColor: '#94A3B8' }
+                      : isCashBlocked
+                      ? { backgroundColor: '#DC2626' }
+                      : undefined,
+                  ]}
+                  onPress={() => {
+                    if (isPendingApproval) {
+                      Alert.alert(
+                        'Account Pending Approval',
+                        'Your documents are under review by Admin. You cannot accept orders until approved.'
+                      );
+                      return;
+                    }
+                    if (isCashBlocked) {
+                      Alert.alert(
+                        'Order Acceptance Locked',
+                        `You have reached the ₹${cashLimit} cash limit (Dues: ₹${netDueToAdmin}). Please settle with Admin to accept orders.`,
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          { text: 'View Khata', onPress: () => setCurrentTab('Earnings') },
+                        ]
+                      );
+                      return;
+                    }
+                    acceptDelivery(job);
+                  }}
                   activeOpacity={0.85}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                    <Ionicons name="checkmark-circle-outline" size={16} color={COLORS.white} />
-                    <Text style={styles.jobAcceptBtnFullText}>ACCEPT DELIVERY</Text>
+                    <Ionicons
+                      name={isPendingApproval ? 'lock-closed' : isCashBlocked ? 'lock-closed' : 'checkmark-circle-outline'}
+                      size={16}
+                      color={COLORS.white}
+                    />
+                    <Text style={styles.jobAcceptBtnFullText}>
+                      {isPendingApproval
+                        ? 'LOCKED (PENDING ADMIN APPROVAL)'
+                        : isCashBlocked
+                        ? 'LOCKED (CASH LIMIT REACHED)'
+                        : 'ACCEPT DELIVERY'}
+                    </Text>
                   </View>
                 </TouchableOpacity>
 
@@ -877,6 +1087,7 @@ export const CurrentDeliveryScreen: React.FC = () => {
             ))
           )}
         </ScrollView>
+        )
       )}
 
       {/* ===================================================================== */}
@@ -2348,5 +2559,173 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: '#94A3B8',
+  },
+
+  // Giant Red Lock Screen Styles (₹500 Cash Limit Rule)
+  giantRedLockContainer: {
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    marginHorizontal: 16,
+    marginTop: 24,
+    borderWidth: 1.5,
+    borderColor: '#F87171',
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  giantRedLockCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#DC2626',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  giantRedLockTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#991B1B',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  giantRedLockSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  giantRedLockInstructionsCard: {
+    width: '100%',
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 20,
+  },
+  giantRedLockInstructionsTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#991B1B',
+    marginBottom: 6,
+  },
+  giantRedLockInstructionsText: {
+    fontSize: 12,
+    color: '#7F1D1D',
+    lineHeight: 18,
+  },
+  giantRedLockActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#071B52',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    width: '100%',
+  },
+  giantRedLockActionBtnText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+
+  // COD Cash Collection Card Styles
+  codCashCollectCard: {
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1.5,
+    borderColor: '#F59E0B',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
+    gap: 6,
+  },
+  codCashCollectTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  codCashCollectTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#92400E',
+  },
+  codBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  codBadgePending: {
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+  },
+  codBadgeSuccess: {
+    backgroundColor: '#DCFCE7',
+    borderWidth: 1,
+    borderColor: '#86EFAC',
+  },
+  codBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  codBadgePendingText: {
+    color: '#B45309',
+  },
+  codBadgeSuccessText: {
+    color: '#15803D',
+  },
+  codAmountBig: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: '#78350F',
+    marginVertical: 2,
+  },
+  codExplainerText: {
+    fontSize: 11,
+    color: '#92400E',
+    marginBottom: 6,
+  },
+  collectCashActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#D97706',
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginTop: 4,
+  },
+  collectCashActionBtnText: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
+  },
+  cashCollectedSuccessBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#DCFCE7',
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  cashCollectedSuccessText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#15803D',
   },
 });

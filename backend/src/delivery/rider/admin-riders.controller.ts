@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Put, Param, Query, Body } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Put, Delete, Param, Query, Body } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { RiderService } from './rider.service';
 
@@ -41,6 +41,12 @@ export class AdminRidersController {
   @ApiOperation({ summary: 'Update rider profile (PUT alias)' })
   async updateRiderPut(@Param('id') id: string, @Body() updates: any) {
     return this.riderService.adminUpdateRider(id, updates);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete delivery partner permanently' })
+  async deleteRider(@Param('id') id: string) {
+    return this.riderService.adminDeleteRider(id);
   }
 
   @Post([':id/approve', ':id/verify'])

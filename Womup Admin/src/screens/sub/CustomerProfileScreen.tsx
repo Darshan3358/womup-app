@@ -19,6 +19,7 @@ import {
   Printer,
   ChevronRight,
   FileText,
+  Trash2,
 } from 'lucide-react-native';
 import { COLORS, RADIUS, SPACING } from '../../theme';
 import { useAdminState } from '../../context/AdminStateContext';
@@ -29,8 +30,10 @@ export const CustomerProfileScreen: React.FC = () => {
   const {
     selectedCustomer,
     toggleBlockCustomer,
+    deleteCustomer,
     setActiveModal,
     navigateSubView,
+    goBackSubView,
     orders,
     printOrders,
     setSelectedOrder,
@@ -74,6 +77,34 @@ export const CustomerProfileScreen: React.FC = () => {
   const handleOpenPrintOrderDetail = (printOrder: PrintOrder) => {
     setSelectedPrintOrder(printOrder);
     setActiveModal('PrintOrderDetails');
+  };
+
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteCustomer = async () => {
+    if (!selectedCustomer || isDeleting) return;
+    const confirmed = typeof window !== 'undefined' && window.confirm
+      ? window.confirm(`Are you sure you want to permanently delete customer "${selectedCustomer.name}" (${selectedCustomer.phone})?\n\nThis will remove their profile, addresses, and cart data from the database. This action cannot be undone.`)
+      : true;
+
+    if (!confirmed) return;
+
+    setIsDeleting(true);
+    try {
+      const ok = await deleteCustomer(selectedCustomer.id);
+      if (ok) {
+        if (typeof window !== 'undefined' && window.alert) {
+          window.alert(`Customer ${selectedCustomer.name} has been deleted successfully.`);
+        }
+        goBackSubView();
+      } else {
+        if (typeof window !== 'undefined' && window.alert) {
+          window.alert(`Failed to delete customer. Please try again.`);
+        }
+      }
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -457,6 +488,18 @@ export const CustomerProfileScreen: React.FC = () => {
           <Text style={styles.btnText}>{isBlocked ? 'Unblock' : 'Block User'}</Text>
         </TouchableOpacity>
       </View>
+
+      <TouchableOpacity
+        style={styles.deleteCustomerBtn}
+        onPress={handleDeleteCustomer}
+        disabled={isDeleting}
+        activeOpacity={0.7}
+      >
+        <Trash2 size={16} color="#DC2626" style={{ marginRight: 6 }} />
+        <Text style={styles.deleteCustomerBtnText}>
+          {isDeleting ? 'Deleting Customer...' : 'Delete Customer Permanently'}
+        </Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 };
@@ -831,5 +874,21 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: COLORS.purple,
     letterSpacing: 0.5,
+  },
+  deleteCustomerBtn: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: RADIUS.button,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1.5,
+    borderColor: '#FCA5A5',
+  },
+  deleteCustomerBtnText: {
+    color: '#DC2626',
+    fontWeight: '700',
+    fontSize: 14,
   },
 });

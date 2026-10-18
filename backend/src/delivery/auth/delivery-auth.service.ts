@@ -16,6 +16,8 @@ import { User, UserDocument } from '../../users/schemas/user.schema';
 import {
   DeliveryPartner,
   DeliveryPartnerDocument,
+  RiderBankAccount,
+  RiderBankAccountDocument,
 } from '../schemas/delivery-partner.schema';
 import {
   OtpVerification,
@@ -31,25 +33,36 @@ import { EmailService } from '../../auth/email.service';
 
 export interface RegisterRiderDto {
   registrationToken?: string;
+  verificationId?: string;
   email: string;
-  fullName: string;
-  mobile: string;
+  fullName?: string;
+  name?: string;
+  mobile?: string;
+  phone?: string;
+  phoneNumber?: string;
   password?: string;
-  vehicleType: string;
-  vehicleNumber: string;
+  vehicleType?: string;
+  vehicleNumber?: string;
   city?: string;
   cityName?: string;
   cityId?: string;
   areaId?: string;
   areaName?: string;
   drivingLicense?: string;
+  drivingLicenseNumber?: string;
+  dlNumber?: string;
   dlImageUrl?: string;
+  dlFrontImage?: string;
+  dlBackImage?: string;
   aadharNumber?: string;
   aadharFrontUrl?: string;
+  aadharFrontImage?: string;
   aadharBackUrl?: string;
+  aadharBackImage?: string;
   profilePhotoUrl?: string;
   rcNumber?: string;
   rcImageUrl?: string;
+  rcFrontImage?: string;
   vehicleInsuranceUrl?: string;
   vehicleModelYear?: string;
   hubId?: string;
@@ -60,7 +73,37 @@ export interface RegisterRiderDto {
   accountHolderName?: string;
   accountNumber?: string;
   ifscCode?: string;
+  ifsc?: string;
   upiId?: string;
+  basicInfo?: {
+    name?: string;
+    phone?: string;
+    email?: string;
+  };
+  bankDetails?: {
+    bankName?: string;
+    bankBranch?: string;
+    accountHolderName?: string;
+    accountNumber?: string;
+    ifscCode?: string;
+    ifsc?: string;
+    upiId?: string;
+  };
+  documents?: {
+    aadharNumber?: string;
+    aadharFrontUrl?: string;
+    aadharFrontImage?: string;
+    aadharBackUrl?: string;
+    aadharBackImage?: string;
+    dlImageUrl?: string;
+    dlFrontImage?: string;
+    dlNumber?: string;
+    drivingLicense?: string;
+    rcNumber?: string;
+    rcImageUrl?: string;
+    rcFrontImage?: string;
+    vehicleInsuranceUrl?: string;
+  };
 }
 
 @Injectable()
@@ -71,6 +114,8 @@ export class DeliveryAuthService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(DeliveryPartner.name)
     private partnerModel: Model<DeliveryPartnerDocument>,
+    @InjectModel(RiderBankAccount.name)
+    private bankAccountModel: Model<RiderBankAccountDocument>,
     @InjectModel(OtpVerification.name)
     private otpModel: Model<OtpVerificationDocument>,
     @InjectModel(RiderOtpVerification.name)
@@ -213,7 +258,9 @@ export class DeliveryAuthService {
    */
   async registerRider(dto: RegisterRiderDto) {
     const cleanEmail = dto.email.trim().toLowerCase();
-    const cleanMobile = dto.mobile.trim().replace(/\s+/g, '').replace(/^\+91/, '');
+    const rawMobile = dto.mobile || dto.phone || dto.phoneNumber || dto.basicInfo?.phone || '';
+    const cleanMobile = String(rawMobile).trim().replace(/\s+/g, '').replace(/^\+91/, '');
+    const finalFullName = (dto.fullName || dto.name || dto.basicInfo?.name || '').trim();
 
     if (!cleanEmail || !cleanEmail.includes('@')) {
       throw new BadRequestException('Please provide a valid email address');
@@ -221,9 +268,25 @@ export class DeliveryAuthService {
     if (!cleanMobile || cleanMobile.length < 10) {
       throw new BadRequestException('Please provide a valid 10-digit mobile number');
     }
-    if (!dto.fullName || dto.fullName.trim().length < 2) {
+    if (!finalFullName || finalFullName.length < 2) {
       throw new BadRequestException('Please enter your full name');
     }
+
+    // Extract bank details (supporting both nested bankDetails and flat fields)
+    const finalBankName = (dto.bankDetails?.bankName || dto.bankName || '').trim();
+    const finalAccountHolder = (dto.bankDetails?.accountHolderName || dto.accountHolderName || finalFullName).trim();
+    const finalAccountNumber = (dto.bankDetails?.accountNumber || dto.accountNumber || '').trim();
+    const finalIfsc = (dto.bankDetails?.ifscCode || dto.bankDetails?.ifsc || dto.ifscCode || dto.ifsc || '').trim().toUpperCase();
+    const finalUpi = (dto.bankDetails?.upiId || dto.upiId || '').trim();
+
+    // Extract document URLs (supporting both nested documents and flat fields)
+    const finalAadhaarNum = (dto.documents?.aadharNumber || dto.aadharNumber || '').trim();
+    const finalAadhaarFront = (dto.documents?.aadharFrontImage || dto.documents?.aadharFrontUrl || dto.aadharFrontUrl || dto.aadharFrontImage || '').trim();
+    const finalAadhaarBack = (dto.documents?.aadharBackImage || dto.documents?.aadharBackUrl || dto.aadharBackUrl || dto.aadharBackImage || '').trim();
+    const finalDlNumber = (dto.documents?.dlNumber || dto.documents?.drivingLicense || dto.drivingLicense || dto.drivingLicenseNumber || '').trim().toUpperCase();
+    const finalDlFront = (dto.documents?.dlFrontImage || dto.documents?.dlImageUrl || dto.dlImageUrl || '').trim();
+    const finalRcNumber = (dto.documents?.rcNumber || dto.rcNumber || '').trim().toUpperCase();
+    const finalRcFront = (dto.documents?.rcFrontImage || dto.documents?.rcImageUrl || dto.rcImageUrl || '').trim();
 
     // Verify registration token if provided or check verified OTP
     if (dto.registrationToken) {
@@ -259,20 +322,45 @@ export class DeliveryAuthService {
     const count = await this.partnerModel.countDocuments();
     const riderCode = `RDR${String(count + 1).padStart(3, '0')}`;
 
-    // Find or create User document
+    // Find or create User document - Ensure ALL Bank and KYC fields are populated
     let user = await this.userModel.findOne({ email: cleanEmail });
+    const userPayload: any = {
+      email: cleanEmail,
+      phone: `+91${cleanMobile}`,
+      name: finalFullName,
+      role: Role.DELIVERY_PARTNER,
+      isActive: true,
+      verificationStatus: 'PENDING',
+      kycStatus: 'Pending',
+      customerKycStatus: 1,
+      customerIsVerify: 2,
+      bankName: finalBankName,
+      accountHolderName: finalAccountHolder,
+      accountNumber: finalAccountNumber,
+      ifscCode: finalIfsc,
+      upiId: finalUpi,
+      aadhaarNumber: finalAadhaarNum,
+      aadharFrontImage: finalAadhaarFront,
+      customer_image_aadhar_front: finalAadhaarFront,
+      aadharBackImage: finalAadhaarBack,
+      customer_image_aadhar_back: finalAadhaarBack,
+      vehicleType: dto.vehicleType || 'BIKE',
+      vehicleNumber: (dto.vehicleNumber || 'GJ 01 AB 1234').trim().toUpperCase(),
+      dlNumber: finalDlNumber,
+      dlFrontImage: finalDlFront,
+      rcNumber: finalRcNumber,
+      rcFrontImage: finalRcFront,
+      isOnline: false,
+      currentCashLimit: 500,
+      totalDeliveries: 0,
+      ...(passwordHash ? { password: passwordHash } : {}),
+    };
+
     if (!user) {
-      user = await this.userModel.create({
-        email: cleanEmail,
-        phone: `+91${cleanMobile}`,
-        name: dto.fullName.trim(),
-        role: Role.DELIVERY_PARTNER,
-        isActive: true,
-        ...(passwordHash ? { password: passwordHash } : {}),
-      });
+      user = await this.userModel.create(userPayload);
     } else {
       user.role = Role.DELIVERY_PARTNER;
-      if (passwordHash) (user as any).password = passwordHash;
+      Object.assign(user, userPayload);
       await user.save();
     }
 
@@ -284,7 +372,7 @@ export class DeliveryAuthService {
       userId: user._id,
       partnerCode: riderCode,
       riderCode,
-      fullName: dto.fullName.trim(),
+      fullName: finalFullName,
       email: cleanEmail,
       emailVerified: true,
       phoneNumber: cleanMobile,
@@ -292,24 +380,24 @@ export class DeliveryAuthService {
       passwordHash,
       vehicleType: dto.vehicleType || 'BIKE',
       vehicleNumber: (dto.vehicleNumber || 'GJ 01 AB 1234').trim().toUpperCase(),
-      drivingLicense: dto.drivingLicense?.trim().toUpperCase(),
-      dlImageUrl: dto.dlImageUrl,
-      aadharNumber: dto.aadharNumber,
-      aadharFrontUrl: dto.aadharFrontUrl,
-      aadharBackUrl: dto.aadharBackUrl,
+      drivingLicense: finalDlNumber,
+      dlImageUrl: finalDlFront,
+      aadharNumber: finalAadhaarNum,
+      aadharFrontUrl: finalAadhaarFront,
+      aadharBackUrl: finalAadhaarBack,
       profilePhotoUrl: dto.profilePhotoUrl,
-      rcNumber: dto.rcNumber,
-      rcImageUrl: dto.rcImageUrl,
+      rcNumber: finalRcNumber,
+      rcImageUrl: finalRcFront,
       vehicleInsuranceUrl: dto.vehicleInsuranceUrl,
       vehicleModelYear: dto.vehicleModelYear,
       shiftPreference: dto.shiftPreference || 'FLEXIBLE',
       emergencyContact: dto.emergencyContact,
-      bankName: dto.bankName,
+      bankName: finalBankName,
       bankBranch: dto.bankBranch,
-      accountHolderName: dto.accountHolderName,
-      accountNumber: dto.accountNumber,
-      ifscCode: dto.ifscCode,
-      upiId: dto.upiId,
+      accountHolderName: finalAccountHolder,
+      accountNumber: finalAccountNumber,
+      ifscCode: finalIfsc,
+      upiId: finalUpi,
       cityId: dto.cityId ? new Types.ObjectId(dto.cityId) : undefined,
       city: chosenCity,
       cityName: chosenCity,
@@ -328,6 +416,22 @@ export class DeliveryAuthService {
       registeredAt: new Date(),
       lastLoginAt: new Date(),
     });
+
+    // Create initial bank account record if bank details provided
+    if (finalBankName || finalAccountNumber) {
+      const rawAcc = finalAccountNumber;
+      const masked = rawAcc.length >= 4 ? `********${rawAcc.slice(-4)}` : (rawAcc ? `********${rawAcc}` : '********4829');
+      await this.bankAccountModel.create({
+        riderId: partner._id,
+        bankName: finalBankName,
+        accountHolderName: finalAccountHolder,
+        accountNumberFull: rawAcc,
+        maskedAccount: masked,
+        ifsc: finalIfsc,
+        upiId: finalUpi,
+        verificationStatus: 'PENDING',
+      });
+    }
 
     // Cleanup used registration token
     await this.riderOtpModel.deleteMany({ email: cleanEmail });
@@ -717,6 +821,7 @@ export class DeliveryAuthService {
       areaId: partner.areaId?.toString(),
       hubName: partner.hubName,
       status: partner.status,
+      verificationStatus: partner.verificationStatus || (partner.status === 'APPROVED' ? 'VERIFIED' : partner.status === 'REJECTED' ? 'REJECTED' : 'PENDING'),
       isOnline: partner.isOnline,
       isActive: partner.isActive,
       isBlocked: partner.isBlocked,

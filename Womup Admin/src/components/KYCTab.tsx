@@ -79,14 +79,14 @@ export const KYCTab: React.FC<KYCTabProps> = ({ customer, onStatusChange }) => {
           aadhaarFrontUrl: customer.customer_image_aadhar_front || customer.aadhaarFrontImage || '',
           aadhaarBackUrl: customer.customer_image_aadhar_back || customer.aadhaarBackImage || '',
           bankDetails: {
-            bankName: customer.bankName || 'HDFC Bank',
-            branchName: customer.branchName || 'SG Highway',
-            accountHolderName: customer.accountHolderName || customer.name,
+            bankName: customer.bankName || 'Not Linked',
+            branchName: customer.branchName || 'N/A',
+            accountHolderName: customer.accountHolderName || customer.name || 'N/A',
             accountNumber: customer.accountNumber
               ? `XXXX ${customer.accountNumber.slice(-4)}`
-              : 'XXXX 9182',
-            ifscCode: customer.ifscCode || 'HDFC0000123',
-            upiId: customer.upiId || 'ayushi@okhdfcbank',
+              : 'N/A',
+            ifscCode: customer.ifscCode || 'N/A',
+            upiId: customer.upiId || 'N/A',
           },
           personalInfo: {
             firstName: customer.firstName || customer.name.split(' ')[0],
@@ -463,21 +463,21 @@ export const KYCTab: React.FC<KYCTabProps> = ({ customer, onStatusChange }) => {
           <View style={styles.infoField}>
             <Text style={styles.fieldLabel}>Bank Name</Text>
             <Text style={styles.fieldValueBold}>
-              {kycData?.bankDetails?.bankName || customer.bankName || 'HDFC Bank'}
+              {kycData?.bankDetails?.bankName || customer.bankName || 'Not Linked'}
             </Text>
           </View>
 
           <View style={styles.infoField}>
             <Text style={styles.fieldLabel}>Branch Name</Text>
             <Text style={styles.fieldValue}>
-              {kycData?.bankDetails?.branchName || customer.branchName || 'SG Highway'}
+              {kycData?.bankDetails?.branchName || customer.branchName || 'N/A'}
             </Text>
           </View>
 
           <View style={styles.infoField}>
             <Text style={styles.fieldLabel}>Account Holder Name</Text>
             <Text style={styles.fieldValueBold}>
-              {kycData?.bankDetails?.accountHolderName || customer.accountHolderName || customer.name}
+              {kycData?.bankDetails?.accountHolderName || customer.accountHolderName || customer.name || 'N/A'}
             </Text>
           </View>
 
@@ -485,21 +485,21 @@ export const KYCTab: React.FC<KYCTabProps> = ({ customer, onStatusChange }) => {
             <Text style={styles.fieldLabel}>Account Number</Text>
             <Text style={styles.fieldValueMono}>
               {kycData?.bankDetails?.accountNumber ||
-                (customer.accountNumber ? `XXXX ${customer.accountNumber.slice(-4)}` : 'XXXX 9182')}
+                (customer.accountNumber ? `XXXX ${customer.accountNumber.slice(-4)}` : 'N/A')}
             </Text>
           </View>
 
           <View style={styles.infoField}>
             <Text style={styles.fieldLabel}>IFSC Code</Text>
             <Text style={styles.fieldValueMono}>
-              {kycData?.bankDetails?.ifscCode || customer.ifscCode || 'HDFC0000123'}
+              {kycData?.bankDetails?.ifscCode || customer.ifscCode || 'N/A'}
             </Text>
           </View>
 
           <View style={styles.infoField}>
             <Text style={styles.fieldLabel}>UPI ID</Text>
             <Text style={styles.fieldValueMono}>
-              {kycData?.bankDetails?.upiId || customer.upiId || 'ayushi@okhdfcbank'}
+              {kycData?.bankDetails?.upiId || customer.upiId || 'N/A'}
             </Text>
           </View>
         </View>

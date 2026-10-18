@@ -24,6 +24,16 @@ interface MenuItem {
 export const RiderMoreMenuScreen: React.FC = () => {
   const { profile, setSubScreen, unreadCount, logout, detectedHubName, setCurrentTab } = useRider();
 
+  const isKycVerified =
+    profile?.status === 'APPROVED' ||
+    profile?.status === 'ACTIVE' ||
+    profile?.verificationStatus === 'VERIFIED';
+  const isKycRejected =
+    profile?.status === 'REJECTED' ||
+    profile?.verificationStatus === 'REJECTED';
+  const kycBadge = isKycVerified ? 'VERIFIED' : isKycRejected ? 'REJECTED' : 'PENDING';
+  const kycBadgeColor = isKycVerified ? '#10B981' : isKycRejected ? '#EF4444' : '#F59E0B';
+
   const menuItems: MenuItem[] = [
     { key: 'None', icon: 'home-outline', title: 'Dashboard' },
     { key: 'DutyHistory', icon: 'receipt-outline', title: 'Order History' },
@@ -31,7 +41,7 @@ export const RiderMoreMenuScreen: React.FC = () => {
     { key: 'BankSettlement', icon: 'wallet-outline', title: 'Wallet & Payouts' },
     { key: 'Profile', icon: 'person-outline', title: 'My Profile' },
     { key: 'VehicleDetails', icon: 'bicycle-outline', title: 'Vehicle Details' },
-    { key: 'Documents', icon: 'document-text-outline', title: 'KYC & Documents', badge: 'VERIFIED', badgeColor: '#13B978' },
+    { key: 'Documents', icon: 'document-text-outline', title: 'KYC & Documents', badge: kycBadge, badgeColor: kycBadgeColor },
     { key: 'Performance', icon: 'stats-chart-outline', title: 'Performance & Rating', badge: '4.9 ★', badgeColor: '#F59E0B' },
     { key: 'Notifications', icon: 'notifications-outline', title: 'Alerts & Broadcasts', badge: unreadCount > 0 ? `${unreadCount} NEW` : undefined, badgeColor: '#FF3B98' },
     { key: 'Support', icon: 'headset-outline', title: 'Help & Support' },
@@ -241,12 +251,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   iconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   rowTitle: {
     fontSize: 14,
@@ -271,7 +283,8 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: '#F1F5F9',
-    marginLeft: 48,
+    marginLeft: 50,
+    marginRight: 4,
   },
   logoutBtn: {
     flexDirection: 'row',

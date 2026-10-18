@@ -23,4 +23,8 @@ export class UpdateBankAccountDto {
   @IsOptional()
   @IsString()
   ifsc?: string;
+
+  @IsOptional()
+  @IsString()
+  upiId?: string;
 }

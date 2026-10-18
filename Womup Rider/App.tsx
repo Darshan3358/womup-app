@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
@@ -124,10 +124,12 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: COLORS.navy,
+    ...(Platform.OS === 'web' ? ({ height: '100vh', maxHeight: '100vh' } as any) : {}),
   },
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+    ...(Platform.OS === 'web' ? ({ height: '100%', overflow: 'hidden' } as any) : {}),
   },
   body: {
     flex: 1,

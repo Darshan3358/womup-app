@@ -114,58 +114,27 @@ class RiderUploadService {
 
     let finalUrl = '';
     let publicId = '';
-    let directOk = false;
 
-    // Step 3: Direct signed Cloudinary upload
-    if (signatureData?.uploadUrl && signatureData?.apiKey && signatureData?.signature) {
-      try {
-        formData.append('api_key', signatureData.apiKey);
-        formData.append('timestamp', String(signatureData.timestamp));
-        formData.append('signature', signatureData.signature);
-        formData.append('folder', signatureData.folder || folder);
-        if (signatureData.publicId) {
-          formData.append('public_id', signatureData.publicId);
-        }
-
-        const cloudRes = await fetch(signatureData.uploadUrl, {
+    // Direct resilient upload via backend proxy (100% authenticated Cloudinary upload)
+    try {
+      const proxyRes = await fetch(
+        `${API_BASE_URL}/uploads/upload?folder=${encodeURIComponent(folder)}`,
+        {
           method: 'POST',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
           body: formData,
-        });
-
-        const cloudData = await cloudRes.json();
-        if (cloudRes.ok && cloudData.secure_url) {
-          finalUrl = cloudData.secure_url;
-          publicId = cloudData.public_id;
-          directOk = true;
-          onProgress?.(80);
-        }
-      } catch (err) {
-        console.warn('[RiderUploadService] Direct upload exception:', err);
+        },
+      );
+      const proxyData = await proxyRes.json();
+      if (proxyRes.ok && (proxyData.data?.secure_url || proxyData.data?.url || proxyData.url)) {
+        finalUrl = proxyData.data?.secure_url || proxyData.data?.url || proxyData.url;
+        publicId = proxyData.data?.publicId || proxyData.data?.public_id || proxyData.publicId || '';
+        onProgress?.(80);
+      } else {
+        throw new Error(proxyData.message || 'Server upload failed');
       }
-    }
-
-    // Step 4: Fallback to backend proxy if direct failed
-    if (!directOk) {
-      try {
-        const proxyRes = await fetch(
-          `${API_BASE_URL}/uploads/upload?folder=${encodeURIComponent(folder)}`,
-          {
-            method: 'POST',
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-            body: formData,
-          },
-        );
-        const proxyData = await proxyRes.json();
-        if (proxyRes.ok && (proxyData.data?.url || proxyData.url)) {
-          finalUrl = proxyData.data?.url || proxyData.url;
-          publicId = proxyData.data?.publicId || proxyData.publicId || '';
-          onProgress?.(80);
-        } else {
-          throw new Error(proxyData.message || 'Proxy upload failed');
-        }
-      } catch (proxyErr: any) {
-        throw new Error(`Upload failed: ${proxyErr.message || 'Network error'}`);
-      }
+    } catch (proxyErr: any) {
+      throw new Error(`Upload failed: ${proxyErr.message || 'Network error'}`);
     }
 
     // Step 5: Save audit reference in DB

@@ -309,7 +309,7 @@ export const SidebarDrawer: React.FC = () => {
                 <MapPin size={18} color={activeTab === 'Locations' && subView === 'none' ? COLORS.white : COLORS.success} />
               </View>
               <Text style={[styles.menuLabel, activeTab === 'Locations' && subView === 'none' && styles.menuLabelActive]}>
-                Cities & Areas (1:1 Store)
+                Cities & Operational Areas
               </Text>
               <ChevronRight size={16} color={COLORS.secondaryText} />
             </TouchableOpacity>
@@ -427,13 +427,13 @@ export const SidebarDrawer: React.FC = () => {
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(5, 6, 42, 0.65)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     flexDirection: 'row',
     justifyContent: 'flex-end',
   },
   safeDrawerArea: {
-    width: '82%',
-    maxWidth: 320,
+    width: '80%',
+    maxWidth: 300,
     height: '100%',
   },
   drawerPanel: {
@@ -523,8 +523,9 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   menuContent: {
-    padding: SPACING.md,
-    paddingBottom: SPACING.lg,
+    paddingHorizontal: 10,
+    paddingTop: 12,
+    paddingBottom: 36,
   },
   menuSectionTitle: {
     fontSize: 10,
@@ -532,33 +533,36 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     letterSpacing: 0.8,
     marginBottom: SPACING.sm,
+    paddingHorizontal: 4,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: SPACING.sm,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
     borderRadius: RADIUS.card,
-    marginBottom: 4,
+    marginBottom: 3,
   },
   menuItemActive: {
     backgroundColor: COLORS.lightPink,
   },
   iconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: COLORS.cardBackground,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
+    marginRight: 8,
+    flexShrink: 0,
   },
   iconActive: {
     backgroundColor: COLORS.hotPink,
   },
   menuLabel: {
     flex: 1,
-    fontSize: 13,
+    minWidth: 0,
+    fontSize: 12.5,
     fontWeight: '600',
     color: COLORS.textPrimary,
   },

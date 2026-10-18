@@ -42,6 +42,12 @@ export class SettlementController {
     return this.settlementService.getBalance(user.id);
   }
 
+  @Get('wallet')
+  @ApiOperation({ summary: 'Get complete rider wallet details with transactions' })
+  async getWallet(@CurrentUser() user: any) {
+    return this.settlementService.getRiderWallet(user.id);
+  }
+
   @Post('payout/request')
   @ApiOperation({ summary: 'Request instant IMPS payout to verified bank account' })
   async requestPayout(@CurrentUser() user: any, @Body() body: RequestPayoutDto) {
@@ -58,6 +64,27 @@ export class SettlementController {
   @ApiOperation({ summary: 'Update payout bank account details' })
   async updateBankAccount(@CurrentUser() user: any, @Body() body: UpdateBankAccountDto) {
     return this.settlementService.updateBankAccount(user.id, body);
+  }
+
+  @Get('settlements/payment-info')
+  @ApiOperation({ summary: 'Get Admin UPI payment details and current dues for online settlement' })
+  async getPaymentInfo(@CurrentUser() user: any) {
+    return this.settlementService.getPaymentInfo(user.id);
+  }
+
+  @Post('settlements/request')
+  @ApiOperation({ summary: 'Submit online UPI payment proof (UTR) to settle COD dues and unblock account' })
+  async createSettlementRequest(
+    @CurrentUser() user: any,
+    @Body() body: { amount: number; utrNumber: string },
+  ) {
+    return this.settlementService.createSettlementRequest(user.id, body);
+  }
+
+  @Get('settlements/my-requests')
+  @ApiOperation({ summary: 'Get list of rider settlement requests submitted by current rider' })
+  async getMySettlementRequests(@CurrentUser() user: any) {
+    return this.settlementService.getMySettlementRequests(user.id);
   }
 }
 

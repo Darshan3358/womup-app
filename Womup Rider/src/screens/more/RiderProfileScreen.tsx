@@ -21,6 +21,15 @@ export const RiderProfileScreen: React.FC = () => {
   const [city, setCity] = useState(profile?.city || 'Ahmedabad (Satellite Hub)');
   const [saving, setSaving] = useState(false);
 
+  const isKycVerified =
+    profile?.status === 'APPROVED' ||
+    profile?.status === 'ACTIVE' ||
+    profile?.verificationStatus === 'VERIFIED';
+  const isKycRejected =
+    profile?.status === 'REJECTED' ||
+    profile?.verificationStatus === 'REJECTED';
+  const kycStatusLabel = isKycVerified ? 'VERIFIED' : isKycRejected ? 'REJECTED' : 'PENDING';
+
   const handleSave = async () => {
     if (!name.trim()) {
       Alert.alert('Required Field', 'Please enter your full name');
@@ -110,17 +119,43 @@ export const RiderProfileScreen: React.FC = () => {
           activeOpacity={0.7}
         >
           <View style={styles.navLeft}>
-            <View style={[styles.navIconBox, { backgroundColor: '#ECFDF5' }]}>
-              <Ionicons name="document-text" size={18} color="#059669" />
+            <View style={[styles.navIconBox, { backgroundColor: isKycVerified ? '#ECFDF5' : isKycRejected ? '#FEF2F2' : '#FFFBEB' }]}>
+              <Ionicons
+                name="document-text"
+                size={18}
+                color={isKycVerified ? '#059669' : isKycRejected ? '#DC2626' : '#D97706'}
+              />
             </View>
             <View>
               <Text style={styles.navTitle}>Documents</Text>
-              <Text style={styles.navSubtitle}>Aadhaar, DL, PAN & RC Verified</Text>
+              <Text style={styles.navSubtitle}>
+                {isKycVerified
+                  ? 'Aadhaar, DL, PAN & RC Verified'
+                  : isKycRejected
+                  ? 'Verification Rejected • Tap to re-upload'
+                  : 'Pending Verification • Under Review'}
+              </Text>
             </View>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <View style={styles.verifiedSmallBadge}>
-              <Text style={styles.verifiedSmallText}>VERIFIED</Text>
+            <View
+              style={[
+                styles.verifiedSmallBadge,
+                {
+                  backgroundColor: isKycVerified ? '#ECFDF5' : isKycRejected ? '#FEF2F2' : '#FFFBEB',
+                  borderColor: isKycVerified ? '#A7F3D0' : isKycRejected ? '#FECACA' : '#FDE68A',
+                  borderWidth: 1,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.verifiedSmallText,
+                  { color: isKycVerified ? '#059669' : isKycRejected ? '#DC2626' : '#D97706' },
+                ]}
+              >
+                {kycStatusLabel}
+              </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
           </View>

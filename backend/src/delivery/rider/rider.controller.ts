@@ -23,13 +23,10 @@ class LocationDto {
 
   @IsOptional()
   @IsNumber()
-  @Min(0)
   speed?: number;
 
   @IsOptional()
   @IsNumber()
-  @Min(0)
-  @Max(360)
   heading?: number;
 
   @IsOptional()
@@ -71,6 +68,10 @@ export class RiderController {
   @Post('location')
   @ApiOperation({ summary: 'Post GPS telemetry and broadcast to real-time tracking gateway' })
   async updateLocation(@CurrentUser() user: any, @Body() body: LocationDto) {
-    return this.riderService.updateLocation(user.id, body);
+    const userId = user?.id || user?._id || user?.sub;
+    if (!userId) {
+      return { success: false, message: 'Rider session not authenticated' };
+    }
+    return this.riderService.updateLocation(userId, body);
   }
 }

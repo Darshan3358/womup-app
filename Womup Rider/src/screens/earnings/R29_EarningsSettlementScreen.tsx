@@ -13,6 +13,7 @@ import { COLORS } from '../../theme/colors';
 import { useRider } from '../../context/RiderContext';
 import { RiderApiService } from '../../services/riderApi';
 import { SettlementHistoryItem } from '../../types/rider.types';
+import { OnlinePaymentModal } from '../../components/modals/OnlinePaymentModal';
 
 type FilterPeriod = 'TODAY' | 'WEEK' | 'MONTH';
 
@@ -28,10 +29,15 @@ export const EarningsSettlementScreen: React.FC = () => {
   const [history, setHistory] = useState<SettlementHistoryItem[]>([]);
   const [filter, setFilter] = useState<FilterPeriod>('TODAY');
   const [refreshing, setRefreshing] = useState(false);
+  const [showPayAdminModal, setShowPayAdminModal] = useState(false);
 
   const loadData = async () => {
-    const list = await RiderApiService.getSettlementHistory();
-    setHistory(list);
+    try {
+      const list = await RiderApiService.getSettlementHistory();
+      setHistory(list || []);
+    } catch {
+      setHistory([]);
+    }
     await refreshDashboard();
   };
 
@@ -93,38 +99,42 @@ export const EarningsSettlementScreen: React.FC = () => {
 
   const displayTotal =
     filter === 'TODAY'
-      ? (settlementSummary?.netPayableToday || 520)
+      ? (settlementSummary?.netPayableToday ?? 0)
       : filter === 'WEEK'
-      ? (settlementSummary?.weekEarnings || 2450)
-      : (settlementSummary?.monthEarnings || 9800);
+      ? (settlementSummary?.weekEarnings ?? 0)
+      : (settlementSummary?.monthEarnings ?? 0);
 
   const displayOrders =
     filter === 'TODAY'
-      ? (settlementSummary?.todayCompleted || 3)
+      ? (settlementSummary?.todayCompleted ?? 0)
       : filter === 'WEEK'
-      ? 18
-      : 74;
+      ? (settlementSummary?.weekOrders ?? (settlementSummary?.todayCompleted ? settlementSummary.todayCompleted * 4 : 0))
+      : (settlementSummary?.monthOrders ?? (settlementSummary?.todayCompleted ? settlementSummary.todayCompleted * 15 : 0));
 
   const displayBase =
     filter === 'TODAY'
-      ? (settlementSummary?.basePayout || 420)
+      ? (settlementSummary?.basePayout ?? 0)
       : filter === 'WEEK'
-      ? 2000
-      : 8000;
+      ? (settlementSummary?.weekBase ?? (settlementSummary?.basePayout ? settlementSummary.basePayout * 4 : 0))
+      : (settlementSummary?.monthBase ?? (settlementSummary?.basePayout ? settlementSummary.basePayout * 15 : 0));
 
   const displayTips =
     filter === 'TODAY'
-      ? (settlementSummary?.tips || 50)
+      ? (settlementSummary?.tips ?? 0)
       : filter === 'WEEK'
-      ? 250
-      : 1000;
+      ? (settlementSummary?.weekTips ?? 0)
+      : (settlementSummary?.monthTips ?? 0);
 
   const displayIncentives =
     filter === 'TODAY'
-      ? (settlementSummary?.incentives || 50)
+      ? (settlementSummary?.incentives ?? 0)
       : filter === 'WEEK'
-      ? 200
-      : 800;
+      ? (settlementSummary?.weekIncentives ?? 0)
+      : (settlementSummary?.monthIncentives ?? 0);
+
+  const netDueToAdmin = settlementSummary?.netBalance ?? settlementSummary?.riderOwesAdmin ?? 0;
+  const cashLimit = settlementSummary?.cashLimit ?? 500;
+  const isCashBlocked = Boolean(settlementSummary?.isOrderBlocked || netDueToAdmin >= cashLimit);
 
   return (
     <ScrollView
@@ -135,8 +145,8 @@ export const EarningsSettlementScreen: React.FC = () => {
       {/* Header */}
       <View style={styles.screenHeaderRow}>
         <View>
-          <Text style={styles.screenTitle}>Earnings</Text>
-          <Text style={styles.screenSubtitle}>Fast · Safe · Transparent Settlements</Text>
+          <Text style={styles.screenTitle}>Earnings & Khata</Text>
+          <Text style={styles.screenSubtitle}>Net Settlement · Zero Split · Order Khata</Text>
         </View>
         <TouchableOpacity
           style={styles.walletHeaderIconBtn}
@@ -145,6 +155,111 @@ export const EarningsSettlementScreen: React.FC = () => {
         >
           <Ionicons name="wallet-outline" size={20} color="#071B52" />
         </TouchableOpacity>
+      </View>
+
+      {/* 0. Khata Net Settlement Overview Card (SRS Specification) */}
+      <View style={[styles.khataOverviewCard, isCashBlocked && styles.khataOverviewCardBlocked]}>
+        <View style={styles.khataOverviewHeader}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Ionicons name="book-outline" size={16} color="#071B52" />
+            <Text style={styles.khataOverviewTitle}>Rider Ledger (Khata Hisaab)</Text>
+          </View>
+          <View
+            style={[
+              styles.khataStatusPill,
+              isCashBlocked ? styles.khataStatusPillBlocked : styles.khataStatusPillActive,
+            ]}
+          >
+            <Ionicons
+              name={isCashBlocked ? 'lock-closed' : 'checkmark-circle'}
+              size={11}
+              color={isCashBlocked ? '#DC2626' : '#059669'}
+            />
+            <Text
+              style={[
+                styles.khataStatusPillText,
+                isCashBlocked ? styles.khataStatusPillTextBlocked : styles.khataStatusPillTextActive,
+              ]}
+            >
+              {isCashBlocked ? 'LOCKED (Dues >= ₹500)' : 'ACTIVE (Safe)'}
+            </Text>
+          </View>
+        </View>
+
+        {/* 3 Metrics Row */}
+        <View style={styles.khataMetricRow}>
+          <View style={styles.khataBox}>
+            <Text style={styles.khataBoxLabel}>COD CASH IN HAND</Text>
+            <Text style={[styles.khataBoxVal, { color: '#071B52' }]}>
+              ₹{settlementSummary?.totalCodCollected ?? settlementSummary?.todayCod ?? 0}
+            </Text>
+            <Text style={styles.khataBoxSub}>Total Collected</Text>
+          </View>
+
+          <View style={styles.khataBox}>
+            <Text style={styles.khataBoxLabel}>RIDER EARNINGS</Text>
+            <Text style={[styles.khataBoxVal, { color: '#059669' }]}>
+              ₹{settlementSummary?.totalEarnings ?? displayTotal}
+            </Text>
+            <Text style={styles.khataBoxSub}>Online + COD</Text>
+          </View>
+
+          <View style={[styles.khataBox, styles.khataNetBox]}>
+            <Text style={styles.khataBoxLabel}>NET BALANCE</Text>
+            <Text
+              style={[
+                styles.khataBoxVal,
+                netDueToAdmin > 0
+                  ? styles.khataNetValOwedAdmin
+                  : netDueToAdmin < 0
+                  ? styles.khataNetValOwedRider
+                  : null,
+              ]}
+            >
+              ₹{Math.abs(netDueToAdmin)}
+            </Text>
+            <Text
+              style={[
+                styles.khataBoxSub,
+                netDueToAdmin > 0
+                  ? { color: '#DC2626', fontWeight: '700' }
+                  : netDueToAdmin < 0
+                  ? { color: '#059669', fontWeight: '700' }
+                  : null,
+              ]}
+            >
+              {netDueToAdmin > 0 ? 'Owed to Admin' : netDueToAdmin < 0 ? 'Admin Owes You' : 'All Settled'}
+            </Text>
+          </View>
+        </View>
+
+        {/* Limit Warning / Safe Bar */}
+        <View style={[styles.limitBarBox, isCashBlocked && styles.limitBarBoxBlocked]}>
+          <Ionicons
+            name={isCashBlocked ? 'alert-circle' : 'shield-checkmark-outline'}
+            size={14}
+            color={isCashBlocked ? '#DC2626' : '#64748B'}
+          />
+          <Text style={[styles.limitBarText, isCashBlocked && styles.limitBarTextBlocked]}>
+            {isCashBlocked
+              ? `₹500 Cash limit exceeded! Handover ₹${netDueToAdmin} cash to Admin to unlock new orders.`
+              : `Credit Limit: ₹${netDueToAdmin} / ₹${cashLimit} dues (₹${Math.max(
+                  0,
+                  cashLimit - netDueToAdmin
+                )} safe headroom remaining)`}
+          </Text>
+        </View>
+
+        {netDueToAdmin > 0 && (
+          <TouchableOpacity
+            style={[styles.khataPayAdminBtn, isCashBlocked && styles.khataPayAdminBtnBlocked]}
+            onPress={() => setShowPayAdminModal(true)}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="card" size={15} color="#FFFFFF" />
+            <Text style={styles.khataPayAdminBtnText}>Pay ₹{netDueToAdmin} via UPI to Admin</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* 1. Period Selector Tabs (Wireframe Screen 11: Today / Week / Month) */}
@@ -194,23 +309,27 @@ export const EarningsSettlementScreen: React.FC = () => {
         {/* Breakdown Items List */}
         <View style={styles.breakdownBox}>
           <View style={styles.breakdownLine}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <View style={[styles.dotMarker, { backgroundColor: '#3B82F6' }]} />
               <Text style={styles.breakdownLineLabel}>Delivery Earnings</Text>
             </View>
             <Text style={styles.breakdownLineValue}>₹ {displayBase}</Text>
           </View>
 
+          <View style={styles.breakdownDivider} />
+
           <View style={styles.breakdownLine}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <View style={[styles.dotMarker, { backgroundColor: '#13B978' }]} />
               <Text style={styles.breakdownLineLabel}>Tips (100% Direct)</Text>
             </View>
             <Text style={[styles.breakdownLineValue, { color: '#13B978' }]}>+₹ {displayTips}</Text>
           </View>
 
+          <View style={styles.breakdownDivider} />
+
           <View style={styles.breakdownLine}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <View style={[styles.dotMarker, { backgroundColor: '#F59E0B' }]} />
               <Text style={styles.breakdownLineLabel}>Incentives</Text>
             </View>
@@ -256,47 +375,144 @@ export const EarningsSettlementScreen: React.FC = () => {
             </View>
           )}
         </View>
-        <View style={styles.verifiedBadge}>
-          <Text style={styles.verifiedText}>{bankAccount ? 'VERIFIED' : 'ADD BANK'}</Text>
-          <Ionicons name="chevron-forward" size={13} color={bankAccount ? '#059669' : COLORS.primary} />
+        <View
+          style={[
+            styles.verifiedBadge,
+            {
+              backgroundColor: !bankAccount
+                ? '#FEE2E2'
+                : bankAccount.verificationStatus === 'VERIFIED'
+                ? '#DCFCE7'
+                : '#FEF3C7',
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.verifiedText,
+              {
+                color: !bankAccount
+                  ? COLORS.primary
+                  : bankAccount.verificationStatus === 'VERIFIED'
+                  ? '#059669'
+                  : '#D97706',
+              },
+            ]}
+          >
+            {!bankAccount ? 'ADD BANK' : bankAccount.verificationStatus === 'VERIFIED' ? 'VERIFIED' : 'PENDING'}
+          </Text>
+          <Ionicons
+            name="chevron-forward"
+            size={13}
+            color={
+              !bankAccount
+                ? COLORS.primary
+                : bankAccount.verificationStatus === 'VERIFIED'
+                ? '#059669'
+                : '#D97706'
+            }
+          />
         </View>
       </TouchableOpacity>
 
-      {/* 4. Recent Trips Header */}
+      {/* 4. Order-by-Order Khata Ledger (SRS Table) */}
       <View style={styles.recentTripsHeaderRow}>
-        <Text style={styles.recentTripsTitle}>Recent Trips</Text>
+        <View>
+          <Text style={styles.recentTripsTitle}>Order Ledger (Khata Entries)</Text>
+          <Text style={styles.khataSubHeader}>Online payments to Admin • COD cash collected by Rider</Text>
+        </View>
         <TouchableOpacity onPress={() => setSubScreen('DutyHistory')} activeOpacity={0.7}>
           <Text style={styles.seeAllText}>See All →</Text>
         </TouchableOpacity>
       </View>
 
-      {/* 5. Trip Earnings List */}
+      {/* 5. Trip Khata Cards List */}
       <View style={styles.historyList}>
-        {filteredHistory.map((item) => (
-          <View key={item.id} style={styles.historyItemCard}>
-            <View style={styles.historyLeft}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={styles.historyOrder}>{item.orderNumber}</Text>
-                <View style={styles.settledBadge}>
-                  <Text style={styles.settledText}>{item.status}</Text>
+        {filteredHistory.length === 0 ? (
+          <View style={styles.emptyKhataCard}>
+            <View style={styles.emptyKhataIconCircle}>
+              <Ionicons name="receipt-outline" size={32} color="#94A3B8" />
+            </View>
+            <Text style={styles.emptyKhataTitle}>No orders in ledger yet</Text>
+            <Text style={styles.emptyKhataSubtitle}>
+              Complete your first delivery to see order earnings, customer tips, and cash collections here.
+            </Text>
+          </View>
+        ) : (
+          filteredHistory.map((item) => {
+          const isCod = item.paymentMode === 'COD';
+          const orderTotal = item.totalAmount ?? (item.baseAmount + (item.adminShare ?? 0));
+          const riderEarn = item.riderEarning ?? item.baseAmount ?? item.total;
+          const adminCut = item.adminShare ?? (isCod ? Math.max(0, orderTotal - riderEarn) : 0);
+
+          return (
+            <View key={item.id} style={styles.khataOrderCard}>
+              <View style={styles.khataOrderCardTop}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={styles.khataOrderNum}>{item.orderNumber}</Text>
+                  <View style={[styles.modePill, isCod ? styles.modePillCod : styles.modePillOnline]}>
+                    <Text style={[styles.modePillText, isCod ? styles.modePillCodText : styles.modePillOnlineText]}>
+                      {isCod ? 'COD (Cash)' : 'Online Pay'}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.khataOrderDate}>{item.date}</Text>
+              </View>
+
+              {/* 3-column financial calculation matching SRS */}
+              <View style={styles.khataOrderCalcRow}>
+                <View style={styles.khataCalcCol}>
+                  <Text style={styles.khataCalcLabel}>TOTAL ORDER</Text>
+                  <Text style={styles.khataCalcVal}>₹{orderTotal}</Text>
+                </View>
+
+                <View style={styles.khataCalcCol}>
+                  <Text style={styles.khataCalcLabel}>RIDER SHARE (+)</Text>
+                  <Text style={[styles.khataCalcVal, { color: '#059669', fontWeight: '800' }]}>
+                    +₹{riderEarn}
+                  </Text>
+                </View>
+
+                <View style={styles.khataCalcCol}>
+                  <Text style={styles.khataCalcLabel}>ADMIN SHARE (-)</Text>
+                  <Text
+                    style={[
+                      styles.khataCalcVal,
+                      { color: adminCut > 0 ? '#DC2626' : '#64748B', fontWeight: '800' },
+                    ]}
+                  >
+                    {adminCut > 0 ? `-₹${adminCut}` : '₹0'}
+                  </Text>
                 </View>
               </View>
-              <Text style={styles.historyDate}>{item.date}</Text>
-              <View style={styles.itemTags}>
-                <Text style={styles.tagText}>Base: ₹{item.baseAmount}</Text>
-                {item.bonus > 0 && <Text style={styles.bonusTag}>Bonus: +₹{item.bonus}</Text>}
-                {item.tip > 0 && <Text style={styles.tipTag}>Tip: +₹{item.tip}</Text>}
+
+              {/* Net Hisaab Footer */}
+              <View style={styles.khataOrderFooter}>
+                <Text style={styles.khataOrderFooterNote}>
+                  {isCod
+                    ? `Net Hisaab: Rider owes Admin ₹${adminCut}`
+                    : `Net Hisaab: Added to rider payout (+₹${riderEarn})`}
+                </Text>
+                <View style={styles.settledBadge}>
+                  <Text style={styles.settledText}>{item.status || 'DELIVERED'}</Text>
+                </View>
               </View>
             </View>
-
-            <View style={styles.historyRight}>
-              <Text style={styles.historyAmount}>+₹{item.total}</Text>
-            </View>
-          </View>
-        ))}
+          );
+        })
+      )}
       </View>
 
       <View style={styles.bottomSpacer} />
+
+      <OnlinePaymentModal
+        visible={showPayAdminModal}
+        onClose={() => setShowPayAdminModal(false)}
+        dueAmount={netDueToAdmin}
+        onPaymentSuccess={() => {
+          refreshDashboard();
+        }}
+      />
     </ScrollView>
   );
 };
@@ -435,6 +651,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingVertical: 5,
+  },
+  breakdownDivider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 2,
   },
   dotMarker: {
     width: 8,
@@ -622,5 +844,269 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: 36,
+  },
+
+  // Khata Overview Card Styles
+  khataOverviewCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  khataOverviewCardBlocked: {
+    borderColor: '#F87171',
+    backgroundColor: '#FFFBFB',
+    borderWidth: 1.5,
+  },
+  khataOverviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  khataOverviewTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#071B52',
+  },
+  khataStatusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  khataStatusPillActive: {
+    backgroundColor: '#DCFCE7',
+  },
+  khataStatusPillBlocked: {
+    backgroundColor: '#FEE2E2',
+  },
+  khataStatusPillText: {
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  khataStatusPillTextActive: {
+    color: '#15803D',
+  },
+  khataStatusPillTextBlocked: {
+    color: '#DC2626',
+  },
+  khataMetricRow: {
+    flexDirection: 'row',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  khataBox: {
+    flex: 1,
+  },
+  khataNetBox: {
+    borderLeftWidth: 1,
+    borderLeftColor: '#E2E8F0',
+    paddingLeft: 8,
+  },
+  khataBoxLabel: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: '#64748B',
+    textTransform: 'uppercase',
+  },
+  khataBoxVal: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#071B52',
+    marginTop: 2,
+  },
+  khataNetValOwedAdmin: {
+    color: '#DC2626',
+  },
+  khataNetValOwedRider: {
+    color: '#059669',
+  },
+  khataBoxSub: {
+    fontSize: 9,
+    color: '#94A3B8',
+    marginTop: 1,
+  },
+  limitBarBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F1F5F9',
+    padding: 8,
+    borderRadius: 8,
+  },
+  limitBarBoxBlocked: {
+    backgroundColor: '#FEE2E2',
+  },
+  limitBarText: {
+    flex: 1,
+    fontSize: 10,
+    color: '#475569',
+    lineHeight: 14,
+  },
+  limitBarTextBlocked: {
+    color: '#DC2626',
+    fontWeight: '700',
+  },
+  khataPayAdminBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#DC2626',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    marginTop: 10,
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  khataPayAdminBtnBlocked: {
+    backgroundColor: '#B91C1C',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+  },
+  khataPayAdminBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.4,
+  },
+  khataSubHeader: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+
+  // Khata Order Cards
+  khataOrderCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 8,
+  },
+  khataOrderCardTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  khataOrderNum: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#071B52',
+  },
+  modePill: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  modePillCod: {
+    backgroundColor: '#FEF3C7',
+  },
+  modePillOnline: {
+    backgroundColor: '#EEF2FF',
+  },
+  modePillText: {
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  modePillCodText: {
+    color: '#92400E',
+  },
+  modePillOnlineText: {
+    color: '#4338CA',
+  },
+  khataOrderDate: {
+    fontSize: 10,
+    color: '#94A3B8',
+  },
+  khataOrderCalcRow: {
+    flexDirection: 'row',
+    backgroundColor: '#F8FAFC',
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  khataCalcCol: {
+    flex: 1,
+  },
+  khataCalcLabel: {
+    fontSize: 8,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  khataCalcVal: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#071B52',
+    marginTop: 2,
+  },
+  khataOrderFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: '#F8FAFC',
+  },
+  khataOrderFooterNote: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  emptyKhataCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginTop: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  emptyKhataIconCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  emptyKhataTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#071B52',
+    marginBottom: 6,
+  },
+  emptyKhataSubtitle: {
+    fontSize: 12,
+    color: '#94A3B8',
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: 16,
   },
 });

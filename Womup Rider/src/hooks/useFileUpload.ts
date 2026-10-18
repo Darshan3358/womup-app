@@ -348,70 +348,36 @@ export const useFileUpload = (options: UseFileUploadOptions = {}) => {
         console.warn('[useFileUpload] Signature request failed, falling back to direct server upload:', sigErr);
       }
 
-      // Step B: Upload file
+      // Step B: Upload file via backend resilient Cloudinary upload service
       const uploadedResultUrl = await new Promise<string>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         activeXhrRef.current = xhr;
 
-        // If we have valid Cloudinary signature, upload directly to Cloudinary
-        if (signatureData && signatureData.uploadUrl && signatureData.apiKey) {
-          const cloudUploadUrl = file.isPdf
-            ? signatureData.uploadUrl.replace('/image/upload', '/auto/upload')
-            : signatureData.uploadUrl;
+        xhr.open('POST', `${baseUrl}/uploads/upload?folder=${encodeURIComponent(folder)}`);
+        if (token) {
+          xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        }
 
-          xhr.open('POST', cloudUploadUrl);
+        const formData = new FormData();
+        const executeSend = () => {
+          xhr.send(formData);
+        };
 
-          const formData = new FormData();
-          if (Platform.OS === 'web') {
-            fetch(file.uri)
-              .then((r) => r.blob())
-              .then((blob) => {
-                formData.append('file', blob, file.name);
-                formData.append('api_key', signatureData.apiKey);
-                formData.append('timestamp', String(signatureData.timestamp));
-                formData.append('signature', signatureData.signature);
-                formData.append('folder', signatureData.folder);
-                if (signatureData.publicId) {
-                  formData.append('public_id', signatureData.publicId);
-                }
-                xhr.send(formData);
-              })
-              .catch(reject);
-          } else {
-            formData.append('file', {
-              uri: file.uri,
-              type: file.type,
-              name: file.name,
-            } as any);
-            formData.append('api_key', signatureData.apiKey);
-            formData.append('timestamp', String(signatureData.timestamp));
-            formData.append('signature', signatureData.signature);
-            formData.append('folder', signatureData.folder);
-            if (signatureData.publicId) {
-              formData.append('public_id', signatureData.publicId);
-            }
-            xhr.send(formData);
-          }
+        if (Platform.OS === 'web') {
+          fetch(file.uri)
+            .then((r) => r.blob())
+            .then((blob) => {
+              formData.append('file', blob, file.name);
+              executeSend();
+            })
+            .catch(reject);
         } else {
-          // Direct backend upload fallback
-          xhr.open('POST', `${baseUrl}/uploads/upload?folder=${encodeURIComponent(folder)}`);
-          const formData = new FormData();
-          if (Platform.OS === 'web') {
-            fetch(file.uri)
-              .then((r) => r.blob())
-              .then((blob) => {
-                formData.append('file', blob, file.name);
-                xhr.send(formData);
-              })
-              .catch(reject);
-          } else {
-            formData.append('file', {
-              uri: file.uri,
-              type: file.type,
-              name: file.name,
-            } as any);
-            xhr.send(formData);
-          }
+          formData.append('file', {
+            uri: file.uri,
+            type: file.type,
+            name: file.name,
+          } as any);
+          executeSend();
         }
 
         xhr.upload.onprogress = (event) => {

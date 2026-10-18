@@ -803,11 +803,11 @@ export const StoresManagementScreen: React.FC = () => {
                           </View>
                         </View>
 
-                        {/* 🔒 1:1 Area Lock and City Identity Banner */}
+                        {/* 🔒 Operating Area and City Identity Banner */}
                         <View style={styles.cardAreaLockBanner}>
                           <View style={styles.cardAreaLockLeft}>
                             <Lock size={12} color={COLORS.purple} />
-                            <Text style={styles.cardAreaLockLabel}>1:1 AREA LOCKED:</Text>
+                            <Text style={styles.cardAreaLockLabel}>OPERATING AREA:</Text>
                             <Text style={styles.cardAreaLockValue}>
                               {store.areaName || 'Paldi / Central'}
                             </Text>
@@ -1992,7 +1992,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.xl,
+    paddingBottom: 100,
     gap: 16,
   },
   citySectionGroup: {
@@ -2162,12 +2162,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#FDE68A',
     borderRadius: RADIUS.sm,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    marginTop: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginTop: 6,
   },
   unattendedWarningText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
     color: '#B45309',
     flex: 1,
@@ -2222,23 +2222,18 @@ const styles = StyleSheet.create({
     color: COLORS.hotPink,
   },
   credentialsBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     backgroundColor: '#F7F6FD',
     borderRadius: 10,
     padding: 10,
     borderWidth: 1,
     borderColor: '#E7E4F9',
     marginBottom: 12,
-    flexWrap: 'wrap',
     gap: 8,
   },
   credLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
-    minWidth: 160,
+    width: '100%',
   },
   credLabel: {
     fontSize: 9,
@@ -2247,7 +2242,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   credValue: {
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: '800',
     color: COLORS.textPrimary,
     fontFamily: 'monospace',
@@ -2257,14 +2252,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    flexShrink: 0,
+    width: '100%',
   },
   copyBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: COLORS.white,
     paddingHorizontal: 8,
-    paddingVertical: 5,
+    paddingVertical: 6,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: COLORS.border,
@@ -2276,11 +2273,13 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
   },
   resetBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: COLORS.white,
     paddingHorizontal: 8,
-    paddingVertical: 5,
+    paddingVertical: 6,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: COLORS.purple,

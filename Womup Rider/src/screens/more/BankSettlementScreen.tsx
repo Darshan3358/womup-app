@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,9 +7,12 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRider } from '../../context/RiderContext';
+import { RiderApiService } from '../../services/riderApi';
 import { COLORS } from '../../theme/colors';
 
 interface WalletTransaction {
@@ -20,15 +23,8 @@ interface WalletTransaction {
   type: 'EARNING' | 'TIP' | 'INCENTIVE' | 'WITHDRAWAL';
 }
 
-const DEFAULT_TRANSACTIONS: WalletTransaction[] = [
-  { id: 'tx-1', title: 'Order Earnings', timestamp: 'Today, 12:30 PM', amount: 75, type: 'EARNING' },
-  { id: 'tx-2', title: 'Tip Received', timestamp: 'Today, 11:45 AM', amount: 10, type: 'TIP' },
-  { id: 'tx-3', title: 'Withdrawal to Bank', timestamp: 'Yesterday, 04:20 PM', amount: -500, type: 'WITHDRAWAL' },
-  { id: 'tx-4', title: 'Incentive Bonus', timestamp: 'Yesterday, 09:00 PM', amount: 120, type: 'INCENTIVE' },
-];
-
 export const BankSettlementScreen: React.FC = () => {
-  const { bankAccount, updateBankAccount, setSubScreen, settlementSummary, requestPayout } = useRider();
+  const { bankAccount, updateBankAccount, setSubScreen, settlementSummary, requestPayout, refreshDashboard } = useRider();
 
   const [bankName, setBankName] = useState(bankAccount?.bankName || '');
   const [accountNumber, setAccountNumber] = useState(bankAccount?.accountNumberFull || '');
@@ -39,13 +35,51 @@ export const BankSettlementScreen: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const [walletBalance, setWalletBalance] = useState<number>(settlementSummary?.pendingTransfer ?? 0);
+  const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
+  const [loadingTransactions, setLoadingTransactions] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchWalletData = useCallback(async () => {
+    try {
+      const data = await RiderApiService.getRiderWallet();
+      setTransactions(data.transactions || []);
+      if (typeof data.balance === 'number') {
+        setWalletBalance(data.balance);
+      } else if (typeof data.pendingTransfer === 'number') {
+        setWalletBalance(data.pendingTransfer);
+      } else if (typeof settlementSummary?.pendingTransfer === 'number') {
+        setWalletBalance(settlementSummary.pendingTransfer);
+      } else {
+        setWalletBalance(0);
+      }
+    } catch (e) {
+      console.log('Error fetching wallet data', e);
+      setTransactions([]);
+    } finally {
+      setLoadingTransactions(false);
+      setRefreshing(false);
+    }
+  }, [settlementSummary?.pendingTransfer]);
+
+  useEffect(() => {
+    fetchWalletData();
+  }, [fetchWalletData]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([fetchWalletData(), refreshDashboard()]);
+    setRefreshing(false);
+  }, [fetchWalletData, refreshDashboard]);
+
   useEffect(() => {
     if (bankAccount) {
-      setBankName(bankAccount.bankName);
-      setAccountNumber(bankAccount.accountNumberFull || '');
-      setConfirmAccount(bankAccount.accountNumberFull || '');
-      setIfsc(bankAccount.ifscCode);
-      setHolderName(bankAccount.accountHolderName);
+      setBankName(bankAccount.bankName || '');
+      const acc = bankAccount.accountNumberFull || '';
+      setAccountNumber(acc);
+      setConfirmAccount(acc);
+      setIfsc(bankAccount.ifscCode || '');
+      setHolderName(bankAccount.accountHolderName || '');
       setUpi(bankAccount.upiId || '');
     }
   }, [bankAccount]);
@@ -70,6 +104,7 @@ export const BankSettlementScreen: React.FC = () => {
       });
       setIsEditing(false);
       Alert.alert('Bank Account Verified', 'Your payout bank account has been updated and verified for direct transfers.');
+      fetchWalletData();
     } catch {
       Alert.alert('Error', 'Failed to update bank details.');
     } finally {
@@ -78,15 +113,23 @@ export const BankSettlementScreen: React.FC = () => {
   };
 
   const handleInstantPayout = async () => {
-    const pending = settlementSummary?.pendingTransfer || 1250;
+    const pending = walletBalance;
     if (pending <= 0) {
-      Alert.alert('No Pending Balance', 'You do not have any pending earnings available for instant transfer right now.');
+      Alert.alert('No Available Balance', 'You do not have any pending earnings available for instant transfer right now.');
       return;
     }
 
     if (!bankAccount) {
       Alert.alert('No Bank Account', 'Please add and verify your bank account details before requesting a withdrawal.');
       setIsEditing(true);
+      return;
+    }
+
+    if (bankAccount.verificationStatus !== 'VERIFIED') {
+      Alert.alert(
+        'Bank Account Pending',
+        'Your bank account details are currently under review by Admin. Payouts will be enabled once verified.'
+      );
       return;
     }
 
@@ -100,6 +143,7 @@ export const BankSettlementScreen: React.FC = () => {
           onPress: async () => {
             const res = await requestPayout(pending);
             Alert.alert('Transfer Initiated', res.message);
+            fetchWalletData();
           },
         },
       ]
@@ -107,7 +151,11 @@ export const BankSettlementScreen: React.FC = () => {
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#FF3B98']} tintColor="#FF3B98" />}
+    >
       {/* Header Row */}
       <View style={styles.headerRow}>
         <TouchableOpacity
@@ -134,7 +182,7 @@ export const BankSettlementScreen: React.FC = () => {
         </View>
 
         <Text style={styles.balanceAmount}>
-          ₹ {settlementSummary?.pendingTransfer || 1250}
+          ₹ {walletBalance}
         </Text>
         <Text style={styles.balanceSub}>Daily automatic batch payout at 11:59 PM</Text>
 
@@ -182,8 +230,30 @@ export const BankSettlementScreen: React.FC = () => {
                 <Text style={styles.bankSubtitle}>A/C: {bankAccount.accountNumberMasked}</Text>
               </View>
             </View>
-            <View style={styles.verifiedBadge}>
-              <Text style={styles.verifiedBadgeText}>VERIFIED</Text>
+            <View
+              style={[
+                styles.verifiedBadge,
+                {
+                  backgroundColor:
+                    bankAccount.verificationStatus === 'VERIFIED'
+                      ? '#DCFCE7'
+                      : '#FEF3C7',
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.verifiedBadgeText,
+                  {
+                    color:
+                      bankAccount.verificationStatus === 'VERIFIED'
+                        ? '#16A34A'
+                        : '#D97706',
+                  },
+                ]}
+              >
+                {bankAccount.verificationStatus === 'VERIFIED' ? 'VERIFIED' : 'PENDING'}
+              </Text>
             </View>
           </View>
 
@@ -206,7 +276,18 @@ export const BankSettlementScreen: React.FC = () => {
 
           <TouchableOpacity
             style={styles.changeBankBtn}
-            onPress={() => setIsEditing(true)}
+            onPress={() => {
+              if (bankAccount) {
+                setBankName(bankAccount.bankName || '');
+                const acc = bankAccount.accountNumberFull || '';
+                setAccountNumber(acc);
+                setConfirmAccount(acc);
+                setIfsc(bankAccount.ifscCode || '');
+                setHolderName(bankAccount.accountHolderName || '');
+                setUpi(bankAccount.upiId || '');
+              }
+              setIsEditing(true);
+            }}
             activeOpacity={0.8}
           >
             <Text style={styles.changeBankText}>Change Bank Details</Text>
@@ -297,58 +378,75 @@ export const BankSettlementScreen: React.FC = () => {
         </View>
       )}
 
-      {/* 3. Transaction History (Wireframe Screen 13) */}
+      {/* 3. Transaction History */}
       <View style={styles.txHeaderRow}>
         <Text style={styles.txSectionTitle}>Transaction History</Text>
         <Text style={styles.txFilterLabel}>Recent Activity</Text>
       </View>
 
-      <View style={styles.txList}>
-        {DEFAULT_TRANSACTIONS.map((tx) => {
-          const isWithdrawal = tx.amount < 0;
-          return (
-            <View key={tx.id} style={styles.txItemCard}>
-              <View style={styles.txLeft}>
-                <View
+      {loadingTransactions ? (
+        <View style={styles.emptyStateCard}>
+          <ActivityIndicator size="small" color="#FF3B98" />
+          <Text style={styles.emptyStateSub}>Loading your transactions...</Text>
+        </View>
+      ) : transactions.length === 0 ? (
+        <View style={styles.emptyStateCard}>
+          <View style={styles.emptyIconCircle}>
+            <Ionicons name="receipt-outline" size={32} color="#94A3B8" />
+          </View>
+          <Text style={styles.emptyStateTitle}>No transactions yet</Text>
+          <Text style={styles.emptyStateSub}>
+            Your delivery earnings, tips, and payouts will appear here.
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.txList}>
+          {transactions.map((tx) => {
+            const isWithdrawal = tx.amount < 0 || tx.type === 'WITHDRAWAL';
+            return (
+              <View key={tx.id} style={styles.txItemCard}>
+                <View style={styles.txLeft}>
+                  <View
+                    style={[
+                      styles.txIconCircle,
+                      {
+                        backgroundColor: isWithdrawal ? '#FEE2E2' : '#DCFCE7',
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name={
+                        tx.type === 'WITHDRAWAL'
+                          ? 'arrow-up-circle'
+                          : tx.type === 'TIP'
+                          ? 'heart'
+                          : tx.type === 'INCENTIVE'
+                          ? 'trophy'
+                          : 'cash'
+                      }
+                      size={20}
+                      color={isWithdrawal ? '#EF4444' : '#13B978'}
+                    />
+                  </View>
+                  <View>
+                    <Text style={styles.txTitle}>{tx.title}</Text>
+                    <Text style={styles.txTime}>{tx.timestamp}</Text>
+                  </View>
+                </View>
+
+                <Text
                   style={[
-                    styles.txIconCircle,
-                    {
-                      backgroundColor: isWithdrawal ? '#FEE2E2' : '#DCFCE7',
-                    },
+                    styles.txAmount,
+                    { color: isWithdrawal ? '#EF4444' : '#13B978' },
                   ]}
                 >
-                  <Ionicons
-                    name={
-                      tx.type === 'WITHDRAWAL'
-                        ? 'arrow-up-circle'
-                        : tx.type === 'TIP'
-                        ? 'heart'
-                        : tx.type === 'INCENTIVE'
-                        ? 'trophy'
-                        : 'cash'
-                    }
-                    size={20}
-                    color={isWithdrawal ? '#EF4444' : '#13B978'}
-                  />
-                </View>
-                <View>
-                  <Text style={styles.txTitle}>{tx.title}</Text>
-                  <Text style={styles.txTime}>{tx.timestamp}</Text>
-                </View>
+                  {isWithdrawal ? `-₹${Math.abs(tx.amount)}` : `+₹${tx.amount}`}
+                </Text>
               </View>
-
-              <Text
-                style={[
-                  styles.txAmount,
-                  { color: isWithdrawal ? '#EF4444' : '#13B978' },
-                ]}
-              >
-                {isWithdrawal ? `-₹${Math.abs(tx.amount)}` : `+₹${tx.amount}`}
-              </Text>
-            </View>
-          );
-        })}
-      </View>
+            );
+          })}
+        </View>
+      )}
 
       <View style={styles.bottomSpacer} />
     </ScrollView>
@@ -690,5 +788,42 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: 36,
+  },
+  emptyStateCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginTop: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  emptyIconCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  emptyStateTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#071B52',
+    marginBottom: 6,
+  },
+  emptyStateSub: {
+    fontSize: 12,
+    color: '#94A3B8',
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: 16,
   },
 });

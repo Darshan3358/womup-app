@@ -542,10 +542,26 @@ export interface RiderWalletItem {
   riderId: string;
   partnerCode: string;
   name: string;
+  riderName?: string;
+  fullName?: string;
   phone: string;
+  phoneNumber?: string;
+  vehicleNumber?: string;
   balance: number;
   lifetimeEarnings: number;
   codPending: number;
+  totalDeliveries?: number;
+  completedDeliveries?: number;
+  totalCodCollected?: number;
+  totalEarnings?: number;
+  totalOnlineEarnings?: number;
+  netBalance?: number;
+  cashLimit?: number;
+  isBlocked?: boolean;
+  isOrderBlocked?: boolean;
+  riderOwesAdmin?: number;
+  adminOwesRider?: number;
+  settlementType?: 'RIDER_OWES_ADMIN' | 'ADMIN_OWES_RIDER';
   settlementCycle: string;
   lastSettlementAt?: string | null;
   bankAccount: {

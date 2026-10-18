@@ -8,8 +8,9 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
-import { MapPin, X, Check, DollarSign, Package, AlertCircle } from 'lucide-react-native';
+import { MapPin, X, Check, DollarSign, Package, AlertCircle, Edit2 } from 'lucide-react-native';
 import { COLORS, RADIUS, SPACING } from '../../theme';
 import { useAdminState } from '../../context/AdminStateContext';
 
@@ -23,9 +24,12 @@ export const EditZonePriceModal: React.FC = () => {
     zones,
     areaPricing,
     updateVariantAreaPrice,
+    updateProductItem,
   } = useAdminState();
 
   const [priceStr, setPriceStr] = useState('');
+  const [defaultPriceStr, setDefaultPriceStr] = useState('');
+  const [mrpStr, setMrpStr] = useState('');
   const [stockStr, setStockStr] = useState('100');
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -44,6 +48,8 @@ export const EditZonePriceModal: React.FC = () => {
         variant.sellingPrice;
 
       setPriceStr(String(currentAreaPrice));
+      setDefaultPriceStr(String(variant.sellingPrice || ''));
+      setMrpStr(String(variant.mrp || variant.sellingPrice || ''));
       setStockStr(String(variant.stock ?? 100));
       setErrorMsg(null);
     }
@@ -54,8 +60,8 @@ export const EditZonePriceModal: React.FC = () => {
   }
 
   const { product, variant, zone } = selectedVariantPricing;
-  const defaultPrice = variant.sellingPrice;
-  const mrp = variant.mrp || defaultPrice;
+  const defaultPrice = parseFloat(defaultPriceStr) || variant.sellingPrice;
+  const mrp = parseFloat(mrpStr) || variant.mrp || defaultPrice;
   const currentPriceNum = parseFloat(priceStr) || 0;
 
   const handleClose = () => {
@@ -66,15 +72,24 @@ export const EditZonePriceModal: React.FC = () => {
   const handleSave = async () => {
     setErrorMsg(null);
     const parsedPrice = parseFloat(priceStr);
+    const parsedDefault = parseFloat(defaultPriceStr);
+    const parsedMrp = parseFloat(mrpStr);
     const parsedStock = parseInt(stockStr, 10);
 
+    const effectiveMrp = !isNaN(parsedMrp) && parsedMrp > 0 ? parsedMrp : mrp;
+
     if (isNaN(parsedPrice) || parsedPrice < 0) {
-      setErrorMsg('Selling price must be a valid positive number.');
+      setErrorMsg('Zone selling price must be a valid positive number.');
       return;
     }
 
-    if (parsedPrice > mrp) {
-      setErrorMsg(`Selling price (₹${parsedPrice}) cannot exceed MRP (₹${mrp}).`);
+    if (parsedPrice > effectiveMrp) {
+      setErrorMsg(`Zone price (₹${parsedPrice}) cannot exceed MRP (₹${effectiveMrp}).`);
+      return;
+    }
+
+    if (!isNaN(parsedDefault) && parsedDefault > effectiveMrp) {
+      setErrorMsg(`Catalog default price (₹${parsedDefault}) cannot exceed MRP (₹${effectiveMrp}).`);
       return;
     }
 
@@ -83,14 +98,30 @@ export const EditZonePriceModal: React.FC = () => {
       const zoneObj = zones.find((z) => z.name === zone || z.id === zone);
       const zoneId = zoneObj?.id || zone;
 
+      // 1. Save area override price & mrp
       const success = await updateVariantAreaPrice(
         product.id,
         variant.id,
         zoneId,
         parsedPrice,
-        mrp,
+        effectiveMrp,
         isNaN(parsedStock) ? undefined : parsedStock
       );
+
+      // 2. If default price or MRP was modified, update product variants master catalog
+      if (updateProductItem && (!isNaN(parsedDefault) || !isNaN(parsedMrp))) {
+        const updatedVariants = (product.variants || []).map((v) => {
+          if (v.id === variant.id) {
+            return {
+              ...v,
+              sellingPrice: !isNaN(parsedDefault) ? parsedDefault : v.sellingPrice,
+              mrp: effectiveMrp,
+            };
+          }
+          return v;
+        });
+        await updateProductItem(product.id, { variants: updatedVariants });
+      }
 
       if (success) {
         handleClose();
@@ -110,37 +141,42 @@ export const EditZonePriceModal: React.FC = () => {
         <View style={styles.modalContainer}>
           {/* Header */}
           <View style={styles.modalHeader}>
-            <View style={[styles.headerTitleRow, { flex: 1, minWidth: 0, marginRight: 8 }]}>
+            <View style={styles.headerTitleRow}>
               <View style={styles.iconCircle}>
-                <DollarSign size={20} color={COLORS.primary} />
+                <DollarSign size={20} color="#F562AF" />
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={styles.modalTitle} numberOfLines={1}>Edit Zone Price</Text>
-                <Text style={styles.modalSubtitle} numberOfLines={1}>Single Source of Truth: area_pricing</Text>
+                <Text style={styles.modalTitle} numberOfLines={1}>Edit Zone Price & MRP</Text>
+                <Text style={styles.modalSubtitle} numberOfLines={1}>Area: {zone} · Live Sync</Text>
               </View>
             </View>
-            <TouchableOpacity style={styles.closeBtn} onPress={handleClose} disabled={saving}>
-              <X size={20} color={COLORS.textMuted} />
+            <TouchableOpacity style={styles.closeBtn} onPress={handleClose} disabled={saving} activeOpacity={0.7}>
+              <X size={20} color="#64748B" />
             </TouchableOpacity>
           </View>
 
-          {/* Body Content */}
-          <View style={styles.modalBody}>
-            {/* Target Information Card */}
+          {/* Scrollable Body Content */}
+          <ScrollView
+            style={styles.modalScrollView}
+            contentContainerStyle={styles.modalScrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* 1. Target Information Summary Card */}
             <View style={styles.targetCard}>
               <View style={styles.targetRow}>
-                <Text style={styles.targetLabel}>Product:</Text>
-                <Text style={styles.targetValueBold}>{product.name}</Text>
+                <Text style={styles.targetLabel}>Product</Text>
+                <Text style={styles.targetValueBold} numberOfLines={1}>{product.name}</Text>
               </View>
               <View style={styles.targetRow}>
-                <Text style={styles.targetLabel}>Pack / Variant:</Text>
+                <Text style={styles.targetLabel}>Pack / Variant</Text>
                 <View style={styles.variantBadge}>
-                  <Package size={12} color={COLORS.primary} style={{ marginRight: 4 }} />
+                  <Package size={12} color="#F562AF" style={{ marginRight: 4 }} />
                   <Text style={styles.variantBadgeText}>{variant.weightOrVolume || variant.sku}</Text>
                 </View>
               </View>
               <View style={styles.targetRow}>
-                <Text style={styles.targetLabel}>Operational Zone:</Text>
+                <Text style={styles.targetLabel}>Operational Zone</Text>
                 <View style={styles.zoneBadge}>
                   <MapPin size={12} color="#059669" style={{ marginRight: 4 }} />
                   <Text style={styles.zoneBadgeText}>{zone} Zone</Text>
@@ -148,26 +184,19 @@ export const EditZonePriceModal: React.FC = () => {
               </View>
             </View>
 
-            {/* Reference Price Tags */}
-            <View style={styles.refPricesRow}>
-              <View style={styles.refPriceBox}>
-                <Text style={styles.refPriceLabel}>Catalog Default</Text>
-                <Text style={styles.refPriceVal}>₹{defaultPrice}</Text>
-                <Text style={styles.refPriceSub}>Global Fallback</Text>
-              </View>
-              <View style={[styles.refPriceBox, { borderColor: '#E5E7EB' }]}>
-                <Text style={styles.refPriceLabel}>MRP</Text>
-                <Text style={[styles.refPriceVal, { color: COLORS.textMuted }]}>₹{mrp}</Text>
-                <Text style={styles.refPriceSub}>Max Retail Price</Text>
-              </View>
-            </View>
+            <View style={styles.modalDivider} />
 
-            {/* Price Edit Input */}
+            {/* 2. Zone Selling Price (Primary Focus) */}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>
-                Zone Selling Price (₹) <Text style={styles.requiredStar}>*</Text>
-              </Text>
-              <View style={[styles.inputWrapper, currentPriceNum > mrp && styles.inputWrapperError]}>
+              <View style={styles.labelRow}>
+                <Text style={styles.inputLabel}>
+                  Zone Selling Price (₹) <Text style={styles.requiredStar}>*</Text>
+                </Text>
+                <View style={styles.zoneActiveBadge}>
+                  <Text style={styles.zoneActiveBadgeText}>Active Zone</Text>
+                </View>
+              </View>
+              <View style={[styles.inputWrapper, styles.inputWrapperPrimary, currentPriceNum > mrp && styles.inputWrapperError]}>
                 <Text style={styles.inputCurrencySymbol}>₹</Text>
                 <TextInput
                   style={styles.priceTextInput}
@@ -177,19 +206,77 @@ export const EditZonePriceModal: React.FC = () => {
                     setPriceStr(val);
                     setErrorMsg(null);
                   }}
-                  placeholder="e.g. 14"
-                  placeholderTextColor={COLORS.textMuted}
+                  placeholder="e.g. 23"
+                  placeholderTextColor="#94A3B8"
                   editable={!saving}
                 />
               </View>
               <Text style={styles.inputHelp}>
-                This price will only apply to customers ordering in <Text style={{ fontWeight: '600' }}>{zone} Zone</Text>.
+                This price will only apply to customers ordering in <Text style={{ fontWeight: '700', color: '#1E293B' }}>{zone} Zone</Text>.
               </Text>
             </View>
 
-            {/* Stock in Zone Dark Store */}
+            {/* 3. Catalog Default Price (Stacked) */}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Stock Allocation (Units)</Text>
+              <View style={styles.labelRow}>
+                <Text style={styles.inputLabel}>
+                  Catalog Default Price (₹)
+                </Text>
+                <View style={styles.editPencilBadge}>
+                  <Edit2 size={10} color="#4F46E5" style={{ marginRight: 3 }} />
+                  <Text style={styles.editPencilText}>Editable Base</Text>
+                </View>
+              </View>
+              <View style={styles.inputWrapper}>
+                <Text style={styles.inputCurrencySymbol}>₹</Text>
+                <TextInput
+                  style={styles.priceTextInput}
+                  keyboardType="numeric"
+                  value={defaultPriceStr}
+                  onChangeText={setDefaultPriceStr}
+                  placeholder="e.g. 10"
+                  placeholderTextColor="#94A3B8"
+                  editable={!saving}
+                />
+              </View>
+              <Text style={styles.inputHelp}>
+                Global catalog fallback price when no zone override exists.
+              </Text>
+            </View>
+
+            {/* 4. MRP (Stacked) */}
+            <View style={styles.inputGroup}>
+              <View style={styles.labelRow}>
+                <Text style={styles.inputLabel}>
+                  Maximum Retail Price - MRP (₹) <Text style={styles.requiredStar}>*</Text>
+                </Text>
+                <View style={styles.editPencilBadge}>
+                  <Edit2 size={10} color="#4F46E5" style={{ marginRight: 3 }} />
+                  <Text style={styles.editPencilText}>Max Price</Text>
+                </View>
+              </View>
+              <View style={[styles.inputWrapper, currentPriceNum > mrp && styles.inputWrapperError]}>
+                <Text style={styles.inputCurrencySymbol}>₹</Text>
+                <TextInput
+                  style={styles.priceTextInput}
+                  keyboardType="numeric"
+                  value={mrpStr}
+                  onChangeText={setMrpStr}
+                  placeholder="e.g. 28"
+                  placeholderTextColor="#94A3B8"
+                  editable={!saving}
+                />
+              </View>
+              <Text style={styles.inputHelp}>
+                Zone selling price cannot legally exceed this printed MRP.
+              </Text>
+            </View>
+
+            {/* 5. Stock Allocation */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>
+                Stock Allocation (Units) <Text style={styles.requiredStar}>*</Text>
+              </Text>
               <View style={styles.inputWrapper}>
                 <TextInput
                   style={styles.priceTextInput}
@@ -197,32 +284,36 @@ export const EditZonePriceModal: React.FC = () => {
                   value={stockStr}
                   onChangeText={setStockStr}
                   placeholder="100"
-                  placeholderTextColor={COLORS.textMuted}
+                  placeholderTextColor="#94A3B8"
                   editable={!saving}
                 />
+                <Text style={styles.inputSuffix}>Units</Text>
               </View>
+              <Text style={styles.inputHelp}>
+                Available inventory allocated to the {zone} Zone dark store.
+              </Text>
             </View>
 
             {/* Error Banner */}
             {errorMsg && (
               <View style={styles.errorBanner}>
-                <AlertCircle size={16} color={COLORS.error} style={{ marginRight: 6 }} />
+                <AlertCircle size={16} color="#E8596C" style={{ marginRight: 6 }} />
                 <Text style={styles.errorBannerText}>{errorMsg}</Text>
               </View>
             )}
-          </View>
+          </ScrollView>
 
           {/* Footer Actions */}
           <View style={styles.modalFooter}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={handleClose} disabled={saving}>
+            <TouchableOpacity style={styles.cancelBtn} onPress={handleClose} disabled={saving} activeOpacity={0.7}>
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
+            <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving} activeOpacity={0.85}>
               {saving ? (
-                <ActivityIndicator size="small" color={COLORS.white} />
+                <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
                 <>
-                  <Check size={16} color={COLORS.white} style={{ marginRight: 6 }} />
+                  <Check size={16} color="#FFFFFF" style={{ marginRight: 6 }} strokeWidth={2.5} />
                   <Text style={styles.saveBtnText}>Save Zone Price</Text>
                 </>
               )}
@@ -240,63 +331,79 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: SPACING.md,
+    padding: 12,
   },
   modalContainer: {
     width: '100%',
-    maxWidth: 480,
-    backgroundColor: COLORS.cardBackground,
-    borderRadius: RADIUS.card,
+    maxWidth: 440,
+    maxHeight: '92%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-    backgroundColor: COLORS.white,
+    borderBottomColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
   },
   headerTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
+    flex: 1,
+    marginRight: 8,
   },
   iconCircle: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#FCE1F5',
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
+    fontSize: 15.5,
+    fontWeight: '800',
+    color: '#0F172A',
   },
   modalSubtitle: {
     fontSize: 11,
-    color: COLORS.textMuted,
+    color: '#64748B',
     marginTop: 1,
+    fontWeight: '500',
   },
   closeBtn: {
-    padding: 6,
-    borderRadius: RADIUS.sm,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  modalBody: {
-    padding: SPACING.lg,
-    backgroundColor: COLORS.white,
+  modalScrollView: {
+    flexShrink: 1,
+  },
+  modalScrollContent: {
+    padding: 16,
+    paddingBottom: 10,
+    backgroundColor: '#FFFFFF',
   },
   targetCard: {
     backgroundColor: '#F8FAFC',
-    borderRadius: RADIUS.card,
-    padding: SPACING.md,
-    marginBottom: SPACING.md,
+    borderRadius: 12,
+    padding: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     gap: 8,
@@ -307,115 +414,133 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   targetLabel: {
-    fontSize: 13,
-    color: COLORS.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
   },
   targetValueBold: {
     fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
+    fontWeight: '800',
+    color: '#0F172A',
   },
   variantBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#FCE1F5',
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: RADIUS.sm,
+    paddingVertical: 2.5,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: '#F562AF33',
   },
   variantBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.primary,
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#F562AF',
   },
   zoneBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ECFDF5',
+    backgroundColor: '#DCFCE7',
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: RADIUS.sm,
+    paddingVertical: 2.5,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#A7F3D0',
+    borderColor: '#BBF7D0',
   },
   zoneBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#059669',
-  },
-  refPricesRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: SPACING.md,
-  },
-  refPriceBox: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-    borderRadius: RADIUS.input,
-    padding: SPACING.sm,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  refPriceLabel: {
-    fontSize: 11,
-    color: COLORS.textMuted,
-    marginBottom: 2,
-  },
-  refPriceVal: {
-    fontSize: 16,
+    fontSize: 11.5,
     fontWeight: '700',
-    color: COLORS.textPrimary,
+    color: '#16A34A',
   },
-  refPriceSub: {
-    fontSize: 10,
-    color: COLORS.textMuted,
-    marginTop: 2,
+  modalDivider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 14,
   },
   inputGroup: {
-    marginBottom: SPACING.md,
+    marginBottom: 14,
+  },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
   },
   inputLabel: {
     fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-    marginBottom: 6,
+    fontWeight: '700',
+    color: '#1E293B',
   },
   requiredStar: {
-    color: COLORS.error,
+    color: '#EF4444',
+  },
+  zoneActiveBadge: {
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  zoneActiveBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#4F46E5',
+  },
+  editPencilBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  editPencilText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#4F46E5',
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: COLORS.border,
-    borderRadius: RADIUS.input,
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
     paddingHorizontal: 12,
-    height: 44,
+    height: 48,
+  },
+  inputWrapperPrimary: {
+    borderColor: '#4F46E5',
+    backgroundColor: '#FBFBFE',
   },
   inputWrapperError: {
-    borderColor: COLORS.error,
+    borderColor: '#EF4444',
+    backgroundColor: '#FEF2F2',
   },
   inputCurrencySymbol: {
     fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    marginRight: 6,
+    fontWeight: '800',
+    color: '#64748B',
+    marginRight: 8,
   },
   priceTextInput: {
     flex: 1,
     fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
+    fontWeight: '700',
+    color: '#0F172A',
     paddingVertical: 0,
+  },
+  inputSuffix: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#94A3B8',
+    marginLeft: 6,
   },
   inputHelp: {
     fontSize: 11,
-    color: COLORS.textMuted,
+    color: '#64748B',
     marginTop: 4,
+    lineHeight: 15,
   },
   errorBanner: {
     flexDirection: 'row',
@@ -423,51 +548,59 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF2F2',
     borderWidth: 1,
     borderColor: '#FECACA',
-    borderRadius: RADIUS.sm,
+    borderRadius: 8,
     padding: 10,
     marginTop: 4,
+    marginBottom: 8,
   },
   errorBannerText: {
     fontSize: 12,
-    color: COLORS.error,
-    fontWeight: '500',
+    color: '#EF4444',
+    fontWeight: '600',
     flex: 1,
   },
   modalFooter: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
     alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: COLORS.border,
+    borderTopColor: '#E2E8F0',
     backgroundColor: '#F8FAFC',
   },
   cancelBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: RADIUS.button,
+    flex: 1,
+    height: 46,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.white,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cancelBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.textMuted,
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#475569',
   },
   saveBtn: {
+    flex: 1.5,
+    height: 46,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: RADIUS.button,
+    justifyContent: 'center',
+    backgroundColor: '#F562AF',
+    borderRadius: 10,
+    shadowColor: '#F562AF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 2,
   },
   saveBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.white,
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

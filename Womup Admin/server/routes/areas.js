@@ -75,6 +75,13 @@ router.get('/', async (req, res) => {
             address: s.address,
             phone: s.phone,
             email: s.email,
+            location: s.location,
+            coordinates: s.location?.coordinates || s.coordinates || (s.longitude && s.latitude ? [s.longitude, s.latitude] : undefined),
+            latitude: s.location?.coordinates ? s.location.coordinates[1] : s.latitude,
+            longitude: s.location?.coordinates ? s.location.coordinates[0] : s.longitude,
+            serviceRadiusKm: s.serviceRadiusKm || 4.5,
+            estimatedDeliveryMinutes: s.estimatedDeliveryMinutes || 9,
+            isActive: s.isActive !== false,
           })),
           assignedStore: primaryStore
             ? {
@@ -84,6 +91,13 @@ router.get('/', async (req, res) => {
                 code: primaryStore.code,
                 loginId: primaryStore.loginId,
                 address: primaryStore.address,
+                location: primaryStore.location,
+                coordinates: primaryStore.location?.coordinates || primaryStore.coordinates || (primaryStore.longitude && primaryStore.latitude ? [primaryStore.longitude, primaryStore.latitude] : undefined),
+                latitude: primaryStore.location?.coordinates ? primaryStore.location.coordinates[1] : primaryStore.latitude,
+                longitude: primaryStore.location?.coordinates ? primaryStore.location.coordinates[0] : primaryStore.longitude,
+                serviceRadiusKm: primaryStore.serviceRadiusKm || 4.5,
+                estimatedDeliveryMinutes: primaryStore.estimatedDeliveryMinutes || 9,
+                isActive: primaryStore.isActive !== false,
               }
             : null,
           createdAt: area.createdAt,

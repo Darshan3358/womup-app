@@ -279,25 +279,35 @@ export class RiderService {
     userId: string,
     data: { latitude: number; longitude: number; speed?: number; heading?: number; orderId?: string },
   ) {
-    // 1. Strict GPS validation
-    if (typeof data.latitude !== 'number' || data.latitude < -90 || data.latitude > 90) {
-      throw new BadRequestException('Invalid GPS latitude. Must be between -90 and 90');
+    // 1. GPS coordinates validation
+    if (typeof data.latitude !== 'number' || isNaN(data.latitude) || data.latitude < -90 || data.latitude > 90) {
+      return { success: false, message: 'Invalid GPS latitude' };
     }
-    if (typeof data.longitude !== 'number' || data.longitude < -180 || data.longitude > 180) {
-      throw new BadRequestException('Invalid GPS longitude. Must be between -180 and 180');
+    if (typeof data.longitude !== 'number' || isNaN(data.longitude) || data.longitude < -180 || data.longitude > 180) {
+      return { success: false, message: 'Invalid GPS longitude' };
     }
-    if (data.speed !== undefined && data.speed < 0) {
-      throw new BadRequestException('Speed cannot be negative');
-    }
-    if (data.heading !== undefined && (data.heading < 0 || data.heading > 360)) {
-      throw new BadRequestException('Heading must be between 0 and 360 degrees');
-    }
+
+    // Sanitize speed and heading gracefully
+    const safeSpeed = typeof data.speed === 'number' && !isNaN(data.speed) ? Math.max(0, data.speed) : 0;
+    const safeHeading = typeof data.heading === 'number' && !isNaN(data.heading) ? Math.max(0, Math.min(360, data.heading)) : 0;
 
     const partner = await this.getPartnerByUserId(userId);
 
-    // 2. Only accept GPS when rider is online
+    // 2. If rider is offline, save location for telemetry but return gracefully without 400
     if (!partner.isOnline) {
-      throw new BadRequestException('Rider must be online on duty to broadcast live location');
+      await this.partnerModel.updateOne(
+        { _id: partner._id },
+        {
+          $set: {
+            currentLocation: {
+              type: 'Point',
+              coordinates: [data.longitude, data.latitude],
+            },
+            locationUpdatedAt: new Date(),
+          },
+        },
+      );
+      return { success: true, isOnline: false, message: 'Location updated in offline state' };
     }
 
     // 3. Atomically update rider current location
@@ -375,6 +385,11 @@ export class RiderService {
     partner.rejectionReason = '';
     await partner.save();
 
+    await this.partnerModel.db.collection('rider_bank_accounts').updateOne(
+      { $or: [{ riderId: partner._id }, { userId: partner.userId }] },
+      { $set: { verificationStatus: 'VERIFIED', isVerified: true, verifiedAt: new Date() } }
+    );
+
     if (this.trackingGateway) {
       this.trackingGateway.emitRiderApproved(partner._id.toString(), {
         riderId: partner._id.toString(),
@@ -404,6 +419,11 @@ export class RiderService {
     if (adminId) partner.approvedBy = adminId;
     await partner.save();
 
+    await this.partnerModel.db.collection('rider_bank_accounts').updateOne(
+      { $or: [{ riderId: partner._id }, { userId: partner.userId }] },
+      { $set: { verificationStatus: 'REJECTED', isVerified: false } }
+    );
+
     if (this.trackingGateway) {
       this.trackingGateway.emitKycRejected('rider', partner._id.toString(), {
         riderId: partner._id.toString(),
@@ -418,6 +438,39 @@ export class RiderService {
       data: partner,
     };
   }
+
+  async adminDeleteRider(id: string) {
+    let partner = await this.partnerModel.findById(id).exec();
+    if (!partner) {
+      partner = await this.partnerModel.findOne({
+        $or: [{ partnerCode: id }, { riderCode: id }, { userId: id }],
+      }).exec();
+    }
+    if (!partner) throw new NotFoundException('Delivery partner not found');
+
+    const partnerId = partner._id;
+    const userId = partner.userId;
+
+    await this.partnerModel.deleteOne({ _id: partnerId });
+    await this.partnerModel.db.collection('rider_bank_accounts').deleteMany({
+      $or: [{ riderId: partnerId }, { riderId: partnerId.toString() }],
+    });
+    await this.partnerModel.db.collection('rider_wallets').deleteMany({
+      $or: [{ riderId: partnerId }, { riderId: partnerId.toString() }],
+    });
+
+    if (userId) {
+      try {
+        await this.partnerModel.db.collection('users').deleteOne({ _id: userId });
+      } catch (_) {}
+    }
+
+    return {
+      success: true,
+      message: 'Delivery partner deleted successfully',
+    };
+  }
+
   async adminGetRiderDetail(id: string) {
     let partner = await this.partnerModel.findById(id).lean().exec();
     if (!partner) {
@@ -428,6 +481,20 @@ export class RiderService {
     if (!partner) throw new NotFoundException('Delivery partner not found');
 
     const p: any = partner;
+    const bankDoc = await this.partnerModel.db.collection('rider_bank_accounts').findOne({
+      $or: [{ riderId: p._id }, { userId: p.userId }]
+    });
+
+    const bankInfo = {
+      bankName: p.bankName || bankDoc?.bankName || null,
+      accountHolderName: p.accountHolderName || bankDoc?.accountHolderName || p.fullName || null,
+      accountNumber: p.accountNumber || bankDoc?.accountNumberFull || bankDoc?.accountNumber || bankDoc?.maskedAccount || null,
+      ifscCode: p.ifscCode || bankDoc?.ifscCode || bankDoc?.ifsc || null,
+      branchName: p.bankBranch || bankDoc?.branchName || bankDoc?.bankBranch || null,
+      upiId: p.upiId || bankDoc?.upiId || null,
+      isVerified: p.verificationStatus === 'VERIFIED' || p.status === 'APPROVED' || bankDoc?.verificationStatus === 'VERIFIED',
+    };
+
     return {
       id: p._id.toString(),
       _id: p._id.toString(),
@@ -460,7 +527,7 @@ export class RiderService {
       documents: {
         profilePhoto: p.profilePhotoUrl || null,
         profilePhotoUrl: p.profilePhotoUrl || null,
-        dlNumber: p.dlNumber || null,
+        dlNumber: p.drivingLicense || p.drivingLicenseNumber || p.dlNumber || null,
         dlFront: p.dlImageUrl || null,
         dlFrontUrl: p.dlImageUrl || null,
         dlBack: p.dlBackUrl || null,
@@ -480,24 +547,8 @@ export class RiderService {
         insuranceUrl: p.vehicleInsuranceUrl || null,
       },
       // Bank Account & Payout Details
-      bankAccount: {
-        bankName: p.bankName || null,
-        accountHolderName: p.accountHolderName || p.fullName || null,
-        accountNumber: p.accountNumber || null,
-        ifscCode: p.ifscCode || null,
-        branchName: p.bankBranch || null,
-        upiId: p.upiId || null,
-        isVerified: p.verificationStatus === 'VERIFIED' || p.status === 'APPROVED',
-      },
-      bankDetails: {
-        bankName: p.bankName || null,
-        accountHolderName: p.accountHolderName || p.fullName || null,
-        accountNumber: p.accountNumber || null,
-        ifscCode: p.ifscCode || null,
-        branchName: p.bankBranch || null,
-        upiId: p.upiId || null,
-        isVerified: p.verificationStatus === 'VERIFIED' || p.status === 'APPROVED',
-      },
+      bankAccount: bankInfo,
+      bankDetails: bankInfo,
       vehicle: {
         type: p.vehicleType || 'Motorbike',
         number: p.vehicleNumber || '',

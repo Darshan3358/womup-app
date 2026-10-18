@@ -86,6 +86,19 @@ export const LocationManagementScreen: React.FC = () => {
   const [areaRoutingStrategy, setAreaRoutingStrategy] = useState('NEAREST');
   const [areaSubmitting, setAreaSubmitting] = useState(false);
 
+  // Store Modal State
+  const [showStoreModal, setShowStoreModal] = useState(false);
+  const [editingStore, setEditingStore] = useState<any>(null);
+  const [storeName, setStoreName] = useState('');
+  const [storeCode, setStoreCode] = useState('');
+  const [storeLoginId, setStoreLoginId] = useState('');
+  const [storeLat, setStoreLat] = useState('23.0225');
+  const [storeLng, setStoreLng] = useState('72.5714');
+  const [storeRadius, setStoreRadius] = useState('3.5');
+  const [storeSla, setStoreSla] = useState('9');
+  const [storeIsActive, setStoreIsActive] = useState(true);
+  const [storeSubmitting, setStoreSubmitting] = useState(false);
+
   // Calculate Metrics (Multi-Store Capacity Aware)
   const totalCities = cities.length;
   const activeCitiesCount = cities.filter((c) => c.status === 'Active' || !c.status).length;
@@ -379,6 +392,90 @@ export const LocationManagementScreen: React.FC = () => {
         },
       ]
     );
+  };
+
+  // Handle Open Edit Store
+  const handleOpenEditStore = (st: any) => {
+    // Merge with master darkStores item to ensure live coordinates & operational data
+    const liveStore = darkStores.find((ds: any) =>
+      String(ds.id || ds._id) === String(st.id || st._id) ||
+      (ds.code && st.code && ds.code.toUpperCase() === st.code.toUpperCase()) ||
+      (ds.loginId && st.loginId && ds.loginId.toLowerCase() === st.loginId.toLowerCase())
+    ) || {};
+    const merged = { ...st, ...liveStore };
+
+    setEditingStore(merged);
+    setStoreName(merged.name || '');
+    setStoreCode(merged.code || '');
+    setStoreLoginId(merged.loginId || '');
+
+    const lng = merged.location?.coordinates?.[0] !== undefined
+      ? merged.location.coordinates[0]
+      : merged.coordinates?.[0] !== undefined
+      ? merged.coordinates[0]
+      : merged.longitude !== undefined
+      ? merged.longitude
+      : 72.5714;
+
+    const lat = merged.location?.coordinates?.[1] !== undefined
+      ? merged.location.coordinates[1]
+      : merged.coordinates?.[1] !== undefined
+      ? merged.coordinates[1]
+      : merged.latitude !== undefined
+      ? merged.latitude
+      : 23.0225;
+
+    setStoreLat(String(lat));
+    setStoreLng(String(lng));
+    setStoreRadius(String(merged.serviceRadiusKm || 3.5));
+    setStoreSla(String(merged.estimatedDeliveryMinutes || 9));
+    setStoreIsActive(merged.isActive !== false);
+    setShowStoreModal(true);
+  };
+
+  // Submit Store Form
+  const handleSubmitStore = async () => {
+    if (!editingStore) return;
+    if (!storeName.trim()) {
+      Alert.alert('Required', 'Please enter store name');
+      return;
+    }
+    const storeId = String(editingStore.id || editingStore._id);
+    const parsedLat = parseFloat(storeLat) || 23.0225;
+    const parsedLng = parseFloat(storeLng) || 72.5714;
+    const cleanCode = (storeCode.trim() || storeName.trim()).toUpperCase().replace(/\s+/g, '_');
+
+    setStoreSubmitting(true);
+    try {
+      const payload: any = {
+        name: storeName.trim(),
+        code: cleanCode,
+        loginId: storeLoginId.trim() || undefined,
+        serviceRadiusKm: parseFloat(storeRadius) || 3.5,
+        estimatedDeliveryMinutes: parseInt(storeSla, 10) || 9,
+        location: {
+          type: 'Point',
+          coordinates: [parsedLng, parsedLat],
+        },
+        coordinates: [parsedLng, parsedLat],
+        latitude: parsedLat,
+        longitude: parsedLng,
+        isActive: storeIsActive,
+      };
+
+      const res = await ApiService.updateStore(storeId, payload);
+      if (res.success) {
+        await refreshFromDb();
+        setShowStoreModal(false);
+        Alert.alert('Success', `Dark Store "${storeName}" updated successfully`);
+      } else {
+        Alert.alert('Error', res.error || 'Failed to update store');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'An error occurred while updating the store');
+    } finally {
+      setStoreSubmitting(false);
+    }
   };
 
   // Switch to Areas tab filtered by specific city
@@ -771,13 +868,22 @@ export const LocationManagementScreen: React.FC = () => {
                     return false;
                   });
 
-                  const allStores = area.assignedStores && area.assignedStores.length > 0
+                  const rawStores = area.assignedStores && area.assignedStores.length > 0
                     ? area.assignedStores
                     : matchingStores.length > 0
                     ? matchingStores
                     : area.assignedStore
                     ? [area.assignedStore]
                     : [];
+
+                  const allStores = rawStores.map((st: any) => {
+                    const live = darkStores.find((ds: any) =>
+                      String(ds.id || ds._id) === String(st.id || st._id) ||
+                      (ds.code && st.code && ds.code.toUpperCase() === st.code.toUpperCase()) ||
+                      (ds.loginId && st.loginId && ds.loginId.toLowerCase() === st.loginId.toLowerCase())
+                    );
+                    return live ? { ...st, ...live } : st;
+                  });
 
                   const maxStores = Number(area.maxStores) || 1;
                   const currentCount = allStores.length;
@@ -879,7 +985,7 @@ export const LocationManagementScreen: React.FC = () => {
                             {allStores.map((st: any, idx: number) => (
                               <View key={st.id || st._id || idx} style={styles.assignedStoreItemRow}>
                                 <Store size={13} color={COLORS.purple} />
-                                <View style={{ flex: 1, marginLeft: 6 }}>
+                                <View style={{ flex: 1, marginLeft: 6, marginRight: 6 }}>
                                   <Text style={styles.assignedStoreName} numberOfLines={1}>
                                     {st.name}
                                   </Text>
@@ -887,6 +993,14 @@ export const LocationManagementScreen: React.FC = () => {
                                     Code: {st.code || st.loginId} · 📍 {st.location?.coordinates ? `${st.location.coordinates[1]?.toFixed(4)}, ${st.location.coordinates[0]?.toFixed(4)}` : st.latitude ? `${st.latitude}, ${st.longitude}` : 'GPS Linked'}
                                   </Text>
                                 </View>
+                                <TouchableOpacity
+                                  style={styles.editStoreItemBtn}
+                                  onPress={() => handleOpenEditStore(st)}
+                                  activeOpacity={0.7}
+                                >
+                                  <Edit2 size={11} color="#2563EB" />
+                                  <Text style={styles.editStoreItemBtnText}>Edit Store</Text>
+                                </TouchableOpacity>
                               </View>
                             ))}
                             {!isFull && (
@@ -1279,6 +1393,183 @@ export const LocationManagementScreen: React.FC = () => {
                   <Text style={styles.submitBtnText}>
                     {editingArea ? 'Save Area' : 'Create Area'}
                   </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ================= MODAL: EDIT DARK STORE ================= */}
+      <Modal
+        visible={showStoreModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowStoreModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleRow}>
+                <Store size={20} color={COLORS.purple} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.modalTitle} numberOfLines={1}>
+                    Edit Store: {editingStore?.name || 'Dark Store'}
+                  </Text>
+                  <Text style={styles.modalSubtitle}>
+                    Operational dark store parameters, GPS coordinates, and credentials
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setShowStoreModal(false)}>
+                <X size={20} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 520 }}>
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Dark Store Name *</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="e.g. Wom Up Chandlodiya - Tragad Dark Store"
+                  placeholderTextColor={COLORS.textMuted}
+                  value={storeName}
+                  onChangeText={setStoreName}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Store Code *</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="e.g. STORE-CHANDLODIYA_TRAGAD"
+                  placeholderTextColor={COLORS.textMuted}
+                  value={storeCode}
+                  onChangeText={(text) => setStoreCode(text.toUpperCase())}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Store Login ID / Username</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="e.g. womup_chandlodiyatragad"
+                  placeholderTextColor={COLORS.textMuted}
+                  value={storeLoginId}
+                  onChangeText={setStoreLoginId}
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={styles.formRow}>
+                <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                  <Text style={styles.formLabel}>Delivery SLA (Mins)</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="9"
+                    placeholderTextColor={COLORS.textMuted}
+                    keyboardType="numeric"
+                    value={storeSla}
+                    onChangeText={setStoreSla}
+                  />
+                </View>
+
+                <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
+                  <Text style={styles.formLabel}>Service Radius (Km)</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="3.5"
+                    placeholderTextColor={COLORS.textMuted}
+                    keyboardType="numeric"
+                    value={storeRadius}
+                    onChangeText={setStoreRadius}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.formRow}>
+                <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                  <Text style={styles.formLabel}>GPS Latitude</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="23.1288"
+                    placeholderTextColor={COLORS.textMuted}
+                    keyboardType="numeric"
+                    value={storeLat}
+                    onChangeText={setStoreLat}
+                  />
+                </View>
+
+                <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
+                  <Text style={styles.formLabel}>GPS Longitude</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="72.5507"
+                    placeholderTextColor={COLORS.textMuted}
+                    keyboardType="numeric"
+                    value={storeLng}
+                    onChangeText={setStoreLng}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Operational Status</Text>
+                <View style={styles.statusToggleRow}>
+                  <TouchableOpacity
+                    style={[
+                      styles.statusOption,
+                      storeIsActive && styles.statusOptionActive,
+                    ]}
+                    onPress={() => setStoreIsActive(true)}
+                  >
+                    <Text
+                      style={[
+                        styles.statusOptionText,
+                        storeIsActive && styles.statusOptionTextActive,
+                      ]}
+                    >
+                      Active
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.statusOption,
+                      !storeIsActive && styles.statusOptionInactive,
+                    ]}
+                    onPress={() => setStoreIsActive(false)}
+                  >
+                    <Text
+                      style={[
+                        styles.statusOptionText,
+                        !storeIsActive && styles.statusOptionTextInactive,
+                      ]}
+                    >
+                      Inactive
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                onPress={() => setShowStoreModal(false)}
+              >
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.submitBtn}
+                onPress={handleSubmitStore}
+                disabled={storeSubmitting}
+              >
+                {storeSubmitting ? (
+                  <ActivityIndicator size="small" color={COLORS.white} />
+                ) : (
+                  <Text style={styles.submitBtnText}>Save Store</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -1830,6 +2121,23 @@ const styles = StyleSheet.create({
     padding: 7,
     borderRadius: 6,
     marginVertical: 3,
+  },
+  editStoreItemBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 5,
+    marginLeft: 8,
+  },
+  editStoreItemBtnText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#2563EB',
   },
   addStoreSlotBtn: {
     flexDirection: 'row',

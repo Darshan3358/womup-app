@@ -48,6 +48,8 @@ export interface RiderDocument {
   title: string;
   documentNumberMasked?: string;
   fileUrl?: string;
+  url?: string;
+  backUrl?: string;
   status: DocumentStatus;
   issuedAt?: string;
   expiresAt?: string;
@@ -106,6 +108,13 @@ export interface DeliveryRequest {
   rateSource?: 'AREA' | 'CITY' | 'GLOBAL' | string;
   basePayout?: number;
   bagBarcode?: string;
+  isCod?: boolean;
+  cashToCollect?: number;
+  riderEarning?: number;
+  paymentMode?: string;
+  isOrderBlocked?: boolean;
+  currentOutstandingCash?: number;
+  outstandingCashLimit?: number;
 }
 
 export interface RiderProfile {
@@ -122,6 +131,7 @@ export interface RiderProfile {
   rating: number;
   completedDeliveries: number;
   status: RiderAccountStatus;
+  verificationStatus?: 'PENDING' | 'VERIFIED' | 'REJECTED';
   isOnline: boolean;
   suspensionReason?: string;
 }
@@ -138,17 +148,41 @@ export interface SettlementSummary {
   pendingTransfer: number;
   incentivesEarned?: number;
   tipsCollected?: number;
+  weekOrders?: number;
+  monthOrders?: number;
+  weekBase?: number;
+  monthBase?: number;
+  weekTips?: number;
+  monthTips?: number;
+  weekIncentives?: number;
+  monthIncentives?: number;
+  // Khata / Net Settlement Metrics
+  totalCodCollected?: number;
+  totalEarnings?: number;
+  totalOnlineEarnings?: number;
+  netBalance?: number;
+  riderOwesAdmin?: number;
+  adminOwesRider?: number;
+  cashLimit?: number;
+  isOrderBlocked?: boolean;
+  todayCod?: number;
 }
 
 export interface SettlementHistoryItem {
   id: string;
   date: string;
   orderNumber: string;
+  paymentMode?: 'COD' | 'ONLINE' | string;
+  totalAmount?: number;
+  riderEarning?: number;
+  adminShare?: number;
+  cashCollected?: number;
+  netImpact?: number;
   baseAmount: number;
   tip: number;
   bonus: number;
   total: number;
-  status: 'SETTLED' | 'PENDING' | 'PROCESSING';
+  status: 'SETTLED' | 'PENDING' | 'PROCESSING' | 'DELIVERED' | string;
 }
 
 export interface PerformanceMetrics {
@@ -187,6 +221,7 @@ export interface RiderBankAccount {
   accountHolderName: string;
   upiId?: string;
   isVerified: boolean;
+  verificationStatus?: 'VERIFIED' | 'PENDING' | 'REJECTED' | string;
 }
 
 export interface RiderVehicle {

@@ -32,6 +32,9 @@ export const DocumentsScreen: React.FC<{ isAuthOnboarding?: boolean }> = ({ isAu
   const [uploadedUrl, setUploadedUrl] = useState('');
   const [isPickingImage, setIsPickingImage] = useState(false);
 
+  // Fullscreen Preview Modal State
+  const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null);
+
   const loadDocs = async () => {
     const list = await RiderApiService.getDocuments();
     setDocuments(list);
@@ -175,6 +178,66 @@ export const DocumentsScreen: React.FC<{ isAuthOnboarding?: boolean }> = ({ isAu
                 </View>
               </View>
 
+              {/* Document Images Preview Section */}
+              {doc.type === 'AADHAAR_PAN' ? (
+                doc.fileUrl || doc.backUrl ? (
+                  <View style={styles.imageGridRow}>
+                    {doc.fileUrl ? (
+                      <TouchableOpacity
+                        style={styles.imageThumbCard}
+                        activeOpacity={0.85}
+                        onPress={() => setPreviewImage({ url: doc.fileUrl!, title: `${doc.title} (Front Side)` })}
+                      >
+                        <Image source={{ uri: doc.fileUrl }} style={styles.thumbImage} resizeMode="cover" />
+                        <View style={styles.thumbBadge}>
+                          <Ionicons name="scan-outline" size={11} color="#FFF" />
+                          <Text style={styles.thumbBadgeText}>Front View</Text>
+                        </View>
+                      </TouchableOpacity>
+                    ) : null}
+
+                    {doc.backUrl ? (
+                      <TouchableOpacity
+                        style={styles.imageThumbCard}
+                        activeOpacity={0.85}
+                        onPress={() => setPreviewImage({ url: doc.backUrl!, title: `${doc.title} (Back Side)` })}
+                      >
+                        <Image source={{ uri: doc.backUrl }} style={styles.thumbImage} resizeMode="cover" />
+                        <View style={styles.thumbBadge}>
+                          <Ionicons name="scan-outline" size={11} color="#FFF" />
+                          <Text style={styles.thumbBadgeText}>Back View</Text>
+                        </View>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                ) : (
+                  <View style={styles.noDocImageBox}>
+                    <Ionicons name="image-outline" size={16} color="#94A3B8" />
+                    <Text style={styles.noDocImageText}>Document copy not uploaded</Text>
+                  </View>
+                )
+              ) : doc.fileUrl ? (
+                <TouchableOpacity
+                  style={styles.singleImageCard}
+                  activeOpacity={0.85}
+                  onPress={() => setPreviewImage({ url: doc.fileUrl!, title: doc.title })}
+                >
+                  <Image source={{ uri: doc.fileUrl }} style={styles.singleThumbImage} resizeMode="cover" />
+                  <View style={styles.thumbOverlayBar}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Ionicons name="eye-outline" size={13} color="#FFF" />
+                      <Text style={styles.thumbBadgeText}>Uploaded Document Preview</Text>
+                    </View>
+                    <Text style={styles.tapToViewText}>Tap to enlarge ↗</Text>
+                  </View>
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.noDocImageBox}>
+                  <Ionicons name="image-outline" size={16} color="#94A3B8" />
+                  <Text style={styles.noDocImageText}>Document copy not uploaded</Text>
+                </View>
+              )}
+
               <View style={styles.docFooter}>
                 <Text style={styles.expiryText}>
                   {doc.expiresAt ? `Valid till: ${doc.expiresAt}` : isVerified ? 'Verified by Compliance' : 'Pending Verification'}
@@ -242,6 +305,42 @@ export const DocumentsScreen: React.FC<{ isAuthOnboarding?: boolean }> = ({ isAu
                 placeholderTextColor={COLORS.textMuted}
               />
 
+              <Text style={styles.fieldLabel}>DOCUMENT PHOTO</Text>
+              {uploadedUrl ? (
+                <View style={styles.modalImagePreviewBox}>
+                  <Image source={{ uri: uploadedUrl }} style={styles.modalImagePreview} resizeMode="cover" />
+                  <TouchableOpacity
+                    style={styles.changePhotoBtn}
+                    onPress={() => setUploadedUrl('')}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                    <Text style={styles.changePhotoText}>Remove / Re-upload</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.uploadButtonsRow}>
+                  <TouchableOpacity
+                    style={styles.pickBtn}
+                    onPress={() => pickImage('camera')}
+                    disabled={isPickingImage}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="camera" size={18} color={COLORS.hotPink} />
+                    <Text style={styles.pickBtnText}>Take Photo</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.pickBtn}
+                    onPress={() => pickImage('gallery')}
+                    disabled={isPickingImage}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="images" size={18} color="#2563EB" />
+                    <Text style={[styles.pickBtnText, { color: '#2563EB' }]}>From Gallery</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
               <View style={styles.modalBtnRow}>
                 <TouchableOpacity
                   style={styles.modalCancelBtn}
@@ -260,6 +359,42 @@ export const DocumentsScreen: React.FC<{ isAuthOnboarding?: boolean }> = ({ isAu
                 </TouchableOpacity>
               </View>
             </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Fullscreen Image Preview Modal */}
+      {previewImage && (
+        <Modal visible={true} transparent animationType="fade" onRequestClose={() => setPreviewImage(null)}>
+          <View style={styles.previewOverlay}>
+            <View style={styles.previewHeader}>
+              <Text style={styles.previewTitle} numberOfLines={1}>
+                {previewImage.title}
+              </Text>
+              <TouchableOpacity
+                style={styles.closePreviewBtn}
+                onPress={() => setPreviewImage(null)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="close-circle" size={30} color="#FFF" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.previewImageContainer}>
+              <Image
+                source={{ uri: previewImage.url }}
+                style={styles.fullPreviewImage}
+                resizeMode="contain"
+              />
+            </View>
+
+            <TouchableOpacity
+              style={styles.donePreviewBtn}
+              onPress={() => setPreviewImage(null)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.donePreviewText}>Close Preview</Text>
+            </TouchableOpacity>
           </View>
         </Modal>
       )}
@@ -492,6 +627,191 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     letterSpacing: 0.8,
+  },
+  imageGridRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  imageThumbCard: {
+    flex: 1,
+    height: 120,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: '#0F172A',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    position: 'relative',
+  },
+  thumbImage: {
+    width: '100%',
+    height: '100%',
+  },
+  thumbBadge: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  thumbBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  singleImageCard: {
+    height: 150,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: '#0F172A',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 12,
+    position: 'relative',
+  },
+  singleThumbImage: {
+    width: '100%',
+    height: '100%',
+  },
+  thumbOverlayBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  tapToViewText: {
+    color: '#93C5FD',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  noDocImageBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F8FAFC',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderStyle: 'dashed',
+    marginBottom: 12,
+  },
+  noDocImageText: {
+    fontSize: 11,
+    color: '#94A3B8',
+    fontWeight: '600',
+  },
+  modalImagePreviewBox: {
+    height: 130,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#0F172A',
+    position: 'relative',
+    marginBottom: 10,
+  },
+  modalImagePreview: {
+    width: '100%',
+    height: '100%',
+  },
+  changePhotoBtn: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  changePhotoText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#EF4444',
+  },
+  uploadButtonsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 10,
+  },
+  pickBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  pickBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.hotPink,
+  },
+  previewOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    justifyContent: 'space-between',
+    paddingTop: 50,
+    paddingBottom: 30,
+    paddingHorizontal: 16,
+  },
+  previewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  previewTitle: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginRight: 10,
+  },
+  closePreviewBtn: {
+    padding: 4,
+  },
+  previewImageContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullPreviewImage: {
+    width: '100%',
+    height: '100%',
+  },
+  donePreviewBtn: {
+    backgroundColor: COLORS.hotPink,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  donePreviewText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
   },
 });
 

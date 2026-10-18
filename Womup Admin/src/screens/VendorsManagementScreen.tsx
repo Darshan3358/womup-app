@@ -314,175 +314,186 @@ export const VendorsManagementScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* 1. Header Bar */}
-      <LinearGradient colors={['#FFFFFF', '#F8FAFC']} style={styles.topHeader}>
-        <View style={styles.headerTitleRow}>
-          <View style={styles.headerLeft}>
-            <View style={styles.iconCircle}>
-              <Store size={22} color={COLORS.navy} />
+      <ScrollView
+        style={styles.mainScrollView}
+        contentContainerStyle={styles.mainScrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* 1. Header Bar */}
+        <LinearGradient colors={['#FFFFFF', '#F8FAFC']} style={styles.topHeader}>
+          <View style={styles.headerTitleRow}>
+            <View style={styles.headerLeft}>
+              <View style={styles.iconCircle}>
+                <Store size={20} color={COLORS.navy} />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.headerTitle} numberOfLines={1}>Local Store Vendors</Text>
+                <Text style={styles.headerSubtitle} numberOfLines={1}>
+                  Manage offline partner shops & Coin %
+                </Text>
+              </View>
             </View>
-            <View>
-              <Text style={styles.headerTitle}>Local Store Vendors</Text>
-              <Text style={styles.headerSubtitle}>
-                Manage offline partner shops & Admin-controlled Shopping Coin %
-              </Text>
-            </View>
-          </View>
 
-          <View style={styles.headerRightActions}>
-            <TouchableOpacity
-              style={styles.refreshBtn}
-              onPress={onRefresh}
-              disabled={refreshing}
-            >
-              <RefreshCw size={18} color={COLORS.navy} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.addNewBtn}
-              onPress={handleOpenCreateModal}
-              activeOpacity={0.85}
-            >
-              <Plus size={18} color={COLORS.white} />
-              <Text style={styles.addNewBtnText}>Add New Vendor</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* 2. Filters & Search Row */}
-        <View style={styles.filtersBar}>
-          <View style={styles.searchBox}>
-            <Search size={16} color={COLORS.textMuted} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search by store name, category, or address..."
-              placeholderTextColor={COLORS.textMuted}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              onSubmitEditing={fetchVendorsData}
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <X size={16} color={COLORS.textMuted} />
+            <View style={styles.headerRightActions}>
+              <TouchableOpacity
+                style={styles.refreshBtn}
+                onPress={onRefresh}
+                disabled={refreshing}
+              >
+                <RefreshCw size={16} color={COLORS.navy} />
               </TouchableOpacity>
-            )}
+
+              <TouchableOpacity
+                style={styles.addNewBtn}
+                onPress={handleOpenCreateModal}
+                activeOpacity={0.85}
+              >
+                <Plus size={16} color={COLORS.white} />
+                <Text style={styles.addNewBtnText}>Add Vendor</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
-          {/* Quick Category Filter Chips */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
-            {['All Categories', 'Vegetables', 'Grocery', 'Medical', 'Salon', 'Garments', 'Bakery', 'Electronics'].map(
-              (cat) => (
-                <TouchableOpacity
-                  key={cat}
-                  style={[
-                    styles.filterChip,
-                    selectedCategory === cat && styles.filterChipActive,
-                  ]}
-                  onPress={() => setSelectedCategory(cat)}
-                >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      selectedCategory === cat && styles.filterChipTextActive,
-                    ]}
-                  >
-                    {cat}
-                  </Text>
+          {/* 2. Filters & Search Row */}
+          <View style={styles.filtersBar}>
+            <View style={styles.searchBox}>
+              <Search size={16} color={COLORS.textMuted} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search by store name, category, or address..."
+                placeholderTextColor={COLORS.textMuted}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                onSubmitEditing={fetchVendorsData}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                  <X size={16} color={COLORS.textMuted} />
                 </TouchableOpacity>
-              )
-            )}
-          </ScrollView>
-        </View>
-      </LinearGradient>
-
-      {/* KPI Summary Cards */}
-      <View style={styles.kpiRow}>
-        <View style={styles.kpiCard}>
-          <Text style={styles.kpiNumber}>{analytics.totalVendors || vendors.length}</Text>
-          <Text style={styles.kpiLabel}>Total Vendors</Text>
-        </View>
-        <View style={styles.kpiCard}>
-          <Text style={[styles.kpiNumber, { color: '#10B981' }]}>
-            {analytics.activeVendors || vendors.filter((v) => v.isActive).length}
-          </Text>
-          <Text style={styles.kpiLabel}>Active Stores</Text>
-        </View>
-        <View style={styles.kpiCard}>
-          <Text style={[styles.kpiNumber, { color: '#F59E0B' }]}>
-            {analytics.kycPending || vendors.filter((v) => !v.isVerified).length}
-          </Text>
-          <Text style={styles.kpiLabel}>KYC Pending</Text>
-        </View>
-        <View style={styles.kpiCard}>
-          <Text style={[styles.kpiNumber, { color: '#2563EB' }]}>
-            ₹{((analytics.monthlyRevenue || 45000) / 1000).toFixed(1)}k
-          </Text>
-          <Text style={styles.kpiLabel}>Monthly GMV</Text>
-        </View>
-      </View>
-
-      {/* Status Filter Tabs */}
-      <View style={styles.statusFilterBar}>
-        {[
-          { id: 'ALL', label: `All (${vendors.length})` },
-          { id: 'ACTIVE', label: `Active (${vendors.filter((v) => v.isActive).length})` },
-          { id: 'DISABLED', label: `Disabled (${vendors.filter((v) => !v.isActive).length})` },
-          { id: 'KYC_PENDING', label: `KYC Pending (${vendors.filter((v) => !v.isVerified).length})` },
-        ].map((st) => (
-          <TouchableOpacity
-            key={st.id}
-            style={[
-              styles.statusTabPill,
-              statusFilter === st.id && styles.statusTabPillActive,
-            ]}
-            onPress={() => setStatusFilter(st.id as any)}
-          >
-            <Text
-              style={[
-                styles.statusTabPillText,
-                statusFilter === st.id && styles.statusTabPillTextActive,
-              ]}
-            >
-              {st.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* 3. Vendor Cards List */}
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.navy} />
-          <Text style={styles.loadingText}>Loading MongoDB vendors collection...</Text>
-        </View>
-      ) : (
-        <ScrollView contentContainerStyle={styles.listContent}>
-          {displayedVendors.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Store size={64} color="#CBD5E1" />
-              <Text style={styles.emptyTitle}>No Vendors Found</Text>
-              <Text style={styles.emptySubtitle}>
-                {statusFilter !== 'ALL'
-                  ? `No vendors matching filter "${statusFilter}".`
-                  : 'Click "+ Add New Vendor" above to register your first local partner shop.'}
-              </Text>
+              )}
             </View>
-          ) : (
-            displayedVendors.map((vendor) => (
+
+            {/* Quick Category Filter Chips */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.categoryScroll}
+              contentContainerStyle={styles.categoryScrollContent}
+            >
+              {['All Categories', 'Vegetables', 'Grocery', 'Medical', 'Salon', 'Garments', 'Bakery', 'Electronics'].map(
+                (cat) => (
+                  <TouchableOpacity
+                    key={cat}
+                    style={[
+                      styles.filterChip,
+                      selectedCategory === cat && styles.filterChipActive,
+                    ]}
+                    onPress={() => setSelectedCategory(cat)}
+                  >
+                    <Text
+                      style={[
+                        styles.filterChipText,
+                        selectedCategory === cat && styles.filterChipTextActive,
+                      ]}
+                    >
+                      {cat}
+                    </Text>
+                  </TouchableOpacity>
+                )
+              )}
+            </ScrollView>
+          </View>
+        </LinearGradient>
+
+        {/* KPI Summary Cards */}
+        <View style={styles.kpiRow}>
+          <View style={styles.kpiCard}>
+            <Text style={styles.kpiNumber}>{analytics.totalVendors || vendors.length}</Text>
+            <Text style={styles.kpiLabel}>Total</Text>
+          </View>
+          <View style={styles.kpiCard}>
+            <Text style={[styles.kpiNumber, { color: '#10B981' }]}>
+              {analytics.activeVendors || vendors.filter((v) => v.isActive).length}
+            </Text>
+            <Text style={styles.kpiLabel}>Active</Text>
+          </View>
+          <View style={styles.kpiCard}>
+            <Text style={[styles.kpiNumber, { color: '#F59E0B' }]}>
+              {analytics.kycPending || vendors.filter((v) => !v.isVerified).length}
+            </Text>
+            <Text style={styles.kpiLabel}>KYC Pending</Text>
+          </View>
+          <View style={styles.kpiCard}>
+            <Text style={[styles.kpiNumber, { color: '#2563EB' }]}>
+              ₹{((analytics.monthlyRevenue || 45000) / 1000).toFixed(1)}k
+            </Text>
+            <Text style={styles.kpiLabel}>Monthly GMV</Text>
+          </View>
+        </View>
+
+        {/* Status Filter Tabs */}
+        <View style={styles.statusFilterBar}>
+          {[
+            { id: 'ALL', label: `All (${vendors.length})` },
+            { id: 'ACTIVE', label: `Active (${vendors.filter((v) => v.isActive).length})` },
+            { id: 'DISABLED', label: `Disabled (${vendors.filter((v) => !v.isActive).length})` },
+            { id: 'KYC_PENDING', label: `KYC Pending (${vendors.filter((v) => !v.isVerified).length})` },
+          ].map((st) => (
+            <TouchableOpacity
+              key={st.id}
+              style={[
+                styles.statusTabPill,
+                statusFilter === st.id && styles.statusTabPillActive,
+              ]}
+              onPress={() => setStatusFilter(st.id as any)}
+            >
+              <Text
+                style={[
+                  styles.statusTabPillText,
+                  statusFilter === st.id && styles.statusTabPillTextActive,
+                ]}
+              >
+                {st.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* 3. Vendor Cards List */}
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={COLORS.navy} />
+            <Text style={styles.loadingText}>Loading MongoDB vendors collection...</Text>
+          </View>
+        ) : displayedVendors.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Store size={64} color="#CBD5E1" />
+            <Text style={styles.emptyTitle}>No Vendors Found</Text>
+            <Text style={styles.emptySubtitle}>
+              {statusFilter !== 'ALL'
+                ? `No vendors matching filter "${statusFilter}".`
+                : 'Click "+ Add Vendor" above to register your first local partner shop.'}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.listContent}>
+            {displayedVendors.map((vendor) => (
               <View key={vendor.id || vendor._id} style={styles.vendorCard}>
                 <View style={styles.cardHeader}>
                   <View style={styles.cardHeaderLeft}>
                     <View style={styles.storeIconBox}>
-                      <Store size={22} color={COLORS.navy} />
+                      <Store size={20} color={COLORS.navy} />
                     </View>
-                    <View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
                       <View style={styles.storeTitleRow}>
-                        <Text style={styles.storeNameText}>{vendor.storeName}</Text>
+                        <Text style={styles.storeNameText} numberOfLines={1}>
+                          {vendor.storeName}
+                        </Text>
                         <View style={styles.vendorCodePill}>
                           <Text style={styles.vendorCodeText}>{vendor.vendorCode}</Text>
                         </View>
                       </View>
-                      <Text style={styles.metaText}>
+                      <Text style={styles.metaText} numberOfLines={1}>
                         {vendor.categoryName} • {vendor.city} • {vendor.pincode}
                       </Text>
                     </View>
@@ -509,7 +520,7 @@ export const VendorsManagementScreen: React.FC = () => {
 
                     {vendor.isVerified && (
                       <View style={[styles.badgePill, styles.badgeVerified]}>
-                        <ShieldCheck size={12} color="#2563EB" />
+                        <ShieldCheck size={11} color="#2563EB" />
                         <Text style={[styles.badgeText, { color: '#2563EB' }]}>Verified</Text>
                       </View>
                     )}
@@ -523,13 +534,13 @@ export const VendorsManagementScreen: React.FC = () => {
                     style={styles.coinBanner}
                   >
                     <View style={styles.coinBannerLeft}>
-                      <Coins size={20} color="#D97706" />
-                      <View style={{ marginLeft: 8 }}>
-                        <Text style={styles.coinBannerTitle}>
+                      <Coins size={18} color="#D97706" />
+                      <View style={{ marginLeft: 8, flex: 1, minWidth: 0 }}>
+                        <Text style={styles.coinBannerTitle} numberOfLines={1}>
                           Shopping Coin Cashback: <Text style={styles.coinHighlight}>{vendor.shoppingCoinPercent}%</Text>
                         </Text>
-                        <Text style={styles.coinBannerSub}>
-                          Customer earns ₹{vendor.shoppingCoinPercent} coins per ₹100 bill amount
+                        <Text style={styles.coinBannerSub} numberOfLines={1}>
+                          Customer earns ₹{vendor.shoppingCoinPercent} coins per ₹100 bill
                         </Text>
                       </View>
                     </View>
@@ -540,8 +551,9 @@ export const VendorsManagementScreen: React.FC = () => {
                         setCoinEditVendor(vendor);
                         setQuickCoinPercent((vendor.shoppingCoinPercent || 10).toString());
                       }}
+                      activeOpacity={0.75}
                     >
-                      <Edit2 size={13} color="#92400E" />
+                      <Edit2 size={12} color="#92400E" />
                       <Text style={styles.coinEditBtnText}>Edit %</Text>
                     </TouchableOpacity>
                   </LinearGradient>
@@ -551,52 +563,57 @@ export const VendorsManagementScreen: React.FC = () => {
                 <View style={styles.infoGrid}>
                   <View style={styles.infoCol}>
                     <View style={styles.infoRow}>
-                      <User size={14} color="#64748B" />
-                      <Text style={styles.infoValue}>Owner: {vendor.ownerName || '—'}</Text>
+                      <User size={13} color="#64748B" />
+                      <Text style={styles.infoValue} numberOfLines={1}>Owner: {vendor.ownerName || '—'}</Text>
                     </View>
                     <View style={styles.infoRow}>
-                      <Phone size={14} color="#64748B" />
-                      <Text style={styles.infoValue}>{vendor.ownerPhone || '—'}</Text>
+                      <Phone size={13} color="#64748B" />
+                      <Text style={styles.infoValue} numberOfLines={1}>{vendor.ownerPhone || '—'}</Text>
                     </View>
                   </View>
 
                   <View style={styles.infoCol}>
                     <View style={styles.infoRow}>
-                      <Clock size={14} color="#64748B" />
-                      <Text style={styles.infoValue}>
+                      <Clock size={13} color="#64748B" />
+                      <Text style={styles.infoValue} numberOfLines={1}>
                         {vendor.openingTime || '8:00 AM'} - {vendor.closingTime || '9:00 PM'}
                       </Text>
                     </View>
                     <View style={styles.infoRow}>
-                      <QrCode size={14} color="#64748B" />
-                      <Text style={styles.infoValue}>{vendor.upiId || `${vendor.vendorCode.toLowerCase()}@okhdfcbank`}</Text>
+                      <QrCode size={13} color="#64748B" />
+                      <Text style={styles.infoValue} numberOfLines={1}>
+                        {vendor.upiId || `${vendor.vendorCode.toLowerCase()}@okhdfcbank`}
+                      </Text>
                     </View>
                   </View>
                 </View>
 
-                {/* Bottom Actions */}
-                <View style={styles.cardActionsRow}>
-                  <View style={styles.statsPreview}>
+                {/* Bottom Actions Section */}
+                <View style={styles.cardActionsContainer}>
+                  <View style={styles.statsPreviewRow}>
                     <Text style={styles.statLabel}>
                       Transactions: <Text style={styles.statVal}>{vendor.totalTransactions ?? 0}</Text>
                     </Text>
+                    <View style={styles.statDivider} />
                     <Text style={styles.statLabel}>
                       Revenue: <Text style={styles.statVal}>₹{(vendor.monthlyRevenue ?? 0).toLocaleString()}</Text>
                     </Text>
                   </View>
 
-                  <View style={styles.actionButtons}>
+                  <View style={styles.actionButtonsWrap}>
                     <TouchableOpacity
                       style={styles.actionBtnOutline}
                       onPress={() => setQrVendor(vendor)}
+                      activeOpacity={0.7}
                     >
-                      <QrCode size={13} color={COLORS.navy} />
+                      <QrCode size={12} color={COLORS.navy} style={{ marginRight: 4 }} />
                       <Text style={styles.actionBtnOutlineText}>Show QR</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
                       style={styles.actionBtnOutline}
                       onPress={() => handleToggleActive(vendor)}
+                      activeOpacity={0.7}
                     >
                       <Text style={styles.actionBtnOutlineText}>
                         {vendor.isActive ? 'Disable' : 'Enable'}
@@ -606,6 +623,7 @@ export const VendorsManagementScreen: React.FC = () => {
                     <TouchableOpacity
                       style={styles.actionBtnOutline}
                       onPress={() => setReviewVendorId((vendor as any)._id || vendor.id)}
+                      activeOpacity={0.7}
                     >
                       <Text style={[styles.actionBtnOutlineText, { color: !vendor.isVerified ? '#2563EB' : '#10B981' }]}>
                         {!vendor.isVerified ? 'Review KYC' : 'View KYC'}
@@ -615,24 +633,26 @@ export const VendorsManagementScreen: React.FC = () => {
                     <TouchableOpacity
                       style={styles.actionBtnPrimary}
                       onPress={() => handleOpenEditModal(vendor)}
+                      activeOpacity={0.8}
                     >
-                      <Edit2 size={13} color="#FFFFFF" />
+                      <Edit2 size={12} color="#FFFFFF" style={{ marginRight: 4 }} />
                       <Text style={styles.actionBtnPrimaryText}>Edit</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
                       style={styles.actionBtnDanger}
                       onPress={() => handleDeleteVendor(vendor)}
+                      activeOpacity={0.7}
                     >
-                      <Trash2 size={14} color="#EF4444" />
+                      <Trash2 size={13} color="#EF4444" />
                     </TouchableOpacity>
                   </View>
                 </View>
               </View>
-            ))
-          )}
-        </ScrollView>
-      )}
+            ))}
+          </View>
+        )}
+      </ScrollView>
 
       {/* 4. Add / Edit Vendor Modal */}
       <Modal visible={isModalOpen} animationType="slide" transparent>
@@ -1083,11 +1103,21 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
+    width: '100%',
+    overflow: 'hidden',
+  },
+  mainScrollView: {
+    flex: 1,
+    width: '100%',
+  },
+  mainScrollContent: {
+    paddingBottom: 90,
+    width: '100%',
   },
   topHeader: {
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 14,
+    paddingHorizontal: 12,
+    paddingTop: 14,
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
   },
@@ -1095,40 +1125,45 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 12,
+    gap: 8,
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
+    flex: 1,
+    minWidth: 0,
   },
   iconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: '800',
     color: COLORS.navy,
   },
   headerSubtitle: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#64748B',
-    marginTop: 2,
+    marginTop: 1,
   },
   headerRightActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 6,
+    flexShrink: 0,
   },
   refreshBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1139,14 +1174,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.navy,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 10,
+    gap: 4,
   },
   addNewBtnText: {
     color: COLORS.white,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
   },
   filtersBar: {
@@ -1156,36 +1191,43 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 40,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    height: 38,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     gap: 8,
+    width: '100%',
   },
   searchInput: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 12.5,
     color: '#0F172A',
+    paddingVertical: 0,
   },
   categoryScroll: {
+    width: '100%',
+  },
+  categoryScrollContent: {
     flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: 12,
   },
   filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 16,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    marginRight: 8,
+    marginRight: 6,
   },
   filterChipActive: {
     backgroundColor: COLORS.navy,
     borderColor: COLORS.navy,
   },
   filterChipText: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '600',
     color: '#475569',
   },
@@ -1193,107 +1235,122 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   loadingContainer: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 40,
   },
   loadingText: {
     marginTop: 12,
-    fontSize: 14,
+    fontSize: 13,
     color: '#64748B',
     fontWeight: '600',
   },
   listContent: {
-    padding: 16,
-    gap: 14,
+    paddingHorizontal: 12,
+    paddingTop: 4,
+    gap: 10,
+    width: '100%',
   },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 80,
+    paddingVertical: 60,
     gap: 8,
+    paddingHorizontal: 16,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '800',
     color: '#1E293B',
   },
   emptySubtitle: {
-    fontSize: 13,
+    fontSize: 12.5,
     color: '#64748B',
     textAlign: 'center',
-    maxWidth: 320,
+    maxWidth: 300,
   },
   vendorCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 14,
+    padding: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
     elevation: 2,
-    gap: 12,
+    gap: 10,
+    width: '100%',
+    overflow: 'hidden',
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    gap: 8,
+    width: '100%',
   },
   cardHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
     flex: 1,
+    minWidth: 0,
   },
   storeIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 10,
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   storeTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
+    flexWrap: 'nowrap',
   },
   storeNameText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
     color: '#0F172A',
+    flexShrink: 1,
   },
   vendorCodePill: {
     backgroundColor: '#F1F5F9',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
     borderRadius: 6,
+    flexShrink: 0,
   },
   vendorCodeText: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '700',
     color: '#475569',
   },
   metaText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#64748B',
     marginTop: 2,
   },
   statusBadgesRow: {
     flexDirection: 'row',
-    gap: 6,
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: 4,
+    flexShrink: 0,
+    maxWidth: 130,
   },
   badgePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 10,
+    gap: 3,
   },
   badgeActive: {
     backgroundColor: '#ECFDF5',
@@ -1310,41 +1367,45 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   badgeText: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '700',
     color: '#0F172A',
   },
   coinConfigRow: {
-    borderRadius: 12,
+    borderRadius: 10,
     overflow: 'hidden',
+    width: '100%',
   },
   coinBanner: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#FDE68A',
+    gap: 6,
+    width: '100%',
   },
   coinBannerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    minWidth: 0,
   },
   coinBannerTitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: '#92400E',
   },
   coinHighlight: {
-    fontSize: 15,
+    fontSize: 13.5,
     fontWeight: '900',
     color: '#B45309',
   },
   coinBannerSub: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#B45309',
     marginTop: 1,
   },
@@ -1352,50 +1413,60 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: '#FCD34D',
-    gap: 4,
+    gap: 3,
+    flexShrink: 0,
   },
   coinEditBtnText: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '800',
     color: '#92400E',
   },
   infoGrid: {
     flexDirection: 'row',
     backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 10,
+    borderRadius: 10,
+    padding: 8,
     borderWidth: 1,
     borderColor: '#F1F5F9',
+    gap: 6,
+    width: '100%',
   },
   infoCol: {
     flex: 1,
-    gap: 6,
+    minWidth: 0,
+    gap: 4,
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
   },
   infoValue: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#475569',
+    flex: 1,
   },
-  cardActionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  cardActionsContainer: {
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
-    paddingTop: 10,
+    paddingTop: 8,
+    gap: 8,
+    width: '100%',
   },
-  statsPreview: {
+  statsPreviewRow: {
     flexDirection: 'row',
-    gap: 12,
+    alignItems: 'center',
+    gap: 10,
+  },
+  statDivider: {
+    width: 1,
+    height: 12,
+    backgroundColor: '#CBD5E1',
   },
   statLabel: {
     fontSize: 11,
@@ -1405,14 +1476,19 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#0F172A',
   },
-  actionButtons: {
+  actionButtonsWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    flexWrap: 'wrap',
+    gap: 6,
+    width: '100%',
   },
   actionBtnOutline: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 9,
+    paddingVertical: 5.5,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#CBD5E1',
@@ -1426,11 +1502,11 @@ const styles = StyleSheet.create({
   actionBtnPrimary: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: COLORS.navy,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 11,
+    paddingVertical: 5.5,
     borderRadius: 8,
-    gap: 4,
   },
   actionBtnPrimaryText: {
     fontSize: 11,
@@ -1438,9 +1514,12 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   actionBtnDanger: {
-    padding: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 5.5,
     borderRadius: 8,
     backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalOverlay: {
     flex: 1,
@@ -1639,48 +1718,52 @@ const styles = StyleSheet.create({
   },
   kpiRow: {
     flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: 20,
-    marginTop: 12,
+    gap: 6,
+    paddingHorizontal: 12,
+    marginTop: 10,
     marginBottom: 6,
+    width: '100%',
   },
   kpiCard: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 12,
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 2,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.04,
     shadowRadius: 2,
     elevation: 1,
   },
   kpiNumber: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '900',
     color: '#0F172A',
   },
   kpiLabel: {
-    fontSize: 11,
+    fontSize: 9.5,
     fontWeight: '700',
     color: '#64748B',
     marginTop: 2,
+    textAlign: 'center',
   },
   statusFilterBar: {
     flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 20,
+    gap: 6,
+    paddingHorizontal: 12,
     marginBottom: 8,
     marginTop: 4,
     flexWrap: 'wrap',
+    width: '100%',
   },
   statusTabPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
     backgroundColor: '#F1F5F9',
     borderWidth: 1,
     borderColor: '#E2E8F0',

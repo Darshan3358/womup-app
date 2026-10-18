@@ -204,17 +204,18 @@ export class CloudinaryService {
   /**
    * Generate signed Cloudinary upload parameters for secure direct client uploads
    */
-  generateSignature(folder = 'wormup/kyc', publicId?: string) {
+  generateSignature(folder = 'wormup/rider/kyc', publicId?: string) {
     const timestamp = Math.round(new Date().getTime() / 1000);
     const cloudName = this.configService.get<string>('CLOUDINARY_CLOUD_NAME') || 'wormup';
     const apiKey = this.configService.get<string>('CLOUDINARY_API_KEY') || '';
     const apiSecret = this.configService.get<string>('CLOUDINARY_API_SECRET') || '';
 
+    const cleanFolder = (folder || 'wormup/rider/kyc').trim().replace(/^\/+|\/+$/g, '');
     const paramsToSign: Record<string, any> = {
+      folder: cleanFolder,
       timestamp,
-      folder,
     };
-    if (publicId) paramsToSign.public_id = publicId;
+    if (publicId) paramsToSign.public_id = publicId.trim();
 
     const signature = cloudinary.utils.api_sign_request(paramsToSign, apiSecret);
 
@@ -223,7 +224,7 @@ export class CloudinaryService {
       timestamp,
       apiKey,
       cloudName,
-      folder,
+      folder: cleanFolder,
       publicId,
       uploadUrl: `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
       expiresIn: 3600,

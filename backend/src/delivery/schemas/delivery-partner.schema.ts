@@ -1,3 +1,4 @@
+
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
@@ -85,13 +86,13 @@ export class DeliveryPartner {
   @Prop()
   lastRatedAt?: Date;
 
-  @Prop({ default: 428 })
+  @Prop({ default: 0 })
   totalDeliveries: number;
 
-  @Prop({ default: 428 })
+  @Prop({ default: 0 })
   completedDeliveries: number;
 
-  @Prop({ default: 3 })
+  @Prop({ default: 0 })
   cancelledDeliveries: number;
 
   @Prop({ default: 94.0 })
@@ -178,6 +179,24 @@ export class DeliveryPartner {
 
   @Prop({ default: 0 })
   totalEarnings: number;
+
+  @Prop({ default: 500 })
+  outstandingCashLimit: number;
+
+  @Prop({ default: 0 })
+  currentOutstandingCash: number;
+
+  @Prop({ default: 0 })
+  totalCodCollected: number;
+
+  @Prop({ default: 0 })
+  totalOnlineEarnings: number;
+
+  @Prop({ default: false })
+  isOrderBlocked: boolean;
+
+  @Prop({ type: Date })
+  lastSettledAt?: Date;
 
   @Prop()
   expoPushToken?: string;
@@ -341,6 +360,24 @@ export class RiderSettlement {
   @Prop({ required: true })
   orderNumber: string;
 
+  @Prop({ default: 'ONLINE', enum: ['COD', 'ONLINE'] })
+  paymentMode: string;
+
+  @Prop({ default: 0 })
+  totalAmount: number;
+
+  @Prop({ default: 0 })
+  riderEarning: number;
+
+  @Prop({ default: 0 })
+  adminShare: number;
+
+  @Prop({ default: 0 })
+  cashCollected: number;
+
+  @Prop({ default: 0 })
+  netImpact: number;
+
   @Prop({ required: true, default: 48 })
   basePay: number;
 
@@ -377,23 +414,29 @@ export class RiderBankAccount {
   @Prop({ type: Types.ObjectId, ref: 'DeliveryPartner', required: true, unique: true, index: true })
   riderId: Types.ObjectId;
 
-  @Prop({ required: true, default: 'HDFC Bank Ltd' })
+  @Prop({ default: '' })
   bankName: string;
 
-  @Prop({ required: true })
+  @Prop({ default: '' })
   accountHolderName: string;
 
-  @Prop({ required: true })
+  @Prop({ default: '' })
+  accountNumberFull?: string;
+
+  @Prop({ default: '' })
   maskedAccount: string;
 
-  @Prop({ required: true })
+  @Prop({ default: '' })
   ifsc: string;
 
-  @Prop({ default: 'VERIFIED', enum: ['PENDING', 'VERIFIED', 'REJECTED'] })
+  @Prop({ default: '' })
+  upiId?: string;
+
+  @Prop({ default: 'PENDING', enum: ['PENDING', 'VERIFIED', 'REJECTED'] })
   verificationStatus: string;
 
-  @Prop({ default: Date.now })
-  verifiedAt: Date;
+  @Prop()
+  verifiedAt?: Date;
 }
 
 export const RiderBankAccountSchema = SchemaFactory.createForClass(RiderBankAccount);
@@ -545,3 +588,49 @@ export class DeliveryLocation {
 
 export const DeliveryLocationSchema = SchemaFactory.createForClass(DeliveryLocation);
 DeliveryLocationSchema.index({ location: '2dsphere' });
+
+export type RiderSettlementRequestDocument = RiderSettlementRequest & Document;
+
+@Schema({ collection: 'rider_settlement_requests', timestamps: true })
+export class RiderSettlementRequest {
+  @Prop({ type: Types.ObjectId, ref: 'DeliveryPartner', required: true, index: true })
+  riderId: Types.ObjectId;
+
+  @Prop({ required: true })
+  riderName: string;
+
+  @Prop({ required: true })
+  riderPhone: string;
+
+  @Prop({ required: true })
+  amount: number;
+
+  @Prop({ required: true })
+  utrNumber: string;
+
+  @Prop({ default: 'UPI' })
+  paymentMethod: string;
+
+  @Prop({
+    required: true,
+    enum: ['PENDING', 'APPROVED', 'REJECTED'],
+    default: 'PENDING',
+    index: true,
+  })
+  status: string;
+
+  @Prop()
+  adminRemarks?: string;
+
+  @Prop({ default: Date.now })
+  requestedAt: Date;
+
+  @Prop()
+  approvedAt?: Date;
+
+  @Prop()
+  rejectedAt?: Date;
+}
+
+export const RiderSettlementRequestSchema = SchemaFactory.createForClass(RiderSettlementRequest);
+

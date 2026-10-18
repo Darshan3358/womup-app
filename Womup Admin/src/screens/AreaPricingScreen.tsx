@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   Alert,
   Modal,
   TextInput,
+  Image,
+  useWindowDimensions,
 } from 'react-native';
 import {
   ChevronDown,
@@ -18,6 +20,7 @@ import {
   Plus,
   Edit2,
   History,
+  RotateCcw,
   Trash2,
   Package,
   CheckCircle2,
@@ -25,6 +28,9 @@ import {
   MapPin,
   Navigation,
   Warehouse,
+  Store,
+  Home,
+  Settings,
   Lock,
   Search,
   X,
@@ -52,13 +58,19 @@ export const AreaPricingScreen: React.FC = () => {
     toggleProductStatus,
   } = useAdminState();
 
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [selectedCityId, setSelectedCityId] = useState<string>('');
   const [selectedAreaId, setSelectedAreaId] = useState<string>('');
+  const [selectedStoreId, setSelectedStoreId] = useState<string>('');
   const [showCityPicker, setShowCityPicker] = useState(false);
   const [showAreaPicker, setShowAreaPicker] = useState(false);
+  const [showStorePicker, setShowStorePicker] = useState(false);
   const [citySearch, setCitySearch] = useState('');
   const [areaSearch, setAreaSearch] = useState('');
+  const [storeSearch, setStoreSearch] = useState('');
 
   // Expanded product states
   const [expandedProducts, setExpandedProducts] = useState<Record<string, boolean>>({});
@@ -96,10 +108,35 @@ export const AreaPricingScreen: React.FC = () => {
     }
   }, [currentArea, selectedZone, setSelectedZone]);
 
-  // 3. Auto-Select the ONE Dark Store assigned to this area (1-store-per-area rule)
-  const resolvedStore = darkStores.find((s) => {
+  // 3. Resolve Available Dark Stores for Selected Area (Multi-Store Capacity Support)
+  const areaStores = useMemo(() => {
+    if (!currentArea) return [];
+    const areaIdStr = String(currentArea.id || (currentArea as any)._id || '');
+    return darkStores.filter((s: any) => {
+      if (s.areaId && areaIdStr && String(s.areaId) === areaIdStr) return true;
+      if (s.areaName && currentArea.name && s.areaName.toLowerCase() === currentArea.name.toLowerCase()) return true;
+      if (currentArea.assignedStores && currentArea.assignedStores.some((as: any) => String(as.id || as._id) === String(s.id || s._id))) return true;
+      if (currentArea.assignedStore && String(currentArea.assignedStore.id || currentArea.assignedStore._id) === String(s.id || s._id)) return true;
+      if (currentArea.darkStore && s.name.toLowerCase().includes(currentArea.name.toLowerCase())) return true;
+      return false;
+    });
+  }, [currentArea, darkStores]);
+
+  // Default to first store in area when area changes
+  useEffect(() => {
+    if (areaStores.length > 0) {
+      const exists = areaStores.some((s: any) => String(s.id || s._id) === String(selectedStoreId));
+      if (!exists) {
+        setSelectedStoreId(String(areaStores[0].id || (areaStores[0] as any)._id));
+      }
+    } else {
+      setSelectedStoreId('');
+    }
+  }, [areaStores, selectedStoreId]);
+
+  const resolvedStore = darkStores.find((s: any) => {
     if (currentArea) {
-      const areaIdStr = currentArea.id || currentArea._id;
+      const areaIdStr = currentArea.id || (currentArea as any)._id;
       if (s.areaId && areaIdStr && String(s.areaId) === String(areaIdStr)) return true;
       if (s.areaName && currentArea.name && s.areaName.toLowerCase() === currentArea.name.toLowerCase()) return true;
       if (currentArea.assignedStore && (s.id === currentArea.assignedStore.id || s.code === currentArea.assignedStore.code)) return true;
@@ -108,7 +145,12 @@ export const AreaPricingScreen: React.FC = () => {
     return false;
   }) || (currentCity ? darkStores.find(s => (s.cityName || s.city || '').toLowerCase() === currentCity.name.toLowerCase()) : null) || darkStores[0];
 
-  const currentStoreName = resolvedStore?.name || currentArea?.darkStore || `Wom Up ${currentArea?.name || 'Area'} Dark Store`;
+  const selectedStore =
+    areaStores.find((s: any) => String(s.id || s._id) === String(selectedStoreId)) ||
+    areaStores[0] ||
+    resolvedStore;
+
+  const currentStoreName = selectedStore?.name || resolvedStore?.name || currentArea?.darkStore || `Wom Up ${currentArea?.name || 'Area'} Dark Store`;
 
   // Active category is resolved dynamically from categories collection
   const activeCategory =
@@ -206,101 +248,134 @@ export const AreaPricingScreen: React.FC = () => {
     await toggleProductStatus(product.id);
   };
 
+  const getProductThumbnail = (name: string, defaultUrl?: string) => {
+    if (defaultUrl && defaultUrl.startsWith('http')) return defaultUrl;
+    const n = (name || '').toLowerCase();
+    if (n.includes('tomato')) return 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=200&auto=format&fit=crop&q=80';
+    if (n.includes('potato')) return 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=200&auto=format&fit=crop&q=80';
+    if (n.includes('onion')) return 'https://images.unsplash.com/photo-1618512496248-a07fe83aa8cb?w=200&auto=format&fit=crop&q=80';
+    if (n.includes('banana')) return 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=200&auto=format&fit=crop&q=80';
+    if (n.includes('capsicum') || n.includes('pepper')) return 'https://images.unsplash.com/photo-1563565375-f3fdfdbefa83?w=200&auto=format&fit=crop&q=80';
+    if (n.includes('apple')) return 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=200&auto=format&fit=crop&q=80';
+    if (n.includes('milk')) return 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=200&auto=format&fit=crop&q=80';
+    return defaultUrl || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=200&auto=format&fit=crop&q=80';
+  };
+
   return (
     <View style={styles.container}>
-      {/* City -> Area Cascading Controls Header */}
-      <View style={styles.topSection}>
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>💰 Area Dynamic Pricing</Text>
-          <Text style={styles.sectionSubtitle}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.mainScrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* 1. TOP HEADER */}
+        <View style={styles.headerBox}>
+          <Text style={styles.headerTitle}>💰 Area Dynamic Pricing</Text>
+          <Text style={styles.headerSubtitle}>
             Configure hyper-local selling prices per Area (cascades from City)
           </Text>
         </View>
 
-        {/* Cascading 2-Step Selector */}
-        <View style={styles.cascadingRow}>
-          {/* STEP 1: SELECT CITY */}
-          <View style={styles.cascadingCol}>
-            <Text style={styles.inputLabel}>STEP 1: SELECT CITY</Text>
-            <TouchableOpacity
-              style={styles.cascadingBtn}
-              onPress={() => setShowCityPicker(true)}
-              activeOpacity={0.8}
-            >
-              <View style={styles.cascadingBtnLeft}>
-                <MapPin size={16} color={COLORS.purple} />
-                <Text style={styles.cascadingBtnText} numberOfLines={1}>
-                  {currentCity ? `${currentCity.name} (${currentCity.code})` : 'Select City'}
-                </Text>
-              </View>
-              <ChevronDown size={18} color={COLORS.textPrimary} />
-            </TouchableOpacity>
-          </View>
-
-          {/* STEP 2: SELECT AREA */}
-          <View style={styles.cascadingCol}>
-            <Text style={styles.inputLabel}>STEP 2: SELECT AREA</Text>
-            <TouchableOpacity
-              style={[styles.cascadingBtn, availableAreas.length === 0 && styles.disabledBtn]}
-              onPress={() => {
-                if (availableAreas.length === 0) return;
-                setShowAreaPicker(true);
-              }}
-              activeOpacity={0.8}
-              disabled={availableAreas.length === 0}
-            >
-              <View style={styles.cascadingBtnLeft}>
-                <Navigation size={16} color={COLORS.blue} />
-                <Text style={styles.cascadingBtnText} numberOfLines={1}>
-                  {currentArea ? currentArea.name : availableAreas.length === 0 ? 'No Areas Found' : 'Select Area'}
-                </Text>
-              </View>
-              <ChevronDown size={18} color={COLORS.textPrimary} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Fulfilling Store (auto-selected) */}
-        <View style={styles.autoStoreCard}>
-          <Text style={styles.autoStoreLabel}>Fulfilling Store (auto-selected):</Text>
-          <View style={styles.autoStoreBox}>
-            <View style={styles.autoStoreLeft}>
-              <View style={styles.storeIconBadge}>
-                <Warehouse size={18} color={COLORS.purple} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <View style={styles.autoStoreTitleRow}>
-                  <Text style={styles.autoStoreName} numberOfLines={1}>
-                    {currentStoreName}
-                  </Text>
-                  <View style={styles.lockBadge}>
-                    <Lock size={10} color="#047857" style={{ marginRight: 3 }} />
-                    <Text style={styles.lockBadgeText}>
-                      1:1 AREA LOCKED · {currentCity?.name || 'Active City'}
-                    </Text>
-                  </View>
-                </View>
-                <Text style={styles.autoStoreSubText}>
-                  Bound to area: <Text style={{ fontWeight: '700', color: COLORS.navy }}>{currentAreaName}</Text> ({currentCity?.name})
-                </Text>
-              </View>
+      {/* 2. CASCADING 3-STEP SELECTORS (City -> Area -> Store) */}
+      <View style={styles.selectorsSection}>
+        {/* STEP 1: SELECT CITY */}
+        <TouchableOpacity
+          style={styles.selectorCard}
+          onPress={() => setShowCityPicker(true)}
+          activeOpacity={0.8}
+        >
+          <View style={styles.selectorLeft}>
+            <MapPin size={18} color="#6366F1" style={styles.selectorIcon} />
+            <View>
+              <Text style={styles.selectorStepLabel}>STEP 1: SELECT CITY</Text>
+              <Text style={styles.selectorValue}>
+                {currentCity ? `${currentCity.name} (${currentCity.code})` : 'Ahmedabad (AHM)'}
+              </Text>
             </View>
           </View>
-        </View>
+          <ChevronDown size={18} color="#334155" />
+        </TouchableOpacity>
 
-        {/* Small Breadcrumb above Category Tabs */}
-        <View style={styles.tabsBreadcrumbRow}>
-          <Text style={styles.tabsBreadcrumbText}>
-            🏙️ {currentCity?.name} · 📍 {currentAreaName}
+        {/* STEP 2: SELECT AREA */}
+        <TouchableOpacity
+          style={styles.selectorCard}
+          onPress={() => setShowAreaPicker(true)}
+          activeOpacity={0.8}
+        >
+          <View style={styles.selectorLeft}>
+            <Navigation size={18} color="#6366F1" style={styles.selectorIcon} />
+            <View>
+              <Text style={styles.selectorStepLabel}>STEP 2: SELECT AREA</Text>
+              <Text style={styles.selectorValue}>
+                {currentArea ? currentArea.name : 'Satellite'}
+              </Text>
+            </View>
+          </View>
+          <ChevronDown size={18} color="#334155" />
+        </TouchableOpacity>
+
+        {/* STEP 3: SELECT STORE */}
+        <TouchableOpacity
+          style={styles.selectorCard}
+          onPress={() => setShowStorePicker(true)}
+          activeOpacity={0.8}
+        >
+          <View style={styles.selectorLeft}>
+            <Store size={18} color="#6366F1" style={styles.selectorIcon} />
+            <View style={{ flex: 1, paddingRight: 6 }}>
+              <Text style={styles.selectorStepLabel}>STEP 3: SELECT STORE</Text>
+              <Text style={styles.selectorValue} numberOfLines={1}>
+                {currentStoreName || 'Wom Up Satellite Dark Store'}
+              </Text>
+            </View>
+          </View>
+          <ChevronDown size={18} color="#334155" />
+        </TouchableOpacity>
+      </View>
+
+      {/* 3. SELECTED STORE BANNER CARD */}
+      <View style={styles.selectedStoreCard}>
+        <View style={styles.selectedStoreTopRow}>
+          <View style={styles.selectedStoreIconBox}>
+            <Warehouse size={18} color="#4F46E5" />
+          </View>
+          <Text style={styles.selectedStoreName} numberOfLines={1}>
+            {currentStoreName || 'Wom Up Satellite Dark Store'}
           </Text>
+          <View style={styles.selectedStorePill}>
+            <Text style={styles.selectedStorePillText}>◎ SELECTED STORE</Text>
+          </View>
         </View>
 
-        {/* Category Selector Tabs with Dynamic Counters */}
+        <View style={styles.selectedStoreTagsRow}>
+          <View style={styles.storeTag}>
+            <Text style={styles.storeTagText}>
+              📍 Area: <Text style={styles.boldText}>{currentAreaName} • {currentCity?.name}</Text>
+            </Text>
+          </View>
+
+          <View style={styles.storeHubTag}>
+            <Text style={styles.storeHubTagText}>
+              ⚙ Hub: {currentStoreName || 'Wom Up Satellite Dark Store'}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* 4. LOCATION BREADCRUMB */}
+      <View style={styles.breadcrumbRow}>
+        <Home size={16} color="#1E3A8A" style={{ marginRight: 6 }} />
+        <Text style={styles.breadcrumbText}>
+          {currentCity?.name || 'Ahmedabad'} • {currentAreaName || 'Satellite'}
+        </Text>
+      </View>
+
+      {/* 5. HORIZONTAL CATEGORY TABS WITH CHEVRON */}
+      <View style={styles.categoryTabsContainer}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoryScrollContainer}
-          style={styles.categoryScrollView}
+          contentContainerStyle={styles.categoryTabsScroll}
         >
           {categories.map((cat) => {
             const isSelected = activeCategory?.id === cat.id;
@@ -308,59 +383,56 @@ export const AreaPricingScreen: React.FC = () => {
             return (
               <TouchableOpacity
                 key={cat.id}
-                style={[styles.categoryTab, isSelected && styles.activeCategoryTab]}
+                style={[styles.categoryTabPill, isSelected && styles.categoryTabPillActive]}
                 onPress={() => setSelectedCategoryId(cat.id)}
+                activeOpacity={0.8}
               >
-                <Text style={[styles.categoryText, isSelected && styles.activeCategoryText]}>
+                <Text style={[styles.categoryTabText, isSelected && styles.categoryTabTextActive]}>
                   {cat.name} ({count})
                 </Text>
               </TouchableOpacity>
             );
           })}
         </ScrollView>
+        <View style={styles.categoryChevronBox}>
+          <ChevronRight size={14} color="#64748B" />
+        </View>
       </View>
 
-      {/* Sub Header / Catalog & Add Item Action Bar */}
-      <View style={styles.actionBar}>
-        <View>
-          <Text style={styles.catalogHeading}>{activeCategory?.name || 'Category'} Catalog</Text>
-          <Text style={styles.catalogSubHeading}>
+      {/* 6. CATALOG HEADING & ADD ITEM ACTION ROW */}
+      <View style={styles.catalogHeadingRow}>
+        <View style={{ flex: 1, paddingRight: 8 }}>
+          <Text style={styles.catalogTitle}>{activeCategory?.name || 'Vegetables'} Catalog</Text>
+          <Text style={styles.catalogSubtitle}>
             {filteredProducts.length} products configured for {currentAreaName} ({currentCity?.name})
           </Text>
         </View>
 
         <TouchableOpacity
-          style={styles.addItemBtn}
+          style={styles.addCatalogItemBtn}
           onPress={() => setActiveModal('AddProduct')}
+          activeOpacity={0.85}
         >
-          <Plus size={16} color={COLORS.white} style={{ marginRight: 4 }} />
-          <Text style={styles.addItemBtnText}>+ Add Item</Text>
+          <Plus size={15} color="#FFFFFF" strokeWidth={2.5} style={{ marginRight: 4 }} />
+          <Text style={styles.addCatalogItemBtnText}>Add Item</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Product List with Expandable Variant Hierarchy */}
-      <ScrollView style={styles.tableScrollView} contentContainerStyle={styles.tableContent}>
+      {/* 7. PRODUCT PRICING CARDS */}
+      <View style={styles.productsListWrap}>
         {filteredProducts.length === 0 ? (
           <View style={styles.emptyState}>
+            <Package size={40} color="#CBD5E1" />
             <Text style={styles.emptyTitle}>No {activeCategory?.name} items found</Text>
             <Text style={styles.emptySubTitle}>
-              Click "+ Add Item" above to add new {activeCategory?.name?.toLowerCase()} items to the catalog.
+              Click "+ Add Item" above to add new {activeCategory?.name?.toLowerCase()} items.
             </Text>
-            <TouchableOpacity
-              style={[styles.addItemBtn, { marginTop: 12 }]}
-              onPress={() => setActiveModal('AddProduct')}
-            >
-              <Plus size={16} color={COLORS.white} style={{ marginRight: 4 }} />
-              <Text style={styles.addItemBtnText}>Add First {activeCategory?.name} Item</Text>
-            </TouchableOpacity>
           </View>
         ) : (
           filteredProducts.map((p) => {
             const isItemActive = p.isActive !== false;
-            const expanded = isExpanded(p.id);
             const variants = p.variants || [];
 
-            // Calculate "From ₹X" minimum price across variants for this area
             let minPrice = 0;
             if (variants.length > 0) {
               const prices = variants.map((v) => getVariantZonePrice(v).price);
@@ -369,243 +441,209 @@ export const AreaPricingScreen: React.FC = () => {
               minPrice = p.sellingPrice || p.basePrice || 0;
             }
 
+            const thumbUrl = getProductThumbnail(p.name, p.image || p.imageUrl);
+
             return (
-              <View
-                key={p.id}
-                style={[
-                  styles.productCard,
-                  !isItemActive && styles.inactiveCard,
-                ]}
-              >
-                {/* Collapsed/Expanded Header Row */}
-                <View style={styles.productCardHeader}>
-                  <TouchableOpacity
-                    style={styles.productInfoRow}
-                    onPress={() => toggleExpand(p.id)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.expandIconContainer}>
-                      {expanded ? (
-                        <ChevronDown size={18} color={COLORS.purple} />
-                      ) : (
-                        <ChevronRight size={18} color={COLORS.textMuted} />
-                      )}
-                    </View>
+              <View key={p.id} style={styles.pricingProductCard}>
+                {/* TOP HEADER: THUMBNAIL, INFO, ACTIONS */}
+                <View style={styles.pricingCardTopRow}>
+                  {/* Thumbnail Image */}
+                  <Image
+                    source={{ uri: thumbUrl }}
+                    style={styles.productThumbImg}
+                    resizeMode="cover"
+                  />
 
-                    <View style={{ flex: 1 }}>
-                      <View style={styles.titleWithBadge}>
-                        <Text
-                          style={[
-                            styles.productNameText,
-                            !isItemActive && { color: COLORS.textMuted },
-                          ]}
-                        >
-                          {p.name}
-                        </Text>
-                        <View style={styles.variantCountBadge}>
-                          <Package size={11} color={COLORS.purple} style={{ marginRight: 3 }} />
-                          <Text style={styles.variantCountText}>
-                            {variants.length} {variants.length === 1 ? 'Variant' : 'Variants'}
-                          </Text>
-                        </View>
-                      </View>
-
-                      {/* City · Area Sub-label */}
-                      <Text style={styles.productBreadcrumb}>
-                        {currentCity?.name} · {currentAreaName}
+                  {/* Middle Info */}
+                  <View style={styles.productInfoCol}>
+                    <View style={styles.titleBadgeRow}>
+                      <Text style={styles.productTitleText} numberOfLines={1}>
+                        {p.name}
                       </Text>
-
-                      <View style={styles.metaRow}>
-                        <Text style={styles.fromPriceText}>
-                          From <Text style={styles.fromPriceBold}>₹{minPrice}</Text> in {currentCity?.name} → {currentAreaName}
+                      <View style={styles.variantCountPill}>
+                        <Edit2 size={9} color="#6366F1" style={{ marginRight: 3 }} />
+                        <Text style={styles.variantCountPillText}>
+                          {variants.length} Variants
                         </Text>
-                        <Text style={styles.metaDot}>•</Text>
-                        <TouchableOpacity
-                          style={[
-                            styles.statusPill,
-                            { backgroundColor: isItemActive ? '#ECFDF5' : '#FEF2F2' },
-                          ]}
-                          onPress={() => handleToggleActive(p)}
-                        >
-                          <View
-                            style={[
-                              styles.statusDot,
-                              { backgroundColor: isItemActive ? COLORS.success : COLORS.error },
-                            ]}
-                          />
-                          <Text
-                            style={[
-                              styles.statusPillText,
-                              { color: isItemActive ? COLORS.success : COLORS.error },
-                            ]}
-                          >
-                            {isItemActive ? 'Active' : 'Hidden'}
-                          </Text>
-                        </TouchableOpacity>
                       </View>
                     </View>
-                  </TouchableOpacity>
 
-                  {/* Actions for the master product */}
-                  <View style={styles.masterActions}>
+                    <View style={styles.subLocRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.subLocText}>
+                          📍 {currentCity?.name || 'Ahmedabad'}
+                        </Text>
+                        <Text style={[styles.subLocText, { marginLeft: 14 }]}>
+                          • {currentAreaName || 'Satellite'}
+                        </Text>
+                      </View>
+                      <View style={styles.activeStatusPill}>
+                        <Text style={styles.activeStatusText}>
+                          {isItemActive ? 'Active' : 'Hidden'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text style={styles.fromPriceRow}>
+                      From <Text style={styles.fromPriceVal}>₹{minPrice}</Text> in {currentCity?.name} → {currentAreaName}
+                    </Text>
+                  </View>
+
+                  {/* Top Right Actions */}
+                  <View style={styles.productTopActions}>
                     <TouchableOpacity
-                      style={styles.actionIconBtn}
+                      style={styles.roundActionBtn}
                       onPress={() => handleEditProduct(p)}
-                      accessibilityLabel={`Edit master details for ${p.name}`}
+                      activeOpacity={0.75}
                     >
-                      <Edit2 size={15} color={COLORS.purple} />
+                      <Edit2 size={13} color="#4F46E5" />
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                      style={styles.actionIconBtn}
+                      style={styles.roundHistoryBtn}
                       onPress={() => handleViewHistory(p)}
-                      accessibilityLabel="View price history"
+                      activeOpacity={0.75}
                     >
-                      <History size={15} color={COLORS.textMuted} />
+                      <RotateCcw size={13} color="#64748B" />
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                      style={styles.actionIconBtn}
+                      style={styles.roundDeleteBtn}
                       onPress={() => handleDelete(p)}
-                      accessibilityLabel="Delete item"
+                      activeOpacity={0.75}
                     >
-                      <Trash2 size={15} color={COLORS.error} />
+                      <Trash2 size={13} color="#EF4444" />
                     </TouchableOpacity>
                   </View>
                 </View>
 
-                {/* Expanded Variants Section */}
-                {expanded && (
-                  <View style={styles.variantsContainer}>
-                    {variants.length === 0 ? (
-                      <View style={styles.noVariantsNotice}>
-                        <AlertCircle size={14} color={COLORS.warning} style={{ marginRight: 6 }} />
-                        <Text style={styles.noVariantsText}>
-                          No SKU variants defined for this product. Edit product to configure variants.
-                        </Text>
-                      </View>
-                    ) : (
-                      <>
-                        <View style={styles.variantTableHeader}>
-                          <Text style={[styles.variantColHeader, { flex: 2 }]}>PACK / SKU</Text>
-                          <Text style={[styles.variantColHeader, { flex: 1.1, textAlign: 'center' }]}>
-                            DEFAULT
-                          </Text>
-                          <Text style={[styles.variantColHeader, { flex: 1.6, textAlign: 'center' }]}>
-                            AREA PRICE
-                          </Text>
-                          <Text style={[styles.variantColHeader, { flex: 0.9, textAlign: 'center' }]}>MRP</Text>
-                          <Text style={[styles.variantColHeader, { flex: 1.1, textAlign: 'center' }]}>ACTION</Text>
-                        </View>
-
-                        {variants.map((v) => {
-                          const { price: zoneSellingPrice, hasOverride } = getVariantZonePrice(v);
-
-                          return (
-                            <View key={v.id} style={styles.variantRow}>
-                              {/* Variant identity / SKU */}
-                              <View style={{ flex: 2 }}>
-                                <Text style={styles.variantWeightText}>
-                                  {v.weightOrVolume}
-                                  {v.isDefault && <Text style={styles.defaultLabel}> (Default)</Text>}
-                                </Text>
-                                <Text style={styles.variantSkuText}>SKU: {v.sku}</Text>
-                              </View>
-
-                              {/* Base/Default Price */}
-                              <View style={{ flex: 1.1, alignItems: 'center' }}>
-                                <Text style={styles.defaultPriceValue}>₹{v.sellingPrice}</Text>
-                                <Text style={styles.defaultPriceSub}>Catalog Base</Text>
-                              </View>
-
-                              {/* Final Area Selling Price */}
-                              <View style={{ flex: 1.6, alignItems: 'center' }}>
-                                <TouchableOpacity
-                                  style={[
-                                    styles.zonePriceBadge,
-                                    hasOverride ? styles.overrideBadge : styles.noOverrideBadge,
-                                  ]}
-                                  onPress={() => handleEditVariantPrice(p, v)}
-                                  activeOpacity={0.7}
-                                >
-                                  <Text
-                                    style={[
-                                      styles.zonePriceValue,
-                                      hasOverride
-                                        ? styles.overridePriceText
-                                        : styles.noOverridePriceText,
-                                    ]}
-                                  >
-                                    ₹{zoneSellingPrice}
-                                  </Text>
-                                </TouchableOpacity>
-                                <Text
-                                  style={[
-                                    styles.overrideLabel,
-                                    hasOverride ? styles.overrideLabelActive : styles.overrideLabelMuted,
-                                  ]}
-                                >
-                                  {hasOverride ? 'Area Override' : 'Default'}
-                                </Text>
-                              </View>
-
-                              {/* MRP */}
-                              <View style={{ flex: 0.9, alignItems: 'center' }}>
-                                <Text style={styles.mrpValue}>₹{v.mrp}</Text>
-                              </View>
-
-                              {/* Edit Action Button */}
-                              <View style={{ flex: 1.1, alignItems: 'center' }}>
-                                <TouchableOpacity
-                                  style={styles.editVariantBtn}
-                                  onPress={() => handleEditVariantPrice(p, v)}
-                                  activeOpacity={0.7}
-                                >
-                                  <Edit2 size={11} color={COLORS.white} style={{ marginRight: 2 }} />
-                                  <Text style={styles.editVariantBtnText}>Edit</Text>
-                                </TouchableOpacity>
-                              </View>
-                            </View>
-                          );
-                        })}
-                      </>
-                    )}
+                {/* VARIANT PRICING TABLE (100% MATCHING SCREENSHOT) */}
+                <View style={styles.variantTableWrap}>
+                  {/* Table Header */}
+                  <View style={styles.variantTableHeaderRow}>
+                    <Text style={[styles.variantThText, { flex: 2.1 }]}>PACK / SKU</Text>
+                    <Text style={[styles.variantThText, { flex: 1.2, textAlign: 'center' }]}>DEFAULT</Text>
+                    <Text style={[styles.variantThText, { flex: 1.4, textAlign: 'center' }]}>AREA PRICE</Text>
+                    <Text style={[styles.variantThText, { flex: 1.0, textAlign: 'center' }]}>MRP</Text>
+                    <Text style={[styles.variantThText, { flex: 1.3, textAlign: 'center' }]}>ACTION</Text>
                   </View>
-                )}
+
+                  {/* Variant Rows */}
+                  {variants.length === 0 ? (
+                    <View style={styles.noVariantsNotice}>
+                      <Text style={styles.noVariantsText}>No variants defined for this item.</Text>
+                    </View>
+                  ) : (
+                    variants.map((v) => {
+                      const { price: zoneSellingPrice, hasOverride } = getVariantZonePrice(v);
+                      return (
+                        <View key={v.id} style={styles.variantTableRow}>
+                          {/* Pack / SKU */}
+                          <View style={{ flex: 2.1, paddingRight: 4 }}>
+                            <Text style={styles.variantWeightText}>
+                              {v.weightOrVolume}
+                            </Text>
+                            {v.isDefault && (
+                              <Text style={styles.defaultPillText}>(Default)</Text>
+                            )}
+                            <Text style={styles.variantSkuText} numberOfLines={1}>
+                              SKU: {v.sku}
+                            </Text>
+                          </View>
+
+                          {/* Default Base Price (Touch to Edit) */}
+                          <TouchableOpacity
+                            style={{ flex: 1.2, alignItems: 'center' }}
+                            onPress={() => handleEditVariantPrice(p, v)}
+                            activeOpacity={0.7}
+                          >
+                            <View style={styles.defaultPillBox}>
+                              <Text style={styles.defaultPillValText}>₹{v.sellingPrice}</Text>
+                            </View>
+                            <Text style={styles.baseLabelText}>Catalog{'\n'}Base</Text>
+                          </TouchableOpacity>
+
+                          {/* Area Price with Override Pill (Touch to Edit) */}
+                          <TouchableOpacity
+                            style={{ flex: 1.4, alignItems: 'center' }}
+                            onPress={() => handleEditVariantPrice(p, v)}
+                            activeOpacity={0.7}
+                          >
+                            <View style={styles.areaPricePill}>
+                              <Text style={styles.areaPricePillText}>₹{zoneSellingPrice}</Text>
+                            </View>
+                            <Text style={styles.overrideSubText}>
+                              {hasOverride ? 'Area\nOverride' : 'Default'}
+                            </Text>
+                          </TouchableOpacity>
+
+                          {/* MRP (Clean text, Touch to Edit) */}
+                          <TouchableOpacity
+                            style={{ flex: 1.0, alignItems: 'center', justifyContent: 'center' }}
+                            onPress={() => handleEditVariantPrice(p, v)}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={styles.mrpText}>₹{v.mrp}</Text>
+                          </TouchableOpacity>
+
+                          {/* Edit Action Button */}
+                          <View style={{ flex: 1.3, alignItems: 'center' }}>
+                            <TouchableOpacity
+                              style={styles.editActionBtn}
+                              onPress={() => handleEditVariantPrice(p, v)}
+                              activeOpacity={0.8}
+                            >
+                              <Edit2 size={11} color="#FFFFFF" style={{ marginRight: 3 }} />
+                              <Text style={styles.editActionBtnText}>Edit</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      );
+                    })
+                  )}
+                </View>
               </View>
             );
           })
         )}
-      </ScrollView>
+      </View>
 
-      {/* Actions Footer */}
-      <View style={styles.footerActions}>
-        <View style={styles.subActionRow}>
+      {/* 8. BOTTOM FLOATING MULTI-MODE ACTION STRIP */}
+      <View style={styles.floatingBottomWrap}>
+        <View style={styles.floatingBottomBar}>
           <TouchableOpacity
-            style={styles.subActionBtn}
+            style={styles.floatingTabActive}
             onPress={() => setSubView('SingleZonePricing')}
+            activeOpacity={0.8}
           >
-            <Layers size={14} color={COLORS.purple} />
-            <Text style={styles.subActionText}>Single Config</Text>
+            <Settings size={14} color="#4F46E5" style={{ marginRight: 5 }} />
+            <Text style={styles.floatingTabTextActive}>Single Config</Text>
           </TouchableOpacity>
 
+          <View style={styles.floatingDivider} />
+
           <TouchableOpacity
-            style={styles.subActionBtn}
+            style={styles.floatingTab}
             onPress={() => setActiveModal('CrossZoneMatrix')}
+            activeOpacity={0.8}
           >
-            <Table size={14} color={COLORS.purple} />
-            <Text style={styles.subActionText}>Cross-Zone Matrix</Text>
+            <Table size={14} color="#6366F1" style={{ marginRight: 5 }} />
+            <Text style={styles.floatingTabText}>Cross-Zone Matrix</Text>
           </TouchableOpacity>
 
+          <View style={styles.floatingDivider} />
+
           <TouchableOpacity
-            style={styles.subActionBtn}
+            style={styles.floatingTab}
             onPress={() => setActiveModal('BulkPriceAdjustment')}
+            activeOpacity={0.8}
           >
-            <SlidersHorizontal size={14} color={COLORS.purple} />
-            <Text style={styles.subActionText}>Bulk Adjust</Text>
+            <Layers size={14} color="#6366F1" style={{ marginRight: 5 }} />
+            <Text style={styles.floatingTabText}>Bulk Adjust</Text>
           </TouchableOpacity>
         </View>
       </View>
+    </ScrollView>
 
       {/* ================= MODAL: SELECT CITY ================= */}
       <Modal
@@ -775,6 +813,93 @@ export const AreaPricingScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      {/* ================= MODAL: STORE PICKER ================= */}
+      <Modal
+        visible={showStorePicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowStorePicker(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalPanel}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderTitleRow}>
+                <Warehouse size={20} color={COLORS.purple} />
+                <View>
+                  <Text style={styles.modalTitle}>Select Dark Store</Text>
+                  <Text style={styles.modalSubtitle}>
+                    {areaStores.length} Dark Stores operating in {currentAreaName}
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setShowStorePicker(false)}>
+                <X size={20} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              <View style={styles.searchInnerRow}>
+                <Search size={16} color={COLORS.textMuted} />
+                <TextInput
+                  style={styles.searchInnerInput}
+                  placeholder="Search store name or code..."
+                  placeholderTextColor={COLORS.textMuted}
+                  value={storeSearch}
+                  onChangeText={setStoreSearch}
+                />
+                {storeSearch ? (
+                  <TouchableOpacity onPress={() => setStoreSearch('')}>
+                    <X size={16} color={COLORS.textMuted} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={true}>
+                {areaStores
+                  .filter(
+                    (s: any) =>
+                      s.name.toLowerCase().includes(storeSearch.toLowerCase()) ||
+                      (s.code && s.code.toLowerCase().includes(storeSearch.toLowerCase()))
+                  )
+                  .map((store: any) => {
+                    const isSelected =
+                      selectedStore?.id === store.id || (selectedStore as any)?._id === store._id || selectedStore?.name === store.name;
+                    return (
+                      <TouchableOpacity
+                        key={store.id || store._id}
+                        style={[styles.modalItem, isSelected && styles.modalItemActive]}
+                        onPress={() => {
+                          setSelectedStoreId(String(store.id || store._id));
+                          setShowStorePicker(false);
+                          setStoreSearch('');
+                        }}
+                      >
+                        <View style={styles.modalItemLeft}>
+                          <View style={styles.areaMiniDot} />
+                          <View>
+                            <Text
+                              style={[
+                                styles.modalItemText,
+                                isSelected && styles.modalItemTextActive,
+                              ]}
+                            >
+                              {store.name}
+                            </Text>
+                            <Text style={styles.modalItemSub}>
+                              Code: {store.code || store.loginId} · SLA: {store.estimatedDeliveryMinutes || 9}m
+                            </Text>
+                          </View>
+                        </View>
+                        {isSelected && <Check size={18} color={COLORS.purple} />}
+                      </TouchableOpacity>
+                    );
+                  })}
+              </ScrollView>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -808,6 +933,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     marginBottom: SPACING.sm,
+  },
+  cascadingRowMobile: {
+    flexDirection: 'column',
+    gap: 10,
   },
   cascadingCol: {
     flex: 1,
@@ -1000,7 +1129,7 @@ const styles = StyleSheet.create({
   tableContent: {
     paddingHorizontal: 12,
     paddingTop: 10,
-    paddingBottom: 24,
+    paddingBottom: 100,
   },
   emptyState: {
     padding: SPACING.xl,
@@ -1175,20 +1304,20 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.sm,
     marginBottom: 4,
   },
-  variantWeightText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
+  legacyVariantWeightText: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#0F172A',
   },
   defaultLabel: {
     fontSize: 9.5,
     color: COLORS.purple,
     fontWeight: '800',
   },
-  variantSkuText: {
-    fontSize: 9.5,
-    color: COLORS.textMuted,
-    marginTop: 1,
+  legacyVariantSkuText: {
+    fontSize: 10,
+    color: '#64748B',
+    marginTop: 2,
   },
   defaultPriceValue: {
     fontSize: 12,
@@ -1401,5 +1530,520 @@ const styles = StyleSheet.create({
   modalItemSub: {
     fontSize: 10,
     color: COLORS.textMuted,
+  },
+
+  // Exact 1:1 Area Dynamic Pricing Styles Matching Screenshot
+  mainScrollContent: {
+    paddingHorizontal: 10,
+    paddingTop: 10,
+    paddingBottom: 110,
+    backgroundColor: '#F8FAFC',
+  },
+  headerBox: {
+    marginBottom: 16,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#071B52',
+    letterSpacing: -0.3,
+  },
+  headerSubtitle: {
+    fontSize: 12.5,
+    color: '#64748B',
+    marginTop: 3,
+    lineHeight: 18,
+    fontWeight: '500',
+  },
+  selectorsSection: {
+    gap: 10,
+    marginBottom: 14,
+  },
+  selectorCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  selectorLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  selectorIcon: {
+    marginRight: 2,
+  },
+  selectorStepLabel: {
+    fontSize: 10,
+    color: '#6366F1',
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    marginBottom: 1,
+  },
+  selectorValue: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  selectedStoreCard: {
+    backgroundColor: '#F0F4FF',
+    borderWidth: 1,
+    borderColor: '#E0E7FF',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 14,
+  },
+  selectedStoreTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  selectedStoreIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E7FF',
+  },
+  selectedStoreName: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#071B52',
+    flex: 1,
+  },
+  selectedStorePill: {
+    backgroundColor: '#EDE9FE',
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  selectedStorePillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#7C3AED',
+  },
+  selectedStoreTagsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 10,
+    marginLeft: 44,
+  },
+  storeTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  storeTagText: {
+    fontSize: 10,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  boldText: {
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  storeHubTag: {
+    backgroundColor: '#FDF2F8',
+    borderWidth: 1,
+    borderColor: '#FCE7F3',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  storeHubTagText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#DB2777',
+  },
+  breadcrumbRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    marginTop: 4,
+  },
+  breadcrumbText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#071B52',
+  },
+  categoryTabsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  categoryTabsScroll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingRight: 10,
+  },
+  categoryTabPill: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 22,
+  },
+  categoryTabPillActive: {
+    backgroundColor: '#6366F1',
+    borderColor: '#6366F1',
+  },
+  categoryTabText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  categoryTabTextActive: {
+    color: '#FFFFFF',
+  },
+  categoryChevronBox: {
+    paddingLeft: 4,
+    paddingRight: 2,
+    justifyContent: 'center',
+  },
+  catalogHeadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  catalogTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#071B52',
+  },
+  catalogSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  addCatalogItemBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#6366F1',
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 8,
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  addCatalogItemBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  productsListWrap: {
+    gap: 14,
+    marginBottom: 20,
+  },
+  pricingProductCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 16,
+    padding: 12,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  pricingCardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  productThumbImg: {
+    width: 62,
+    height: 62,
+    borderRadius: 14,
+    backgroundColor: '#F1F5F9',
+  },
+  productInfoCol: {
+    flex: 1,
+    marginLeft: 10,
+    paddingRight: 4,
+  },
+  titleBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  productTitleText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  variantCountPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1,
+    borderColor: '#E0E7FF',
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: 12,
+  },
+  variantCountPillText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#4F46E5',
+  },
+  subLocRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  subLocText: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '600',
+    lineHeight: 15,
+  },
+  activeStatusPill: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  activeStatusText: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#16A34A',
+  },
+  fromPriceRow: {
+    fontSize: 11,
+    color: '#475569',
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  fromPriceVal: {
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  productTopActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  roundActionBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roundHistoryBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roundDeleteBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  variantTableWrap: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#EDF2F7',
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginTop: 10,
+  },
+  variantTableHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    backgroundColor: '#F8FAFC',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EDF2F7',
+  },
+  variantThText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 0.4,
+  },
+  variantTableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8FAFC',
+  },
+  variantWeightText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  defaultPillText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#4F46E5',
+    marginTop: 1,
+  },
+  variantSkuText: {
+    fontSize: 9.5,
+    color: '#94A3B8',
+    marginTop: 1,
+  },
+  defaultPillBox: {
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    minWidth: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  defaultPillValText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  baseLabelText: {
+    fontSize: 8.5,
+    fontWeight: '600',
+    color: '#94A3B8',
+    textAlign: 'center',
+    lineHeight: 11,
+    marginTop: 2,
+  },
+  areaPricePill: {
+    backgroundColor: '#EEF2FF',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    minWidth: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  areaPricePillText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#4F46E5',
+  },
+  overrideSubText: {
+    fontSize: 8.5,
+    fontWeight: '700',
+    color: '#4F46E5',
+    textAlign: 'center',
+    lineHeight: 11,
+    marginTop: 2,
+  },
+  mrpText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#475569',
+    textAlign: 'center',
+  },
+  editActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#4F46E5',
+    paddingHorizontal: 10,
+    paddingVertical: 5.5,
+    borderRadius: 7,
+  },
+  editActionBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  floatingBottomWrap: {
+    alignItems: 'center',
+    marginTop: 10,
+    marginBottom: 20,
+    paddingHorizontal: 4,
+    width: '100%',
+  },
+  floatingBottomBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 30,
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+    maxWidth: '100%',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  floatingTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  floatingTabActive: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  floatingTabText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  floatingTabTextActive: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#4F46E5',
+  },
+  floatingDivider: {
+    width: 1,
+    height: 14,
+    backgroundColor: '#E2E8F0',
+    marginHorizontal: 1,
   },
 });

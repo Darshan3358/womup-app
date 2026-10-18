@@ -565,6 +565,7 @@ export class RiderApiService {
         rating: remoteProfile.rating ?? 0,
         completedDeliveries: remoteProfile.completedDeliveries ?? 0,
         status: remoteProfile.status || 'PENDING',
+        verificationStatus: remoteProfile.verificationStatus || (remoteProfile.status === 'APPROVED' ? 'VERIFIED' : remoteProfile.status === 'REJECTED' ? 'REJECTED' : 'PENDING'),
         isOnline: remoteProfile.isOnline ?? false,
       };
       await this.setStorage(STORAGE_KEYS.PROFILE, mapped);
@@ -929,16 +930,26 @@ export class RiderApiService {
     if (!(await this.hasValidToken())) {
       return false;
     }
+    if (
+      !coords ||
+      typeof coords.latitude !== 'number' ||
+      isNaN(coords.latitude) ||
+      typeof coords.longitude !== 'number' ||
+      isNaN(coords.longitude)
+    ) {
+      return false;
+    }
+
     const headers = await this.getAuthHeader();
     try {
       const res = await fetch(`${this.getApiBaseUrl()}/delivery/location`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-          speed: coords.speed,
-          heading: coords.heading,
+          latitude: Number(coords.latitude),
+          longitude: Number(coords.longitude),
+          speed: Math.max(0, Number(coords.speed) || 0),
+          heading: Math.max(0, Math.min(360, Number(coords.heading) || 0)),
         }),
       });
       if (res.status === 401) {
@@ -951,6 +962,56 @@ export class RiderApiService {
   }
 
   // --- SETTLEMENTS & PAYOUTS ---
+  static async getRiderWallet(): Promise<{
+    balance: number;
+    pendingTransfer: number;
+    lifetimeEarnings: number;
+    bankAccount: RiderBankAccount | null;
+    transactions: {
+      id: string;
+      title: string;
+      timestamp: string;
+      amount: number;
+      type: 'EARNING' | 'TIP' | 'INCENTIVE' | 'WITHDRAWAL';
+    }[];
+  }> {
+    const defaultData = {
+      balance: 0,
+      pendingTransfer: 0,
+      lifetimeEarnings: 0,
+      bankAccount: null,
+      transactions: [],
+    };
+
+    if (!(await this.hasValidToken())) {
+      return defaultData;
+    }
+    const headers = await this.getAuthHeader();
+    try {
+      const res = await fetch(`${this.getApiBaseUrl()}/delivery/wallet`, { headers });
+      if (res.status === 401) {
+        await this.clearAuth();
+        return defaultData;
+      }
+      if (res.ok) {
+        const raw = await res.json();
+        const data = this.unwrapData<any>(raw);
+        if (data) {
+          return {
+            balance: typeof data.balance === 'number' ? data.balance : Number(data.balance) || 0,
+            pendingTransfer: typeof data.pendingTransfer === 'number' ? data.pendingTransfer : Number(data.pendingTransfer) || 0,
+            lifetimeEarnings: typeof data.lifetimeEarnings === 'number' ? data.lifetimeEarnings : Number(data.lifetimeEarnings) || 0,
+            bankAccount: data.bankAccount || null,
+            transactions: Array.isArray(data.transactions) ? data.transactions : [],
+          };
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return defaultData;
+  }
+
   static async getSettlementSummary(): Promise<SettlementSummary> {
     if (!(await this.hasValidToken())) {
       return {
@@ -1053,7 +1114,110 @@ export class RiderApiService {
     } catch {
       // ignore
     }
+    return [];
+  }
 
+  static async getPaymentInfo(): Promise<{
+    adminUpiId: string;
+    adminUpiName: string;
+    supportPhone: string;
+    riderOwesAdmin: number;
+    totalCodCollected: number;
+    totalEarnings: number;
+    cashLimit: number;
+    isOrderBlocked: boolean;
+    hasPendingVerification: boolean;
+    pendingRequest?: {
+      id: string;
+      amount: number;
+      utrNumber: string;
+      status: string;
+      requestedAt: string;
+    } | null;
+  }> {
+    const defaultInfo = {
+      adminUpiId: 'wormup@okicici',
+      adminUpiName: 'WormUp Technologies Pvt Ltd',
+      supportPhone: '+91 98765 43210',
+      riderOwesAdmin: 0,
+      totalCodCollected: 0,
+      totalEarnings: 0,
+      cashLimit: 500,
+      isOrderBlocked: false,
+      hasPendingVerification: false,
+      pendingRequest: null,
+    };
+    if (!(await this.hasValidToken())) return defaultInfo;
+    const headers = await this.getAuthHeader();
+    try {
+      const res = await fetch(`${this.getApiBaseUrl()}/delivery/settlements/payment-info`, { headers });
+      if (res.ok) {
+        const raw = await res.json();
+        const data = this.unwrapData<any>(raw);
+        if (data) {
+          return {
+            adminUpiId: data.adminUpiId || 'wormup@okicici',
+            adminUpiName: data.adminUpiName || 'WormUp Technologies Pvt Ltd',
+            supportPhone: data.supportPhone || '+91 98765 43210',
+            riderOwesAdmin: Number(data.riderOwesAdmin) || 0,
+            totalCodCollected: Number(data.totalCodCollected) || 0,
+            totalEarnings: Number(data.totalEarnings) || 0,
+            cashLimit: Number(data.cashLimit) || 500,
+            isOrderBlocked: Boolean(data.isOrderBlocked),
+            hasPendingVerification: Boolean(data.hasPendingVerification),
+            pendingRequest: data.pendingRequest || null,
+          };
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return defaultInfo;
+  }
+
+  static async submitSettlementProof(
+    amount: number,
+    utrNumber: string
+  ): Promise<{ success: boolean; message: string; request?: any }> {
+    const headers = await this.getAuthHeader();
+    try {
+      const res = await fetch(`${this.getApiBaseUrl()}/delivery/settlements/request`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ amount, utrNumber }),
+      });
+      const raw = await res.json().catch(() => ({}));
+      if (res.ok) {
+        return {
+          success: true,
+          message: raw.message || 'Settlement request submitted successfully!',
+          request: raw.request,
+        };
+      }
+      return {
+        success: false,
+        message: raw.message || 'Failed to submit settlement request. Please check UTR and try again.',
+      };
+    } catch {
+      return {
+        success: false,
+        message: 'Network error. Please check your internet connection.',
+      };
+    }
+  }
+
+  static async getMySettlementRequests(): Promise<any[]> {
+    const headers = await this.getAuthHeader();
+    try {
+      const res = await fetch(`${this.getApiBaseUrl()}/delivery/settlements/my-requests`, { headers });
+      if (res.ok) {
+        const raw = await res.json();
+        const data = this.unwrapData<any[]>(raw);
+        if (Array.isArray(data)) return data;
+      }
+    } catch {
+      // ignore
+    }
     return [];
   }
 
@@ -1110,15 +1274,16 @@ export class RiderApiService {
       }
       const raw = await res.json();
       const data = this.unwrapData<any>(raw);
-      if (data && data.bankName) {
+      if (data && (data.bankName || data.accountNumber || data.accountNumberFull)) {
         return {
-          bankName: data.bankName,
+          bankName: data.bankName || '',
           accountNumberMasked: data.maskedAccount || data.accountNumberMasked || '•••• ' + (data.last4 || ''),
-          accountNumberFull: '',
+          accountNumberFull: data.accountNumberFull || data.accountNumber || '',
           ifscCode: data.ifsc || data.ifscCode || '',
           accountHolderName: data.accountHolderName || '',
           upiId: data.upiId || '',
           isVerified: data.verificationStatus === 'VERIFIED',
+          verificationStatus: data.verificationStatus || 'PENDING',
         };
       }
       return null;
@@ -1138,6 +1303,7 @@ export class RiderApiService {
           accountHolderName: data.accountHolderName,
           accountNumber: data.accountNumberFull,
           ifsc: data.ifscCode,
+          upiId: data.upiId,
         }),
       });
     } catch {
@@ -1254,8 +1420,22 @@ export class RiderApiService {
       const res = await fetch(`${this.getApiBaseUrl()}/delivery/documents`, { headers });
       if (res.ok) {
         const raw = await res.json();
-        const data = this.unwrapData<RiderDocument[]>(raw);
-        if (Array.isArray(data)) return data;
+        const data = this.unwrapData<any[]>(raw);
+        if (Array.isArray(data)) {
+          return data.map((d) => ({
+            id: d.id,
+            type: d.type,
+            title: d.title,
+            documentNumberMasked: d.documentNumberMasked,
+            fileUrl: d.fileUrl || d.url || '',
+            url: d.url || d.fileUrl || '',
+            backUrl: d.backUrl || '',
+            status: d.status,
+            issuedAt: d.issuedAt,
+            expiresAt: d.expiresAt,
+            rejectionReason: d.rejectionReason,
+          }));
+        }
       }
     } catch {
       // ignore

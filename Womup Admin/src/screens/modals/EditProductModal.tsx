@@ -29,6 +29,7 @@ import {
 import { COLORS } from '../../theme';
 import { useAdminState } from '../../context/AdminStateContext';
 import { ProductVariantItem } from '../../types/admin';
+import { ApiService } from '../../services/api';
 
 interface FormVariant {
   id: string;
@@ -53,6 +54,10 @@ export const EditProductModal: React.FC = () => {
     updateVariantAreaPrice,
     areaPricingRecords,
     zones,
+    darkStores,
+    inventory,
+    selectedDarkStore,
+    refreshFromDb,
   } = useAdminState();
 
   // Basic Details
@@ -299,6 +304,35 @@ export const EditProductModal: React.FC = () => {
       } as any);
 
       if (success) {
+        // Sync store-specific inventory if store context exists (productId, storeId, inventoryId)
+        const targetStore = darkStores.find((s) => s.name === selectedDarkStore || s.id === selectedDarkStore);
+        if (targetStore) {
+          const storeId = String(targetStore.id || (targetStore as any)._id);
+          const invRecord = inventory.find(
+            (i) => i.productId === selectedProduct.id && (i.darkStoreId === storeId || i.darkStoreName === targetStore.name)
+          );
+          const newStock = defaultVar.stock || 50;
+          const oldStock = invRecord ? invRecord.availableKg : (selectedProduct.stockKg || 50);
+          const delta = newStock - oldStock;
+          await ApiService.adjustStock(
+            storeId,
+            selectedProduct.id,
+            delta,
+            'Product edit modal stock sync',
+            invRecord?.id
+          );
+          if (shelfLocation.trim()) {
+            await ApiService.updateShelfLocation({
+              inventoryId: invRecord?.id,
+              productId: selectedProduct.id,
+              storeId,
+              shelfLocation: shelfLocation.trim(),
+            });
+          }
+          if (refreshFromDb) {
+            await refreshFromDb();
+          }
+        }
         handleClose();
       } else {
         setErrorMsg('Failed to update product. Please try again.');

@@ -107,12 +107,12 @@ export const EditCustomerModal: React.FC = () => {
       setReferralCode(selectedCustomer.sponsorCode || 'WORM5871');
       setUserCode(selectedCustomer.referralCode || selectedCustomer.userCode || 'WORM1213');
 
-      setBankName(selectedCustomer.bankName || 'HDFC Bank');
-      setBranchName(selectedCustomer.branchName || 'SG Highway');
-      setAccountHolderName(selectedCustomer.accountHolderName || selectedCustomer.name);
+      setBankName(selectedCustomer.bankName || '');
+      setBranchName(selectedCustomer.branchName || '');
+      setAccountHolderName(selectedCustomer.accountHolderName || selectedCustomer.name || '');
       setAccountNumber(selectedCustomer.accountNumber || '');
-      setIfscCode(selectedCustomer.ifscCode || 'HDFC0000123');
-      setUpiId(selectedCustomer.upiId || 'ayushi@okhdfcbank');
+      setIfscCode(selectedCustomer.ifscCode || '');
+      setUpiId(selectedCustomer.upiId || '');
 
       setKycStatus(selectedCustomer.kycStatus || 'Pending');
       setPaymentStatus(selectedCustomer.paymentStatus !== undefined ? (selectedCustomer.paymentStatus as 1 | 2) : 1);

@@ -32,6 +32,15 @@ export class DocumentService {
 
   async getDocuments(userId: string) {
     const partner = await this.getPartner(userId);
+    let user: any = null;
+    if (partner.userId) {
+      try {
+        user = await this.partnerModel.db.collection('users').findOne({ _id: partner.userId });
+      } catch {
+        // ignore
+      }
+    }
+
     const isApproved = partner.status === 'APPROVED' || partner.verificationStatus === 'VERIFIED';
 
     const mask = (str?: string) => {
@@ -39,45 +48,61 @@ export class DocumentService {
       return `${str.slice(0, 4)}****${str.slice(-4)}`;
     };
 
+    const dlImg = partner.dlImageUrl || user?.dlImageUrl || user?.drivingLicenseImage || '';
+    const dlNum = partner.drivingLicense || user?.drivingLicense || '';
+
+    const rcImg = partner.rcImageUrl || user?.rcImageUrl || user?.rcFrontImage || '';
+    const rcNum = partner.rcNumber || user?.rcNumber || partner.vehicleNumber || '';
+
+    const insImg = partner.vehicleInsuranceUrl || user?.vehicleInsuranceUrl || user?.insuranceImage || '';
+
+    const aadharFront = partner.aadharFrontUrl || user?.aadharFrontImage || user?.aadharFrontUrl || user?.customer_image_aadhar_front || '';
+    const aadharBack = partner.aadharBackUrl || user?.aadharBackImage || user?.aadharBackUrl || user?.customer_image_aadhar_back || '';
+    const aadharNum = partner.aadharNumber || user?.aadharNumber || '';
+
     return [
       {
         id: 'doc_dl',
         type: 'DRIVING_LICENSE',
         title: 'Commercial Driving License',
-        documentNumberMasked: partner.drivingLicense ? mask(partner.drivingLicense) : 'Not uploaded',
-        url: partner.dlImageUrl || '',
-        status: isApproved && partner.dlImageUrl ? 'VERIFIED' : partner.dlImageUrl || partner.drivingLicense ? 'PENDING' : 'NOT_UPLOADED',
+        documentNumberMasked: dlNum ? mask(dlNum) : 'Not uploaded',
+        url: dlImg,
+        fileUrl: dlImg,
+        status: isApproved && dlImg ? 'VERIFIED' : dlImg || dlNum ? 'PENDING' : 'NOT_UPLOADED',
         issuedAt: 'Recent',
-        expiresAt: partner.drivingLicense ? 'Active' : undefined,
+        expiresAt: dlNum ? 'Active' : undefined,
       },
       {
         id: 'doc_rc',
         type: 'VEHICLE_RC',
         title: 'Vehicle Registration Certificate (RC)',
-        documentNumberMasked: partner.rcNumber ? mask(partner.rcNumber) : (partner.vehicleNumber || 'Not uploaded'),
-        url: partner.rcImageUrl || '',
-        status: isApproved && partner.rcImageUrl ? 'VERIFIED' : partner.rcImageUrl || partner.rcNumber ? 'PENDING' : 'NOT_UPLOADED',
+        documentNumberMasked: rcNum ? mask(rcNum) : 'Not uploaded',
+        url: rcImg,
+        fileUrl: rcImg,
+        status: isApproved && rcImg ? 'VERIFIED' : rcImg || rcNum ? 'PENDING' : 'NOT_UPLOADED',
         issuedAt: 'Recent',
-        expiresAt: partner.vehicleNumber ? 'Active' : undefined,
+        expiresAt: rcNum ? 'Active' : undefined,
       },
       {
         id: 'doc_insurance',
         type: 'INSURANCE',
         title: 'Two-Wheeler Comprehensive Insurance',
-        documentNumberMasked: partner.vehicleInsuranceUrl ? 'Insurance Document Linked' : 'Not uploaded',
-        url: partner.vehicleInsuranceUrl || '',
-        status: isApproved && partner.vehicleInsuranceUrl ? 'VERIFIED' : partner.vehicleInsuranceUrl ? 'PENDING' : 'NOT_UPLOADED',
+        documentNumberMasked: insImg ? 'Insurance Document Linked' : 'Not uploaded',
+        url: insImg,
+        fileUrl: insImg,
+        status: isApproved && insImg ? 'VERIFIED' : insImg ? 'PENDING' : 'NOT_UPLOADED',
         issuedAt: 'Recent',
-        expiresAt: partner.vehicleInsuranceUrl ? 'Active' : undefined,
+        expiresAt: insImg ? 'Active' : undefined,
       },
       {
         id: 'doc_aadhaar',
         type: 'AADHAAR_PAN',
         title: 'National Identity Proof (Aadhaar)',
-        documentNumberMasked: partner.aadharNumber ? `XXXX-XXXX-${partner.aadharNumber.slice(-4)}` : 'Not uploaded',
-        url: partner.aadharFrontUrl || '',
-        backUrl: partner.aadharBackUrl || '',
-        status: isApproved && partner.aadharFrontUrl ? 'VERIFIED' : partner.aadharFrontUrl || partner.aadharNumber ? 'PENDING' : 'NOT_UPLOADED',
+        documentNumberMasked: aadharNum ? `XXXX-XXXX-${aadharNum.slice(-4)}` : 'Not uploaded',
+        url: aadharFront,
+        fileUrl: aadharFront,
+        backUrl: aadharBack,
+        status: isApproved && aadharFront ? 'VERIFIED' : aadharFront || aadharNum ? 'PENDING' : 'NOT_UPLOADED',
         issuedAt: 'Government UIDAI',
       },
     ];

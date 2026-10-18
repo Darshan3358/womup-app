@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, StatusBar } from 'react-native';
+import { StyleSheet, View, StatusBar, Platform } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { AdminStateProvider, useAdminState } from './src/context/AdminStateContext';
 import { Header } from './src/components/common/Header';
@@ -165,13 +165,17 @@ export default function App() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+    height: (Platform.OS === 'web' ? '100vh' : '100%') as any,
     backgroundColor: COLORS.navy,
   },
   container: {
     flex: 1,
+    height: '100%',
     backgroundColor: COLORS.background,
+    overflow: 'hidden',
   },
   body: {
     flex: 1,
+    overflow: 'hidden',
   },
 });

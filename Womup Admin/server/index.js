@@ -144,6 +144,16 @@ app.get('/api/realtime-data', async (req, res) => {
           name: s.name,
           code: s.code,
           loginId: s.loginId,
+          address: s.address,
+          phone: s.phone,
+          email: s.email,
+          location: s.location,
+          coordinates: s.location?.coordinates || s.coordinates || (s.longitude && s.latitude ? [s.longitude, s.latitude] : undefined),
+          latitude: s.location?.coordinates ? s.location.coordinates[1] : s.latitude,
+          longitude: s.location?.coordinates ? s.location.coordinates[0] : s.longitude,
+          serviceRadiusKm: s.serviceRadiusKm || 4.5,
+          estimatedDeliveryMinutes: s.estimatedDeliveryMinutes || 9,
+          isActive: s.isActive !== false,
         })),
         assignedStore: areaStores[0] || null,
       };
@@ -236,26 +246,82 @@ app.get('/api/admin/riders/:id', async (req, res) => {
     }
 
     let email = '';
+    let userDoc = null;
     if (rider.userId) {
-      const user = await db.collection('users').findOne({ _id: new ObjectId(rider.userId.toString()) });
-      if (user) {
-        email = user.email || '';
+      try {
+        userDoc = await db.collection('users').findOne({
+          $or: [
+            ...(ObjectId.isValid(rider.userId) ? [{ _id: new ObjectId(rider.userId.toString()) }] : []),
+            { _id: rider.userId.toString() },
+          ]
+        });
+      } catch (_) {}
+      if (userDoc) {
+        email = userDoc.email || '';
       }
     }
 
     let bankAccount = null;
     const bankDoc = await db.collection('rider_bank_accounts').findOne({
-      $or: [{ riderId: rider._id }, { userId: rider.userId }]
+      $or: [
+        { riderId: rider._id },
+        { riderId: rider._id.toString() },
+        ...(rider.userId ? [{ userId: rider.userId }, { userId: rider.userId.toString() }] : []),
+      ]
     });
     if (bankDoc) {
       bankAccount = {
-        accountNumber: bankDoc.accountNumber,
-        ifscCode: bankDoc.ifscCode,
-        bankName: bankDoc.bankName,
-        accountHolderName: bankDoc.accountHolderName,
-        isVerified: bankDoc.isVerified,
+        accountNumber: bankDoc.accountNumberFull || bankDoc.accountNumber || bankDoc.maskedAccount || 'N/A',
+        ifscCode: bankDoc.ifscCode || bankDoc.ifsc || 'N/A',
+        bankName: bankDoc.bankName || 'N/A',
+        accountHolderName: bankDoc.accountHolderName || rider.fullName || 'N/A',
+        branchName: bankDoc.branchName || bankDoc.bankBranch || rider.bankBranch || '',
+        upiId: bankDoc.upiId || rider.upiId || '',
+        isVerified: bankDoc.isVerified || bankDoc.verificationStatus === 'VERIFIED' || rider.status === 'APPROVED',
+      };
+    } else if (rider.bankName || rider.accountNumber) {
+      bankAccount = {
+        accountNumber: rider.accountNumber || 'N/A',
+        ifscCode: rider.ifscCode || 'N/A',
+        bankName: rider.bankName || 'N/A',
+        accountHolderName: rider.accountHolderName || rider.fullName || 'N/A',
+        branchName: rider.bankBranch || '',
+        upiId: rider.upiId || '',
+        isVerified: rider.verificationStatus === 'VERIFIED' || rider.status === 'APPROVED',
+      };
+    } else if (userDoc && (userDoc.bankName || userDoc.accountNumber)) {
+      bankAccount = {
+        accountNumber: userDoc.accountNumber || 'N/A',
+        ifscCode: userDoc.ifscCode || 'N/A',
+        bankName: userDoc.bankName || 'N/A',
+        accountHolderName: userDoc.accountHolderName || rider.fullName || userDoc.name || 'N/A',
+        branchName: userDoc.branchName || '',
+        upiId: userDoc.upiId || '',
+        isVerified: userDoc.verificationStatus === 'VERIFIED' || rider.status === 'APPROVED',
       };
     }
+
+    const documents = {
+      dlFront: rider.dlImageUrl || rider.drivingLicenseUrl || userDoc?.dlFrontImage || (rider.documents && (rider.documents.dlFront || rider.documents.dlFrontUrl)) || null,
+      dlFrontUrl: rider.dlImageUrl || rider.drivingLicenseUrl || userDoc?.dlFrontImage || (rider.documents && (rider.documents.dlFront || rider.documents.dlFrontUrl)) || null,
+      dlBack: rider.dlBackUrl || userDoc?.dlBackImage || (rider.documents && (rider.documents.dlBack || rider.documents.dlBackUrl)) || null,
+      dlBackUrl: rider.dlBackUrl || userDoc?.dlBackImage || (rider.documents && (rider.documents.dlBack || rider.documents.dlBackUrl)) || null,
+      dlNumber: rider.drivingLicense || rider.drivingLicenseNumber || rider.dlNumber || userDoc?.dlNumber || (rider.documents && rider.documents.dlNumber) || null,
+      rcFront: rider.rcImageUrl || userDoc?.rcFrontImage || (rider.documents && (rider.documents.rcFront || rider.documents.rcFrontUrl)) || null,
+      rcFrontUrl: rider.rcImageUrl || userDoc?.rcFrontImage || (rider.documents && (rider.documents.rcFront || rider.documents.rcFrontUrl)) || null,
+      rcBack: rider.rcBackUrl || (rider.documents && (rider.documents.rcBack || rider.documents.rcBackUrl)) || null,
+      rcBackUrl: rider.rcBackUrl || (rider.documents && (rider.documents.rcBack || rider.documents.rcBackUrl)) || null,
+      rcNumber: rider.rcNumber || userDoc?.rcNumber || (rider.documents && rider.documents.rcNumber) || null,
+      insurance: rider.vehicleInsuranceUrl || (rider.documents && (rider.documents.insurance || rider.documents.insuranceUrl)) || null,
+      insuranceUrl: rider.vehicleInsuranceUrl || (rider.documents && (rider.documents.insurance || rider.documents.insuranceUrl)) || null,
+      aadhaarFront: rider.aadharFrontUrl || userDoc?.aadharFrontImage || userDoc?.customer_image_aadhar_front || (rider.documents && (rider.documents.aadhaarFront || rider.documents.aadhaarFrontUrl)) || null,
+      aadhaarFrontUrl: rider.aadharFrontUrl || userDoc?.aadharFrontImage || userDoc?.customer_image_aadhar_front || (rider.documents && (rider.documents.aadhaarFront || rider.documents.aadhaarFrontUrl)) || null,
+      aadhaarBack: rider.aadharBackUrl || userDoc?.aadharBackImage || userDoc?.customer_image_aadhar_back || (rider.documents && (rider.documents.aadhaarBack || rider.documents.aadhaarBackUrl)) || null,
+      aadhaarBackUrl: rider.aadharBackUrl || userDoc?.aadharBackImage || userDoc?.customer_image_aadhar_back || (rider.documents && (rider.documents.aadhaarBack || rider.documents.aadhaarBackUrl)) || null,
+      aadhaarNumber: rider.aadharNumber || userDoc?.aadhaarNumber || (rider.documents && rider.documents.aadhaarNumber) || null,
+      profilePhoto: rider.profilePhotoUrl || userDoc?.avatar || (rider.documents && (rider.documents.profilePhoto || rider.documents.profilePhotoUrl)) || null,
+      profilePhotoUrl: rider.profilePhotoUrl || userDoc?.avatar || (rider.documents && (rider.documents.profilePhoto || rider.documents.profilePhotoUrl)) || null,
+    };
 
     res.json({
       success: true,
@@ -263,6 +329,8 @@ app.get('/api/admin/riders/:id', async (req, res) => {
         ...rider,
         email,
         bankAccount,
+        bankDetails: bankAccount,
+        documents,
       }
     });
   } catch (err) {
@@ -321,6 +389,82 @@ const handleUpdateRider = async (req, res) => {
 
 app.patch('/api/admin/riders/:id', handleUpdateRider);
 app.put('/api/admin/riders/:id', handleUpdateRider);
+
+app.delete('/api/admin/riders/:id', async (req, res) => {
+  try {
+    const db = getDB();
+    const { id } = req.params;
+
+    let query = {};
+    if (ObjectId.isValid(id)) {
+      query = { $or: [{ _id: new ObjectId(id) }, { partnerCode: id }] };
+    } else {
+      query = { partnerCode: id };
+    }
+
+    const rider = await db.collection('delivery_partners').findOne(query);
+    if (!rider) {
+      return res.status(404).json({ success: false, error: 'Rider not found' });
+    }
+
+    // Delete from delivery_partners
+    await db.collection('delivery_partners').deleteOne({ _id: rider._id });
+
+    // Clean up bank accounts and wallets
+    await db.collection('rider_bank_accounts').deleteMany({
+      $or: [{ riderId: rider._id }, { riderId: rider._id.toString() }],
+    });
+    await db.collection('rider_wallets').deleteMany({
+      $or: [{ riderId: rider._id }, { riderId: rider._id.toString() }],
+    });
+
+    if (rider.userId) {
+      try {
+        const uId = ObjectId.isValid(rider.userId) ? new ObjectId(rider.userId.toString()) : rider.userId;
+        await db.collection('users').deleteOne({ _id: uId });
+      } catch (_) {}
+    }
+
+    res.json({ success: true, message: 'Delivery partner deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Alias DELETE for customers
+app.delete('/api/admin/customers/:id', async (req, res) => {
+  try {
+    const db = getDB();
+    const { id } = req.params;
+
+    let userObjId;
+    try {
+      userObjId = new ObjectId(id);
+    } catch {
+      return res.status(400).json({ success: false, error: 'Invalid customer ID' });
+    }
+
+    await db.collection('users').deleteOne({
+      $or: [{ _id: userObjId }, { _id: id }],
+    });
+
+    await db.collection('addresses').deleteMany({
+      $or: [{ userId: userObjId }, { userId: id }],
+    });
+
+    await db.collection('cart').deleteMany({
+      $or: [{ userId: userObjId }, { userId: id }],
+    });
+
+    await db.collection('delivery_partners').deleteMany({
+      $or: [{ userId: userObjId }, { userId: id }],
+    });
+
+    res.json({ success: true, message: 'Customer deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 // Mount Admin Management Modules
 app.use('/api/admin/dashboard', dashboardRouter);

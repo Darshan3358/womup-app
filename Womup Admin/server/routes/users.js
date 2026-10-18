@@ -270,4 +270,47 @@ router.get('/:id/addresses', async (req, res) => {
   }
 });
 
+// 6. Delete customer permanently
+router.delete('/:id', async (req, res) => {
+  try {
+    const db = getDB();
+    const { id } = req.params;
+
+    let userObjId;
+    try {
+      userObjId = new ObjectId(id);
+    } catch {
+      return res.status(400).json({ success: false, error: 'Invalid user ID' });
+    }
+
+    const user = await db.collection('users').findOne({
+      $or: [{ _id: userObjId }, { _id: id }]
+    });
+
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'Customer not found' });
+    }
+
+    await db.collection('users').deleteOne({
+      $or: [{ _id: userObjId }, { _id: id }]
+    });
+
+    await db.collection('addresses').deleteMany({
+      $or: [{ userId: userObjId }, { userId: id }]
+    });
+
+    await db.collection('cart').deleteMany({
+      $or: [{ userId: userObjId }, { userId: id }]
+    });
+
+    await db.collection('delivery_partners').deleteMany({
+      $or: [{ userId: userObjId }, { userId: id }]
+    });
+
+    res.json({ success: true, message: 'Customer deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;

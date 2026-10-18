@@ -22,6 +22,8 @@ import {
   RiderLocationLogSchema,
   DeliveryLocation,
   DeliveryLocationSchema,
+  RiderSettlementRequest,
+  RiderSettlementRequestSchema,
 } from './schemas/delivery-partner.schema';
 import { RiderPayoutRate, RiderPayoutRateSchema } from './schemas/rider-payout-rate.schema';
 import { RiderOtpVerification, RiderOtpVerificationSchema } from './schemas/rider-otp.schema';
@@ -71,6 +73,7 @@ import { SupportService } from './support/support.service';
       { name: OtpVerification.name, schema: OtpVerificationSchema },
       { name: RiderPayoutRate.name, schema: RiderPayoutRateSchema },
       { name: RiderOtpVerification.name, schema: RiderOtpVerificationSchema },
+      { name: RiderSettlementRequest.name, schema: RiderSettlementRequestSchema },
     ]),
     JwtModule.registerAsync({
       imports: [ConfigModule],

@@ -347,6 +347,37 @@ export class User {
     emailReceipts: boolean;
     dndEnabled: boolean;
   };
+
+  // ── Delivery Partner Specific Fields ──
+  @Prop({ default: 'BIKE' })
+  vehicleType?: string;
+
+  @Prop({ default: '' })
+  vehicleNumber?: string;
+
+  @Prop({ default: '' })
+  dlNumber?: string;
+
+  @Prop({ default: '' })
+  dlFrontImage?: string;
+
+  @Prop({ default: '' })
+  dlBackImage?: string;
+
+  @Prop({ default: '' })
+  rcNumber?: string;
+
+  @Prop({ default: '' })
+  rcFrontImage?: string;
+
+  @Prop({ default: false })
+  isOnline?: boolean;
+
+  @Prop({ default: 500 })
+  currentCashLimit?: number;
+
+  @Prop({ default: 0 })
+  totalDeliveries?: number;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

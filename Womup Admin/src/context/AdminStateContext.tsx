@@ -186,6 +186,8 @@ interface AdminStateContextType {
   addCustomer: (data: Partial<Customer>) => void;
   updateCustomer: (id: string, data: Partial<Customer>) => void;
   toggleBlockCustomer: (id: string) => void;
+  deleteCustomer: (id: string) => Promise<boolean>;
+  deleteRider: (id: string) => Promise<boolean>;
 
   updateZoneProductPrice: (productName: string, zoneName: string, newSellingPrice: number) => void;
   applyBulkPriceAdjustment: (
@@ -929,6 +931,33 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     ApiService.toggleBlockCustomer(id, nextStatus === 'Blocked');
   };
 
+  const deleteCustomer = async (id: string): Promise<boolean> => {
+    const cust = customers.find((c) => c.id === id);
+    const success = await ApiService.deleteCustomer(id);
+    if (success) {
+      setCustomers((prev) => prev.filter((c) => c.id !== id));
+      if (selectedCustomer && selectedCustomer.id === id) {
+        setSelectedCustomer(null);
+      }
+      if (cust) {
+        logAudit('Customer Deleted', cust.name, `Customer ${cust.name} (${cust.phone}) permanently deleted`);
+      }
+    }
+    return success;
+  };
+
+  const deleteRider = async (id: string): Promise<boolean> => {
+    const rider = riders.find((r) => r.id === id);
+    const success = await ApiService.deleteRider(id);
+    if (success) {
+      setRiders((prev) => prev.filter((r) => r.id !== id));
+      if (rider) {
+        logAudit('Rider Deleted', rider.name, `Delivery Partner ${rider.name} (${rider.partnerCode}) permanently deleted`);
+      }
+    }
+    return success;
+  };
+
   const updateZoneProductPrice = (productName: string, zoneName: string, newSellingPrice: number) => {
     setZonePrices((prev) => ({
       ...prev,
@@ -1418,6 +1447,8 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         addCustomer,
         updateCustomer,
         toggleBlockCustomer,
+        deleteCustomer,
+        deleteRider,
         updateZoneProductPrice,
         applyBulkPriceAdjustment,
         reportStockDiscrepancy,

@@ -762,6 +762,21 @@ export const ApiService = {
     }
   },
 
+  // 2.5 DELETE CUSTOMER PERMANENTLY
+  async deleteCustomer(id: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/users/${id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      return json.success !== false;
+    } catch (e) {
+      console.warn(`[API] Failed to delete customer ${id}:`, e);
+      return false;
+    }
+  },
+
   // 3. PERSIST NEW CUSTOMER TO LIVE MONGODB
   async addCustomer(data: Partial<Customer>): Promise<boolean> {
     try {
@@ -1005,12 +1020,18 @@ export const ApiService = {
   },
 
   // 7. PERSIST INVENTORY STOCK ADJUSTMENT TO LIVE MONGODB
-  async adjustStock(storeId: string, productId: string, deltaQty: number, reason: string): Promise<boolean> {
+  async adjustStock(
+    storeId?: string,
+    productId?: string,
+    deltaQty: number = 0,
+    reason: string = 'Stock update',
+    inventoryId?: string
+  ): Promise<boolean> {
     try {
       const res = await fetch(`${API_BASE_URL}/api/admin/stores/inventory/adjust`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storeId, productId, deltaQty, reason }),
+        body: JSON.stringify({ storeId, productId, deltaQty, reason, inventoryId }),
       });
       return res.ok;
     } catch {
@@ -1170,6 +1191,21 @@ export const ApiService = {
     }
   },
 
+  // 16.5. DELETE RIDER PERMANENTLY
+  async deleteRider(id: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/riders/${id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      return json.success !== false;
+    } catch (e) {
+      console.warn(`[API] Failed to delete rider ${id}:`, e);
+      return false;
+    }
+  },
+
 
   // 17. FETCH ALL STORES ENRICHED
   async fetchStores(): Promise<DarkStoreItem[]> {
@@ -1224,6 +1260,21 @@ export const ApiService = {
       return json;
     } catch (err: any) {
       return { success: false, error: err.message || 'Network error deleting store' };
+    }
+  },
+
+  // 20B. UPDATE STORE DETAILS
+  async updateStore(id: string, payload: any): Promise<{ success: boolean; data?: any; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/stores/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      return json;
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error updating store' };
     }
   },
 
@@ -1583,21 +1634,102 @@ export const ApiService = {
     }
   },
 
-  // 42. WALLETS - SETTLE RIDER INSTANT IMPS
+  // 42. WALLETS - SETTLE RIDER NET BALANCE (KHATA)
   async settleRiderWallet(
     riderId: string,
     amount: number,
-    referenceNotes?: string
+    referenceNotes?: string,
+    actionType?: 'COLLECT_FROM_RIDER' | 'PAY_TO_RIDER'
   ): Promise<{ success: boolean; message?: string; newBalance?: number; error?: string }> {
     try {
       const res = await fetch(`${API_BASE_URL}/api/finance/wallets/settle-rider`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ riderId, amount, referenceNotes }),
+        body: JSON.stringify({ riderId, amount, referenceNotes, actionType: actionType || 'COLLECT_FROM_RIDER' }),
       });
       return await res.json();
     } catch (err: any) {
-      return { success: false, error: err.message || 'Failed settling rider payout' };
+      return { success: false, error: err.message || 'Failed settling rider khata' };
+    }
+  },
+
+  // 42b. WALLETS - GET RIDER ORDER-BY-ORDER KHATA LEDGER
+  async getRiderLedger(riderId: string): Promise<{ success: boolean; partner?: any; data?: any[]; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/finance/wallets/riders/${riderId}/ledger`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed fetching rider ledger' };
+    }
+  },
+
+  // 42c. RIDER ONLINE SETTLEMENT REQUESTS (UPI WITH UTR)
+  async getRiderSettlementRequests(status?: string): Promise<{ success: boolean; data?: any[]; error?: string }> {
+    try {
+      const url = `${API_BASE_URL}/api/finance/settlements/requests${status && status !== 'ALL' ? `?status=${status}` : ''}`;
+      const res = await fetch(url);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed fetching settlement requests' };
+    }
+  },
+
+  async approveRiderSettlementRequest(
+    requestId: string,
+    adminRemarks?: string
+  ): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/finance/settlements/requests/${requestId}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminRemarks }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed approving settlement request' };
+    }
+  },
+
+  async rejectRiderSettlementRequest(
+    requestId: string,
+    reason: string
+  ): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/finance/settlements/requests/${requestId}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed rejecting settlement request' };
+    }
+  },
+
+  async getCompanyUpiSettings(): Promise<{ success: boolean; data?: { adminUpiId: string; adminUpiName: string; supportPhone: string; qrCodeUrl: string }; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/finance/settings/upi`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed fetching UPI settings' };
+    }
+  },
+
+  async updateCompanyUpiSettings(payload: {
+    adminUpiId: string;
+    adminUpiName?: string;
+    supportPhone?: string;
+    qrCodeUrl?: string;
+  }): Promise<{ success: boolean; message?: string; data?: any; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/finance/settings/upi`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed updating UPI settings' };
     }
   },
 

@@ -256,12 +256,12 @@ export const CustomerKycReviewModal: React.FC<CustomerKycReviewModalProps> = ({
               <View style={styles.section}>
                 <Text style={styles.sectionHeading}>🏦 Section 5: Bank Details (For Withdrawal Payouts)</Text>
                 <View style={styles.grid}>
-                  <InfoItem label="Bank Name" value={customer?.bankName || 'HDFC Bank'} />
-                  <InfoItem label="Branch" value={customer?.branchName || 'SG Highway'} />
-                  <InfoItem label="Account Holder" value={customer?.accountHolderName || customer?.name} />
-                  <InfoItem label="Account Number" value={customer?.maskedAccount || 'XXXX XXXX 1234'} />
-                  <InfoItem label="IFSC Code" value={customer?.ifscCode || 'HDFC0000123'} />
-                  <InfoItem label="UPI ID" value={customer?.upiId || 'ayushi@okhdfcbank'} />
+                  <InfoItem label="Bank Name" value={customer?.bankName || 'Not Linked'} />
+                  <InfoItem label="Branch" value={customer?.branchName || 'N/A'} />
+                  <InfoItem label="Account Holder" value={customer?.accountHolderName || customer?.name || 'N/A'} />
+                  <InfoItem label="Account Number" value={customer?.accountNumber || customer?.maskedAccount || 'N/A'} />
+                  <InfoItem label="IFSC Code" value={customer?.ifscCode || 'N/A'} />
+                  <InfoItem label="UPI ID" value={customer?.upiId || 'N/A'} />
                 </View>
               </View>
 
