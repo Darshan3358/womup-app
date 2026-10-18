@@ -225,7 +225,7 @@ export class DeliveryAuthService {
       throw new UnauthorizedException('Maximum verification attempts (5) exceeded. Please request a new OTP.');
     }
 
-    const isMatch = (await bcrypt.compare(cleanOtp, record.otpHash)) || cleanOtp === '123456';
+    const isMatch = await bcrypt.compare(cleanOtp, record.otpHash);
     if (!isMatch) {
       record.attempts = (record.attempts || 0) + 1;
       await record.save();
@@ -754,7 +754,7 @@ export class DeliveryAuthService {
       throw new UnauthorizedException('OTP expired or not found. Please request a new code.');
     }
 
-    const isValid = (await bcrypt.compare(otp, record.otpHash || '')) || otp === '123456';
+    const isValid = await bcrypt.compare(otp, record.otpHash || '');
     if (!isValid) {
       throw new UnauthorizedException('Invalid 6-digit OTP');
     }

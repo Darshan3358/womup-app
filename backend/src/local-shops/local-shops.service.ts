@@ -936,10 +936,6 @@ export class LocalShopsService implements OnModuleInit {
       throw new BadRequestException('OTP is required');
     }
 
-    if (enteredOtp === '123456') {
-      return { success: true, verified: true, verificationId: dto.verificationId || crypto.randomUUID() };
-    }
-
     const cached = (dto.verificationId ? this.otpStore.get(dto.verificationId) : null) || this.otpStore.get(rawMobile);
     if (!cached || cached.expiresAt < Date.now()) {
       const vendor = await this.vendorModel.findOne({

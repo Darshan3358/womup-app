@@ -6,28 +6,139 @@ import * as crypto from 'crypto';
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
-  private transporter: nodemailer.Transporter | null = null;
+  private transporter465: nodemailer.Transporter | null = null;
+  private transporter587: nodemailer.Transporter | null = null;
+  private defaultUser = 'mukeshthanki10@gmail.com';
+  private defaultPass = 'gmpttqcoiyscvqjw';
 
   constructor(private configService: ConfigService) {
-    const user = this.configService.get<string>('EMAIL_USER');
-    const pass = this.configService.get<string>('EMAIL_PASS');
+    const user = this.configService.get<string>('EMAIL_USER') || this.defaultUser;
+    const rawPass = this.configService.get<string>('EMAIL_PASS') || this.defaultPass;
+    const cleanPass = (rawPass || '').replace(/\s+/g, '');
 
-    if (user && pass) {
-      const cleanPass = pass.replace(/\s+/g, '');
-      this.transporter = nodemailer.createTransport({
+    if (user && cleanPass) {
+      // Primary SSL Port 465
+      this.transporter465 = nodemailer.createTransport({
         host: 'smtp.gmail.com',
         port: 465,
         secure: true,
-        family: 4, // Force IPv4 to prevent 120s IPv6 timeout on cloud hosts like Render
+        family: 4, // Force IPv4
         auth: { user, pass: cleanPass },
-        connectionTimeout: 5000,
-        greetingTimeout: 5000,
-        socketTimeout: 8000,
+        connectionTimeout: 8000,
+        greetingTimeout: 8000,
+        socketTimeout: 10000,
       } as any);
+
+      // Fallback TLS Port 587
+      this.transporter587 = nodemailer.createTransport({
+        host: 'smtp.gmail.com',
+        port: 587,
+        secure: false,
+        family: 4,
+        auth: { user, pass: cleanPass },
+        connectionTimeout: 8000,
+        greetingTimeout: 8000,
+        socketTimeout: 10000,
+      } as any);
+
       this.logger.log(`Email Service initialized with: ${user}`);
     } else {
-      this.logger.warn('EMAIL_USER or EMAIL_PASS not set — email delivery disabled (dev mode)');
+      this.logger.warn('EMAIL_USER or EMAIL_PASS not set');
     }
+  }
+
+  /** Centralized dispatcher that tries all available channels to deliver real emails */
+  async sendMail(options: {
+    to: string;
+    subject: string;
+    text: string;
+    html: string;
+    fromName?: string;
+  }): Promise<{ success: boolean; provider?: string; error?: string }> {
+    const { to, subject, text, html, fromName = 'Worm Up' } = options;
+    const fromEmail = this.configService.get<string>('EMAIL_USER') || this.defaultUser;
+
+    // Channel 1: Google Apps Script / HTTPS Relay (if configured, works 100% on Render without port blocks)
+    const relayUrl = this.configService.get<string>('GMAIL_RELAY_URL')?.trim();
+    if (relayUrl) {
+      try {
+        const relayRes = await fetch(relayUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to, subject, text, html, fromName }),
+        });
+        if (relayRes.ok) {
+          this.logger.log(`[Email] Delivered to ${to} via HTTPS Relay`);
+          return { success: true, provider: 'HTTPS Relay' };
+        }
+      } catch (err: any) {
+        this.logger.warn(`[Email] HTTPS Relay failed: ${err.message}`);
+      }
+    }
+
+    // Channel 2: Resend API (Works for test address mukeshthanki10@gmail.com)
+    const resendKey = this.configService.get<string>('RESEND_API_KEY')?.trim();
+    if (resendKey && to.toLowerCase() === this.defaultUser.toLowerCase()) {
+      try {
+        const response = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${resendKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: 'Worm Up <onboarding@resend.dev>',
+            to: [to],
+            subject,
+            text,
+            html,
+          }),
+        });
+        if (response.ok) {
+          this.logger.log(`[Email] Delivered to ${to} via Resend`);
+          return { success: true, provider: 'Resend' };
+        }
+      } catch (err: any) {
+        this.logger.warn(`[Email] Resend API failed: ${err.message}`);
+      }
+    }
+
+    // Channel 3: Gmail SMTP Port 465
+    if (this.transporter465) {
+      try {
+        await this.transporter465.sendMail({
+          from: `"${fromName}" <${fromEmail}>`,
+          to,
+          subject,
+          text,
+          html,
+        });
+        this.logger.log(`[Email] Delivered successfully via Gmail SMTP (Port 465) to ${to}`);
+        return { success: true, provider: 'Gmail SMTP (Port 465)' };
+      } catch (err: any) {
+        this.logger.warn(`[Email] Gmail SMTP Port 465 failed for ${to}: ${err.message}`);
+      }
+    }
+
+    // Channel 4: Gmail SMTP Port 587
+    if (this.transporter587) {
+      try {
+        await this.transporter587.sendMail({
+          from: `"${fromName}" <${fromEmail}>`,
+          to,
+          subject,
+          text,
+          html,
+        });
+        this.logger.log(`[Email] Delivered successfully via Gmail SMTP (Port 587) to ${to}`);
+        return { success: true, provider: 'Gmail SMTP (Port 587)' };
+      } catch (err: any) {
+        this.logger.error(`[Email] Gmail SMTP Port 587 failed for ${to}: ${err.message}`);
+        return { success: false, error: err.message };
+      }
+    }
+
+    return { success: false, error: 'No email transport available' };
   }
 
   /** Generate a secure 6-digit OTP */
@@ -51,8 +162,6 @@ export class EmailService {
   /** Send OTP email to user */
   async sendOtpEmail(email: string, otp: string): Promise<boolean> {
     const fromName = 'Worm Up';
-    const fromEmail = this.configService.get<string>('EMAIL_USER');
-
     const html = `
 <!DOCTYPE html>
 <html>
@@ -65,16 +174,12 @@ export class EmailService {
     <tr>
       <td align="center">
         <table width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
-          
-          <!-- Header -->
           <tr>
             <td style="background:linear-gradient(135deg,#FF2D78,#FF6B35);padding:32px;text-align:center;">
               <h1 style="color:#ffffff;margin:0;font-size:28px;font-weight:800;letter-spacing:-0.5px;">🐛 Worm Up</h1>
               <p style="color:rgba(255,255,255,0.85);margin:8px 0 0;font-size:14px;">Your verification code</p>
             </td>
           </tr>
-
-          <!-- Body -->
           <tr>
             <td style="padding:40px 32px;">
               <p style="color:#374151;font-size:16px;margin:0 0 24px;">Hi there 👋</p>
@@ -82,14 +187,11 @@ export class EmailService {
                 Use the OTP below to verify your email address and log in to <strong>Worm Up</strong>.
                 This code is valid for <strong>10 minutes</strong>.
               </p>
-
-              <!-- OTP Box -->
               <div style="text-align:center;margin:0 0 32px;">
                 <div style="display:inline-block;background:#FFF1F6;border:2px solid #FF2D78;border-radius:12px;padding:20px 40px;">
                   <p style="margin:0;font-size:42px;font-weight:900;color:#FF2D78;letter-spacing:10px;">${otp}</p>
                 </div>
               </div>
-
               <p style="color:#9CA3AF;font-size:12px;text-align:center;margin:0 0 8px;">
                 ⚠️ Never share this code with anyone. Worm Up will never ask for your OTP.
               </p>
@@ -98,16 +200,13 @@ export class EmailService {
               </p>
             </td>
           </tr>
-
-          <!-- Footer -->
           <tr>
             <td style="background:#F9FAFB;padding:20px 32px;text-align:center;border-top:1px solid #E5E7EB;">
               <p style="color:#9CA3AF;font-size:12px;margin:0;">
-                © 2025 Worm Up. All rights reserved.
+                © 2026 Worm Up. All rights reserved.
               </p>
             </td>
           </tr>
-
         </table>
       </td>
     </tr>
@@ -115,63 +214,19 @@ export class EmailService {
 </body>
 </html>`;
 
-    // 1. Try HTTPS API (Resend) - Works 100% on cloud platforms like Render without port 465/587 blocks
-    const resendKey = this.configService.get<string>('RESEND_API_KEY')?.trim();
-    if (resendKey) {
-      try {
-        const response = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${resendKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            from: 'Worm Up <onboarding@resend.dev>',
-            to: [email],
-            subject: `${otp} is your Worm Up verification code`,
-            text: `Your Worm Up OTP is: ${otp}. Valid for 10 minutes. Do not share with anyone.`,
-            html,
-          }),
-        });
-
-        if (response.ok) {
-          this.logger.log(`[Email OTP] Sent via Resend HTTPS API to ${email}`);
-          return true;
-        } else {
-          const errText = await response.text();
-          this.logger.error(`[Email OTP] Resend API error: ${errText}`);
-        }
-      } catch (err: any) {
-        this.logger.error(`[Email OTP] Resend API request failed: ${err.message}`);
-      }
-    }
-
-    // 2. SMTP Transporter (Works on localhost, blocked on Render free tier)
-    if (this.transporter) {
-      try {
-        await this.transporter.sendMail({
-          from: `"${fromName}" <${fromEmail}>`,
-          to: email,
-          subject: `${otp} is your Worm Up verification code`,
-          text: `Your Worm Up OTP is: ${otp}. Valid for 10 minutes. Do not share with anyone.`,
-          html,
-        });
-        this.logger.log(`[Email OTP] Sent successfully via SMTP to ${email}`);
-        return true;
-      } catch (err: any) {
-        this.logger.error(`[Email OTP] SMTP failed to send to ${email}: ${err.message}`);
-        return false;
-      }
-    }
-
-    this.logger.warn(`[Email OTP] Dev mode fallback — OTP for ${email}: ${otp}`);
-    return true;
+    const res = await this.sendMail({
+      to: email,
+      subject: `${otp} is your Worm Up verification code`,
+      text: `Your Worm Up OTP is: ${otp}. Valid for 10 minutes. Do not share with anyone.`,
+      html,
+      fromName,
+    });
+    return res.success;
   }
 
   /** Send 6-digit verification OTP to Rider */
   async sendRiderOtpEmail(email: string, otp: string, riderName?: string): Promise<boolean> {
     const fromName = 'Worm Up Rider Team';
-    const fromEmail = this.configService.get<string>('EMAIL_USER');
     const name = riderName || 'Rider';
 
     const html = `
@@ -218,30 +273,19 @@ export class EmailService {
 </body>
 </html>`;
 
-    if (this.transporter) {
-      try {
-        await this.transporter.sendMail({
-          from: `"${fromName}" <${fromEmail}>`,
-          to: email,
-          subject: `${otp} is your Worm Up Rider verification code`,
-          text: `Hi ${name},\n\nYour verification code is: ${otp}\n\nThis code is valid for 10 minutes.\nDo not share this code with anyone.\n\n— WormUp Rider Team`,
-          html,
-        });
-        this.logger.log(`[Rider Email OTP] Dispatched successfully to ${email}`);
-        return true;
-      } catch (err: any) {
-        this.logger.error(`[Rider Email OTP] Transporter error: ${err.message}`);
-      }
-    }
-    this.logger.warn(`[Rider Email OTP] Dev mode fallback — OTP for ${email}: ${otp}`);
-    return true;
+    const res = await this.sendMail({
+      to: email,
+      subject: `${otp} is your Worm Up Rider verification code`,
+      text: `Hi ${name},\n\nYour verification code is: ${otp}\n\nThis code is valid for 10 minutes.\nDo not share this code with anyone.\n\n— WormUp Rider Team`,
+      html,
+      fromName,
+    });
+    return res.success;
   }
 
   /** Send Welcome email after successful Rider registration */
   async sendRiderWelcomeEmail(email: string, riderName: string, riderCode: string): Promise<boolean> {
     const fromName = 'Worm Up Rider Team';
-    const fromEmail = this.configService.get<string>('EMAIL_USER');
-
     const html = `
 <!DOCTYPE html>
 <html>
@@ -289,27 +333,19 @@ export class EmailService {
 </body>
 </html>`;
 
-    if (this.transporter) {
-      try {
-        await this.transporter.sendMail({
-          from: `"${fromName}" <${fromEmail}>`,
-          to: email,
-          subject: 'Welcome to WormUp Rider Program! 🛵',
-          text: `Hi ${riderName},\n\nWelcome to WormUp!\n\nYour Rider ID: ${riderCode}\nRegistered Email: ${email}\n\nYou can now go online and start delivering!\n\n— WormUp Rider Team`,
-          html,
-        });
-        return true;
-      } catch (err: any) {
-        this.logger.error(`[Rider Welcome Email] Error: ${err.message}`);
-      }
-    }
-    return true;
+    const res = await this.sendMail({
+      to: email,
+      subject: 'Welcome to WormUp Rider Program! 🛵',
+      text: `Hi ${riderName},\n\nWelcome to WormUp!\n\nYour Rider ID: ${riderCode}\nRegistered Email: ${email}\n\nYou can now go online and start delivering!\n\n— WormUp Rider Team`,
+      html,
+      fromName,
+    });
+    return res.success;
   }
 
   /** Send Password Reset Email with OTP */
   async sendRiderPasswordResetEmail(email: string, otp: string, riderName?: string): Promise<boolean> {
     const fromName = 'Worm Up Security';
-    const fromEmail = this.configService.get<string>('EMAIL_USER');
     const name = riderName || 'Rider';
 
     const html = `
@@ -351,21 +387,14 @@ export class EmailService {
 </body>
 </html>`;
 
-    if (this.transporter) {
-      try {
-        await this.transporter.sendMail({
-          from: `"${fromName}" <${fromEmail}>`,
-          to: email,
-          subject: `${otp} is your Worm Up Rider password reset code`,
-          text: `Hi ${name},\n\nYour password reset code is: ${otp}\n\nValid for 10 minutes.\n\n— WormUp Security Team`,
-          html,
-        });
-        return true;
-      } catch (err: any) {
-        this.logger.error(`[Rider Reset Email] Error: ${err.message}`);
-      }
-    }
-    return true;
+    const res = await this.sendMail({
+      to: email,
+      subject: `${otp} is your Worm Up Rider password reset code`,
+      text: `Hi ${name},\n\nYour password reset code is: ${otp}\n\nValid for 10 minutes.\n\n— WormUp Security Team`,
+      html,
+      fromName,
+    });
+    return res.success;
   }
 }
 

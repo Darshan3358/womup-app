@@ -50,7 +50,7 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     private emailService: EmailService,
-  ) {}
+  ) { }
 
   async sendOtp(dto: SendOtpDto) {
     const isDelivery = dto.purpose === 'DELIVERY_LOGIN';
@@ -180,10 +180,8 @@ export class AuthService {
       throw new BadRequestException('Maximum verification attempts exceeded. Please request a new code');
     }
 
-    // Real OTP verification: match against cryptographic hash, or master fallback OTP (123456)
-    const isApproved =
-      this.emailService.verifyOtpHash(otp, record.otpHash || '') ||
-      otp === '123456';
+    // Real OTP verification: match strictly against cryptographic hash
+    const isApproved = this.emailService.verifyOtpHash(otp, record.otpHash || '');
 
     if (!isApproved) {
       record.attempts += 1;
@@ -199,7 +197,7 @@ export class AuthService {
     // ── Delivery Partner Verification Flow ─────────────────────────
     if (isDelivery) {
       const riderEmail = (record.email || record.phone || email || '').trim().toLowerCase();
-      
+
       // Look for existing rider User and DeliveryPartner profile
       const user = await this.userModel.findOne({ email: riderEmail, role: Role.DELIVERY_PARTNER });
       const partner = user
@@ -1180,6 +1178,23 @@ export class AuthService {
         sponsorId: company.referralCode || 'WORMUP001',
         referralCode: company.referralCode || 'WORMUP001',
       },
+    };
+  }
+
+  async testSendEmail(targetEmail: string) {
+    const cleanEmail = (targetEmail || 'ayushithanki77@gmail.com').trim().toLowerCase();
+    const otp = this.emailService.generateOtp();
+    const result = await this.emailService.sendMail({
+      to: cleanEmail,
+      subject: `${otp} is your Worm Up verification code`,
+      text: `Your Worm Up OTP is: ${otp}. Valid for 10 minutes.`,
+      html: `<h2>Worm Up Live Email </h2><p>Your OTP is: <strong>${otp}</strong></p>`,
+      fromName: 'Worm Up Live',
+    });
+    return {
+      target: cleanEmail,
+      otp,
+      ...result,
     };
   }
 }

@@ -401,7 +401,7 @@ export class StoreAuthService {
       throw new UnauthorizedException('Maximum verification attempts exceeded. Please request a new OTP.');
     }
 
-    const isValid = (await bcrypt.compare(otp, record.otpHash || '')) || otp === '123456';
+    const isValid = await bcrypt.compare(otp, record.otpHash || '');
     if (!isValid) {
       record.attempts = (record.attempts || 0) + 1;
       await record.save();

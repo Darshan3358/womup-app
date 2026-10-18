@@ -7,9 +7,13 @@ export class MailService {
   private readonly logger = new Logger(MailService.name);
   private transporter: nodemailer.Transporter;
 
+  private defaultUser = 'mukeshthanki10@gmail.com';
+  private defaultPass = 'gmpttqcoiyscvqjw';
+
   constructor(private configService: ConfigService) {
-    const user = this.configService.get<string>('SMTP_USER') || this.configService.get<string>('EMAIL_USER');
-    const pass = (this.configService.get<string>('SMTP_PASS') || this.configService.get<string>('EMAIL_PASS') || '').replace(/\s+/g, '');
+    const user = this.configService.get<string>('SMTP_USER') || this.configService.get<string>('EMAIL_USER') || this.defaultUser;
+    const rawPass = this.configService.get<string>('SMTP_PASS') || this.configService.get<string>('EMAIL_PASS') || this.defaultPass;
+    const pass = (rawPass || '').replace(/\s+/g, '');
 
     this.transporter = nodemailer.createTransport({
       host: this.configService.get<string>('SMTP_HOST', 'smtp.gmail.com'),
@@ -20,9 +24,9 @@ export class MailService {
         user,
         pass,
       },
-      connectionTimeout: 5000,
-      greetingTimeout: 5000,
-      socketTimeout: 8000,
+      connectionTimeout: 8000,
+      greetingTimeout: 8000,
+      socketTimeout: 10000,
     } as any);
 
     if (user && pass) {

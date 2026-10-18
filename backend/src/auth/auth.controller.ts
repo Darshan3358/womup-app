@@ -105,4 +105,10 @@ export class AuthController {
   async logout() {
     return { success: true, message: 'Logged out successfully' };
   }
+
+  @Get('test-email')
+  @ApiOperation({ summary: 'Diagnostic test endpoint to verify real email delivery' })
+  async testEmail(@Query('to') to?: string) {
+    return this.authService.testSendEmail(to || 'ayushithanki77@gmail.com');
+  }
 }
