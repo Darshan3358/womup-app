@@ -133,10 +133,16 @@ export class StoreInventoryService {
       .find({ productId: { $in: productIds } })
       .toArray();
 
-    // Query inventories for this store
+    // Query store-specific inventories for this store (ObjectId and string matched)
     let storeInvs: any[] = [];
     if (storeId) {
-      storeInvs = await this.inventoryModel.find({ storeId }).exec();
+      const storeIdStr = storeId.toString();
+      const storeIdObj = Types.ObjectId.isValid(storeIdStr) ? new Types.ObjectId(storeIdStr) : storeId;
+      storeInvs = await this.inventoryModel
+        .find({
+          $or: [{ storeId: storeIdObj }, { storeId: storeIdStr }],
+        })
+        .exec();
     }
 
     const items = [];
@@ -145,19 +151,28 @@ export class StoreInventoryService {
         (v) => v.productId && v.productId.toString() === prod._id.toString()
       );
 
-      // Find store inventory record for this product
-      const inv = storeInvs.find((i) => i.productId && i.productId.toString() === prod._id.toString());
+      // Find all store inventory records for this product
+      const prodInvs = storeInvs.filter(
+        (i) => i.productId && i.productId.toString() === prod._id.toString()
+      );
+      const mainProdInv = prodInvs.find((i) => !i.variantId) || prodInvs[0];
 
-      // Map each variant with store/area pricing and stock
+      // Map each variant with this store's OWN stock (NOT area-shared stock)
       const mappedVariants = prodVariants.map((v) => {
         const ap = areaPricings.find(
           (a) => a.variantId && a.variantId.toString() === v._id.toString()
         );
-        const resolvedStock = ap?.stock !== undefined
-          ? ap.stock
-          : inv?.availableQty !== undefined
-          ? inv.availableQty
-          : (v.stock !== undefined ? v.stock : 50);
+
+        // Find store-specific inventory for this variant
+        const variantInv = prodInvs.find(
+          (i) => i.variantId && i.variantId.toString() === v._id.toString()
+        );
+
+        // STORE-WISE STOCK: 1st priority is this store's own recorded inventory!
+        const resolvedStock =
+          variantInv?.availableQty !== undefined
+            ? variantInv.availableQty
+            : (v.stock !== undefined ? v.stock : 50);
 
         return {
           id: v._id.toString(),
@@ -173,14 +188,14 @@ export class StoreInventoryService {
       const defaultVar = mappedVariants.find((v) => v.isDefault) || mappedVariants[0];
       const availableQty = defaultVar
         ? defaultVar.stock
-        : inv?.availableQty !== undefined
-        ? inv.availableQty
-        : (prod.stock ?? 50);
+        : (mainProdInv?.availableQty !== undefined ? mainProdInv.availableQty : (prod.stock ?? 50));
       const sellingPrice = defaultVar ? defaultVar.sellingPrice : (prod.sellingPrice ?? 0);
       const mrp = defaultVar ? defaultVar.mrp : (prod.mrp || prod.sellingPrice || 0);
 
-      const reservedQty = inv ? (inv.reservedQty ?? 0) : 0;
-      const threshold = inv?.lowStockThreshold ?? 10;
+      const reservedQty = defaultVar
+        ? (prodInvs.find((i) => i.variantId && i.variantId.toString() === defaultVar.id)?.reservedQty ?? 0)
+        : (mainProdInv ? (mainProdInv.reservedQty ?? 0) : 0);
+      const threshold = mainProdInv?.lowStockThreshold ?? 10;
       const isLowStock = availableQty > 0 && availableQty <= threshold;
       const isOutOfStock = availableQty <= 0;
 
@@ -201,7 +216,7 @@ export class StoreInventoryService {
         threshold,
         isLowStock,
         isOutOfStock,
-        shelfLocation: inv?.shelfLocation || (prod as any).shelfLocation || 'A1-R2',
+        shelfLocation: mainProdInv?.shelfLocation || (prod as any).shelfLocation || 'A1-R2',
         sku: (prod as any).sku || (prod as any).slug || `SKU-${prod._id.toString().slice(-6)}`,
         variants: mappedVariants,
       });
@@ -213,97 +228,69 @@ export class StoreInventoryService {
   async adjustStock(userId: string, productId: string, dto: StockAdjustmentDto) {
     const staff = await this.getStaff(userId);
     const storeId = staff.storeId;
-    const store = storeId ? await this.storeModel.findById(storeId).exec() : null;
-    let areaId = store?.areaId;
-
-    if (!areaId && store) {
-      const storeIdStr = store._id?.toString();
-      const storeIdObj = Types.ObjectId.isValid(storeIdStr) ? new Types.ObjectId(storeIdStr) : store._id;
-      const cleanAreaName = (store.areaName || store.name || '')
-        .replace(/^Wom\s*Up\s*/i, '')
-        .replace(/\s*Dark\s*Store.*$/i, '')
-        .trim();
-
-      const area = await this.connection.collection('areas').findOne({
-        $or: [
-          { hubStoreId: storeIdObj },
-          { hubStoreId: storeIdStr },
-          ...(cleanAreaName ? [{ name: new RegExp(cleanAreaName.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&'), 'i') }] : []),
-        ],
-      });
-      if (area) {
-        areaId = area._id;
-      }
+    if (!storeId) {
+      throw new BadRequestException('Staff is not assigned to any store');
     }
+
+    const storeIdStr = storeId.toString();
+    const storeIdObj = Types.ObjectId.isValid(storeIdStr) ? new Types.ObjectId(storeIdStr) : storeId;
 
     const product = await this.productModel.findById(productId);
     if (!product) {
       throw new NotFoundException('Product not found');
     }
 
-    let beforeQty = 50;
-    let afterQty = 50;
-
-    // 1. Update area_pricing if areaId is present
-    if (areaId) {
-      const areaPricingCol = this.connection.collection('area_pricing');
-      let targetVariantId: Types.ObjectId | null = null;
-
-      if (dto.variantId && Types.ObjectId.isValid(dto.variantId)) {
-        targetVariantId = new Types.ObjectId(dto.variantId);
-      } else {
-        // Resolve default variant
-        const defaultVar = await this.connection.collection('product_variants').findOne({
-          productId: product._id,
-          isDefault: true,
-        });
-        const firstVar = defaultVar || (await this.connection.collection('product_variants').findOne({ productId: product._id }));
-        if (firstVar) {
-          targetVariantId = firstVar._id;
-        }
-      }
-
-      if (targetVariantId) {
-        const areaIdStr = areaId.toString();
-        const areaIdObj = Types.ObjectId.isValid(areaIdStr) ? new Types.ObjectId(areaIdStr) : null;
-        const existingAp = await areaPricingCol.findOne({
-          productId: product._id,
-          variantId: targetVariantId,
-          $or: [{ areaId: areaIdObj }, { areaId: areaIdStr }],
-        });
-
-        beforeQty = existingAp?.stock !== undefined ? existingAp.stock : 50;
-        afterQty = Math.max(0, beforeQty + dto.delta);
-
-        await areaPricingCol.updateOne(
-          {
-            productId: product._id,
-            variantId: targetVariantId,
-            areaId: areaIdObj || areaIdStr,
-          },
-          {
-            $set: { stock: afterQty, isAvailable: afterQty > 0 },
-            $setOnInsert: {
-              price: product.sellingPrice || 0,
-              mrp: product.mrp || product.sellingPrice || 0,
-              discountPercent: 0,
-            },
-          },
-          { upsert: true }
-        );
+    // Resolve target variant if specified
+    let targetVariantId: Types.ObjectId | null = null;
+    let targetVarDoc: any = null;
+    if (dto.variantId && Types.ObjectId.isValid(dto.variantId)) {
+      targetVariantId = new Types.ObjectId(dto.variantId);
+      targetVarDoc = await this.connection.collection('product_variants').findOne({ _id: targetVariantId });
+    } else {
+      const defaultVar = await this.connection.collection('product_variants').findOne({
+        productId: product._id,
+        isDefault: true,
+      });
+      targetVarDoc = defaultVar || (await this.connection.collection('product_variants').findOne({ productId: product._id }));
+      if (targetVarDoc) {
+        targetVariantId = targetVarDoc._id;
       }
     }
 
-    // 2. Also keep inventory and productModel in sync
-    let inv = await this.inventoryModel.findOne({
-      storeId,
+    // Query this specific store's inventory record for this product and variant
+    const invQuery: any = {
+      $or: [{ storeId: storeIdObj }, { storeId: storeIdStr }],
       productId: product._id,
-    });
+    };
+    if (targetVariantId) {
+      invQuery.variantId = targetVariantId;
+    }
 
+    let inv = await this.inventoryModel.findOne(invQuery);
+
+    let beforeQty = 50;
+    if (inv && inv.availableQty !== undefined) {
+      beforeQty = inv.availableQty;
+    } else if (targetVarDoc && targetVarDoc.stock !== undefined) {
+      beforeQty = targetVarDoc.stock;
+    } else {
+      beforeQty = product.stock ?? 50;
+    }
+
+    const afterQty = Math.max(0, beforeQty + dto.delta);
+
+    // Save STORE-WISE inventory strictly for this store
     if (!inv) {
       inv = await this.inventoryModel.create({
-        storeId,
+        storeId: storeIdObj,
+        storeName: staff.storeName || 'Dark Store',
+        warehouseId: storeIdObj,
         productId: product._id,
+        productName: product.name,
+        category: (product as any).categoryName || (product as any).category || 'General',
+        variantId: targetVariantId || undefined,
+        sku: targetVarDoc?.sku || (product as any).sku || `SKU-${product._id.toString().slice(-6)}`,
+        packSize: targetVarDoc?.weightOrVolume || targetVarDoc?.packSize || product.quantityLabel || '1 unit',
         availableQty: afterQty,
         reservedQty: 0,
         soldQty: 0,
@@ -315,9 +302,6 @@ export class StoreInventoryService {
       await inv.save();
     }
 
-    product.stock = afterQty;
-    await product.save();
-
     const changeType =
       dto.changeType === 'DAMAGE'
         ? InventoryChangeType.DAMAGE
@@ -326,7 +310,7 @@ export class StoreInventoryService {
         : InventoryChangeType.ADJUSTMENT;
 
     await this.inventoryLogModel.create({
-      storeId,
+      storeId: storeIdObj,
       productId: product._id,
       changeType,
       quantityDelta: dto.delta,
@@ -336,19 +320,20 @@ export class StoreInventoryService {
       afterQty,
     });
 
-    // Real-time broadcast stock change
+    // Real-time broadcast stock change strictly to this store
     this.trackingGateway.broadcastInventoryUpdate({
       storeId: storeId ? storeId.toString() : '',
       productId: product._id.toString(),
       productName: product.name,
       availableQty: afterQty,
-      reservedQty: inv.reservedQty,
+      reservedQty: inv.reservedQty || 0,
     });
 
     return {
       success: true,
-      message: 'Stock adjusted successfully',
+      message: 'Stock adjusted successfully for store',
       productId: product._id.toString(),
+      variantId: targetVariantId ? targetVariantId.toString() : undefined,
       beforeQty,
       newQty: afterQty,
     };
@@ -357,6 +342,12 @@ export class StoreInventoryService {
   async restock(userId: string, productId: string, dto: RestockDto) {
     const staff = await this.getStaff(userId);
     const storeId = staff.storeId;
+    if (!storeId) {
+      throw new BadRequestException('Staff is not assigned to any store');
+    }
+
+    const storeIdStr = storeId.toString();
+    const storeIdObj = Types.ObjectId.isValid(storeIdStr) ? new Types.ObjectId(storeIdStr) : storeId;
 
     const product = await this.productModel.findById(productId);
     if (!product) {
@@ -364,18 +355,22 @@ export class StoreInventoryService {
     }
 
     let inv = await this.inventoryModel.findOne({
-      storeId,
+      $or: [{ storeId: storeIdObj }, { storeId: storeIdStr }],
       productId: product._id,
     });
 
     if (!inv) {
       inv = await this.inventoryModel.create({
-        storeId,
+        storeId: storeIdObj,
+        storeName: staff.storeName || 'Dark Store',
+        warehouseId: storeIdObj,
         productId: product._id,
+        productName: product.name,
         availableQty: dto.quantity,
         reservedQty: 0,
         soldQty: 0,
         lowStockThreshold: 5,
+        shelfLocation: (product as any).shelfLocation || 'A1-R2',
       });
     }
 
@@ -385,11 +380,8 @@ export class StoreInventoryService {
     inv.reservedQty = Math.max(0, inv.reservedQty || 0);
     await inv.save();
 
-    product.stock = afterQty;
-    await product.save();
-
     await this.inventoryLogModel.create({
-      storeId,
+      storeId: storeIdObj,
       productId: product._id,
       changeType: InventoryChangeType.RESTOCK,
       quantityDelta: dto.quantity,
@@ -409,7 +401,7 @@ export class StoreInventoryService {
 
     return {
       success: true,
-      message: `Restocked ${dto.quantity} units`,
+      message: `Restocked ${dto.quantity} units for store`,
       productId: product._id.toString(),
       beforeQty,
       newQty: afterQty,
