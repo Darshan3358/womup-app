@@ -360,7 +360,7 @@ export const LocalShopHomeScreen: React.FC = () => {
         <View style={styles.sectionHeaderRow}>
           <View style={styles.sectionTitleLeft}>
             <Ionicons name="location-sharp" size={20} color="#E11D48" style={{ marginRight: 6 }} />
-            <Text style={styles.sectionTitleText}>Nearby WOMUP Shops</Text>
+            <Text style={styles.sectionTitleText}>Nearby Shops</Text>
           </View>
 
           {/* View on Map Pill Button */}

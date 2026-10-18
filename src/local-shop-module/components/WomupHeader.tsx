@@ -41,7 +41,7 @@ export const WomupHeader: React.FC<WomupHeaderProps> = ({
       )}
 
       <View style={styles.headerRow}>
-        {/* Left: Hamburger Menu */}
+        {/* Left: Hamburger Menu + Brand Name */}
         <View style={styles.leftActionsRow}>
           <TouchableOpacity
             style={styles.iconButton}
@@ -49,23 +49,9 @@ export const WomupHeader: React.FC<WomupHeaderProps> = ({
             onPress={onOpenMenu}
             accessibilityLabel="Menu"
           >
-            <Ionicons name="menu-outline" size={22} color="#0F172A" />
+            <Ionicons name="menu-outline" size={24} color="#0F172A" />
           </TouchableOpacity>
-        </View>
-
-        {/* Center: WOMUP Brand Logo */}
-        <View style={styles.logoContainer}>
-          <View style={styles.logoWRow}>
-            {/* 3D Stylized W with Arrow */}
-            <View style={styles.wIconBadge}>
-              <Text style={styles.wIconLetter}>W</Text>
-              <View style={styles.wArrow}>
-                <Ionicons name="arrow-up" size={11} color="#FFFFFF" />
-              </View>
-            </View>
-            <Text style={styles.womupText}>WOMUP</Text>
-          </View>
-          <Text style={styles.taglineText}>Empowerment • Shopping • Revolutions</Text>
+          <Text style={styles.headerBrandText}>WomUp</Text>
         </View>
 
         {/* Right: Location & Notifications */}
@@ -184,6 +170,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  headerBrandText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginLeft: 6,
+    letterSpacing: -0.2,
+  },
   logoContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -252,7 +245,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     color: '#E11D48',
-    maxWidth: 110,
+    maxWidth: 130,
   },
   bellButton: {
     width: 36,
