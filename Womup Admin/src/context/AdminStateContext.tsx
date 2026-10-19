@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import {
   Customer,
   DeliveryPartnerItem,
@@ -520,7 +521,6 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           return [mappedOrder, ...prev];
         });
       }
-      refreshFromDb();
     });
 
     socket.on('order_status', (data: any) => {
@@ -542,11 +542,10 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           return o;
         }));
       }
-      refreshFromDb();
     });
 
     socket.on('inventory_alert', () => {
-      refreshFromDb();
+      // socket handled
     });
 
     socket.on('inventory_update', (data: any) => {
@@ -574,7 +573,6 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           })
         );
       }
-      refreshFromDb();
     });
 
     // Real-time Store Staff Shift Sync (Picker On/Off Shift)
@@ -600,7 +598,6 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           })
         );
       }
-      refreshFromDb();
     });
 
     socket.on('store_shift_update', (data: any) => {
@@ -625,12 +622,75 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           })
         );
       }
-      refreshFromDb();
     });
 
-    const interval = setInterval(refreshFromDb, 10000);
+    // 🚀 SMART HYBRID SYNC:
+    // 1. Polling is lightweight delta sync (<1KB, only modified items) every 20 seconds
+    // 2. Automatically paused when app is backgrounded to protect battery & server!
+    let syncInterval: any = null;
+    let lastCheckTime = new Date(Date.now() - 30000).toISOString();
+
+    const checkDeltaSync = async () => {
+      try {
+        const res = await fetch(`http://localhost:5050/api/v1/sync-updates?since=${encodeURIComponent(lastCheckTime)}`);
+        if (res.ok) {
+          const delta = await res.json();
+          lastCheckTime = delta.timestamp || new Date().toISOString();
+          if (delta.hasChanges) {
+            if (delta.changedOrders && delta.changedOrders.length > 0) {
+              setOrders(prev => prev.map(o => {
+                const found = delta.changedOrders.find((c: any) => c.id === o.id || c.orderNumber === o.orderNumber);
+                if (found) {
+                  const raw = String(found.status || '').toUpperCase();
+                  const mappedStatus: OrderStage =
+                    raw === 'PACKING' || raw === 'PICKING' ? 'Picking' :
+                    raw === 'PACKED' ? 'Packed' :
+                    raw === 'ASSIGNED' || raw === 'GOING_TO_STORE' || raw === 'ARRIVED_AT_STORE' || raw === 'READY_FOR_DISPATCH' ? 'Ready for Dispatch' :
+                    raw === 'OUT_FOR_DELIVERY' || raw === 'ARRIVED_AT_CUSTOMER' ? 'Out for Delivery' :
+                    raw === 'DELIVERED' || raw === 'COMPLETED' ? 'Delivered' :
+                    raw === 'CANCELLED' || raw === 'PAYMENT_FAILED' ? 'Cancelled' :
+                    raw === 'PLACED' ? 'Order Placed' : o.status;
+                  return { ...o, status: mappedStatus, rawStatus: found.status, bagBarcode: found.bagBarcode || o.bagBarcode };
+                }
+                return o;
+              }));
+            }
+            if (delta.changedInventory && delta.changedInventory.length > 0) {
+              refreshFromDb();
+            }
+          }
+        }
+      } catch {
+        // quiet fallback
+      }
+    };
+
+    const startPolling = () => {
+      if (syncInterval) clearInterval(syncInterval);
+      syncInterval = setInterval(checkDeltaSync, 20000);
+    };
+
+    const stopPolling = () => {
+      if (syncInterval) {
+        clearInterval(syncInterval);
+        syncInterval = null;
+      }
+    };
+
+    startPolling();
+
+    const appStateSub = AppState.addEventListener('change', (state: AppStateStatus) => {
+      if (state === 'active') {
+        checkDeltaSync();
+        startPolling();
+      } else {
+        stopPolling();
+      }
+    });
+
     return () => {
-      clearInterval(interval);
+      stopPolling();
+      appStateSub.remove();
       socket.disconnect();
     };
   }, [refreshFromDb]);

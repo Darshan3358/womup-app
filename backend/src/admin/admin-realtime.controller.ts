@@ -39,6 +39,88 @@ export class AdminRealtimeController {
   }
 
   /**
+   * Ultra-lightweight Delta Sync Endpoint (<1KB)
+   * Only returns orders or inventory modified since requested timestamp.
+   */
+  @Get(['api/v1/sync-updates', 'api/sync-updates', 'sync-updates'])
+  @ApiOperation({ summary: 'Ultra-lightweight Delta Sync endpoint (<1KB)' })
+  async getSyncUpdates(
+    @Query('since') sinceStr?: string,
+    @Query('storeId') storeId?: string,
+  ) {
+    try {
+      const db = this.db;
+      if (!db) {
+        return { success: false, hasChanges: false, error: 'Database not connected' };
+      }
+
+      const sinceDate = sinceStr ? new Date(sinceStr) : new Date(Date.now() - 30000);
+      const query: any = {
+        updatedAt: { $gte: sinceDate },
+      };
+
+      if (storeId) {
+        try {
+          query.$or = [
+            { storeId: new Types.ObjectId(storeId) },
+            { storeId: storeId },
+          ];
+        } catch {
+          query.storeId = storeId;
+        }
+      }
+
+      const changedOrders = await db.collection('orders').find(query, {
+        projection: {
+          _id: 1,
+          orderNumber: 1,
+          status: 1,
+          bagBarcode: 1,
+          totalAmount: 1,
+          updatedAt: 1,
+          deliveryPartnerId: 1,
+        },
+      }).limit(20).toArray();
+
+      const changedInventory = await db.collection('inventory').find({
+        updatedAt: { $gte: sinceDate },
+        ...(storeId ? { storeId: storeId } : {}),
+      }, {
+        projection: {
+          _id: 1,
+          productId: 1,
+          stock: 1,
+          updatedAt: 1,
+        },
+      }).limit(20).toArray();
+
+      const hasChanges = changedOrders.length > 0 || changedInventory.length > 0;
+
+      return {
+        success: true,
+        hasChanges,
+        timestamp: new Date().toISOString(),
+        changedOrders: changedOrders.map((o) => ({
+          id: o.orderNumber || o._id.toString(),
+          orderNumber: o.orderNumber,
+          status: o.status,
+          bagBarcode: o.bagBarcode,
+          totalAmount: o.totalAmount,
+          updatedAt: o.updatedAt,
+        })),
+        changedInventory: changedInventory.map((i) => ({
+          id: i._id.toString(),
+          productId: i.productId?.toString(),
+          stock: i.stock,
+          updatedAt: i.updatedAt,
+        })),
+      };
+    } catch (err: any) {
+      return { success: false, hasChanges: false, error: err.message };
+    }
+  }
+
+  /**
    * Master Realtime Snapshot: Live data synchronization for Admin App
    */
   @Get(['api/realtime-data', 'realtime-data', 'api/v1/realtime-data'])

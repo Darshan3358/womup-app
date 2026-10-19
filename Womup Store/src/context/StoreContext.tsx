@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   AuthStep,
@@ -375,7 +376,26 @@ const enrichStore = (rawStore: any): StoreHub | null => {
     }
   }, []);
 
-  // 10-Second Auto-Poll Fallback for Incoming Orders (guarantees queue parity even if WS drops)
+  // Ref to track app active state
+  const isAppActiveRef = useRef<boolean>(AppState.currentState === 'active');
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      const becameActive = isAppActiveRef.current === false && nextAppState === 'active';
+      isAppActiveRef.current = nextAppState === 'active';
+      if (becameActive && authStep === 'AUTHENTICATED') {
+        // App returned to foreground: quick sync
+        refreshIncoming();
+        refreshPicking();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [authStep, refreshIncoming, refreshPicking]);
+
+  // Smart Fallback Polling (25 seconds) - ONLY runs when app is active
   useEffect(() => {
     if (authStep !== 'AUTHENTICATED') return;
 
@@ -384,8 +404,10 @@ const enrichStore = (rawStore: any): StoreHub | null => {
     refreshPicking();
 
     const pollInterval = setInterval(() => {
+      // Pause completely if app is in background
+      if (!isAppActiveRef.current) return;
       refreshIncoming();
-    }, 10000);
+    }, 25000);
 
     return () => clearInterval(pollInterval);
   }, [authStep, store?.id, refreshIncoming, refreshPicking]);
@@ -408,14 +430,21 @@ const enrichStore = (rawStore: any): StoreHub | null => {
     }
   }, [inventorySearch, inventoryFilter]);
 
-  // Sync queues when tab changes
+  // Smart sync: Only refresh the data for the active tab to prevent concurrent API stampede
   useEffect(() => {
     if (authStep !== 'AUTHENTICATED') return;
-    refreshIncoming();
-    refreshPicking();
-    refreshReady();
-    refreshInventory();
-  }, [authStep, currentTab]);
+    if (currentTab === 'Incoming' || currentTab === 'Dashboard') {
+      refreshIncoming();
+    } else if (currentTab === 'Picking') {
+      refreshPicking();
+    } else if (currentTab === 'Ready') {
+      refreshReady();
+    } else if (currentTab === 'Inventory') {
+      refreshInventory();
+    } else if (currentTab === 'History') {
+      refreshCompletedOrders();
+    }
+  }, [authStep, currentTab, refreshIncoming, refreshPicking, refreshReady, refreshInventory, refreshCompletedOrders]);
 
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
 
