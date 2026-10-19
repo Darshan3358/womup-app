@@ -40,7 +40,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
 
   const isSmallDevice = width <= 360;
 
-  // Only display Profile tab when user is logged in / registered
+  // Display Profile and Womup Local App tab ONLY when user is logged in / registered
   const tabs: {
     key: BlinkitTabKey;
     label: string;
@@ -51,9 +51,11 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
     { key: 'Order Again', label: 'Orders', icon: 'shopping-basket' },
     { key: 'Categories', label: 'Categories', icon: 'grid' },
     ...(isAuthenticated
-      ? [{ key: 'Profile' as BlinkitTabKey, label: 'Profile', icon: 'user' as IconName }]
+      ? [
+          { key: 'Profile' as BlinkitTabKey, label: 'Profile', icon: 'user' as IconName },
+          { key: 'Local Shop' as BlinkitTabKey, label: 'App', isWomupAppButton: true },
+        ]
       : []),
-    { key: 'Local Shop', label: 'App', isWomupAppButton: true },
   ];
 
   const bottomPadding = Math.max(insets.bottom, 8);
