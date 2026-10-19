@@ -678,7 +678,7 @@ export const BlinkitProfileScreen: React.FC = () => {
 
               {user.sponsorCode ? (
                 <View style={styles.sponsorPill}>
-                  <Text style={styles.sponsorPillText}>Sponsor: {user.sponsorCode}</Text>
+                  <Text style={styles.sponsorPillText}>Sponsor: {user.sponsorCode.replace(/^WORMUP/i, 'WOMUP')}</Text>
                 </View>
               ) : null}
             </View>

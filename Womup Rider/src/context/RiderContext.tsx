@@ -325,15 +325,17 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setAuthStep('LOGIN');
         return;
       }
-      const { status, isApproved } = await RiderApiService.checkApprovalStatus();
-      if (isApproved) {
-        await refreshDashboard();
+      const userProfile = await RiderApiService.getProfile();
+      setProfile(userProfile);
+      setIsOnline(userProfile.isOnline);
+
+      if (userProfile.status === 'APPROVED' || userProfile.status === 'ACTIVE') {
         setAuthStep('AUTHENTICATED');
-      } else if (status === 'UNDER_REVIEW') {
-        const userProfile = await RiderApiService.getProfile();
-        setProfile(userProfile);
+        // Load active delivery, GPS, and dark store telemetry in background without blocking splash
+        refreshDashboard().catch(() => {});
+      } else if (userProfile.status === 'UNDER_REVIEW') {
         setAuthStep('APPROVAL_PENDING');
-      } else if (status === 'KYC_PENDING' || status === 'REGISTERED') {
+      } else if (userProfile.status === 'KYC_PENDING' || userProfile.status === 'REGISTERED') {
         setAuthStep('KYC');
       } else {
         setAuthStep('LOGIN');

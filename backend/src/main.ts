@@ -115,8 +115,12 @@ async function bootstrap() {
   SwaggerModule.setup('api/docs', app, document);
 
   const port = process.env.PORT || 5000;
-  await app.listen(port);
-  logger.log(`🚀 Worm Up Backend running on: http://localhost:${port}`);
+  const server = await app.listen(port);
+  if (server && 'keepAliveTimeout' in server) {
+    server.keepAliveTimeout = 5000;
+    server.headersTimeout = 6000;
+  }
+  logger.log(`🚀 Womup Backend running on: http://localhost:${port}`);
   logger.log(`📚 Interactive Swagger Docs available at: http://localhost:${port}/api/docs`);
   logger.log(`⚡ WebSocket Tracking Gateway active on: ws://localhost:${port}/tracking`);
 }

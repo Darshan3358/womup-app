@@ -236,7 +236,7 @@ export const CustomersScreen: React.FC = () => {
     setIsEditingRider(false);
     setSaveToast('');
     setIsDetailModalOpen(true);
-    setIsLoadingDetail(true);
+    setIsLoadingDetail(false);
 
     try {
       const res = await ApiService.fetchRiderDetail(rider.id);
@@ -797,7 +797,7 @@ export const CustomersScreen: React.FC = () => {
             </View>
 
             {/* Modal Body */}
-            {isLoadingDetail ? (
+            {isLoadingDetail && !selectedRider ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={COLORS.primary} />
                 <Text style={styles.loadingText}>Fetching partner details...</Text>

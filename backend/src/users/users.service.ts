@@ -1102,6 +1102,7 @@ export class UsersService {
     customer.customerIsVerify = 1; // Yes
     customer.aadhaarVerified = true;
     customer.verificationStatus = 'VERIFIED';
+    customer.kycStatus = 'Verified';
     customer.kycRejectReason = '';
     customer.verifiedAt = new Date();
     await customer.save();
@@ -1139,6 +1140,7 @@ export class UsersService {
     customer.customerIsVerify = 2; // No
     customer.aadhaarVerified = false;
     customer.verificationStatus = 'NON_VERIFIED';
+    customer.kycStatus = 'Rejected';
     customer.kycRejectReason = reason || 'Aadhaar image not clear';
     await customer.save();
 

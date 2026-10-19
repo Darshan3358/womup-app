@@ -1224,13 +1224,22 @@ export const ApiService = {
 
   // 15. FETCH SINGLE RIDER DETAIL
   async fetchRiderDetail(id: string): Promise<any> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      try { controller.abort(); } catch (_) {}
+    }, 6000);
+
     try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/riders/${id}`);
+      const res = await fetch(`${API_BASE_URL}/api/admin/riders/${id}`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       return { success: true, data: json.data || json };
-    } catch (e) {
-      console.warn(`[API] Failed to fetch rider detail ${id}:`, e);
+    } catch (e: any) {
+      clearTimeout(timeoutId);
+      console.warn(`[API] Failed to fetch rider detail ${id}:`, e?.message || e);
       return null;
     }
   },

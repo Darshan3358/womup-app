@@ -580,6 +580,7 @@ export class RiderApiService {
       await this.setStorage(STORAGE_KEYS.PROFILE, mapped);
       return mapped;
     } catch (err: any) {
+      clearTimeout(timeoutId);
       if (err.message === 'NOT_AUTHENTICATED' || err.message === 'SESSION_EXPIRED') {
         throw err;
       }
@@ -661,6 +662,7 @@ export class RiderApiService {
         }
       }
     } catch {
+      clearTimeout(timeoutId);
       // network/auth error
     }
 

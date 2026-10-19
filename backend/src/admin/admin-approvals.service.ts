@@ -77,10 +77,21 @@ export class AdminApprovalsService {
         withdrawals,
       ] = await Promise.all([
         this.userModel.countDocuments({
-          $or: [
-            { customer_kyc_status: 1 },
-            { customerKycStatus: 1 },
-            { kycStatus: 'Pending' },
+          $and: [
+            {
+              $or: [
+                { customer_kyc_status: 1 },
+                { customerKycStatus: 1 },
+                { kycStatus: 'Pending' },
+              ],
+            },
+            {
+              customerKycStatus: { $ne: 2 },
+              customer_kyc_status: { $ne: 2 },
+              verificationStatus: { $ne: 'VERIFIED' },
+              kycStatus: { $ne: 'Verified' },
+              aadhaarVerified: { $ne: true },
+            },
           ],
         }),
         this.riderModel.countDocuments({
@@ -197,10 +208,21 @@ export class AdminApprovalsService {
   // ── Customer KYC Queue ──
   private async getCustomerQueue(query: any): Promise<{ items: QueueItem[]; total: number }> {
     const filter: any = {
-      $or: [
-        { customer_kyc_status: 1 },
-        { customerKycStatus: 1 },
-        { kycStatus: 'Pending' },
+      $and: [
+        {
+          $or: [
+            { customer_kyc_status: 1 },
+            { customerKycStatus: 1 },
+            { kycStatus: 'Pending' },
+          ],
+        },
+        {
+          customerKycStatus: { $ne: 2 },
+          customer_kyc_status: { $ne: 2 },
+          verificationStatus: { $ne: 'VERIFIED' },
+          kycStatus: { $ne: 'Verified' },
+          aadhaarVerified: { $ne: true },
+        },
       ],
     };
     if (query.search) {
@@ -668,6 +690,7 @@ export class AdminApprovalsService {
     user.customerIsVerify = 1;
     user.aadhaarVerified = true;
     user.verificationStatus = 'VERIFIED';
+    user.kycStatus = 'Verified';
     user.verifiedAt = new Date();
     user.kycRejectReason = '';
     await user.save();
@@ -698,6 +721,7 @@ export class AdminApprovalsService {
     user.customerIsVerify = 2;
     user.aadhaarVerified = false;
     user.verificationStatus = 'NON_VERIFIED';
+    user.kycStatus = 'Rejected';
     user.kycRejectReason = reason || 'Aadhaar image not clear';
     await user.save();
 
