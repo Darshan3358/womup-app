@@ -31,6 +31,7 @@ import {
 import { COLORS, GRADIENTS, RADIUS, SPACING } from '../theme';
 import { KpiCard } from '../components/common/KpiCard';
 import { PendingApprovalsWidget } from '../components/common/PendingApprovalsWidget';
+import { DashboardKpiSkeleton } from '../components/common/Skeleton';
 import { useAdminState } from '../context/AdminStateContext';
 
 export const DashboardScreen: React.FC = () => {
@@ -44,6 +45,7 @@ export const DashboardScreen: React.FC = () => {
     customers,
     staff,
     syncStatus,
+    isLoading,
     refreshFromDb,
   } = useAdminState();
 
@@ -279,46 +281,50 @@ export const DashboardScreen: React.FC = () => {
       <Text style={styles.sectionTitle}>
         Real-time Telemetry {currentCity ? `(${currentCity.name}${currentArea ? ` → ${currentArea.name}` : ''})` : '(National)'}
       </Text>
-      <View style={styles.kpiGrid}>
-        <View style={styles.kpiRow}>
-          <KpiCard
-            title="Total GMV"
-            value={totalGmv > 0 ? `₹${totalGmv.toLocaleString()}` : '₹0'}
-            trend="0.0%"
-            isPositive={true}
-            subLabel={dateFilter === 'Today' ? 'today' : 'all-time'}
-            accentColor={COLORS.hotPink}
-            onPress={() => setActiveTab('Orders')}
-          />
-          <KpiCard
-            title="Active Orders"
-            value={String(activeOrdersCount)}
-            trend="0.0%"
-            isPositive={true}
-            subLabel="in fulfillment"
-            accentColor={COLORS.purple}
-            onPress={() => setActiveTab('Orders')}
-          />
+      {isLoading ? (
+        <DashboardKpiSkeleton />
+      ) : (
+        <View style={styles.kpiGrid}>
+          <View style={styles.kpiRow}>
+            <KpiCard
+              title="Total GMV"
+              value={totalGmv > 0 ? `₹${totalGmv.toLocaleString()}` : '₹0'}
+              trend="0.0%"
+              isPositive={true}
+              subLabel={dateFilter === 'Today' ? 'today' : 'all-time'}
+              accentColor={COLORS.hotPink}
+              onPress={() => setActiveTab('Orders')}
+            />
+            <KpiCard
+              title="Active Orders"
+              value={String(activeOrdersCount)}
+              trend="0.0%"
+              isPositive={true}
+              subLabel="in fulfillment"
+              accentColor={COLORS.purple}
+              onPress={() => setActiveTab('Orders')}
+            />
+          </View>
+          <View style={styles.kpiRow}>
+            <KpiCard
+              title="Live Fleet"
+              value={String(liveFleetCount)}
+              subLabel={`On Duty (${pickersCount} Pickers / ${ridersCount} Riders)`}
+              accentColor={COLORS.blue}
+              onPress={() => setActiveTab('Staff')}
+            />
+            <KpiCard
+              title="Total Customers"
+              value={String(filteredCustomers.length)}
+              trend="0.0%"
+              isPositive={true}
+              subLabel="in selected scope"
+              accentColor={COLORS.deepPurple}
+              onPress={() => setActiveTab('Users')}
+            />
+          </View>
         </View>
-        <View style={styles.kpiRow}>
-          <KpiCard
-            title="Live Fleet"
-            value={String(liveFleetCount)}
-            subLabel={`On Duty (${pickersCount} Pickers / ${ridersCount} Riders)`}
-            accentColor={COLORS.blue}
-            onPress={() => setActiveTab('Staff')}
-          />
-          <KpiCard
-            title="Total Customers"
-            value={String(filteredCustomers.length)}
-            trend="0.0%"
-            isPositive={true}
-            subLabel="in selected scope"
-            accentColor={COLORS.deepPurple}
-            onPress={() => setActiveTab('Users')}
-          />
-        </View>
-      </View>
+      )}
 
       {/* ========================================================================= */}
       {/* ZONE GMV SHARE & DEMAND (Grouped by City as specified in SRS)              */}

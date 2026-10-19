@@ -26,6 +26,7 @@ import {
 import { COLORS, RADIUS, SPACING } from '../theme';
 import { useAdminState } from '../context/AdminStateContext';
 import { Order, OrderStage } from '../types/admin';
+import { OrderListSkeleton } from '../components/common/Skeleton';
 
 export const OrdersScreen: React.FC = () => {
   const {
@@ -36,6 +37,7 @@ export const OrdersScreen: React.FC = () => {
     setSelectedOrder,
     setSubView,
     setActiveModal,
+    isLoading,
   } = useAdminState();
 
   const [topTab, setTopTab] = useState<'Live Orders' | 'Order History'>('Live Orders');
@@ -274,7 +276,9 @@ export const OrdersScreen: React.FC = () => {
 
       {/* Orders List */}
       <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
-        {filteredOrders.length === 0 ? (
+        {isLoading ? (
+          <OrderListSkeleton count={4} />
+        ) : filteredOrders.length === 0 ? (
           <View style={styles.emptyState}>
             <Warehouse size={40} color={COLORS.border} style={{ marginBottom: 10 }} />
             <Text style={styles.emptyTitle}>No orders found</Text>

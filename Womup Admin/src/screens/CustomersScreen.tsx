@@ -45,6 +45,7 @@ import { useAdminState } from '../context/AdminStateContext';
 import { Customer, DeliveryPartnerItem } from '../types/admin';
 import { ApiService } from '../services/api';
 import { CustomerKycReviewModal } from './modals/CustomerKycReviewModal';
+import { CustomerListSkeleton } from '../components/common/Skeleton';
 
 interface RiderEditForm {
   name: string;
@@ -69,6 +70,7 @@ export const CustomersScreen: React.FC = () => {
     updateRider,
     deleteCustomer,
     deleteRider,
+    isLoading,
   } = useAdminState();
 
   const [activeTabMode, setActiveTabMode] = useState<'CUSTOMERS' | 'RIDERS'>('CUSTOMERS');
@@ -553,7 +555,9 @@ export const CustomersScreen: React.FC = () => {
       {/* Main List */}
       <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
         {activeTabMode === 'CUSTOMERS' ? (
-          filteredCustomers.length === 0 ? (
+          isLoading ? (
+            <CustomerListSkeleton count={5} />
+          ) : filteredCustomers.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyText}>No customers found matching criteria</Text>
             </View>
@@ -635,7 +639,9 @@ export const CustomersScreen: React.FC = () => {
             ))
           )
         ) : (
-          filteredRiders.length === 0 ? (
+          isLoading ? (
+            <CustomerListSkeleton count={5} />
+          ) : filteredRiders.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyText}>No delivery partners found matching criteria</Text>
             </View>

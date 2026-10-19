@@ -38,6 +38,7 @@ import {
 import { useAdminState } from '../context/AdminStateContext';
 import { ProductItem, ProductVariantItem } from '../types/admin';
 import { ApiService } from '../services/api';
+import { InventoryListSkeleton } from '../components/common/Skeleton';
 
 export const InventoryScreen: React.FC = () => {
   const {
@@ -56,6 +57,7 @@ export const InventoryScreen: React.FC = () => {
     updateShelfLocation,
     reportStockDiscrepancy,
     inventory,
+    isLoading,
     refreshFromDb,
   } = useAdminState();
 
@@ -875,7 +877,9 @@ export const InventoryScreen: React.FC = () => {
 
       {/* 7. PRODUCTS LIST CARDS */}
       <View style={styles.productsListWrap}>
-        {filteredProducts.length === 0 ? (
+        {isLoading ? (
+          <InventoryListSkeleton count={4} />
+        ) : filteredProducts.length === 0 ? (
           <View style={styles.emptyWrap}>
             <Package size={40} color="#CBD5E1" />
             <Text style={styles.emptyTitle}>No products found</Text>

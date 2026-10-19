@@ -180,6 +180,7 @@ interface AdminStateContextType {
   coinLedger: CoinLedgerItem[];
   auditLogs: AuditLogItem[];
   syncStatus: string;
+  isLoading: boolean;
   refreshFromDb: () => Promise<void>;
 
   // Action methods
@@ -294,6 +295,7 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const [syncStatus, setSyncStatus] = useState<string>('Live MongoDB Connected');
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [cities, setCities] = useState<CityItem[]>([]);
   const [selectedCity, setSelectedCity] = useState<CityItem | null>(null);
   const [zones, setZones] = useState<Zone[]>([]);
@@ -390,6 +392,8 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
     } catch {
       setSyncStatus('Live DB Active (Cluster0)');
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
@@ -1453,6 +1457,7 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         coinLedger,
         auditLogs,
         syncStatus,
+        isLoading,
         refreshFromDb,
         addCustomer,
         updateCustomer,
