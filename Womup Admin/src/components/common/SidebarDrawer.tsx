@@ -68,63 +68,60 @@ export const SidebarDrawer: React.FC = () => {
       statusBarTranslucent={true}
     >
       <View style={styles.backdrop}>
-        {/* Clickable Backdrop overlay covering full screen behind drawer */}
+        {/* Clickable Backdrop overlay on the left side of the drawer */}
         <TouchableOpacity
-          style={StyleSheet.absoluteFillObject}
+          style={styles.backdropDismiss}
           onPress={() => setIsSidebarOpen(false)}
           activeOpacity={1}
         />
 
         {/* Slide-out Sidebar Content Panel */}
-        <SafeAreaView style={styles.safeDrawerArea}>
-          <View style={styles.drawerPanel}>
-            {/* Top Navy Branding Header */}
-            <LinearGradient colors={GRADIENTS.navyHeader} style={styles.drawerHeader}>
-              <View style={styles.headerTop}>
-                <View style={styles.brandRow}>
-                  <Image
-                    source={require('../../../assets/womup_logo.png')}
-                    style={styles.logoBadge}
-                    resizeMode="contain"
-                  />
-                  <Text style={styles.brandName}>Womup Admin</Text>
-                </View>
-
-                <TouchableOpacity
-                  style={styles.closeBtn}
-                  onPress={() => setIsSidebarOpen(false)}
-                >
-                  <X size={20} color={COLORS.white} />
-                </TouchableOpacity>
-              </View>
-
-              {/* Admin User Profile Card with Master Sponsor ID */}
-              <View style={styles.adminProfileCard}>
+        <View style={styles.drawerPanel}>
+          {/* Top Navy Branding Header */}
+          <LinearGradient colors={GRADIENTS.navyHeader} style={styles.drawerHeader}>
+            <View style={styles.headerTop}>
+              <View style={styles.brandRow}>
                 <Image
                   source={require('../../../assets/womup_logo.png')}
-                  style={styles.adminAvatar}
+                  style={styles.logoBadge}
                   resizeMode="contain"
                 />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.adminName}>{adminUser?.name || 'SuperAdmin'}</Text>
-                  <Text style={styles.adminRole}>Sponsor: {adminSponsorId || 'WORMUP001'}</Text>
-                </View>
-                <View style={styles.statusBadge}>
-                  <Text style={styles.statusBadgeText}>ROOT</Text>
-                </View>
+                <Text style={styles.brandName}>Womup Admin</Text>
               </View>
-            </LinearGradient>
 
-            {/* Navigation Items Scroll List */}
-            <ScrollView
-              style={styles.menuScroll}
-              contentContainerStyle={styles.menuContent}
-              nestedScrollEnabled={true}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={true}
-              bounces={true}
-              overScrollMode="always"
-            >
+              <TouchableOpacity
+                style={styles.closeBtn}
+                onPress={() => setIsSidebarOpen(false)}
+              >
+                <X size={20} color={COLORS.white} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Admin User Profile Card with Master Sponsor ID */}
+            <View style={styles.adminProfileCard}>
+              <Image
+                source={require('../../../assets/womup_logo.png')}
+                style={styles.adminAvatar}
+                resizeMode="contain"
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.adminName}>{adminUser?.name || 'SuperAdmin'}</Text>
+                <Text style={styles.adminRole}>Sponsor: {adminSponsorId || 'WORMUP001'}</Text>
+              </View>
+              <View style={styles.statusBadge}>
+                <Text style={styles.statusBadgeText}>ROOT</Text>
+              </View>
+            </View>
+          </LinearGradient>
+
+          {/* Navigation Items Scroll List */}
+          <ScrollView
+            style={styles.menuScroll}
+            contentContainerStyle={styles.menuContent}
+            showsVerticalScrollIndicator={true}
+            bounces={true}
+            keyboardShouldPersistTaps="handled"
+          >
             <Text style={styles.menuSectionTitle}>PRIMARY MODULES</Text>
 
             {/* 1. Dashboard */}
@@ -418,7 +415,6 @@ export const SidebarDrawer: React.FC = () => {
               </TouchableOpacity>
             </View>
           </View>
-        </SafeAreaView>
       </View>
     </Modal>
   );
@@ -429,23 +425,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     flexDirection: 'row',
-    justifyContent: 'flex-end',
   },
-  safeDrawerArea: {
-    width: '80%',
-    maxWidth: 300,
-    height: '100%',
+  backdropDismiss: {
+    flex: 1,
   },
   drawerPanel: {
-    flex: 1,
-    backgroundColor: COLORS.white,
+    width: '84%',
+    maxWidth: 340,
     height: '100%',
+    backgroundColor: COLORS.white,
     shadowColor: '#000',
     shadowOffset: { width: -4, height: 0 },
     shadowOpacity: 0.25,
     shadowRadius: 10,
     elevation: 16,
-    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
   },
   drawerHeader: {
     paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 12 : 45,
@@ -520,12 +515,12 @@ const styles = StyleSheet.create({
   },
   menuScroll: {
     flex: 1,
-    flexShrink: 1,
   },
   menuContent: {
     paddingHorizontal: 10,
     paddingTop: 12,
-    paddingBottom: 36,
+    paddingBottom: 60,
+    flexGrow: 1,
   },
   menuSectionTitle: {
     fontSize: 10,

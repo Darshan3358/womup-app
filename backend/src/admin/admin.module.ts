@@ -8,6 +8,7 @@ import { Order, OrderSchema } from '../orders/schemas/order.schema';
 import { AdminAuditLog, AdminAuditLogSchema } from './schemas/admin-audit-log.schema';
 import { AdminApprovalsService } from './admin-approvals.service';
 import { AdminApprovalsController } from './admin-approvals.controller';
+import { AdminRealtimeController } from './admin-realtime.controller';
 import { TrackingModule } from '../tracking/tracking.module';
 
 @Module({
@@ -23,7 +24,7 @@ import { TrackingModule } from '../tracking/tracking.module';
     ]),
     TrackingModule,
   ],
-  controllers: [AdminApprovalsController],
+  controllers: [AdminApprovalsController, AdminRealtimeController],
   providers: [AdminApprovalsService],
   exports: [AdminApprovalsService],
 })

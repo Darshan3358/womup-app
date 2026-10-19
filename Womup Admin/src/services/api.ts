@@ -36,7 +36,7 @@ const getApiBaseUrl = () => {
       return 'http://localhost:5001';
     }
   }
-  return 'https://womup-admin-backend.onrender.com';
+  return 'https://womup-app-uquz.onrender.com';
 };
 
 const API_BASE_URL = getApiBaseUrl();
@@ -115,9 +115,10 @@ export const ApiService = {
         clearTimeout(timeoutId);
 
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
+        const rawJson = await res.json();
+        const data = (rawJson && rawJson.data && (rawJson.data.users || rawJson.data.orders)) ? rawJson.data : rawJson;
 
-      if (data && data.users) {
+        if (data && (data.users || data.orders)) {
         // 1. DYNAMICALLY MAP CUSTOMERS FROM LIVE MONGODB (Excluding Delivery Partners)
         const partnerUserIds = (data.deliveryPartners || []).map((dp: any) => (dp.userId?.toString ? dp.userId.toString() : String(dp.userId))).filter(Boolean);
         const customerUsers = (data.users || []).filter((u: any) => {

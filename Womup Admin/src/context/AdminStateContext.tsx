@@ -410,7 +410,17 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     refreshFromDb();
 
     // Connect to NestJS authoritative WebSocket Tracking Gateway
-    const socket = io('http://localhost:5050/tracking', {
+    const getSocketUrl = () => {
+      if (typeof window !== 'undefined' && window.location) {
+        const host = window.location.hostname;
+        if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') {
+          return 'http://localhost:5050/tracking';
+        }
+      }
+      return 'https://womup-app-uquz.onrender.com/tracking';
+    };
+
+    const socket = io(getSocketUrl(), {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: 25,
