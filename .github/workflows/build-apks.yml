@@ -14,6 +14,7 @@ on:
           - admin
           - rider
           - store
+          - vendor
           - both
 
 env:
@@ -211,4 +212,52 @@ jobs:
         with:
           name: WormUp-Store-Release-APK
           path: "Womup Store/android/app/build/outputs/apk/release/*.apk"
+          retention-days: 7
+
+  build-vendor:
+    if: inputs.target_app == 'vendor' || inputs.target_app == 'all'
+    name: Build Vendor App APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Vendor Dependencies
+        run: |
+          cd "Womup Vendor"
+          npm ci || npm install --legacy-peer-deps
+
+      - name: Accept Android SDK Licenses
+        run: yes | sdkmanager --licenses 2>/dev/null || true
+
+      - name: Make Vendor Gradle Executable
+        run: chmod +x "Womup Vendor/android/gradlew"
+
+      - name: Clean Vendor Gradle
+        run: |
+          cd "Womup Vendor/android"
+          ./gradlew clean
+
+      - name: Build Vendor Release APK
+        run: |
+          cd "Womup Vendor/android"
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Upload Vendor APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: WormUp-Vendor-Release-APK
+          path: "Womup Vendor/android/app/build/outputs/apk/release/*.apk"
           retention-days: 7
