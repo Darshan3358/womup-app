@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const { ObjectId } = require('mongodb');
 const { connectDB, getDB } = require('./config/db');
 
 // Route imports
@@ -18,11 +19,14 @@ const categoriesRouter = require('./routes/categories');
 const payoutRatesRouter = require('./routes/payoutRates');
 const cartRouter = require('./routes/cart');
 
+const compression = require('compression');
+
 const app = express();
 const PORT = process.env.PORT || 5001;
 
 // Global Middleware
 app.use(cors());
+app.use(compression());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -31,6 +35,220 @@ app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
   next();
 });
+
+// Large document field exclusions for high-speed list & realtime polling
+const RIDER_LIST_PROJECTION = {
+  dlImageUrl: 0,
+  aadharFrontUrl: 0,
+  aadharBackUrl: 0,
+  rcImageUrl: 0,
+  vehicleInsuranceUrl: 0,
+};
+
+// In-memory cache for ultra-fast telemetry & dashboard loads
+let realtimeCache = {
+  data: null,
+  timestamp: 0,
+  inFlight: null,
+};
+
+async function fetchRealtimeSnapshotData() {
+  const db = getDB();
+
+  // Run all 18 collection queries in parallel across the MongoDB pool
+  const [
+    rawDeliveryPartners,
+    allUsers,
+    orders,
+    products,
+    categories,
+    rawAreas,
+    rawStores,
+    storeStaffList,
+    inventory,
+    coinTransactions,
+    coupons,
+    orderHistory,
+    addresses,
+    printOrders,
+    productVariants,
+    areaPricing,
+    cities,
+    banners,
+  ] = await Promise.all([
+    db.collection('delivery_partners').find({}, { projection: RIDER_LIST_PROJECTION }).toArray(),
+    db.collection('users').find({
+      role: { $nin: ['DELIVERY_PARTNER', 'delivery_partner', 'ADMIN', 'admin'] },
+    }).toArray(),
+    db.collection('orders').find({}).toArray(),
+    db.collection('products').find({}).toArray(),
+    db.collection('categories').find({}).toArray(),
+    db.collection('areas').find({}).toArray(),
+    db.collection('stores').find({
+      deletedAt: { $exists: false },
+      isActive: { $ne: false },
+    }).toArray(),
+    db.collection('store_staff').find({}).toArray(),
+    db.collection('inventory').find({}).toArray(),
+    db.collection('coin_transactions').find({}).sort({ createdAt: -1 }).limit(500).toArray(),
+    db.collection('coupons').find({}).toArray(),
+    db.collection('order_status_history').find({}).sort({ timestamp: -1, createdAt: -1 }).limit(500).toArray(),
+    db.collection('addresses').find({}).toArray(),
+    db.collection('print_orders').find({}).toArray(),
+    db.collection('product_variants').find({}).toArray(),
+    db.collection('area_pricing').find({}).toArray(),
+    db.collection('cities').find({}).sort({ sortOrder: 1, name: 1 }).toArray(),
+    db.collection('banners').find({}).sort({ sortOrder: 1 }).toArray(),
+  ]);
+
+  const partnerUserIds = new Set(rawDeliveryPartners.map(p => p.userId?.toString()).filter(Boolean));
+  const users = allUsers.filter(u => !partnerUserIds.has(u._id?.toString()));
+
+  // Enrich delivery partners with exact completed and active orders count
+  const deliveryPartners = rawDeliveryPartners.map((p) => {
+    const pIdStr = p._id.toString();
+    const uIdStr = p.userId ? p.userId.toString() : '';
+
+    const isOrderOfPartner = (o) => {
+      const oPartnerId = (typeof o.deliveryPartnerId === 'object' ? o.deliveryPartnerId?._id : o.deliveryPartnerId)?.toString();
+      const oRiderId = (typeof o.riderId === 'object' ? o.riderId?._id : o.riderId)?.toString();
+      return oPartnerId === pIdStr || oRiderId === pIdStr || (uIdStr && (oPartnerId === uIdStr || oRiderId === uIdStr));
+    };
+
+    const deliveredOrdersCount = orders.filter((o) => isOrderOfPartner(o) && ['DELIVERED', 'COMPLETED'].includes(o.status)).length;
+    const activeOrdersCount = orders.filter((o) => isOrderOfPartner(o) && ['OUT_FOR_DELIVERY', 'PICKED_UP', 'REACHED_STORE', 'ASSIGNED'].includes(o.status)).length;
+    const effectiveCompleted = Math.max(deliveredOrdersCount, Number(p.completedDeliveries) || Number(p.totalDeliveries) || 0);
+
+    return {
+      ...p,
+      completedDeliveries: effectiveCompleted,
+      totalDeliveries: effectiveCompleted,
+      activeDeliveries: activeOrdersCount,
+    };
+  });
+
+  const stores = rawStores.map((store) => {
+    const sId = store._id.toString();
+    const staffAtStore = storeStaffList.filter(
+      st => st.storeId && (st.storeId.toString() === sId)
+    );
+    const staffOnShift = staffAtStore.filter(st => st.isOnShift === true).length;
+    const effectiveStaffOnShift = staffOnShift > 0
+      ? staffOnShift
+      : (store.isOnShift === true ? 1 : 0);
+    const effectiveStaffTotal = Math.max(staffAtStore.length, effectiveStaffOnShift, 1);
+    const isOnline = (store.isActive !== false) && (effectiveStaffOnShift > 0);
+
+    return {
+      ...store,
+      staffOnShift: effectiveStaffOnShift,
+      staffTotal: effectiveStaffTotal,
+      isOnShift: effectiveStaffOnShift > 0,
+      isOnline,
+    };
+  });
+
+  const areas = rawAreas.map((area) => {
+    const aId = area._id.toString();
+    const areaStores = rawStores.filter((s) => {
+      if (s.isActive === false) return false;
+      if (s.areaId && s.areaId.toString() === aId) return true;
+      if (s.areaName && area.name && s.areaName.toLowerCase() === area.name.toLowerCase()) return true;
+      return false;
+    });
+    const maxStores = Math.max(1, Number(area.maxStores) || 1);
+    const currentStoreCount = areaStores.length;
+    const availableSlots = Math.max(0, maxStores - currentStoreCount);
+    const isFull = currentStoreCount >= maxStores;
+
+    return {
+      ...area,
+      id: aId,
+      maxStores,
+      currentStoreCount,
+      availableSlots,
+      isFull,
+      storeRoutingStrategy: area.storeRoutingStrategy || 'NEAREST',
+      hasActiveStore: currentStoreCount > 0,
+      assignedStores: areaStores.map((s) => ({
+        id: s._id.toString(),
+        _id: s._id,
+        name: s.name,
+        code: s.code,
+        loginId: s.loginId,
+        address: s.address,
+        phone: s.phone,
+        email: s.email,
+        location: s.location,
+        coordinates: s.location?.coordinates || s.coordinates || (s.longitude && s.latitude ? [s.longitude, s.latitude] : undefined),
+        latitude: s.location?.coordinates ? s.location.coordinates[1] : s.latitude,
+        longitude: s.location?.coordinates ? s.location.coordinates[0] : s.longitude,
+        serviceRadiusKm: s.serviceRadiusKm || 4.5,
+        estimatedDeliveryMinutes: s.estimatedDeliveryMinutes || 9,
+        isActive: s.isActive !== false,
+      })),
+      assignedStore: areaStores[0] || null,
+    };
+  });
+
+  return {
+    users,
+    deliveryPartners,
+    orders,
+    products,
+    productVariants,
+    areaPricing,
+    categories,
+    cities,
+    areas,
+    stores,
+    inventory,
+    coinTransactions,
+    coupons,
+    banners,
+    orderHistory,
+    addresses,
+    printOrders,
+  };
+}
+
+// Handler for realtime snapshot with in-memory caching and coalescing
+async function handleRealtimeData(req, res) {
+  try {
+    const now = Date.now();
+    // Return cached data immediately if fresh within 3000ms
+    if (realtimeCache.data && (now - realtimeCache.timestamp < 3000)) {
+      res.setHeader('X-Cache', 'HIT');
+      return res.json(realtimeCache.data);
+    }
+
+    // Coalesce concurrent requests into a single promise
+    if (!realtimeCache.inFlight) {
+      realtimeCache.inFlight = fetchRealtimeSnapshotData()
+        .then((payload) => {
+          realtimeCache.data = payload;
+          realtimeCache.timestamp = Date.now();
+          realtimeCache.inFlight = null;
+          return payload;
+        })
+        .catch((err) => {
+          realtimeCache.inFlight = null;
+          throw err;
+        });
+    }
+
+    const data = await realtimeCache.inFlight;
+    res.setHeader('X-Cache', 'MISS');
+    res.json(data);
+  } catch (err) {
+    console.error('Error fetching realtime data:', err);
+    if (realtimeCache.data) {
+      // Fallback to previous snapshot if available
+      return res.json(realtimeCache.data);
+    }
+    res.status(500).json({ error: err.message });
+  }
+}
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -44,175 +262,23 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Mobile App Realtime Snapshot compatibility route
-app.get('/api/realtime-data', async (req, res) => {
-  try {
-    const db = getDB();
-    const rawDeliveryPartners = await db.collection('delivery_partners').find({}).toArray();
-    const partnerUserIds = rawDeliveryPartners.map(p => p.userId?.toString()).filter(Boolean);
-
-    // Only genuine customers (exclude delivery partners and admins)
-    const users = await db.collection('users').find({
-      role: { $nin: ['DELIVERY_PARTNER', 'delivery_partner', 'ADMIN', 'admin'] },
-      _id: {
-        $nin: partnerUserIds
-          .map(id => {
-            try { return new ObjectId(id); } catch { return null; }
-          })
-          .filter(Boolean),
-      },
-    }).toArray();
-    const orders = await db.collection('orders').find({}).toArray();
-
-    // Enrich delivery partners with exact completed and active orders count
-    const deliveryPartners = rawDeliveryPartners.map((p) => {
-      const pIdStr = p._id.toString();
-      const uIdStr = p.userId ? p.userId.toString() : '';
-
-      const isOrderOfPartner = (o) => {
-        const oPartnerId = (typeof o.deliveryPartnerId === 'object' ? o.deliveryPartnerId?._id : o.deliveryPartnerId)?.toString();
-        const oRiderId = (typeof o.riderId === 'object' ? o.riderId?._id : o.riderId)?.toString();
-        return oPartnerId === pIdStr || oRiderId === pIdStr || (uIdStr && (oPartnerId === uIdStr || oRiderId === uIdStr));
-      };
-
-      const deliveredOrdersCount = orders.filter((o) => isOrderOfPartner(o) && ['DELIVERED', 'COMPLETED'].includes(o.status)).length;
-      const activeOrdersCount = orders.filter((o) => isOrderOfPartner(o) && ['OUT_FOR_DELIVERY', 'PICKED_UP', 'REACHED_STORE', 'ASSIGNED'].includes(o.status)).length;
-      const effectiveCompleted = Math.max(deliveredOrdersCount, Number(p.completedDeliveries) || Number(p.totalDeliveries) || 0);
-
-      return {
-        ...p,
-        completedDeliveries: effectiveCompleted,
-        totalDeliveries: effectiveCompleted,
-        activeDeliveries: activeOrdersCount,
-      };
-    });
-    const products = await db.collection('products').find({}).toArray();
-    const categories = await db.collection('categories').find({}).toArray();
-    const rawAreas = await db.collection('areas').find({}).toArray();
-    const rawStores = await db.collection('stores').find({
-      deletedAt: { $exists: false },
-      isActive: { $ne: false },
-    }).toArray();
-    const storeStaffList = await db.collection('store_staff').find({}).toArray();
-
-    const stores = rawStores.map((store) => {
-      const sId = store._id.toString();
-      const staffAtStore = storeStaffList.filter(
-        st => st.storeId && (st.storeId.toString() === sId)
-      );
-      const staffOnShift = staffAtStore.filter(st => st.isOnShift === true).length;
-      const effectiveStaffOnShift = staffOnShift > 0
-        ? staffOnShift
-        : (store.isOnShift === true ? 1 : 0);
-      const effectiveStaffTotal = Math.max(staffAtStore.length, effectiveStaffOnShift, 1);
-      const isOnline = (store.isActive !== false) && (effectiveStaffOnShift > 0);
-
-      return {
-        ...store,
-        staffOnShift: effectiveStaffOnShift,
-        staffTotal: effectiveStaffTotal,
-        isOnShift: effectiveStaffOnShift > 0,
-        isOnline,
-      };
-    });
-
-    const areas = rawAreas.map((area) => {
-      const aId = area._id.toString();
-      const areaStores = rawStores.filter((s) => {
-        if (s.isActive === false) return false;
-        if (s.areaId && s.areaId.toString() === aId) return true;
-        if (s.areaName && area.name && s.areaName.toLowerCase() === area.name.toLowerCase()) return true;
-        return false;
-      });
-      const maxStores = Math.max(1, Number(area.maxStores) || 1);
-      const currentStoreCount = areaStores.length;
-      const availableSlots = Math.max(0, maxStores - currentStoreCount);
-      const isFull = currentStoreCount >= maxStores;
-
-      return {
-        ...area,
-        id: aId,
-        maxStores,
-        currentStoreCount,
-        availableSlots,
-        isFull,
-        storeRoutingStrategy: area.storeRoutingStrategy || 'NEAREST',
-        hasActiveStore: currentStoreCount > 0,
-        assignedStores: areaStores.map((s) => ({
-          id: s._id.toString(),
-          _id: s._id,
-          name: s.name,
-          code: s.code,
-          loginId: s.loginId,
-          address: s.address,
-          phone: s.phone,
-          email: s.email,
-          location: s.location,
-          coordinates: s.location?.coordinates || s.coordinates || (s.longitude && s.latitude ? [s.longitude, s.latitude] : undefined),
-          latitude: s.location?.coordinates ? s.location.coordinates[1] : s.latitude,
-          longitude: s.location?.coordinates ? s.location.coordinates[0] : s.longitude,
-          serviceRadiusKm: s.serviceRadiusKm || 4.5,
-          estimatedDeliveryMinutes: s.estimatedDeliveryMinutes || 9,
-          isActive: s.isActive !== false,
-        })),
-        assignedStore: areaStores[0] || null,
-      };
-    });
-
-    const inventory = await db.collection('inventory').find({}).toArray();
-    const coinTransactions = await db.collection('coin_transactions').find({}).toArray();
-    const coupons = await db.collection('coupons').find({}).toArray();
-    const orderHistory = await db.collection('order_status_history').find({}).toArray();
-    const addresses = await db.collection('addresses').find({}).toArray();
-    const printOrders = await db.collection('print_orders').find({}).toArray();
-    const productVariants = await db.collection('product_variants').find({}).toArray();
-    const areaPricing = await db.collection('area_pricing').find({}).toArray();
-    const cities = await db.collection('cities').find({}).sort({ sortOrder: 1, name: 1 }).toArray();
-    const banners = await db.collection('banners').find({}).sort({ sortOrder: 1 }).toArray();
-
-    res.json({
-      users,
-      deliveryPartners,
-      orders,
-      products,
-      productVariants,
-      areaPricing,
-      categories,
-      cities,
-      areas,
-      stores,
-      inventory,
-      coinTransactions,
-      coupons,
-      banners,
-      orderHistory,
-      addresses,
-      printOrders,
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-const { ObjectId } = require('mongodb');
+// Mobile App Realtime Snapshot compatibility routes
+app.get('/api/realtime-data', handleRealtimeData);
+app.get('/realtime-data', handleRealtimeData);
+app.get('/api/v1/realtime-data', handleRealtimeData);
 
 // Explicit Customers vs Delivery Partners endpoints
 app.get('/api/admin/customers', async (req, res) => {
   try {
     const db = getDB();
-    const deliveryPartners = await db.collection('delivery_partners').find({}).toArray();
-    const partnerUserIds = deliveryPartners.map(p => p.userId?.toString()).filter(Boolean);
+    const deliveryPartners = await db.collection('delivery_partners').find({}, { projection: RIDER_LIST_PROJECTION }).toArray();
+    const partnerUserIds = new Set(deliveryPartners.map(p => p.userId?.toString()).filter(Boolean));
 
-    const customers = await db.collection('users').find({
+    const allCustomers = await db.collection('users').find({
       role: { $nin: ['DELIVERY_PARTNER', 'delivery_partner', 'ADMIN', 'admin'] },
-      _id: {
-        $nin: partnerUserIds
-          .map(id => {
-            try { return new ObjectId(id); } catch { return null; }
-          })
-          .filter(Boolean),
-      },
     }).toArray();
+    const customers = allCustomers.filter(u => !partnerUserIds.has(u._id?.toString()));
+
     res.json({ success: true, count: customers.length, data: customers });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -222,7 +288,7 @@ app.get('/api/admin/customers', async (req, res) => {
 app.get('/api/admin/riders', async (req, res) => {
   try {
     const db = getDB();
-    const riders = await db.collection('delivery_partners').find({}).toArray();
+    const riders = await db.collection('delivery_partners').find({}, { projection: RIDER_LIST_PROJECTION }).toArray();
     res.json({ success: true, count: riders.length, data: riders });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -571,6 +637,56 @@ app.use('/api/admin/areas', areasRouter);
 app.use('/api/admin/cities', citiesRouter);
 app.use('/api/admin/stores', storesRouter);
 app.use('/api/finance', financeRouter);
+
+// Common portal & frontend aliases to guarantee zero 404s
+app.use('/admin/areas', areasRouter);
+app.use('/admin/cities', citiesRouter);
+app.use('/admin/stores', storesRouter);
+app.use('/areas', areasRouter);
+app.use('/api/v1/areas', areasRouter);
+app.use('/api/v1/location/areas', areasRouter);
+
+// Static uploads serving with correct image MIME types
+const path = require('path');
+const uploadsDir = path.join(__dirname, '../../backend/uploads');
+const staticUploadOptions = {
+  maxAge: '1d',
+  setHeaders: (res, filePath) => {
+    const lower = filePath.toLowerCase();
+    if (lower.endsWith('.jpeg') || lower.endsWith('.jpg')) {
+      res.setHeader('Content-Type', 'image/jpeg');
+    } else if (lower.endsWith('.png')) {
+      res.setHeader('Content-Type', 'image/png');
+    } else if (lower.endsWith('.webp')) {
+      res.setHeader('Content-Type', 'image/webp');
+    } else if (lower.endsWith('.pdf')) {
+      res.setHeader('Content-Type', 'application/pdf');
+    }
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  },
+};
+app.use('/uploads', express.static(uploadsDir, staticUploadOptions));
+app.use('/api/v1/uploads/files', express.static(uploadsDir, staticUploadOptions));
+
+// Image fallback: return 200 OK transparent PNG to prevent browser ORB (Opaque Response Blocking) errors
+app.use(['/uploads', '/api/v1/uploads/files'], (req, res, next) => {
+  const url = req.url || '';
+  if (/\.(jpg|jpeg|png|webp|gif|svg)$/i.test(url) || req.headers.accept?.includes('image/')) {
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    const transparentPixel = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+      'base64'
+    );
+    return res.status(200).send(transparentPixel);
+  }
+  next();
+});
+
+
 
 // 404 handler
 app.use((req, res) => {

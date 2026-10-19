@@ -131,13 +131,23 @@ export const CustomerService = {
    */
   async getAreas(): Promise<Array<{ id: string; name: string }>> {
     try {
-      const res = await fetch(`${BASE_URL}/admin/areas`);
-      const data = await res.json();
-      if (data && Array.isArray(data.data)) {
-        return data.data.map((a: any) => ({
-          id: a._id || a.id || a.name,
-          name: a.name,
-        }));
+      const adminBase = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+        ? 'http://localhost:5001'
+        : 'https://womup-app-uquz.onrender.com';
+
+      let res = await fetch(`${adminBase}/api/admin/areas`).catch(() => null);
+      if (!res || !res.ok) {
+        res = await fetch(`${BASE_URL}/location/areas`).catch(() => null);
+      }
+      if (res && res.ok) {
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : (Array.isArray(data.data) ? data.data : []);
+        if (list.length > 0) {
+          return list.map((a: any) => ({
+            id: a._id || a.id || a.name,
+            name: a.name,
+          }));
+        }
       }
     } catch (err) {
       console.warn('[CustomerService] getAreas fallback to local zones');

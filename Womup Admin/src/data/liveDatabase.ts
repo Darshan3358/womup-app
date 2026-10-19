@@ -130,7 +130,7 @@ export const LIVE_ORDERS: Order[] = [
     "customerPhone": "9879432011",
     "address": "Flat 402, Shivalik High Street, Prahlad Nagar, SG Highway, Ahmedabad - 380015",
     "zoneName": "Prahlad Nagar, SG Highway",
-    "darkStore": "Worm Up Ahmedabad Central Dark Store",
+    "darkStore": "Womup Ahmedabad Central Dark Store",
     "items": [
       {
         "id": "6aa03d53e16ee9e38f2d7b1a",
@@ -173,7 +173,7 @@ export const LIVE_ORDERS: Order[] = [
     "customerPhone": "6324957535",
     "address": "Current Street, Ghatlodiya Taluka, Tragad - 382501",
     "zoneName": "Ghatlodiya Taluka",
-    "darkStore": "Worm Up Ahmedabad Central Dark Store",
+    "darkStore": "Womup Ahmedabad Central Dark Store",
     "items": [
       {
         "id": "6aa045e60d07153332ad4e93",
@@ -216,7 +216,7 @@ export const LIVE_ORDERS: Order[] = [
     "customerPhone": "9879432011",
     "address": "Prahlad Nagar Garden Road, Prahlad Nagar, Ahmedabad - 380015",
     "zoneName": "Prahlad Nagar",
-    "darkStore": "Worm Up Ahmedabad Central Dark Store",
+    "darkStore": "Womup Ahmedabad Central Dark Store",
     "items": [
       {
         "id": "6aa11866c6c3e5984e2ef5ec",
@@ -502,49 +502,49 @@ export const LIVE_ZONES: Zone[] = [
   {
     "id": "6aa11866c6c3e5984e2ef5df",
     "name": "Prahlad Nagar",
-    "darkStore": "Worm Up Ahmedabad Central Dark Store",
+    "darkStore": "Womup Ahmedabad Central Dark Store",
     "activeOrders": 2,
     "gmvSharePercent": 52
   },
   {
     "id": "6aa11866c6c3e5984e2ef5e0",
     "name": "Satellite",
-    "darkStore": "Worm Up Ahmedabad Central Dark Store",
+    "darkStore": "Womup Ahmedabad Central Dark Store",
     "activeOrders": 0,
     "gmvSharePercent": 0
   },
   {
     "id": "6aa11866c6c3e5984e2ef5e1",
     "name": "Navrangpura",
-    "darkStore": "Worm Up Ahmedabad Central Dark Store",
+    "darkStore": "Womup Ahmedabad Central Dark Store",
     "activeOrders": 0,
     "gmvSharePercent": 0
   },
   {
     "id": "6aa11866c6c3e5984e2ef5e2",
     "name": "Ghatlodia",
-    "darkStore": "Worm Up Ahmedabad Central Dark Store",
+    "darkStore": "Womup Ahmedabad Central Dark Store",
     "activeOrders": 0,
     "gmvSharePercent": 0
   },
   {
     "id": "6aa11866c6c3e5984e2ef5e3",
     "name": "Bopal",
-    "darkStore": "Worm Up Ahmedabad Central Dark Store",
+    "darkStore": "Womup Ahmedabad Central Dark Store",
     "activeOrders": 0,
     "gmvSharePercent": 0
   },
   {
     "id": "6aa11866c6c3e5984e2ef5e4",
     "name": "SG Highway",
-    "darkStore": "Worm Up Ahmedabad Central Dark Store",
+    "darkStore": "Womup Ahmedabad Central Dark Store",
     "activeOrders": 1,
     "gmvSharePercent": 48
   },
   {
     "id": "6aa11866c6c3e5984e2ef5e5",
     "name": "Thaltej",
-    "darkStore": "Worm Up Ahmedabad Central Dark Store",
+    "darkStore": "Womup Ahmedabad Central Dark Store",
     "activeOrders": 0,
     "gmvSharePercent": 0
   }
@@ -823,7 +823,7 @@ export const LIVE_STAFF: StaffMember[] = [
     "phone": "9879100101",
     "role": "Picker",
     "zone": "Prahlad Nagar",
-    "darkStore": "Worm Up Ahmedabad Central Dark Store",
+    "darkStore": "Womup Ahmedabad Central Dark Store",
     "status": "On Duty",
     "activeOrdersCount": 1,
     "rating": 4.9,
@@ -835,7 +835,7 @@ export const LIVE_STAFF: StaffMember[] = [
     "phone": "9879100102",
     "role": "Rider",
     "zone": "Satellite",
-    "darkStore": "Worm Up Ahmedabad Central Dark Store",
+    "darkStore": "Womup Ahmedabad Central Dark Store",
     "status": "On Duty",
     "activeOrdersCount": 1,
     "rating": 4.8,
@@ -848,7 +848,7 @@ export const LIVE_CAMPAIGNS: MarketingCampaign[] = [
     "id": "6a9ffe88d4a21fe082fbbe71",
     "name": "FESTIVE20 Promo Campaign",
     "scheduledAt": "Valid till 07 Nov 2026",
-    "targetAudience": "All WormUp Customers",
+    "targetAudience": "All Womup Customers",
     "isEnabled": true,
     "subject": "20% OFF on Festive & Pooja essentials up to ₹75",
     "message": "Apply FESTIVE20 at checkout for 20% OFF! Min order: ₹299.",
@@ -859,7 +859,7 @@ export const LIVE_CAMPAIGNS: MarketingCampaign[] = [
     "id": "6a9ffe88d4a21fe082fbbe70",
     "name": "WORM100 Promo Campaign",
     "scheduledAt": "Valid till 07 Mar 2027",
-    "targetAudience": "All WormUp Customers",
+    "targetAudience": "All Womup Customers",
     "isEnabled": true,
     "subject": "Flat ₹100 OFF on orders above ₹499",
     "message": "Apply WORM100 at checkout for ₹100 OFF! Min order: ₹499.",
@@ -870,7 +870,7 @@ export const LIVE_CAMPAIGNS: MarketingCampaign[] = [
     "id": "6a9ffe88d4a21fe082fbbe6f",
     "name": "WELCOME50 Promo Campaign",
     "scheduledAt": "Valid till 08 Sept 2027",
-    "targetAudience": "All WormUp Customers",
+    "targetAudience": "All Womup Customers",
     "isEnabled": true,
     "subject": "Flat ₹50 OFF on your first order above ₹199",
     "message": "Apply WELCOME50 at checkout for ₹50 OFF! Min order: ₹199.",

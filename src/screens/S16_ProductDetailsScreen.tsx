@@ -116,7 +116,7 @@ export const S16_ProductDetailsScreen: React.FC = () => {
             <Ionicons name="flash-outline" size={20} color={COLORS.hotPink} />
             <View style={styles.etaTextContainer}>
               <Text style={styles.etaTitle}>Delivery in {product.deliveryMinutes} mins</Text>
-              <Text style={styles.etaSubtitle}>Shipment from nearest Worm Up dark store</Text>
+              <Text style={styles.etaSubtitle}>Shipment from nearest Womup dark store</Text>
             </View>
           </View>
 

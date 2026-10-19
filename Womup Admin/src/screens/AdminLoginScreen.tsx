@@ -65,7 +65,7 @@ export const AdminLoginScreen: React.FC = () => {
                 resizeMode="contain"
               />
             </View>
-            <Text style={styles.brandTitle}>WormUp Admin</Text>
+            <Text style={styles.brandTitle}>Womup Admin</Text>
             <Text style={styles.brandSubtitle}>SuperAdmin Management Console</Text>
           </View>
 
@@ -188,7 +188,7 @@ export const AdminLoginScreen: React.FC = () => {
           {/* Security Note */}
           <View style={styles.footer}>
             <Text style={styles.footerText}>
-              🔒 Protected by 256-bit JWT • WormUp Technologies Pvt. Ltd.
+              🔒 Protected by 256-bit JWT • Womup Technologies Pvt. Ltd.
             </Text>
           </View>
         </ScrollView>

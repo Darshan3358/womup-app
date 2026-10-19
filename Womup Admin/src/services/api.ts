@@ -54,6 +54,7 @@ const getNestApiBaseUrl = () => {
 
 const NEST_API_BASE_URL = getNestApiBaseUrl();
 
+let cachedLiveSnapshot: LiveDbData | null = null;
 
 export interface LiveDbData {
   customers: Customer[];
@@ -103,8 +104,8 @@ export const ApiService = {
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         const controller = new AbortController();
-        // 35s timeout to allow Render free-tier cold start & mobile latency
-        const timeoutId = setTimeout(() => controller.abort(), 35000);
+        // 20s timeout for network safety
+        const timeoutId = setTimeout(() => controller.abort(), 20000);
 
         const res = await fetch(`${API_BASE_URL}/api/realtime-data`, {
           signal: controller.signal,
@@ -721,7 +722,7 @@ export const ApiService = {
           }) : 'Recent',
         }));
 
-        return {
+        const snapshotResult: LiveDbData = {
           customers: dynamicCustomers,
           riders: dynamicRiders,
           orders: dynamicOrders,
@@ -740,14 +741,17 @@ export const ApiService = {
           coinLedger: dynamicCoinLedger,
           auditLogs: dynamicAuditLogs,
         };
+        cachedLiveSnapshot = snapshotResult;
+        return snapshotResult;
       }
-      return null;
+      return cachedLiveSnapshot;
     } catch (err: any) {
       console.warn(`[API] fetchLiveSnapshot attempt ${attempt} error:`, err?.message || err);
+      if (cachedLiveSnapshot) return cachedLiveSnapshot;
       if (attempt === 2) return null;
     }
   }
-  return null;
+  return cachedLiveSnapshot;
 },
 
   // 1. PERSIST CUSTOMER EDIT TO LIVE MONGODB

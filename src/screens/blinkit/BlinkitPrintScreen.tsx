@@ -541,7 +541,7 @@ export const BlinkitPrintScreen: React.FC = () => {
           <View style={styles.rippleOuter} />
           <View style={styles.rippleInner} />
 
-          <Text style={styles.pageTitle}>Worm Up Print Store</Text>
+          <Text style={styles.pageTitle}>Womup Print Store</Text>
           <Text style={styles.pageSubtitle}>
             Secure doorstep document printing in {deliveryTime}
           </Text>

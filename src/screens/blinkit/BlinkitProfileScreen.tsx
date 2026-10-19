@@ -393,7 +393,7 @@ export const BlinkitProfileScreen: React.FC = () => {
   };
 
   const handleShareApp = async () => {
-    const shareMessage = `Hey! I get fresh groceries, snacks and prints delivered in 9 minutes with Worm Up! 🚀\nUse my referral code ${user.referralCode || 'WORMUP50'} to get ₹50 off your first order.\nDownload now: https://wormup.app/invite`;
+    const shareMessage = `Hey! I get fresh groceries, snacks and prints delivered in 9 minutes with Womup! 🚀\nUse my referral code ${user.referralCode || 'WORMUP50'} to get ₹50 off your first order.\nDownload now: https://womup.app/invite`;
     try {
       if (Platform.OS === 'web') {
         if (typeof navigator !== 'undefined' && navigator.clipboard) {
@@ -406,7 +406,7 @@ export const BlinkitProfileScreen: React.FC = () => {
         await Share.share({ message: shareMessage });
       }
     } catch (e) {
-      Alert.alert('Share Worm Up', shareMessage);
+      Alert.alert('Share Womup', shareMessage);
     }
   };
 
@@ -722,7 +722,7 @@ export const BlinkitProfileScreen: React.FC = () => {
               style={styles.quickActionCard}
             >
               <AppIcon name="wallet" size={24} color={COLORS.primary} />
-              <Text style={styles.quickActionLabel}>Worm Up Money</Text>
+              <Text style={styles.quickActionLabel}>Womup Money</Text>
               <Text style={styles.quickActionSubLabel}>🪙 {user.shoppingCoins ?? 2000} Coins</Text>
             </TouchableOpacity>
 
@@ -785,7 +785,7 @@ export const BlinkitProfileScreen: React.FC = () => {
           {renderSectionCard('Payment and coupons', [
             {
               icon: 'wallet',
-              label: 'Worm Up Money',
+              label: 'Womup Money',
               badge: `₹${walletBalance}`,
               onPress: () => setActiveScreen('Blinkit_Money'),
             },
@@ -852,7 +852,7 @@ export const BlinkitProfileScreen: React.FC = () => {
           <View style={styles.footerSection}>
             <View style={styles.footerBrandRow}>
               <View style={styles.footerDot} />
-              <Text style={styles.footerWordmark}>worm up</Text>
+              <Text style={styles.footerWordmark}>womup</Text>
             </View>
             <Text style={styles.footerTagline}>Groceries & Documents in 9 Minutes</Text>
             <Text style={styles.footerVersion}>v2.4.0 (Build 2026.09)</Text>
@@ -1130,7 +1130,7 @@ export const BlinkitProfileScreen: React.FC = () => {
           <View style={styles.bottomSheetCard}>
             <View style={styles.dragHandle} />
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.sheetTitle}>Worm Up e-Gift Cards 🎁</Text>
+              <Text style={styles.sheetTitle}>Womup e-Gift Cards 🎁</Text>
               <TouchableOpacity onPress={() => setGiftCardsModalVisible(false)} style={styles.sheetCloseBtn}>
                 <Ionicons name="close" size={20} color={COLORS.navy} />
               </TouchableOpacity>
@@ -1308,7 +1308,7 @@ export const BlinkitProfileScreen: React.FC = () => {
 
             <TouchableOpacity activeOpacity={0.88} onPress={handleClaimGiftCard} style={styles.primaryGradBtn}>
               <LinearGradient colors={GRADIENTS.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.gradBtnInner}>
-                <Text style={styles.gradBtnText}>Claim to Worm Up Money</Text>
+                <Text style={styles.gradBtnText}>Claim to Womup Money</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -1390,7 +1390,7 @@ export const BlinkitProfileScreen: React.FC = () => {
           <View style={styles.bottomSheetCard}>
             <View style={styles.dragHandle} />
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.sheetTitle}>Feeding India & Worm Up Cares 🥣</Text>
+              <Text style={styles.sheetTitle}>Feeding India & Womup Cares 🥣</Text>
               <TouchableOpacity onPress={() => setFeedingIndiaModalVisible(false)} style={styles.sheetCloseBtn}>
                 <Ionicons name="close" size={20} color={COLORS.navy} />
               </TouchableOpacity>
@@ -1408,7 +1408,7 @@ export const BlinkitProfileScreen: React.FC = () => {
             </View>
 
             <Text style={[styles.sheetSub, { marginTop: 14 }]}>
-              Every 10 orders placed on Worm Up helps fund 1 warm nutritional meal for underprivileged children across India.
+              Every 10 orders placed on Womup helps fund 1 warm nutritional meal for underprivileged children across India.
             </Text>
 
             <View style={[styles.preferenceRow, { paddingHorizontal: 0, marginTop: 12 }]}>
@@ -1477,14 +1477,14 @@ export const BlinkitProfileScreen: React.FC = () => {
           <View style={styles.bottomSheetCard}>
             <View style={styles.dragHandle} />
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.sheetTitle}>About Worm Up 🚀</Text>
+              <Text style={styles.sheetTitle}>About Womup 🚀</Text>
               <TouchableOpacity onPress={() => setAboutUsModalVisible(false)} style={styles.sheetCloseBtn}>
                 <Ionicons name="close" size={20} color={COLORS.navy} />
               </TouchableOpacity>
             </View>
 
             <Text style={styles.aboutStoryText}>
-              Worm Up is India's fastest hyperlocal grocery & print store network. We combine state-of-the-art dark stores, electric delivery fleet, and 10-minute instant document printing to bring essential everyday items straight to your doorstep.
+              Womup is India's fastest hyperlocal grocery & print store network. We combine state-of-the-art dark stores, electric delivery fleet, and 10-minute instant document printing to bring essential everyday items straight to your doorstep.
             </Text>
 
             <View style={styles.aboutPillsGrid}>
@@ -1494,7 +1494,7 @@ export const BlinkitProfileScreen: React.FC = () => {
               <View style={styles.aboutPill}><Text style={styles.aboutPillText}>🔒 TLS Encrypted</Text></View>
             </View>
 
-            <Text style={styles.aboutContactText}>Support: support@wormup.in • Helpline: +91 80000 12345</Text>
+            <Text style={styles.aboutContactText}>Support: support@womup.in • Helpline: +91 80000 12345</Text>
           </View>
         </View>
       </Modal>
@@ -1507,7 +1507,7 @@ export const BlinkitProfileScreen: React.FC = () => {
           <View style={styles.bottomSheetCard}>
             <View style={styles.dragHandle} />
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.sheetTitle}>Partner & Sell on Worm Up 🏪</Text>
+              <Text style={styles.sheetTitle}>Partner & Sell on Womup 🏪</Text>
               <TouchableOpacity onPress={() => setPartnerModalVisible(false)} style={styles.sheetCloseBtn}>
                 <Ionicons name="close" size={20} color={COLORS.navy} />
               </TouchableOpacity>
@@ -1704,7 +1704,7 @@ export const BlinkitProfileScreen: React.FC = () => {
               {[
                 { q: 'How fast is delivery?', a: 'Grocery and everyday items arrive in 9-10 minutes from our nearest micro-fulfillment center.' },
                 { q: 'How does document printing work?', a: 'Upload PDF or photos under Print store. Documents are printed at 300 DPI, sealed in a tamper-proof envelope, and purged after delivery for complete privacy.' },
-                { q: 'What is the refund policy for damaged goods?', a: 'Instant 100% refund to your Worm Up Money wallet or original payment source within 2 hours of raising an issue.' },
+                { q: 'What is the refund policy for damaged goods?', a: 'Instant 100% refund to your Womup Money wallet or original payment source within 2 hours of raising an issue.' },
                 { q: 'Can I change my delivery address after ordering?', a: 'Since orders are packed within 60 seconds, address changes should be communicated directly to your rider via the live tracking call button.' },
               ].map((faq, index) => {
                 const isExpanded = expandedFaqIndex === index;
@@ -1727,7 +1727,7 @@ export const BlinkitProfileScreen: React.FC = () => {
 
             <TouchableOpacity
               activeOpacity={0.88}
-              onPress={() => Alert.alert('Connecting Live Support Agent 💬', 'Agent Vikram from Worm Up Ahmedabad team is connecting...')}
+              onPress={() => Alert.alert('Connecting Live Support Agent 💬', 'Agent Vikram from Womup Ahmedabad team is connecting...')}
               style={styles.primaryGradBtn}
             >
               <LinearGradient colors={GRADIENTS.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.gradBtnInner}>
@@ -1796,7 +1796,7 @@ export const BlinkitProfileScreen: React.FC = () => {
               <AppIcon name="log-out" size={28} color={COLORS.error} />
             </View>
             <Text style={[TYPOGRAPHY.headingMd, { color: COLORS.textPrimary, marginBottom: 8, textAlign: 'center' }]}>
-              Log Out of Worm Up?
+              Log Out of Womup?
             </Text>
             <Text style={[TYPOGRAPHY.bodySm, { color: COLORS.textMuted, textAlign: 'center', marginBottom: 24, lineHeight: 20 }]}>
               Are you sure you want to log out? You will need to verify your email to access your account again.

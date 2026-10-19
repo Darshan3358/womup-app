@@ -31,6 +31,7 @@ import {
 import { COLORS, RADIUS, SPACING } from '../theme';
 import { Customer } from '../types/admin';
 import { CustomerService } from '../services/customerService';
+import { SafeDocImage } from './common/SafeDocImage';
 
 interface KYCTabProps {
   customer: Customer;
@@ -360,17 +361,13 @@ export const KYCTab: React.FC<KYCTabProps> = ({ customer, onStatusChange }) => {
             </View>
 
             {frontUrl ? (
-              <TouchableOpacity
-                style={styles.imageWrapper}
-                activeOpacity={0.85}
+              <SafeDocImage
+                url={frontUrl}
+                title="Aadhaar Front"
+                containerStyle={styles.imageWrapper}
+                style={styles.docImage}
                 onPress={() => setZoomImage({ url: frontUrl, title: 'Aadhaar Front View' })}
-              >
-                <Image source={{ uri: frontUrl }} style={styles.docImage} resizeMode="cover" />
-                <View style={styles.hoverOverlay}>
-                  <Eye size={16} color={COLORS.white} style={{ marginRight: 4 }} />
-                  <Text style={styles.hoverOverlayText}>Click to Inspect</Text>
-                </View>
-              </TouchableOpacity>
+              />
             ) : (
               <View style={styles.notUploadedBox}>
                 <AlertCircle size={28} color="#94A3B8" style={{ marginBottom: 6 }} />
@@ -423,17 +420,13 @@ export const KYCTab: React.FC<KYCTabProps> = ({ customer, onStatusChange }) => {
             </View>
 
             {backUrl ? (
-              <TouchableOpacity
-                style={styles.imageWrapper}
-                activeOpacity={0.85}
+              <SafeDocImage
+                url={backUrl}
+                title="Aadhaar Back"
+                containerStyle={styles.imageWrapper}
+                style={styles.docImage}
                 onPress={() => setZoomImage({ url: backUrl, title: 'Aadhaar Back View' })}
-              >
-                <Image source={{ uri: backUrl }} style={styles.docImage} resizeMode="cover" />
-                <View style={styles.hoverOverlay}>
-                  <Eye size={16} color={COLORS.white} style={{ marginRight: 4 }} />
-                  <Text style={styles.hoverOverlayText}>Click to Inspect</Text>
-                </View>
-              </TouchableOpacity>
+              />
             ) : (
               <View style={styles.notUploadedBox}>
                 <AlertCircle size={28} color="#94A3B8" style={{ marginBottom: 6 }} />
@@ -638,10 +631,13 @@ export const KYCTab: React.FC<KYCTabProps> = ({ customer, onStatusChange }) => {
             </View>
 
             {zoomImage?.url ? (
-              <Image
-                source={{ uri: zoomImage.url }}
+              <SafeDocImage
+                url={zoomImage.url}
+                title={zoomImage.title}
+                containerStyle={styles.zoomedImage}
                 style={styles.zoomedImage}
                 resizeMode="contain"
+                showZoomIcon={false}
               />
             ) : null}
 

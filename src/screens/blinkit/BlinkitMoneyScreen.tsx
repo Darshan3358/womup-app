@@ -355,7 +355,7 @@ export const BlinkitMoneyScreen: React.FC = () => {
     }
     addWalletBalance(parsed);
     setAddMoneyModalVisible(false);
-    Alert.alert('Success', `₹${parsed} added to Worm Up Wallet successfully!`);
+    Alert.alert('Success', `₹${parsed} added to Womup Wallet successfully!`);
   };
 
   return (
@@ -387,7 +387,7 @@ export const BlinkitMoneyScreen: React.FC = () => {
               activeOpacity={0.8}
               onPress={() =>
                 Alert.alert(
-                  'Worm Up Wallet Settings',
+                  'Womup Wallet Settings',
                   `Current Balance: ₹${walletBalance}\nAuto-Reload and Payment preferences.`
                 )
               }
@@ -402,7 +402,7 @@ export const BlinkitMoneyScreen: React.FC = () => {
           <View style={styles.heroSection}>
             <Blinkit3DWallet size={120} />
 
-            <Text style={styles.brandTitle}>WORM UP</Text>
+            <Text style={styles.brandTitle}>WOMUP</Text>
             <Text style={styles.walletTitle}>WALLET & BALANCES</Text>
           </View>
 
@@ -679,7 +679,7 @@ export const BlinkitMoneyScreen: React.FC = () => {
               <View style={styles.textContainer}>
                 <Text style={styles.cardTitle}>Real-time refunds</Text>
                 <Text style={styles.cardDesc}>
-                  No need to wait for refunds. Worm Up refunds are instant!
+                  No need to wait for refunds. Womup refunds are instant!
                 </Text>
               </View>
             </View>
@@ -690,7 +690,7 @@ export const BlinkitMoneyScreen: React.FC = () => {
             activeOpacity={0.88}
             onPress={() => setAddMoneyModalVisible(true)}
             style={styles.addMoneyBtnWrapper}
-            accessibilityLabel="Add Money to Worm Up Wallet"
+            accessibilityLabel="Add Money to Womup Wallet"
           >
             <LinearGradient
               colors={GRADIENTS.primary}
@@ -978,7 +978,7 @@ export const BlinkitMoneyScreen: React.FC = () => {
                     label="Aadhaar Front Image"
                     required={false}
                     value={aadhaarFrontUrl}
-                    folder="wormup/kyc/customer"
+                    folder="womup/kyc/customer"
                     onUploadComplete={(url) => setAadhaarFrontUrl(url)}
                     helperText="Upload front side showing photo & name"
                   />
@@ -987,7 +987,7 @@ export const BlinkitMoneyScreen: React.FC = () => {
                     label="Aadhaar Back Image"
                     required={false}
                     value={aadhaarBackUrl}
-                    folder="wormup/kyc/customer"
+                    folder="womup/kyc/customer"
                     onUploadComplete={(url) => setAadhaarBackUrl(url)}
                     helperText="Upload back side showing permanent address"
                   />

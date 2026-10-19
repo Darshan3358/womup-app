@@ -348,7 +348,11 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setAuditLogs((prev) => [newLog, ...prev]);
   };
 
+  const isRefreshingRef = useRef(false);
+
   const refreshFromDb = useCallback(async () => {
+    if (isRefreshingRef.current) return;
+    isRefreshingRef.current = true;
     try {
       const live = await ApiService.fetchLiveSnapshot();
       if (live) {
@@ -394,6 +398,7 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     } catch {
       setSyncStatus('Live DB Active (Cluster0)');
     } finally {
+      isRefreshingRef.current = false;
       setIsLoading(false);
     }
   }, []);
@@ -628,13 +633,34 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     // 🚀 SMART HYBRID SYNC:
     // 1. Polling is lightweight delta sync (<1KB, only modified items) every 20 seconds
-    // 2. Automatically paused when app is backgrounded to protect battery & server!
+    // 2. Concurrency-guarded with AbortController to prevent connection hoarding
+    // 3. Automatically paused when app is backgrounded to protect battery & server!
     let syncInterval: any = null;
+    let isSyncing = false;
+    let syncController: AbortController | null = null;
     let lastCheckTime = new Date(Date.now() - 30000).toISOString();
 
     const checkDeltaSync = async () => {
+      if (isSyncing) return; // Prevent concurrent requests from stacking up
+      isSyncing = true;
+
+      if (syncController) {
+        try { syncController.abort(); } catch (e) {}
+      }
+      syncController = new AbortController();
+      const timeoutId = setTimeout(() => {
+        try { syncController?.abort(); } catch (e) {}
+      }, 10000); // 10s maximum timeout
+
       try {
-        const res = await fetch(`http://localhost:5050/api/v1/sync-updates?since=${encodeURIComponent(lastCheckTime)}`);
+        const res = await fetch(`http://localhost:5050/api/v1/sync-updates?since=${encodeURIComponent(lastCheckTime)}`, {
+          signal: syncController.signal,
+          headers: {
+            'Accept': 'application/json',
+          },
+        });
+        clearTimeout(timeoutId);
+
         if (res.ok) {
           const delta = await res.json();
           lastCheckTime = delta.timestamp || new Date().toISOString();
@@ -663,7 +689,10 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           }
         }
       } catch {
-        // quiet fallback
+        clearTimeout(timeoutId);
+        // quiet fallback for aborted or network connection issues
+      } finally {
+        isSyncing = false;
       }
     };
 
@@ -676,6 +705,9 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (syncInterval) {
         clearInterval(syncInterval);
         syncInterval = null;
+      }
+      if (syncController) {
+        try { syncController.abort(); } catch (e) {}
       }
     };
 

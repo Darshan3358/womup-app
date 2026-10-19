@@ -22,14 +22,14 @@ export const S26_AccountScreen: React.FC = () => {
 
   const handleLogout = async () => {
     if (Platform.OS === 'web') {
-      const confirmed = typeof window !== 'undefined' ? window.confirm('Are you sure you want to log out from Worm Up?') : true;
+      const confirmed = typeof window !== 'undefined' ? window.confirm('Are you sure you want to log out from Womup?') : true;
       if (confirmed) {
         await logout();
       }
     } else {
       Alert.alert(
         'Log Out',
-        'Are you sure you want to log out from Worm Up?',
+        'Are you sure you want to log out from Womup?',
         [
           { text: 'Cancel', style: 'cancel' },
           {
@@ -87,7 +87,7 @@ export const S26_AccountScreen: React.FC = () => {
       subtitle: 'FAQs, live chat, call center',
       icon: 'help-circle-outline',
       color: COLORS.darkBlue,
-      action: () => Alert.alert('Support', '24x7 Customer Support is available at support@wormup.in'),
+      action: () => Alert.alert('Support', '24x7 Customer Support is available at support@womup.in'),
     },
     {
       title: 'Settings',

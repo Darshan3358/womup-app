@@ -246,9 +246,9 @@ export class AdminRealtimeController {
       });
 
       const inventory = await db.collection('inventory').find({}).toArray();
-      const coinTransactions = await db.collection('coin_transactions').find({}).toArray();
+      const coinTransactions = await db.collection('coin_transactions').find({}).sort({ createdAt: -1 }).limit(500).toArray();
       const coupons = await db.collection('coupons').find({}).toArray();
-      const orderHistory = await db.collection('order_status_history').find({}).toArray();
+      const orderHistory = await db.collection('order_status_history').find({}).sort({ timestamp: -1, createdAt: -1 }).limit(500).toArray();
       const addresses = await db.collection('addresses').find({}).toArray();
       const printOrders = await db.collection('print_orders').find({}).toArray();
       const productVariants = await db.collection('product_variants').find({}).toArray();

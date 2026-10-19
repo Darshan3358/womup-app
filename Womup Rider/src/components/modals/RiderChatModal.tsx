@@ -234,7 +234,7 @@ export const RiderChatModal: React.FC<RiderChatModalProps> = ({
         <View style={styles.adminMsgRow}>
           <View style={styles.adminBadge}>
             <Ionicons name="shield" size={12} color="#D97706" style={{ marginRight: 4 }} />
-            <Text style={styles.adminBadgeText}>Worm Up Dispatch: {item.message}</Text>
+            <Text style={styles.adminBadgeText}>Womup Dispatch: {item.message}</Text>
           </View>
         </View>
       );

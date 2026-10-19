@@ -31,6 +31,7 @@ export const S07_OtpVerificationScreen: React.FC = () => {
   const [timer, setTimer] = useState(30);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState(false);
 
   useEffect(() => {
     if (timer > 0) {
@@ -70,10 +71,12 @@ export const S07_OtpVerificationScreen: React.FC = () => {
   const handleResend = async () => {
     setTimer(30);
     setError('');
+    setResendSuccess(false);
     if (user.email) {
       const res = await AuthService.sendOtp(user.email);
       if (res.success && res.verificationId) {
         setAuthVerificationId(res.verificationId);
+        setResendSuccess(true);
       } else {
         setError(res.message || 'Failed to resend OTP');
       }
@@ -147,6 +150,14 @@ export const S07_OtpVerificationScreen: React.FC = () => {
           <Text style={styles.sentBadgeText}>OTP sent to your email inbox</Text>
         </View>
 
+        {/* Spam / Promotions tip note */}
+        <View style={styles.spamTipBadge}>
+          <Ionicons name="information-circle-outline" size={14} color="#6B7280" />
+          <Text style={styles.spamTipText}>
+            Not in Primary? Check your <Text style={styles.spamTipHighlight}>Spam</Text> or <Text style={styles.spamTipHighlight}>Promotions</Text> folder
+          </Text>
+        </View>
+
         {/* 6 OTP Digit Boxes */}
         <View style={styles.otpBoxesRow}>
           {otp.map((digit, index) => {
@@ -180,6 +191,12 @@ export const S07_OtpVerificationScreen: React.FC = () => {
             </TouchableOpacity>
           )}
         </View>
+
+        {resendSuccess && (
+          <Text style={styles.resendSuccessText}>
+            ✓ New OTP sent! Please check your Spam / Promotions folder.
+          </Text>
+        )}
 
         {/* ── YOU'LL BE REGISTERED IN ── */}
         <View style={styles.cityContextSection}>
@@ -322,14 +339,34 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: RADIUS.pill,
     paddingHorizontal: 14,
-    paddingVertical: 8,
-    marginBottom: SPACING.lg,
+    paddingVertical: 7,
+    marginBottom: 8,
     gap: 6,
   },
   sentBadgeText: {
     fontSize: 13,
     fontWeight: '600',
     color: '#065F46',
+  },
+  spamTipBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    borderColor: '#E5E7EB',
+    borderWidth: 1,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    marginBottom: SPACING.lg,
+    gap: 5,
+  },
+  spamTipText: {
+    fontSize: 11.5,
+    color: '#4B5563',
+  },
+  spamTipHighlight: {
+    fontWeight: '700',
+    color: '#111827',
   },
   errorText: {
     color: COLORS.error,
@@ -351,6 +388,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.hotPink,
     fontWeight: '700',
+  },
+  resendSuccessText: {
+    fontSize: 12,
+    color: '#059669',
+    fontWeight: '600',
+    marginTop: 6,
+    textAlign: 'center',
   },
   keypad: {
     marginBottom: 10,

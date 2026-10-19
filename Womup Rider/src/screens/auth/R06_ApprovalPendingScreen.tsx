@@ -23,7 +23,7 @@ export const R06_ApprovalPendingScreen: React.FC = () => {
     try {
       const { isApproved } = await RiderApiService.checkApprovalStatus();
       if (isApproved) {
-        Alert.alert('Congratulations!', 'Your partner account has been approved by Worm Up Admin.');
+        Alert.alert('Congratulations!', 'Your partner account has been approved by Womup Admin.');
         await checkSession();
       } else {
         Alert.alert('Under Review', 'Your documents are still being reviewed by the operations team.');

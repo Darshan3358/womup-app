@@ -635,7 +635,7 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           socket.emit('rider_location_update', { ...payload, orderId: cleanOrderId });
         }
       }
-    }, 1000);
+    }, 10000); // Efficient 10s WebSocket cadence - minimizes battery & server load
 
     return () => {
       clearInterval(locationInterval);

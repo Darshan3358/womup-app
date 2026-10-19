@@ -55,7 +55,7 @@ export class EmailService {
     html: string;
     fromName?: string;
   }): Promise<{ success: boolean; provider?: string; error?: string }> {
-    const { to, subject, text, html, fromName = 'Worm Up' } = options;
+    const { to, subject, text, html, fromName = 'Womup' } = options;
     const fromEmail = this.configService.get<string>('EMAIL_USER') || this.defaultUser;
 
     // Channel 1: Google Apps Script / HTTPS Relay (if configured, works 100% on Render without port blocks)
@@ -87,7 +87,7 @@ export class EmailService {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            from: 'Worm Up <onboarding@resend.dev>',
+            from: 'Womup <onboarding@resend.dev>',
             to: [to],
             subject,
             text,
@@ -103,16 +103,27 @@ export class EmailService {
       }
     }
 
+    // Standard anti-spam and transactional delivery headers
+    const mailPayload = {
+      from: `"${fromName}" <${fromEmail}>`,
+      replyTo: fromEmail,
+      to,
+      subject,
+      text,
+      html,
+      headers: {
+        'X-Priority': '1',
+        'Importance': 'high',
+        'Priority': 'urgent',
+        'Auto-Submitted': 'auto-generated',
+        'X-Mailer': 'Womup Authentication Service',
+      },
+    };
+
     // Channel 3: Gmail SMTP Port 465
     if (this.transporter465) {
       try {
-        await this.transporter465.sendMail({
-          from: `"${fromName}" <${fromEmail}>`,
-          to,
-          subject,
-          text,
-          html,
-        });
+        await this.transporter465.sendMail(mailPayload);
         this.logger.log(`[Email] Delivered successfully via Gmail SMTP (Port 465) to ${to}`);
         return { success: true, provider: 'Gmail SMTP (Port 465)' };
       } catch (err: any) {
@@ -123,13 +134,7 @@ export class EmailService {
     // Channel 4: Gmail SMTP Port 587
     if (this.transporter587) {
       try {
-        await this.transporter587.sendMail({
-          from: `"${fromName}" <${fromEmail}>`,
-          to,
-          subject,
-          text,
-          html,
-        });
+        await this.transporter587.sendMail(mailPayload);
         this.logger.log(`[Email] Delivered successfully via Gmail SMTP (Port 587) to ${to}`);
         return { success: true, provider: 'Gmail SMTP (Port 587)' };
       } catch (err: any) {
@@ -161,7 +166,7 @@ export class EmailService {
 
   /** Send OTP email to user */
   async sendOtpEmail(email: string, otp: string): Promise<boolean> {
-    const fromName = 'Worm Up';
+    const fromName = 'Womup Security';
     const html = `
 <!DOCTYPE html>
 <html>
@@ -169,41 +174,40 @@ export class EmailService {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-<body style="margin:0;padding:0;background:#f5f5f5;font-family:'Segoe UI',Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:40px 0;">
+<body style="margin:0;padding:0;background:#F3F4F6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#F3F4F6;padding:32px 0;">
     <tr>
       <td align="center">
-        <table width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
+        <table width="460" cellpadding="0" cellspacing="0" style="background:#FFFFFF;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.06);border:1px solid #E5E7EB;">
           <tr>
-            <td style="background:linear-gradient(135deg,#FF2D78,#FF6B35);padding:32px;text-align:center;">
-              <h1 style="color:#ffffff;margin:0;font-size:28px;font-weight:800;letter-spacing:-0.5px;">🐛 Worm Up</h1>
-              <p style="color:rgba(255,255,255,0.85);margin:8px 0 0;font-size:14px;">Your verification code</p>
+            <td style="background:#0F172A;padding:28px;text-align:center;">
+              <h1 style="color:#FFFFFF;margin:0;font-size:24px;font-weight:800;letter-spacing:1px;">WOMUP</h1>
+              <p style="color:#94A3B8;margin:6px 0 0;font-size:13px;font-weight:500;">Account Verification Code</p>
             </td>
           </tr>
           <tr>
-            <td style="padding:40px 32px;">
-              <p style="color:#374151;font-size:16px;margin:0 0 24px;">Hi there 👋</p>
-              <p style="color:#6B7280;font-size:14px;line-height:1.6;margin:0 0 32px;">
-                Use the OTP below to verify your email address and log in to <strong>Worm Up</strong>.
-                This code is valid for <strong>10 minutes</strong>.
+            <td style="padding:32px 28px;">
+              <p style="color:#1E293B;font-size:15px;font-weight:600;margin:0 0 16px;">Hello,</p>
+              <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 24px;">
+                Your one-time verification code for <strong>Womup</strong> is:
               </p>
-              <div style="text-align:center;margin:0 0 32px;">
-                <div style="display:inline-block;background:#FFF1F6;border:2px solid #FF2D78;border-radius:12px;padding:20px 40px;">
-                  <p style="margin:0;font-size:42px;font-weight:900;color:#FF2D78;letter-spacing:10px;">${otp}</p>
+              <div style="text-align:center;margin:0 0 24px;">
+                <div style="display:inline-block;background:#F8FAFC;border:2px dashed #0F172A;border-radius:8px;padding:16px 36px;">
+                  <p style="margin:0;font-size:36px;font-weight:800;color:#0F172A;letter-spacing:8px;font-family:monospace;">${otp}</p>
                 </div>
               </div>
-              <p style="color:#9CA3AF;font-size:12px;text-align:center;margin:0 0 8px;">
-                ⚠️ Never share this code with anyone. Worm Up will never ask for your OTP.
+              <p style="color:#64748B;font-size:13px;line-height:1.5;margin:0 0 16px;text-align:center;">
+                This code is valid for <strong>10 minutes</strong>. Do not share it with anyone.
               </p>
-              <p style="color:#9CA3AF;font-size:12px;text-align:center;margin:0;">
-                If you didn't request this, you can safely ignore this email.
+              <p style="color:#94A3B8;font-size:12px;line-height:1.4;margin:24px 0 0;padding-top:16px;border-top:1px solid #F1F5F9;text-align:center;">
+                Security notice: If you did not request this verification code, please ignore this email.
               </p>
             </td>
           </tr>
           <tr>
-            <td style="background:#F9FAFB;padding:20px 32px;text-align:center;border-top:1px solid #E5E7EB;">
-              <p style="color:#9CA3AF;font-size:12px;margin:0;">
-                © 2026 Worm Up. All rights reserved.
+            <td style="background:#F8FAFC;padding:16px 28px;text-align:center;border-top:1px solid #E2E8F0;">
+              <p style="color:#94A3B8;font-size:11px;margin:0;">
+                © 2026 Womup Quick-Commerce. Automated notification.
               </p>
             </td>
           </tr>
@@ -216,8 +220,8 @@ export class EmailService {
 
     const res = await this.sendMail({
       to: email,
-      subject: `${otp} is your Worm Up verification code`,
-      text: `Your Worm Up OTP is: ${otp}. Valid for 10 minutes. Do not share with anyone.`,
+      subject: `Womup: Your verification code is ${otp}`,
+      text: `Hello,\n\nYour Womup verification code is: ${otp}\n\nThis code is valid for 10 minutes. Please enter it in the app to complete verification.\n\nSecurity notice: If you did not request this code, you can safely ignore this email.\n\n— Womup Team`,
       html,
       fromName,
     });
@@ -226,7 +230,7 @@ export class EmailService {
 
   /** Send 6-digit verification OTP to Rider */
   async sendRiderOtpEmail(email: string, otp: string, riderName?: string): Promise<boolean> {
-    const fromName = 'Worm Up Rider Team';
+    const fromName = 'Womup Rider Team';
     const name = riderName || 'Rider';
 
     const html = `
@@ -239,7 +243,7 @@ export class EmailService {
       <table width="480" cellpadding="0" cellspacing="0" style="background:#FFFFFF;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(7,27,82,0.08);border:1px solid #E2E8F0;">
         <tr>
           <td style="background:linear-gradient(135deg,#071B52,#0A2570);padding:30px;text-align:center;">
-            <h1 style="color:#FFFFFF;margin:0;font-size:26px;font-weight:900;">🛵 Worm Up Rider</h1>
+            <h1 style="color:#FFFFFF;margin:0;font-size:26px;font-weight:900;">🛵 Womup Rider</h1>
             <p style="color:rgba(255,255,255,0.85);margin:8px 0 0;font-size:14px;font-weight:600;">Email Verification Code</p>
           </td>
         </tr>
@@ -247,7 +251,7 @@ export class EmailService {
           <td style="padding:36px 32px;">
             <p style="color:#071B52;font-size:16px;font-weight:700;margin:0 0 16px;">Hi ${name} 👋</p>
             <p style="color:#64748B;font-size:14px;line-height:1.6;margin:0 0 24px;">
-              Your 6-digit verification code for <strong>Worm Up Delivery Partner</strong> registration & login is:
+              Your 6-digit verification code for <strong>Womup Delivery Partner</strong> registration & login is:
             </p>
             <div style="text-align:center;margin:0 0 28px;">
               <div style="display:inline-block;background:#EEF2FF;border:2px solid #4F46E5;border-radius:12px;padding:16px 36px;">
@@ -264,7 +268,7 @@ export class EmailService {
         </tr>
         <tr>
           <td style="background:#F8FAFC;padding:16px 32px;text-align:center;border-top:1px solid #E2E8F0;">
-            <p style="color:#94A3B8;font-size:12px;margin:0;">— WormUp Rider Team • © 2026 Worm Up</p>
+            <p style="color:#94A3B8;font-size:12px;margin:0;">— Womup Rider Team • © 2026 Womup</p>
           </td>
         </tr>
       </table>
@@ -275,8 +279,8 @@ export class EmailService {
 
     const res = await this.sendMail({
       to: email,
-      subject: `${otp} is your Worm Up Rider verification code`,
-      text: `Hi ${name},\n\nYour verification code is: ${otp}\n\nThis code is valid for 10 minutes.\nDo not share this code with anyone.\n\n— WormUp Rider Team`,
+      subject: `Womup Rider: Your verification code is ${otp}`,
+      text: `Hi ${name},\n\nYour verification code is: ${otp}\n\nThis code is valid for 10 minutes.\nDo not share this code with anyone.\n\n— Womup Rider Team`,
       html,
       fromName,
     });
@@ -285,7 +289,7 @@ export class EmailService {
 
   /** Send Welcome email after successful Rider registration */
   async sendRiderWelcomeEmail(email: string, riderName: string, riderCode: string): Promise<boolean> {
-    const fromName = 'Worm Up Rider Team';
+    const fromName = 'Womup Rider Team';
     const html = `
 <!DOCTYPE html>
 <html>
@@ -296,7 +300,7 @@ export class EmailService {
       <table width="480" cellpadding="0" cellspacing="0" style="background:#FFFFFF;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(7,27,82,0.08);border:1px solid #E2E8F0;">
         <tr>
           <td style="background:linear-gradient(135deg,#047857,#059669);padding:30px;text-align:center;">
-            <h1 style="color:#FFFFFF;margin:0;font-size:26px;font-weight:900;">🎉 Welcome to Worm Up!</h1>
+            <h1 style="color:#FFFFFF;margin:0;font-size:26px;font-weight:900;">🎉 Welcome to Womup!</h1>
             <p style="color:rgba(255,255,255,0.9);margin:8px 0 0;font-size:14px;font-weight:600;">Rider Account Activated</p>
           </td>
         </tr>
@@ -304,7 +308,7 @@ export class EmailService {
           <td style="padding:32px;">
             <p style="color:#071B52;font-size:16px;font-weight:700;margin:0 0 12px;">Hi ${riderName} 👋</p>
             <p style="color:#64748B;font-size:14px;line-height:1.6;margin:0 0 20px;">
-              Congratulations on joining the <strong>Worm Up Delivery Fleet</strong>! Your rider account has been created successfully.
+              Congratulations on joining the <strong>Womup Delivery Fleet</strong>! Your rider account has been created successfully.
             </p>
             <div style="background:#F1F5F9;border-radius:10px;padding:16px;margin:0 0 24px;">
               <p style="margin:0 0 6px;color:#64748B;font-size:12px;">Rider ID: <strong style="color:#071B52;font-size:15px;">${riderCode}</strong></p>
@@ -318,13 +322,13 @@ export class EmailService {
               <li>Withdraw earnings anytime to your bank account</li>
             </ul>
             <div style="text-align:center;">
-              <span style="display:inline-block;background:#071B52;color:#FFFFFF;padding:12px 28px;border-radius:8px;font-size:13px;font-weight:800;">Open Worm Up Rider App</span>
+              <span style="display:inline-block;background:#071B52;color:#FFFFFF;padding:12px 28px;border-radius:8px;font-size:13px;font-weight:800;">Open Womup Rider App</span>
             </div>
           </td>
         </tr>
         <tr>
           <td style="background:#F8FAFC;padding:16px 32px;text-align:center;border-top:1px solid #E2E8F0;">
-            <p style="color:#94A3B8;font-size:12px;margin:0;">— WormUp Rider Team • Helpdesk: support@wormup.in</p>
+            <p style="color:#94A3B8;font-size:12px;margin:0;">— Womup Rider Team • Helpdesk: support@womup.in</p>
           </td>
         </tr>
       </table>
@@ -335,8 +339,8 @@ export class EmailService {
 
     const res = await this.sendMail({
       to: email,
-      subject: 'Welcome to WormUp Rider Program! 🛵',
-      text: `Hi ${riderName},\n\nWelcome to WormUp!\n\nYour Rider ID: ${riderCode}\nRegistered Email: ${email}\n\nYou can now go online and start delivering!\n\n— WormUp Rider Team`,
+      subject: 'Welcome to Womup Rider Program! 🛵',
+      text: `Hi ${riderName},\n\nWelcome to Womup!\n\nYour Rider ID: ${riderCode}\nRegistered Email: ${email}\n\nYou can now go online and start delivering!\n\n— Womup Rider Team`,
       html,
       fromName,
     });
@@ -345,7 +349,7 @@ export class EmailService {
 
   /** Send Password Reset Email with OTP */
   async sendRiderPasswordResetEmail(email: string, otp: string, riderName?: string): Promise<boolean> {
-    const fromName = 'Worm Up Security';
+    const fromName = 'Womup Security';
     const name = riderName || 'Rider';
 
     const html = `
@@ -359,14 +363,14 @@ export class EmailService {
         <tr>
           <td style="background:linear-gradient(135deg,#BE123C,#E11D48);padding:30px;text-align:center;">
             <h1 style="color:#FFFFFF;margin:0;font-size:24px;font-weight:900;">🔒 Password Reset Code</h1>
-            <p style="color:rgba(255,255,255,0.9);margin:8px 0 0;font-size:13px;">Worm Up Rider Account</p>
+            <p style="color:rgba(255,255,255,0.9);margin:8px 0 0;font-size:13px;">Womup Rider Account</p>
           </td>
         </tr>
         <tr>
           <td style="padding:32px;">
             <p style="color:#071B52;font-size:16px;font-weight:700;margin:0 0 12px;">Hi ${name} 👋</p>
             <p style="color:#64748B;font-size:14px;line-height:1.6;margin:0 0 20px;">
-              We received a request to reset the password for your Worm Up Delivery Partner account. Use the code below:
+              We received a request to reset the password for your Womup Delivery Partner account. Use the code below:
             </p>
             <div style="text-align:center;margin:0 0 24px;">
               <div style="display:inline-block;background:#FFF1F2;border:2px solid #E11D48;border-radius:12px;padding:16px 36px;">
@@ -389,8 +393,8 @@ export class EmailService {
 
     const res = await this.sendMail({
       to: email,
-      subject: `${otp} is your Worm Up Rider password reset code`,
-      text: `Hi ${name},\n\nYour password reset code is: ${otp}\n\nValid for 10 minutes.\n\n— WormUp Security Team`,
+      subject: `Womup Rider: Your password reset code is ${otp}`,
+      text: `Hi ${name},\n\nYour password reset code is: ${otp}\n\nValid for 10 minutes.\n\n— Womup Security Team`,
       html,
       fromName,
     });

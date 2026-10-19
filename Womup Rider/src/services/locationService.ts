@@ -284,12 +284,12 @@ export class LocationTrackerService {
           onLocationUpdate(coords);
         }
 
-        // Throttle network dispatch: only send if moved > ~10m or 15s elapsed
+        // Throttle network dispatch: only send if moved > ~20m or 30s elapsed
         const now = Date.now();
         const latDiff = this.lastSentLat !== null ? Math.abs(coords.latitude - this.lastSentLat) : 999;
         const lngDiff = this.lastSentLng !== null ? Math.abs(coords.longitude - this.lastSentLng) : 999;
-        const isSignificantMove = latDiff > 0.0001 || lngDiff > 0.0001;
-        const isHeartbeatDue = now - this.lastSentTime >= 15000;
+        const isSignificantMove = latDiff > 0.0002 || lngDiff > 0.0002;
+        const isHeartbeatDue = now - this.lastSentTime >= 30000;
 
         if (isSignificantMove || isHeartbeatDue) {
           this.lastSentLat = coords.latitude;
@@ -298,7 +298,7 @@ export class LocationTrackerService {
           await RiderApiService.sendLocationTelemetry(coords);
         }
       }
-    }, 5000);
+    }, 10000);
   }
 
   static stopTracking() {

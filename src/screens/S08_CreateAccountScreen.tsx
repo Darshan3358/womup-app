@@ -185,8 +185,8 @@ export const S08_CreateAccountScreen: React.FC = () => {
       newErrors.timing = timingMessage || 'New registrations are closed between 10:00 PM and 6:00 AM IST.';
     }
 
-    if (!firstName.trim()) newErrors.firstName = 'Please enter your first name';
-    if (!surname.trim()) newErrors.surname = 'Please enter your surname';
+    if (!firstName.trim()) newErrors.firstName = 'Please enter your first name as per Aadhar card';
+    if (!surname.trim()) newErrors.surname = 'Please enter your last name as per Aadhar card';
     const computedName = `${firstName.trim()} ${surname.trim()}`.trim();
 
     if (!email.trim() || !email.includes('@')) newErrors.email = 'Please enter a valid email address';
@@ -353,7 +353,7 @@ export const S08_CreateAccountScreen: React.FC = () => {
 
         <View style={styles.content}>
           <Text style={styles.title}>Create Account</Text>
-          <Text style={styles.subtitle}>Enter your details to complete your Worm Up profile</Text>
+          <Text style={styles.subtitle}>Enter your details to complete your Womup profile</Text>
 
           {/* Registration Hours Closed Warning Banner */}
           {!timingAllowed && (
@@ -381,17 +381,17 @@ export const S08_CreateAccountScreen: React.FC = () => {
             </View>
           </View>
 
-          {/* Split Name Fields: First Name + Surname */}
+          {/* Split Name Fields: First Name + Surname (As per Aadhar Card) */}
           <View style={styles.labelRow}>
             <Text style={styles.label}>
-              First Name <Text style={styles.requiredAsterisk}>*</Text>
+              First Name <Text style={styles.aadharTag}>(as per Aadhar card)</Text> <Text style={styles.requiredAsterisk}>*</Text>
             </Text>
           </View>
           <View style={[styles.inputContainer, errors.firstName ? styles.inputError : null]}>
             <Ionicons name="person-outline" size={18} color={COLORS.textMuted} style={styles.inputIcon} />
             <TextInput
               style={styles.input}
-              placeholder="e.g. Ramesh"
+              placeholder="First name as per Aadhar card (e.g. Ramesh)"
               placeholderTextColor={COLORS.secondaryText}
               value={firstName}
               onChangeText={(text) => {
@@ -405,14 +405,14 @@ export const S08_CreateAccountScreen: React.FC = () => {
 
           <View style={[styles.labelRow, { marginTop: 12 }]}>
             <Text style={styles.label}>
-              Surname <Text style={styles.requiredAsterisk}>*</Text>
+              Last Name / Surname <Text style={styles.aadharTag}>(as per Aadhar card)</Text> <Text style={styles.requiredAsterisk}>*</Text>
             </Text>
           </View>
           <View style={[styles.inputContainer, errors.surname ? styles.inputError : null]}>
             <Ionicons name="person-outline" size={18} color={COLORS.textMuted} style={styles.inputIcon} />
             <TextInput
               style={styles.input}
-              placeholder="e.g. Patel"
+              placeholder="Last name as per Aadhar card (e.g. Patel)"
               placeholderTextColor={COLORS.secondaryText}
               value={surname}
               onChangeText={(text) => {
@@ -881,6 +881,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.textPrimary,
     marginBottom: 6,
+  },
+  aadharTag: {
+    fontSize: 11.5,
+    fontWeight: '500',
+    color: '#0284C7',
   },
   requiredAsterisk: {
     color: COLORS.hotPink,

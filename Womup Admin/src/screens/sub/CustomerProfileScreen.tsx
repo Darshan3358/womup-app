@@ -415,13 +415,13 @@ export const CustomerProfileScreen: React.FC = () => {
             <View style={[styles.metricBox, { backgroundColor: '#FDF4FF', borderWidth: 1, borderColor: '#F0ABFC' }]}>
               <Text style={[styles.metricLabel, { color: '#A21CAF', fontWeight: '700' }]}>User Referral Code</Text>
               <Text style={[styles.metricValue, { color: '#86198F', fontSize: 15, fontWeight: '900' }]}>
-                {selectedCustomer.referralCode || 'WORM5871'}
+                {selectedCustomer.referralCode || 'WOMUP5871'}
               </Text>
             </View>
             <View style={[styles.metricBox, { backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE' }]}>
               <Text style={[styles.metricLabel, { color: '#1D4ED8', fontWeight: '700' }]}>Sponsor ID (Upline)</Text>
               <Text style={[styles.metricValue, { color: '#1E40AF', fontSize: 15, fontWeight: '900' }]}>
-                {selectedCustomer.sponsorCode || 'WORMUP001'}
+                {selectedCustomer.sponsorCode || 'WOMUP001'}
               </Text>
             </View>
           </View>

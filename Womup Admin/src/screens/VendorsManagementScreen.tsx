@@ -288,7 +288,7 @@ export const VendorsManagementScreen: React.FC = () => {
     const id = coinEditVendor.id || coinEditVendor._id;
     const val = parseFloat(quickCoinPercent);
     if (!id || isNaN(val) || val < 2 || val > 25) {
-      Alert.alert('Validation Error', 'Shopping Coin % must be between 2% and 25% per WormUp policy.');
+      Alert.alert('Validation Error', 'Shopping Coin % must be between 2% and 25% per Womup policy.');
       return;
     }
 
@@ -783,7 +783,7 @@ export const VendorsManagementScreen: React.FC = () => {
                       <Text style={styles.percentSuffix}>%</Text>
                     </View>
                     <Text style={styles.helperNote}>
-                      WormUp fee retained from offline vendor settlement
+                      Womup fee retained from offline vendor settlement
                     </Text>
                   </View>
                 </View>
@@ -1058,7 +1058,7 @@ export const VendorsManagementScreen: React.FC = () => {
 
                 <View style={styles.qrStandeeBanner}>
                   <Text style={styles.qrStandeeBannerText}>
-                    ⭐ Scan with WormUp & Earn {qrVendor?.shoppingCoinPercent}% Coins
+                    ⭐ Scan with Womup & Earn {qrVendor?.shoppingCoinPercent}% Coins
                   </Text>
                 </View>
               </View>

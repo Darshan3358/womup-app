@@ -56,7 +56,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
     (activeOrder as any)?.riderName ||
     (activeOrder as any)?.rider?.name ||
     '';
-  const cleanInitial = String(rawPartnerName || '').replace(/\s*\(Worm Up Express\)/gi, '').trim();
+  const cleanInitial = String(rawPartnerName || '').replace(/\s*\(Wom(?:r)?\s*Up\s*Express\)/gi, '').trim();
   const initialPartnerName =
     cleanInitial.toLowerCase().includes('rohit') || cleanInitial.toLowerCase() === 'delivery partner'
       ? ''
@@ -171,7 +171,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
       const p = activeOrder.deliveryPartner || activeOrder.deliveryPartnerId || (activeOrder as any).rider;
       if (p) {
         const raw = (p as any).name || (p as any).fullName || '';
-        const clean = String(raw || '').replace(/\s*\(Worm Up Express\)/gi, '').trim();
+        const clean = String(raw || '').replace(/\s*\(Wom(?:r)?\s*Up\s*Express\)/gi, '').trim();
         const formatted = clean.toLowerCase() === 'darshanthanki' ? 'DARSHAN THANKI' : clean;
         if (formatted && !formatted.toLowerCase().includes('rohit') && formatted.toLowerCase() !== 'delivery partner') {
           setPartner((prev) => ({
@@ -299,7 +299,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
 
       const pObj = data.rider || data.partner || data.deliveryPartner;
       const rawName = pObj?.name || pObj?.fullName || data.partnerName || data.riderName || '';
-      const cleanName = rawName.replace(/\s*\(Worm Up Express\)/gi, '').trim();
+      const cleanName = rawName.replace(/\s*\(Wom(?:r)?\s*Up\s*Express\)/gi, '').trim();
       const finalName = cleanName.toLowerCase() === 'darshanthanki' ? 'DARSHAN THANKI' : cleanName;
       if (finalName && !finalName.toLowerCase().includes('rohit') && finalName.toLowerCase() !== 'delivery partner') {
         setPartner((prev) => ({
@@ -396,7 +396,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
           const pObj = fresh?.deliveryPartner || fresh?.deliveryPartnerId || fresh?.rider;
           if (pObj && (pObj.name || pObj.fullName)) {
             const raw = pObj.name || pObj.fullName || '';
-            const clean = raw.replace(/\s*\(Worm Up Express\)/gi, '').trim();
+            const clean = raw.replace(/\s*\(Wom(?:r)?\s*Up\s*Express\)/gi, '').trim();
             const finalName = clean;
             if (finalName && !finalName.toLowerCase().includes('rohit') && finalName.toLowerCase() !== 'delivery partner') {
               setPartner((prev) => ({
@@ -535,7 +535,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
         addToCart({
           id: it.productId?._id || it.productId || `prod_${Date.now()}`,
           name: it.name,
-          brand: 'Worm Up',
+          brand: 'Womup',
           categoryId: 'cooking',
           sellingPrice: it.price || it.unitPrice || 0,
           mrp: Math.round((it.price || it.unitPrice || 0) * 1.15),
@@ -726,7 +726,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
 
             <View style={styles.riderInfoCol}>
               <Text style={styles.blinkitRiderName} numberOfLines={1}>
-                {String(partner.name || '').replace(/\s*\(Worm Up Express\)/gi, '').trim() || 'DARSHAN THANKI'}
+                {String(partner.name || '').replace(/\s*\(Wom(?:r)?\s*Up\s*Express\)/gi, '').trim() || 'DARSHAN THANKI'}
               </Text>
               <View style={styles.riderMetaRow}>
                 <Text style={styles.riderVehicleText}>{partner.vehicleNumber || 'GJ 01 AB 3456'}</Text>
@@ -934,7 +934,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
             <Text style={styles.sectionHeading}>Delivery Address</Text>
           </View>
           <Text style={styles.recipientName}>
-            {activeOrder?.deliveryAddress?.fullName || user?.fullName || 'Worm Up Customer'} ({activeOrder?.deliveryAddress?.type || activeOrder?.deliveryAddress?.label || 'Home'})
+            {activeOrder?.deliveryAddress?.fullName || user?.fullName || 'Womup Customer'} ({activeOrder?.deliveryAddress?.type || activeOrder?.deliveryAddress?.label || 'Home'})
           </Text>
           <Text style={styles.addressLine}>
             {activeOrder?.deliveryAddress?.houseFlat
@@ -1183,7 +1183,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
 
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={() => Alert.alert('Worm Up Support', `For assistance with order ${orderNum}, call 1800-WORM-UP or email support@wormup.in`)}
+          onPress={() => Alert.alert('Womup Support', `For assistance with order ${orderNum}, call 1800-WOMUP or email support@womup.in`)}
           style={styles.supportOutlineBtn}
         >
           <Text style={styles.supportOutlineText}>Need Help with this Order?</Text>
@@ -1202,7 +1202,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
         partnerPhone={partner.phone}
         partnerVehicle={partner.vehicleNumber}
         customerId={(user as any)?.id || (user as any)?._id || 'cust_current'}
-        customerName={user?.fullName || 'Worm Up Customer'}
+        customerName={user?.fullName || 'Womup Customer'}
         liveStatus={liveStatus}
         socket={socketRef.current}
       />

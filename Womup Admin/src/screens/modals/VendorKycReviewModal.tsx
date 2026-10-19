@@ -29,6 +29,7 @@ import {
 } from 'lucide-react-native';
 import { ApiService } from '../../services/api';
 import { resolveImageUrl } from '../../utils/imageUrl';
+import { SafeDocImage } from '../../components/common/SafeDocImage';
 
 interface VendorKycReviewModalProps {
   isOpen: boolean;
@@ -590,19 +591,13 @@ const DocThumbnail: React.FC<{ title: string; url?: string; onZoom: () => void }
     <Text style={styles.docTitle} numberOfLines={1}>
       {title}
     </Text>
-    {url ? (
-      <TouchableOpacity activeOpacity={0.8} onPress={onZoom} style={styles.docImgWrap}>
-        <Image source={{ uri: resolveImageUrl(url) }} style={styles.docImg} resizeMode="cover" />
-        <View style={styles.zoomOverlay}>
-          <Maximize2 size={14} color="#FFFFFF" />
-        </View>
-      </TouchableOpacity>
-    ) : (
-      <View style={styles.docEmpty}>
-        <AlertCircle size={18} color="#94A3B8" />
-        <Text style={styles.docMissingText}>Missing</Text>
-      </View>
-    )}
+    <SafeDocImage
+      url={url}
+      title={title}
+      style={styles.docImg}
+      containerStyle={styles.docImgWrap}
+      onPress={url ? onZoom : undefined}
+    />
   </View>
 );
 

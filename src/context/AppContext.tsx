@@ -72,7 +72,7 @@ export const mapBlinkitToProduct = (bp: BlinkitProduct): Product => ({
 const DEFAULT_FALLBACK_PRODUCT: Product = {
   id: 'prod_default',
   name: 'Loading Products...',
-  brand: 'Worm Up',
+  brand: 'Womup',
   categoryId: 'cooking',
   quantityLabel: '1 unit',
   mrp: 100,

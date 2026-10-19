@@ -144,7 +144,7 @@ export const S09_ReferralCodeScreen: React.FC = () => {
 
         <Text style={styles.title}>Sponsor / Referral ID</Text>
         <Text style={styles.subtitle}>
-          Enter your Sponsor ID if you were invited, or leave blank to join directly under WormUp.
+          Enter your Sponsor ID if you were invited, or leave blank to join directly under Womup.
         </Text>
 
         {/* ₹2,000 Shopping Coins Welcome Callout */}
@@ -200,7 +200,7 @@ export const S09_ReferralCodeScreen: React.FC = () => {
         <View style={styles.defaultSponsorNote}>
           <Ionicons name="information-circle-outline" size={16} color={COLORS.navy} />
           <Text style={styles.defaultSponsorNoteText}>
-            💡 If left blank, you will automatically join under <Text style={{ fontWeight: '700' }}>WormUp Company</Text> (Default Root Sponsor: WORMUP001).
+            💡 If left blank, you will automatically join under <Text style={{ fontWeight: '700' }}>Womup Company</Text> (Default Root Sponsor: WORMUP001).
           </Text>
         </View>
 
@@ -223,7 +223,7 @@ export const S09_ReferralCodeScreen: React.FC = () => {
           disabled={loading}
           style={styles.skipButton}
         >
-          <Text style={styles.skipText}>{loading ? 'Please wait...' : 'Skip (Join WormUp Directly)'}</Text>
+          <Text style={styles.skipText}>{loading ? 'Please wait...' : 'Skip (Join Womup Directly)'}</Text>
         </TouchableOpacity>
       </View>
 

@@ -20,7 +20,7 @@ export interface UseFileUploadOptions {
 
 export function useFileUpload(options: UseFileUploadOptions = {}) {
   const {
-    folder = 'wormup/kyc',
+    folder = 'womup/kyc',
     backendBaseUrl = 'http://localhost:5050/api/v1',
     entityType,
     entityId,

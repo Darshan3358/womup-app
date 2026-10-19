@@ -217,7 +217,7 @@ export const S27_ChatModal: React.FC<S27_ChatModalProps> = ({
         <View style={styles.adminMsgRow}>
           <View style={styles.adminBadge}>
             <Ionicons name="shield" size={12} color="#D97706" style={{ marginRight: 4 }} />
-            <Text style={styles.adminBadgeText}>Worm Up Support: {item.message}</Text>
+            <Text style={styles.adminBadgeText}>Womup Support: {item.message}</Text>
           </View>
         </View>
       );

@@ -105,7 +105,7 @@ class UniversalUploadService {
     options: UploadOptions = {},
   ): Promise<UploadResponse> {
     const {
-      folder = 'wormup/customer/kyc',
+      folder = 'womup/customer/kyc',
       entityType,
       entityId,
       fieldName,

@@ -246,7 +246,7 @@ export const S11_AddAddressScreen: React.FC = () => {
 
         if (errors.area) setErrors((prev) => ({ ...prev, area: '' }));
       } else {
-        const errorMsg = detected?.message || 'Sorry, WormUp delivery is not available at this location.';
+        const errorMsg = detected?.message || 'Sorry, Womup delivery is not available at this location.';
         setDetectedStoreInfo({
           areaName: undefined,
           storeName: undefined,
@@ -295,7 +295,7 @@ export const S11_AddAddressScreen: React.FC = () => {
     setIsUnserviceableModalVisible(false);
     Alert.alert(
       'Notification Saved',
-      `Thank you! We've noted your interest. We'll notify you as soon as Worm Up launches in ${unserviceableCity || 'your city'}.`
+      `Thank you! We've noted your interest. We'll notify you as soon as Womup launches in ${unserviceableCity || 'your city'}.`
     );
   };
 

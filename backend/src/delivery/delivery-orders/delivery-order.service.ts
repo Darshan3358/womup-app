@@ -53,7 +53,11 @@ export class DeliveryOrderService implements OnModuleInit {
   private async getPartner(userId: string): Promise<DeliveryPartnerDocument> {
     const userObjId = Types.ObjectId.isValid(userId) ? new Types.ObjectId(userId) : null;
     let partner = await this.partnerModel.findOne({
-      $or: [{ userId: userObjId }, { userId: userId }],
+      $or: [
+        ...(userObjId ? [{ userId: userObjId }, { _id: userObjId }] : []),
+        { partnerCode: userId },
+        { riderCode: userId },
+      ],
     });
     if (!partner && userObjId) {
       const user = await this.partnerModel.db.collection('users').findOne({ _id: userObjId });

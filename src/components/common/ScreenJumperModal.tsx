@@ -110,7 +110,7 @@ export const ScreenJumperModal: React.FC = () => {
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <View>
-              <Text style={styles.modalTitle}>Worm Up Screen Jumper</Text>
+              <Text style={styles.modalTitle}>Womup Screen Jumper</Text>
               <Text style={styles.modalSubtitle}>Select any of the 26 wireframe screens</Text>
             </View>
             <TouchableOpacity

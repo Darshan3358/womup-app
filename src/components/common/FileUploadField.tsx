@@ -25,7 +25,7 @@ export const FileUploadField: React.FC<FileUploadFieldProps> = ({
   label,
   required = false,
   value,
-  folder = 'wormup/kyc',
+  folder = 'womup/kyc',
   onUploadComplete,
   helperText,
 }) => {

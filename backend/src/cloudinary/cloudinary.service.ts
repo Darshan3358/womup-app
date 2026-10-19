@@ -38,7 +38,7 @@ export class CloudinaryService {
   async uploadImage(
     file: Express.Multer.File,
     folder: string = CLOUDINARY_FOLDERS.PRODUCTS_MAIN,
-    tags: string[] = ['wormup'],
+    tags: string[] = ['womup'],
   ): Promise<MediaAsset> {
     if (!file || !file.buffer) {
       throw new BadRequestException('Invalid file: File buffer is empty or missing.');
@@ -71,7 +71,9 @@ export class CloudinaryService {
               const serverBaseUrl =
                 process.env.BACKEND_PUBLIC_URL ||
                 process.env.RENDER_EXTERNAL_URL ||
-                'https://womup-app-uquz.onrender.com';
+                (process.env.NODE_ENV === 'production'
+                  ? 'https://womup-app-uquz.onrender.com'
+                  : 'http://localhost:5050');
               const localUrl = `${serverBaseUrl}/uploads/${cleanFileName}`;
 
               return resolve({
@@ -207,13 +209,13 @@ export class CloudinaryService {
   /**
    * Generate signed Cloudinary upload parameters for secure direct client uploads
    */
-  generateSignature(folder = 'wormup/rider/kyc', publicId?: string) {
+  generateSignature(folder = 'womup/rider/kyc', publicId?: string) {
     const timestamp = Math.round(new Date().getTime() / 1000);
-    const cloudName = this.configService.get<string>('CLOUDINARY_CLOUD_NAME') || 'wormup';
+    const cloudName = this.configService.get<string>('CLOUDINARY_CLOUD_NAME') || 'womup';
     const apiKey = this.configService.get<string>('CLOUDINARY_API_KEY') || '';
     const apiSecret = this.configService.get<string>('CLOUDINARY_API_SECRET') || '';
 
-    const cleanFolder = (folder || 'wormup/rider/kyc').trim().replace(/^\/+|\/+$/g, '');
+    const cleanFolder = (folder || 'womup/rider/kyc').trim().replace(/^\/+|\/+$/g, '');
     const paramsToSign: Record<string, any> = {
       folder: cleanFolder,
       timestamp,

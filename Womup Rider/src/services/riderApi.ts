@@ -537,8 +537,17 @@ export class RiderApiService {
     }
 
     const headers = await this.getAuthHeader();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      try { controller.abort(); } catch (e) {}
+    }, 6000);
+
     try {
-      const res = await fetch(`${this.getApiBaseUrl()}/delivery/me`, { headers });
+      const res = await fetch(`${this.getApiBaseUrl()}/delivery/me`, {
+        headers,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
       if (res.status === 401) {
         await this.clearAuth();
         throw new Error('SESSION_EXPIRED');
@@ -628,8 +637,17 @@ export class RiderApiService {
     }
 
     const headers = await this.getAuthHeader();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      try { controller.abort(); } catch (e) {}
+    }, 6000);
+
     try {
-      const res = await fetch(`${this.getApiBaseUrl()}/delivery/active-order`, { headers });
+      const res = await fetch(`${this.getApiBaseUrl()}/delivery/active-order`, {
+        headers,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
       if (res.status === 401) {
         await this.clearAuth();
         return null;

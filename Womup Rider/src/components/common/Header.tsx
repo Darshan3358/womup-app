@@ -10,7 +10,7 @@ export const Header: React.FC = () => {
     <View style={styles.container}>
       <View style={styles.leftRow}>
         <View style={styles.logoBadge}>
-          <Text style={styles.logoText}>WORM UP</Text>
+          <Text style={styles.logoText}>WOMUP</Text>
           <View style={styles.partnerPill}>
             <Text style={styles.partnerText}>PARTNER</Text>
           </View>

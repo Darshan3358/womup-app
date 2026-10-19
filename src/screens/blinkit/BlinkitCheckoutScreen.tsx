@@ -1756,7 +1756,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
               Arriving in 9 minutes ⚡
             </Text>
             <Text style={styles.successDesc}>
-              Your items are being packed at the nearest Worm Up dark store.
+              Your items are being packed at the nearest Womup dark store.
             </Text>
 
             <TouchableOpacity

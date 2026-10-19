@@ -87,7 +87,7 @@ export const OrderInspectorScreen: React.FC = () => {
         body: JSON.stringify({
           senderId: 'admin_support_console',
           senderRole: 'ADMIN',
-          senderName: 'Worm Up Dispatch Support',
+          senderName: 'Womup Dispatch Support',
           message: text,
         }),
       });

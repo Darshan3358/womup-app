@@ -14,7 +14,7 @@ import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
 async function bootstrap() {
-  const logger = new Logger('WormUpBackend');
+  const logger = new Logger('WomupBackend');
   const app = await NestFactory.create(AppModule);
 
   // Enable CORS for mobile app, web, and admin panel
@@ -24,13 +24,55 @@ async function bootstrap() {
     credentials: true,
   });
 
+  // Gzip / Deflate payload compression - compresses multi-megabyte payloads down to ~1MB
+  const compression = require('compression');
+  app.use(compression());
+
   // Support high-resolution uploaded images & document payloads up to 50MB
   const express = require('express');
   const path = require('path');
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
-  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
-  app.use('/api/v1/uploads/files', express.static(path.join(process.cwd(), 'uploads')));
+  const uploadsPath = path.join(process.cwd(), 'uploads');
+  const staticUploadOptions = {
+    maxAge: '1d',
+    setHeaders: (res: any, filePath: string) => {
+      const lower = filePath.toLowerCase();
+      if (lower.endsWith('.jpeg') || lower.endsWith('.jpg')) {
+        res.setHeader('Content-Type', 'image/jpeg');
+      } else if (lower.endsWith('.png')) {
+        res.setHeader('Content-Type', 'image/png');
+      } else if (lower.endsWith('.webp')) {
+        res.setHeader('Content-Type', 'image/webp');
+      } else if (lower.endsWith('.gif')) {
+        res.setHeader('Content-Type', 'image/gif');
+      } else if (lower.endsWith('.pdf')) {
+        res.setHeader('Content-Type', 'application/pdf');
+      }
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    },
+  };
+
+  app.use('/uploads', express.static(uploadsPath, staticUploadOptions));
+  app.use('/api/v1/uploads/files', express.static(uploadsPath, staticUploadOptions));
+
+  // Image fallback: return 200 OK transparent PNG to prevent browser ORB (Opaque Response Blocking) errors
+  app.use(['/uploads', '/api/v1/uploads/files'], (req: any, res: any, next: any) => {
+    const url = req.url || '';
+    if (/\.(jpg|jpeg|png|webp|gif|svg)$/i.test(url) || req.headers.accept?.includes('image/')) {
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      const transparentPixel = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+        'base64',
+      );
+      return res.status(200).send(transparentPixel);
+    }
+    next();
+  });
 
   // Global Validation & Serialization
   app.useGlobalPipes(

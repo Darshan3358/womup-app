@@ -101,7 +101,7 @@ export const WalletsRevenueScreen: React.FC = () => {
   const [requestsFilter, setRequestsFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
   const [showUpiConfigModal, setShowUpiConfigModal] = useState<boolean>(false);
   const [companyUpiId, setCompanyUpiId] = useState<string>('wormup@okicici');
-  const [companyUpiName, setCompanyUpiName] = useState<string>('WormUp Technologies Pvt Ltd');
+  const [companyUpiName, setCompanyUpiName] = useState<string>('Womup Technologies Pvt Ltd');
   const [companySupportPhone, setCompanySupportPhone] = useState<string>('+91 98765 43210');
   const [companyUpiSaving, setCompanyUpiSaving] = useState<boolean>(false);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
@@ -1758,7 +1758,7 @@ export const WalletsRevenueScreen: React.FC = () => {
             <Text style={[styles.formInputLabel, { marginTop: 12 }]}>Account Holder Name / Entity</Text>
             <TextInput
               style={styles.formTextInput}
-              placeholder="e.g. WormUp Technologies Pvt Ltd"
+              placeholder="e.g. Womup Technologies Pvt Ltd"
               value={companyUpiName}
               onChangeText={setCompanyUpiName}
             />

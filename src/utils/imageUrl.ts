@@ -1,7 +1,31 @@
+import { Platform } from 'react-native';
+
+const getUploadsBaseUrl = (): string => {
+  if (typeof window !== 'undefined' && window.location) {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') {
+      return 'http://localhost:5050';
+    }
+  }
+
+  // React Native Native platforms (Android emulator vs iOS)
+  if (typeof Platform !== 'undefined') {
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      if (Platform.OS === 'android') {
+        return 'http://10.0.2.2:5050';
+      }
+      return 'http://localhost:5050';
+    }
+  }
+
+  return 'https://womup-app-uquz.onrender.com';
+};
+
 /**
  * Universal Image URL Resolver
- * Automatically resolves localhost/127.0.0.1 URLs to the public cloud URL
- * so images load identically across Web and Native mobile apps (Android/iOS).
+ * Automatically resolves image URLs accurately between local development
+ * environments and cloud production so images load identically across Web
+ * and Native mobile apps without ERR_BLOCKED_BY_ORB or 404s.
  */
 export const resolveImageUrl = (url?: string | null): string => {
   if (!url || typeof url !== 'string') return '';
@@ -9,21 +33,32 @@ export const resolveImageUrl = (url?: string | null): string => {
   if (!trimmed) return '';
 
   // Data URIs or local file paths
-  if (trimmed.startsWith('data:') || trimmed.startsWith('file://')) {
+  if (trimmed.startsWith('data:') || trimmed.startsWith('file://') || trimmed.startsWith('blob:')) {
     return trimmed;
   }
 
-  // Localhost / 127.0.0.1 local server URLs
-  if (trimmed.includes('localhost') || trimmed.includes('127.0.0.1')) {
-    const filename = trimmed.split('/uploads/')[1] || trimmed.split('/').pop();
+  // External CDN URLs (Cloudinary, Unsplash, Google, etc.) - keep unchanged
+  if (
+    trimmed.includes('res.cloudinary.com') ||
+    trimmed.includes('images.unsplash.com') ||
+    trimmed.includes('googleusercontent.com')
+  ) {
+    return trimmed;
+  }
+
+  // If the URL contains an /uploads/ asset path
+  if (trimmed.includes('/uploads/')) {
+    const filename = trimmed.split('/uploads/')[1]?.split('?')[0];
     if (filename) {
-      return `https://womup-app-uquz.onrender.com/uploads/${filename}`;
+      const base = getUploadsBaseUrl();
+      return `${base}/uploads/${filename}`;
     }
   }
 
   // Relative /uploads paths
   if (trimmed.startsWith('/uploads/')) {
-    return `https://womup-app-uquz.onrender.com${trimmed}`;
+    const base = getUploadsBaseUrl();
+    return `${base}${trimmed}`;
   }
 
   // Insecure HTTP to HTTPS conversion for public render domain

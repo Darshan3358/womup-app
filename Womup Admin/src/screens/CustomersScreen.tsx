@@ -44,6 +44,7 @@ import { COLORS, RADIUS, SPACING } from '../theme';
 import { useAdminState } from '../context/AdminStateContext';
 import { Customer, DeliveryPartnerItem } from '../types/admin';
 import { resolveImageUrl } from '../utils/imageUrl';
+import { SafeDocImage } from '../components/common/SafeDocImage';
 import { ApiService } from '../services/api';
 import { CustomerKycReviewModal } from './modals/CustomerKycReviewModal';
 import { CustomerListSkeleton } from '../components/common/Skeleton';
@@ -1170,29 +1171,21 @@ export const CustomersScreen: React.FC = () => {
                           </View>
                           {(selectedRider.documents?.aadhaarFront || selectedRider.documents?.aadhaarFrontUrl) ? (
                             <View style={styles.docThumbsRow}>
-                              <TouchableOpacity
-                                style={styles.docThumbContainer}
+                              <SafeDocImage
+                                url={selectedRider.documents?.aadhaarFront || selectedRider.documents?.aadhaarFrontUrl}
+                                title="Aadhaar Front"
+                                style={styles.docThumbImg}
+                                containerStyle={styles.docThumbContainer}
                                 onPress={() => setPreviewDoc({ title: 'Aadhaar Card (Front)', url: resolveImageUrl(selectedRider.documents?.aadhaarFront || selectedRider.documents?.aadhaarFrontUrl || '') })}
-                                activeOpacity={0.8}
-                              >
-                                <Image source={{ uri: resolveImageUrl(selectedRider.documents?.aadhaarFront || selectedRider.documents?.aadhaarFrontUrl) }} style={styles.docThumbImg} resizeMode="cover" />
-                                <View style={styles.docThumbOverlay}>
-                                  <Eye size={14} color="#FFF" />
-                                  <Text style={styles.docThumbText}>Front</Text>
-                                </View>
-                              </TouchableOpacity>
+                              />
                               {(selectedRider.documents?.aadhaarBack || selectedRider.documents?.aadhaarBackUrl) && (
-                                <TouchableOpacity
-                                  style={styles.docThumbContainer}
+                                <SafeDocImage
+                                  url={selectedRider.documents?.aadhaarBack || selectedRider.documents?.aadhaarBackUrl}
+                                  title="Aadhaar Back"
+                                  style={styles.docThumbImg}
+                                  containerStyle={styles.docThumbContainer}
                                   onPress={() => setPreviewDoc({ title: 'Aadhaar Card (Back)', url: resolveImageUrl(selectedRider.documents?.aadhaarBack || selectedRider.documents?.aadhaarBackUrl || '') })}
-                                  activeOpacity={0.8}
-                                >
-                                  <Image source={{ uri: resolveImageUrl(selectedRider.documents?.aadhaarBack || selectedRider.documents?.aadhaarBackUrl) }} style={styles.docThumbImg} resizeMode="cover" />
-                                  <View style={styles.docThumbOverlay}>
-                                    <Eye size={14} color="#FFF" />
-                                    <Text style={styles.docThumbText}>Back</Text>
-                                  </View>
-                                </TouchableOpacity>
+                                />
                               )}
                             </View>
                           ) : (

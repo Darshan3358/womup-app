@@ -14,3 +14,7 @@ yarn-error.log*
 # OS Files
 .DS_Store
 Thumbs.db
+
+# Ephemeral uploads
+uploads/*
+!uploads/.gitkeep

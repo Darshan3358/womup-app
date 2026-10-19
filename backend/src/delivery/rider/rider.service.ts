@@ -41,12 +41,19 @@ export class RiderService {
   ) {}
 
   async getPartnerByUserId(userId: string): Promise<DeliveryPartnerDocument> {
-    let partner = await this.partnerModel.findOne({ userId: new Types.ObjectId(userId) });
-    if (!partner) {
+    const userObjId = Types.ObjectId.isValid(userId) ? new Types.ObjectId(userId) : null;
+    let partner = await this.partnerModel.findOne({
+      $or: [
+        ...(userObjId ? [{ userId: userObjId }, { _id: userObjId }] : []),
+        { partnerCode: userId },
+        { riderCode: userId },
+      ],
+    });
+    if (!partner && userObjId) {
       // Find or create registered delivery partner document for this user in DB
-      const user = await this.partnerModel.db.collection('users').findOne({ _id: new Types.ObjectId(userId) });
+      const user = await this.partnerModel.db.collection('users').findOne({ _id: userObjId });
       partner = await this.partnerModel.create({
-        userId: new Types.ObjectId(userId),
+        userId: userObjId,
         partnerCode: `RDR-${Math.floor(1000 + Math.random() * 9000)}`,
         fullName: user?.name || 'Delivery Partner',
         phoneNumber: user?.phone || '9876543210',
@@ -324,17 +331,7 @@ export class RiderService {
       },
     );
 
-    // 4. Log telemetry
-    await this.locationLogModel.create({
-      riderId: partner._id,
-      orderId: data.orderId ? new Types.ObjectId(data.orderId) : partner.currentOrderId,
-      latitude: data.latitude,
-      longitude: data.longitude,
-      speedKmph: data.speed || 0,
-      headingDegrees: data.heading || 0,
-    });
-
-    // 5. Broadcast via tracking gateway if active order
+    // 4. Broadcast via tracking gateway if active order
     const activeOrderId = (data.orderId || partner.currentOrderId)?.toString();
     if (activeOrderId) {
       this.trackingGateway.handleLocationUpdate({
@@ -343,6 +340,16 @@ export class RiderService {
         latitude: data.latitude,
         longitude: data.longitude,
       });
+
+      // Log telemetry asynchronously without blocking event loop
+      this.locationLogModel.create({
+        riderId: partner._id,
+        orderId: new Types.ObjectId(activeOrderId),
+        latitude: data.latitude,
+        longitude: data.longitude,
+        speedKmph: safeSpeed,
+        headingDegrees: safeHeading,
+      }).catch(() => {});
     }
 
     return { success: true };
