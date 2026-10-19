@@ -12,7 +12,13 @@ interface FloatingCartPillProps {
 export const FloatingCartPill: React.FC<FloatingCartPillProps> = ({
   bottomOffset = 72,
 }) => {
-  const { blinkitCartCount, blinkitCartTotal, setActiveScreen } = useApp();
+  const {
+    blinkitCartCount,
+    blinkitCartTotal,
+    setActiveScreen,
+    isAuthenticated,
+    openAuthPrompt,
+  } = useApp();
 
   if (blinkitCartCount <= 0) return null;
 
@@ -20,7 +26,13 @@ export const FloatingCartPill: React.FC<FloatingCartPillProps> = ({
     <View style={[styles.wrapper, { bottom: bottomOffset }]}>
       <TouchableOpacity
         activeOpacity={0.85}
-        onPress={() => setActiveScreen('Blinkit_Cart')}
+        onPress={() => {
+          if (!isAuthenticated) {
+            openAuthPrompt('Please sign in or register to view your cart and checkout.', 'Your Cart');
+          } else {
+            setActiveScreen('Blinkit_Cart');
+          }
+        }}
         style={styles.touchable}
         accessibilityLabel={`View cart with ${blinkitCartCount} items`}
       >

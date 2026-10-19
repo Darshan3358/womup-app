@@ -256,6 +256,14 @@ interface AppContextType {
     couponCode?: string;
   };
   emitCheckoutChange: (payload: any) => void;
+
+  // Guest Activity Auth Guard Modal
+  isAuthPromptVisible: boolean;
+  authPromptMessage: string;
+  authPromptActionName: string;
+  openAuthPrompt: (message?: string, actionName?: string) => void;
+  closeAuthPrompt: () => void;
+  requestLocationPermissionAndDetect: () => Promise<void>;
 }
 
 const DEFAULT_FILTERS: FilterSortState = {
@@ -639,12 +647,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     (user.email.length > 0 || user.phoneNumber.length > 0)
   );
 
-  const handleOnboardingSkip = () => {
-    if (isAuthenticated) {
-      navigateTo('Blinkit_Home');
-    } else {
-      navigateTo('C06_MobileNumber');
+  // Guest Activity Auth Guard Modal State
+  const [isAuthPromptVisible, setIsAuthPromptVisible] = useState<boolean>(false);
+  const [authPromptMessage, setAuthPromptMessage] = useState<string>('');
+  const [authPromptActionName, setAuthPromptActionName] = useState<string>('');
+
+  const openAuthPrompt = useCallback((message?: string, actionName?: string) => {
+    setAuthPromptMessage(message || 'Please sign in or register to continue.');
+    setAuthPromptActionName(actionName || 'Login or Register');
+    setIsAuthPromptVisible(true);
+  }, []);
+
+  const closeAuthPrompt = useCallback(() => {
+    setIsAuthPromptVisible(false);
+  }, []);
+
+  const requestLocationPermissionAndDetect = useCallback(async () => {
+    try {
+      const loc = await LocationService.getCurrentLocation();
+      if (loc) {
+        await setActiveGpsLocation(loc);
+      }
+    } catch (err) {
+      console.log('[AppContext] Location permission prompt / detection:', err);
     }
+  }, [setActiveGpsLocation]);
+
+  const handleOnboardingSkip = () => {
+    navigateTo('Blinkit_Home');
   };
 
   // Auto-sync User Profile changes to storage
@@ -740,6 +770,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const toggleWishlist = (product: BlinkitProduct) => {
+    if (!isAuthenticated) {
+      openAuthPrompt(
+        'Please login or register to save items to your wishlist.',
+        'Wishlist'
+      );
+      return;
+    }
     setWishlist((prev) => {
       const exists = prev.some((item) => item.id === product.id);
       const updated = exists ? prev.filter((item) => item.id !== product.id) : [product, ...prev];
@@ -1721,6 +1758,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const cartSummary = CartService.calculateSummary(cart, appliedCoins, 40);
 
   const addToCart = (product: Product) => {
+    if (!isAuthenticated) {
+      openAuthPrompt(
+        'Please login or register with your email or mobile to add items to your cart.',
+        'Add to Cart'
+      );
+      return;
+    }
     // 1. Update legacy cart
     setCart((prev) => {
       const existing = prev.find((item) => item.product.id === product.id);
@@ -2024,6 +2068,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateBlinkitQty = (product: BlinkitProduct, delta: number, variantId?: string) => {
+    if (delta > 0 && !isAuthenticated) {
+      openAuthPrompt(
+        'Please login or register with your email or mobile to add items to your cart.',
+        'Add to Cart'
+      );
+      return;
+    }
     const resolvedVariantId =
       variantId ||
       (product as any).selectedVariantId ||
@@ -2274,6 +2325,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         logout,
         liveCheckoutState,
         emitCheckoutChange,
+        isAuthPromptVisible,
+        authPromptMessage,
+        authPromptActionName,
+        openAuthPrompt,
+        closeAuthPrompt,
+        requestLocationPermissionAndDetect,
       }}
     >
       {children}

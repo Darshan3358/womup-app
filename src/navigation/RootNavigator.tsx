@@ -7,8 +7,8 @@ import { LocationPickerModal } from '../components/common/LocationPickerModal';
 import { DistrictModal } from '../components/common/DistrictModal';
 import { COLORS } from '../theme/colors';
 
-// Allowed screens when user is not authenticated (AuthStack)
-const AUTH_STACK_SCREENS = [
+// Allowed screens when user is not authenticated (AuthStack + Public Browsing)
+const GUEST_ALLOWED_SCREENS = [
   'C01_Splash',
   'C02_Onboarding1',
   'C03_Onboarding2',
@@ -19,6 +19,17 @@ const AUTH_STACK_SCREENS = [
   'C08_CreateAccount',
   'C09_ReferralCode',
   'C10_LocationPermission',
+  'Blinkit_Home',
+  'Blinkit_Categories',
+  'Blinkit_ProductDetail',
+  'Local_Home',
+  'C12_Home',
+  'C13_Category',
+  'C14_SubCategory',
+  'C15_ProductListing',
+  'C16_ProductDetails',
+  'C17_Search',
+  'C18_FilterSort',
 ];
 
 // Blinkit Screens
@@ -33,6 +44,7 @@ import { BlinkitCartScreen } from '../screens/blinkit/BlinkitCartScreen';
 import { BlinkitCheckoutScreen } from '../screens/blinkit/BlinkitCheckoutScreen';
 import { BlinkitWishlistScreen } from '../screens/blinkit/BlinkitWishlistScreen';
 import { LocalShopHomeScreen } from '../local-shop-module/screens/LocalShopHomeScreen';
+import { AuthPromptModal } from '../components/common/AuthPromptModal';
 
 // Legacy screens for backward compatibility
 import { S01_SplashScreen } from '../screens/S01_SplashScreen';
@@ -64,14 +76,13 @@ import { S26_AccountScreen } from '../screens/S26_AccountScreen';
 import { KYCScreen } from '../screens/KYCScreen';
 
 export const RootNavigator: React.FC = () => {
-  const { activeScreen, setActiveScreen, goBack, canGoBack } = useApp();
+  const { activeScreen, setActiveScreen, goBack, canGoBack, openAuthPrompt } = useApp();
   const { isAuthenticated, isLoading } = useAuth();
 
-  // Enforce Layer 2 Navigation Guard:
-  // If user is not authenticated, they can only view screens in AUTH_STACK_SCREENS.
-  // Any attempt to view protected screens redirects directly to Login.
+  // Enforce Navigation Guard:
+  // If user is not authenticated and attempts to view a protected screen, redirect to Login
   useEffect(() => {
-    if (!isLoading && !isAuthenticated && !AUTH_STACK_SCREENS.includes(activeScreen)) {
+    if (!isLoading && !isAuthenticated && !GUEST_ALLOWED_SCREENS.includes(activeScreen)) {
       setActiveScreen('C06_MobileNumber');
     }
   }, [isLoading, isAuthenticated, activeScreen, setActiveScreen]);
@@ -106,18 +117,18 @@ export const RootNavigator: React.FC = () => {
     }
   }, [activeScreen, canGoBack, goBack]);
 
-  // Screens that show bottom navigation bar (ONLY when authenticated)
+  // Screens that show bottom navigation bar (Guest & Authenticated)
   const isMainTabScreen =
-    isAuthenticated &&
-    (activeScreen === 'Blinkit_Home' ||
-      activeScreen === 'Blinkit_OrderAgain' ||
-      activeScreen === 'Blinkit_Categories' ||
-      activeScreen === 'Blinkit_Profile' ||
-      activeScreen === 'C12_Home' ||
-      activeScreen === 'C13_Category' ||
-      activeScreen === 'C19_Cart' ||
-      activeScreen === 'C25_OrderHistory' ||
-      activeScreen === 'C26_Account');
+    activeScreen === 'Blinkit_Home' ||
+    activeScreen === 'Blinkit_OrderAgain' ||
+    activeScreen === 'Blinkit_Categories' ||
+    activeScreen === 'Blinkit_Profile' ||
+    activeScreen === 'Local_Home' ||
+    activeScreen === 'C12_Home' ||
+    activeScreen === 'C13_Category' ||
+    activeScreen === 'C19_Cart' ||
+    activeScreen === 'C25_OrderHistory' ||
+    activeScreen === 'C26_Account';
 
   const getCurrentTabKey = (): BlinkitTabKey => {
     switch (activeScreen) {
@@ -149,14 +160,22 @@ export const RootNavigator: React.FC = () => {
       case 'App':
         setActiveScreen('Local_Home');
         break;
-      case 'Order Again':
-        setActiveScreen('Blinkit_OrderAgain');
-        break;
       case 'Categories':
         setActiveScreen('Blinkit_Categories');
         break;
+      case 'Order Again':
+        if (!isAuthenticated) {
+          openAuthPrompt('Please sign in or register to view your previous orders and reorder.', 'Order History');
+        } else {
+          setActiveScreen('Blinkit_OrderAgain');
+        }
+        break;
       case 'Profile':
-        setActiveScreen('Blinkit_Profile');
+        if (!isAuthenticated) {
+          openAuthPrompt('Please sign in or register to access your account profile, addresses, and settings.', 'My Profile');
+        } else {
+          setActiveScreen('Blinkit_Profile');
+        }
         break;
     }
   };
@@ -167,36 +186,12 @@ export const RootNavigator: React.FC = () => {
       return <S01_SplashScreen />;
     }
 
-    // 2. Unauthenticated User (AuthStack ONLY)
-    // Non-logged-in users CANNOT access any protected screen
-    if (!isAuthenticated) {
-      switch (activeScreen) {
-        case 'C01_Splash':
-          return <S01_SplashScreen />;
-        case 'C02_Onboarding1':
-          return <S02_Onboarding1Screen />;
-        case 'C03_Onboarding2':
-          return <S03_Onboarding2Screen />;
-        case 'C04_Onboarding3':
-          return <S04_Onboarding3Screen />;
-        case 'C05_Onboarding4':
-          return <S05_Onboarding4Screen />;
-        case 'C06_MobileNumber':
-          return <S06_MobileNumberScreen />;
-        case 'C07_OtpVerification':
-          return <S07_OtpVerificationScreen />;
-        case 'C08_CreateAccount':
-          return <S08_CreateAccountScreen />;
-        case 'C09_ReferralCode':
-          return <S09_ReferralCodeScreen />;
-        case 'C10_LocationPermission':
-          return <S10_LocationPermissionScreen />;
-        default:
-          return <S06_MobileNumberScreen />;
-      }
+    // 2. Unauthenticated user accessing protected screen
+    if (!isAuthenticated && !GUEST_ALLOWED_SCREENS.includes(activeScreen)) {
+      return <S06_MobileNumberScreen />;
     }
 
-    // 3. Authenticated User (Full AppStack access)
+    // 3. Screen renderer
     switch (activeScreen) {
       // WOMUP Local Hyperlocal Shop & Earn
       case 'Local_Home':
@@ -290,7 +285,7 @@ export const RootNavigator: React.FC = () => {
     <View style={styles.container}>
       <View style={styles.screenContainer}>{renderCurrentScreen()}</View>
 
-      {/* 5-Tab Bottom Navigation for main tab screens (Authenticated Only) */}
+      {/* 5-Tab Bottom Navigation for main tab screens */}
       {isMainTabScreen && (
         <BottomNavigation
           currentTab={getCurrentTabKey()}
@@ -298,13 +293,10 @@ export const RootNavigator: React.FC = () => {
         />
       )}
 
-      {/* Global Modals (Authenticated Only) */}
-      {isAuthenticated && (
-        <>
-          <LocationPickerModal />
-          <DistrictModal />
-        </>
-      )}
+      {/* Global Modals (Available for all users) */}
+      <LocationPickerModal />
+      <DistrictModal />
+      <AuthPromptModal />
     </View>
   );
 };

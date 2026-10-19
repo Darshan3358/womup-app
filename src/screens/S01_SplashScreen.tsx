@@ -35,12 +35,8 @@ export const S01_SplashScreen: React.FC = () => {
     }
 
     if (setActiveScreenRef.current) {
-      // Golden Rule: Authenticated -> Home Page, Not Authenticated -> Login Page
-      if (authStateRef.current.isAuthenticated) {
-        setActiveScreenRef.current('Blinkit_Home');
-      } else {
-        setActiveScreenRef.current('C06_MobileNumber');
-      }
+      // Direct app open: Always navigate straight to Blinkit Home page!
+      setActiveScreenRef.current('Blinkit_Home');
     }
   };
 

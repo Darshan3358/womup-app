@@ -64,6 +64,8 @@ export const BlinkitHeader: React.FC<BlinkitHeaderProps> = ({
     blinkitCartCount,
     setIsVoiceSearchActive,
     user,
+    isAuthenticated,
+    openAuthPrompt,
   } = useApp();
 
   const totalCartCount = blinkitCartCount;
@@ -205,7 +207,13 @@ export const BlinkitHeader: React.FC<BlinkitHeaderProps> = ({
             {/* Wallet with balance badge */}
             <TouchableOpacity
               activeOpacity={0.8}
-              onPress={() => setActiveScreen('Blinkit_Money')}
+              onPress={() => {
+                if (!isAuthenticated) {
+                  openAuthPrompt('Please sign in or register to access your wallet and cashback earnings.', 'My Wallet');
+                } else {
+                  setActiveScreen('Blinkit_Money');
+                }
+              }}
               style={styles.actionIconButton}
               accessibilityLabel="Wallet"
             >
@@ -257,7 +265,13 @@ export const BlinkitHeader: React.FC<BlinkitHeaderProps> = ({
           {/* Cart Icon */}
           <TouchableOpacity
             activeOpacity={0.85}
-            onPress={() => setActiveScreen('Blinkit_Cart')}
+            onPress={() => {
+              if (!isAuthenticated) {
+                openAuthPrompt('Please sign in or register to view your cart and checkout.', 'Your Cart');
+              } else {
+                setActiveScreen('Blinkit_Cart');
+              }
+            }}
             style={styles.cartButton}
             accessibilityLabel="Shopping Cart"
           >

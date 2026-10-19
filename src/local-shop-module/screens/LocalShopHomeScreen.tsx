@@ -46,6 +46,8 @@ export const LocalShopHomeScreen: React.FC = () => {
     currentAreaName,
     setCurrentCityName,
     setCurrentArea,
+    isAuthenticated,
+    openAuthPrompt,
   } = useApp();
 
   // City & Area Modal State
@@ -152,6 +154,10 @@ export const LocalShopHomeScreen: React.FC = () => {
   }, [currentSubScreen, activeTab]);
 
   const handleSelectTab = (tab: LocalTabKey) => {
+    if ((tab === 'My Orders' || tab === 'My Coin' || tab === 'My Profile') && !isAuthenticated) {
+      openAuthPrompt('Please sign in or register to access this section.', 'Local Shop');
+      return;
+    }
     if (tab === 'Shops') {
       setSelectedCategory('');
       setSearchQuery('');
@@ -167,6 +173,10 @@ export const LocalShopHomeScreen: React.FC = () => {
 
   // Open Cart
   const handleOpenCart = (cart: LocalCartItem[]) => {
+    if (!isAuthenticated) {
+      openAuthPrompt('Please sign in or register to view your cart and place order.', 'Local Shop Cart');
+      return;
+    }
     setCurrentCart(cart);
     setCurrentSubScreen('cart');
   };
@@ -412,6 +422,10 @@ export const LocalShopHomeScreen: React.FC = () => {
         style={styles.floatingQRButton}
         activeOpacity={0.85}
         onPress={() => {
+          if (!isAuthenticated) {
+            openAuthPrompt('Please sign in or register to scan shop QR codes and pay.', 'Scan & Pay');
+            return;
+          }
           setSelectedVendor(null);
           setCurrentSubScreen('qr_scanner');
         }}

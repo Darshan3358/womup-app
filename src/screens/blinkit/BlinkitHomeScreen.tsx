@@ -46,9 +46,13 @@ export const BlinkitHomeScreen: React.FC = () => {
     isServiceable,
     deliveryEtaMinutes,
     setLocationModalVisible,
+    requestLocationPermissionAndDetect,
   } = useApp();
 
-
+  // Direct app open: Request location permission & detect location without registration
+  useEffect(() => {
+    requestLocationPermissionAndDetect?.();
+  }, [requestLocationPermissionAndDetect]);
 
   const [activeTab, setActiveTab] = useState('Home');
   const [isLoading, setIsLoading] = useState(true);
