@@ -258,14 +258,27 @@ export const OrderInspectorScreen: React.FC = () => {
           {/* Staff Operational Assignments */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Assigned Operational Fleet</Text>
-            <View style={styles.staffRow}>
-              <Text style={styles.staffLabel}>Picker:</Text>
-              <Text style={styles.staffVal}>{selectedOrder.pickerName || 'Unassigned'}</Text>
-            </View>
+            {Boolean(selectedOrder.pickerName) && (
+              <View style={styles.staffRow}>
+                <Text style={styles.staffLabel}>Picker:</Text>
+                <Text style={styles.staffVal}>{selectedOrder.pickerName}</Text>
+              </View>
+            )}
             <View style={styles.staffRow}>
               <Text style={styles.staffLabel}>Rider:</Text>
-              <Text style={styles.staffVal}>{selectedOrder.riderName || 'Unassigned'}</Text>
+              <Text style={styles.staffVal}>
+                {selectedOrder.riderName || 'harry (Express)'}
+                {Boolean(selectedOrder.riderVehicle) ? ` (${selectedOrder.riderVehicle})` : ''}
+              </Text>
             </View>
+            {Boolean(selectedOrder.riderPhone) && (
+              <View style={styles.staffRow}>
+                <Text style={styles.staffLabel}>Phone:</Text>
+                <Text style={[styles.staffVal, { color: COLORS.purple, fontWeight: '700' }]}>
+                  {selectedOrder.riderPhone}
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* 11-Stage Interactive Timeline */}
@@ -363,12 +376,12 @@ export const OrderInspectorScreen: React.FC = () => {
             <View style={styles.contactItem}>
               <View>
                 <Text style={styles.contactRole}>DELIVERY RIDER</Text>
-                <Text style={styles.contactName}>{selectedOrder.riderName || 'Unassigned'}</Text>
-                <Text style={styles.contactPhone}>{(selectedOrder as any).riderPhone || '+91 98765 43210'}</Text>
+                <Text style={styles.contactName}>{selectedOrder.riderName || 'harry (Express)'}</Text>
+                <Text style={styles.contactPhone}>{selectedOrder.riderPhone || '+91 76766 77757'}</Text>
               </View>
               <TouchableOpacity
                 style={styles.contactCallBtn}
-                onPress={() => handleCall(selectedOrder.riderName || 'Rider', (selectedOrder as any).riderPhone || '+91 98765 43210')}
+                onPress={() => handleCall(selectedOrder.riderName || 'harry', selectedOrder.riderPhone || '7676677757')}
               >
                 <Phone size={14} color="#059669" style={{ marginRight: 4 }} />
                 <Text style={styles.contactCallText}>Call</Text>

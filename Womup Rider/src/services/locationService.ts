@@ -101,18 +101,34 @@ export class LocationTrackerService {
   private static timer: ReturnType<typeof setInterval> | null = null;
   private static currentLatitude: number | null = null;
   private static currentLongitude: number | null = null;
+  private static lastSentLat: number | null = null;
+  private static lastSentLng: number | null = null;
+  private static lastSentTime = 0;
   private static isSimulated = false;
   private static hasSetLocation = false;
+  private static isPaused = false;
 
   static isLocationSet(): boolean {
     return this.hasSetLocation && this.currentLatitude !== null && this.currentLongitude !== null;
+  }
+
+  static pauseTracking(): void {
+    this.isPaused = true;
+  }
+
+  static resumeTracking(): void {
+    this.isPaused = false;
   }
 
   static clearLocation(): void {
     this.hasSetLocation = false;
     this.currentLatitude = null;
     this.currentLongitude = null;
+    this.lastSentLat = null;
+    this.lastSentLng = null;
+    this.lastSentTime = 0;
     this.isSimulated = false;
+    this.isPaused = false;
   }
 
   static getNearestHub(
@@ -233,12 +249,18 @@ export class LocationTrackerService {
     // Send initial location if available
     const initialCoords = this.getCurrentCoordinates();
     if (initialCoords) {
+      this.lastSentLat = initialCoords.latitude;
+      this.lastSentLng = initialCoords.longitude;
+      this.lastSentTime = Date.now();
       RiderApiService.sendLocationTelemetry(initialCoords).catch(() => {});
       if (onLocationUpdate) onLocationUpdate(initialCoords);
     }
 
-    // Stream GPS telemetry every 1 second while online
+    // Stream GPS telemetry every 5 seconds while online (Swiggy/Uber standard)
     this.timer = setInterval(async () => {
+      // Pause network telemetry if app is in background or paused
+      if (this.isPaused) return;
+
       // If not simulated and location is set, try reading device GPS
       if (!this.isSimulated && this.hasSetLocation) {
         try {
@@ -258,12 +280,25 @@ export class LocationTrackerService {
 
       const coords = this.getCurrentCoordinates();
       if (coords) {
-        await RiderApiService.sendLocationTelemetry(coords);
         if (onLocationUpdate) {
           onLocationUpdate(coords);
         }
+
+        // Throttle network dispatch: only send if moved > ~10m or 15s elapsed
+        const now = Date.now();
+        const latDiff = this.lastSentLat !== null ? Math.abs(coords.latitude - this.lastSentLat) : 999;
+        const lngDiff = this.lastSentLng !== null ? Math.abs(coords.longitude - this.lastSentLng) : 999;
+        const isSignificantMove = latDiff > 0.0001 || lngDiff > 0.0001;
+        const isHeartbeatDue = now - this.lastSentTime >= 15000;
+
+        if (isSignificantMove || isHeartbeatDue) {
+          this.lastSentLat = coords.latitude;
+          this.lastSentLng = coords.longitude;
+          this.lastSentTime = now;
+          await RiderApiService.sendLocationTelemetry(coords);
+        }
       }
-    }, 1000);
+    }, 5000);
   }
 
   static stopTracking() {

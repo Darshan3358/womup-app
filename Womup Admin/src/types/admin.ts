@@ -343,6 +343,8 @@ export interface Order {
   pickerName?: string;
   riderId?: string;
   riderName?: string;
+  riderPhone?: string;
+  riderVehicle?: string;
   timeAgo: string;
   timestamp: string;
   timeline: OrderAuditStep[];

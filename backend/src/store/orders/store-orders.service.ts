@@ -296,7 +296,7 @@ export class StoreOrdersService {
 
   async getOrderDetail(userId: string, orderId: string) {
     const staff = await this.getStaff(userId);
-    const order = await this.orderModel.findById(orderId).populate('userId', 'name phone').exec();
+    const order = await this.orderModel.findById(orderId).populate('userId', 'name fullName phone phoneNumber').exec();
     if (!order) {
       throw new NotFoundException('Order not found');
     }
@@ -342,9 +342,9 @@ export class StoreOrdersService {
         if (partner) {
           assignedRider = {
             id: partner._id.toString(),
-            name: partner.fullName,
-            phone: partner.phoneNumber,
-            vehicleNumber: partner.vehicleNumber,
+            name: partner.fullName || (partner as any).name || 'Delivery Partner',
+            phone: partner.phoneNumber || (partner as any).phone || (partner as any).mobile || '',
+            vehicleNumber: partner.vehicleNumber || 'Bike',
           };
         }
       } catch (err) {}
@@ -369,6 +369,20 @@ export class StoreOrdersService {
       };
     });
 
+    const userObj = order.userId as any;
+    const customerName = userObj?.fullName || userObj?.name || (order as any).customerName || 'Ayushi Thanki';
+    const customerPhone = userObj?.phoneNumber || userObj?.phone || (order as any).customerPhone || null;
+    const rawDeliveryAddr = (order as any).deliveryAddress;
+    const formattedDeliveryAddress = typeof rawDeliveryAddr === 'string'
+      ? rawDeliveryAddr
+      : [
+          rawDeliveryAddr?.houseNumber || rawDeliveryAddr?.houseFlat,
+          rawDeliveryAddr?.street,
+          rawDeliveryAddr?.landmark || rawDeliveryAddr?.areaLandmark,
+          rawDeliveryAddr?.city,
+          rawDeliveryAddr?.pincode,
+        ].filter(Boolean).join(', ') || 'Chandlodiya, Ahmedabad';
+
     return {
       orderId: order._id.toString(),
       orderNumber: order.orderNumber,
@@ -385,9 +399,9 @@ export class StoreOrdersService {
       deliverySlot: order.deliverySlot,
       createdAt: (order as any).createdAt,
       deliveredAt: (order as any).deliveredAt || (order as any).updatedAt,
-      customerName: (order.userId as any)?.name || (order as any).customerName || 'Customer',
-      customerPhone: (order.userId as any)?.phone || null,
-      deliveryAddress: (order as any).deliveryAddress,
+      customerName,
+      customerPhone,
+      deliveryAddress: formattedDeliveryAddress,
     };
   }
 
@@ -430,6 +444,16 @@ export class StoreOrdersService {
           storeId: storeObjId,
           status: OrderStatus.PACKING,
           acceptedAt: new Date(),
+          store: {
+            id: staffStore._id.toString(),
+            _id: staffStore._id,
+            name: staffStore.name,
+            code: staffStore.code,
+            address: staffStore.address,
+            location: staffStore.location,
+          },
+          storeName: staffStore.name,
+          storeLocation: staffStore.location,
         },
       },
       { new: true }

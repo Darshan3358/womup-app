@@ -119,12 +119,11 @@ export const S24_OrderTrackingScreen: React.FC = () => {
     (activeOrder as any)?.deliveryAddress?.longitude ??
     (activeOrder as any)?.deliveryAddress?.lng;
 
-  const defaultStoreLat = 23.1128;
-  const defaultStoreLng = 72.5427;
+  // Dynamic Store Coordinates strictly resolved from the accepting store
   const storeCoords =
     typeof storeLat === 'number' && typeof storeLng === 'number' && !isNaN(storeLat) && !isNaN(storeLng) && storeLat !== 0 && storeLng !== 0
       ? { latitude: storeLat, longitude: storeLng }
-      : { latitude: defaultStoreLat, longitude: defaultStoreLng };
+      : null;
 
   const customerCoords =
     typeof custLat === 'number' && typeof custLng === 'number' && !isNaN(custLat) && !isNaN(custLng) && custLat !== 0 && custLng !== 0
@@ -642,6 +641,17 @@ export const S24_OrderTrackingScreen: React.FC = () => {
               (activeOrder?.deliveryAddress as any)?.city ||
               '';
 
+          if (!storeCoords) {
+            return (
+              <View style={{ height: 260, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8FAFC', borderRadius: 16, marginHorizontal: 16, marginTop: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                <ActivityIndicator size="small" color={COLORS.purple} />
+                <Text style={{ marginTop: 8, fontSize: 13, fontWeight: '700', color: '#64748B' }}>
+                  Locating Accepting Store...
+                </Text>
+              </View>
+            );
+          }
+
           return (
             <DynamicLiveMap
               storeCoords={storeCoords}
@@ -649,7 +659,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
                 (activeOrder as any)?.store?.name ||
                 (activeOrder as any)?.storeId?.name ||
                 (activeOrder as any)?.storeName ||
-                'Wom Up Dark Store'
+                'Dark Store'
               }
               customerCoords={customerCoords}
               customerAddress={customerAddressText}

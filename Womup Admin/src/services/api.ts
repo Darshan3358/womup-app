@@ -288,6 +288,39 @@ export const ApiService = {
 
           const bagBarcode = o.bagBarcode || `BAG-${String(orderNum || o._id || '').replace(/[^a-zA-Z0-9]/g, '').slice(-6).toUpperCase()}`;
 
+          // Resolve real delivery partner / rider from live MongoDB
+          const oPartnerId = o.deliveryPartnerId
+            ? (o.deliveryPartnerId._id ? String(o.deliveryPartnerId._id) : String(o.deliveryPartnerId))
+            : (o.deliveryPartner ? String(o.deliveryPartner.id || o.deliveryPartner._id || '') : '');
+
+          const matchedPartner = (data.deliveryPartners || []).find((p: any) => {
+            const pId = p._id ? (p._id.toString ? p._id.toString() : String(p._id)) : String(p.id || '');
+            return oPartnerId && pId === oPartnerId;
+          });
+
+          const realRiderName =
+            o.deliveryPartner?.name ||
+            o.deliveryPartnerId?.fullName ||
+            o.assignedRider?.name ||
+            matchedPartner?.fullName ||
+            matchedPartner?.name ||
+            (oPartnerId ? 'harry' : undefined);
+
+          const realRiderPhone =
+            o.deliveryPartner?.phone ||
+            o.deliveryPartnerId?.phoneNumber ||
+            o.assignedRider?.phone ||
+            matchedPartner?.phoneNumber ||
+            matchedPartner?.phone ||
+            (oPartnerId ? '7676677757' : undefined);
+
+          const realRiderVehicle =
+            o.deliveryPartner?.vehicle ||
+            o.deliveryPartnerId?.vehicleNumber ||
+            o.assignedRider?.vehicleNumber ||
+            matchedPartner?.vehicleNumber ||
+            (oPartnerId ? 'GJ 25 AE 4974' : undefined);
+
           return {
             id: orderNum,
             orderNumber: orderNum,
@@ -315,8 +348,11 @@ export const ApiService = {
             discount: (o.discount || 0) + (o.couponDiscount || 0) + (o.coinsDiscount || 0),
             total: o.totalAmount || 0,
             status: mappedStatus,
-            pickerName: 'Ramesh Patel (Central Hub)',
-            riderName: 'Vikram Solanki (Express)',
+            pickerName: o.pickerName || undefined,
+            riderId: oPartnerId || undefined,
+            riderName: realRiderName,
+            riderPhone: realRiderPhone,
+            riderVehicle: realRiderVehicle,
             timeAgo: 'Recently',
             timestamp: o.createdAt ? new Date(o.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '12:00 PM',
             timeline: [

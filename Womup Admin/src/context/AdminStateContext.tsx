@@ -502,8 +502,10 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           discount: (raw.discount || 0) + (raw.couponDiscount || 0) + (raw.coinsDiscount || 0),
           total: raw.totalAmount || 0,
           status: 'Order Placed',
-          pickerName: 'Ramesh Patel (Central Hub)',
-          riderName: 'Vikram Solanki (Express)',
+          pickerName: raw.pickerName || undefined,
+          riderName: raw.riderName || (raw.deliveryPartner?.name || raw.deliveryPartnerId?.fullName || undefined),
+          riderPhone: raw.riderPhone || raw.deliveryPartner?.phone || raw.deliveryPartnerId?.phoneNumber || undefined,
+          riderVehicle: raw.riderVehicle || raw.deliveryPartner?.vehicle || raw.deliveryPartnerId?.vehicleNumber || undefined,
           timeAgo: 'Just now',
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           timeline: [

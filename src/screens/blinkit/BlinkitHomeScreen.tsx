@@ -48,6 +48,8 @@ export const BlinkitHomeScreen: React.FC = () => {
     setLocationModalVisible,
   } = useApp();
 
+
+
   const [activeTab, setActiveTab] = useState('Home');
   const [isLoading, setIsLoading] = useState(true);
   const [dbProducts, setDbProducts] = useState<Product[]>([]);
@@ -324,17 +326,19 @@ export const BlinkitHomeScreen: React.FC = () => {
         />
 
         {/* --- BANNER 1: Fresh Groceries (Delivered in 9 Minutes) --- */}
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={() => handleSelectCategory('Vegetables & Fruits', 'c1')}
-          style={styles.groceriesBannerContainer}
-        >
-          <Image
-            source={require('../../../assets/banners/9minbanner.png')}
-            style={styles.groceriesBannerImage}
-            resizeMode="contain"
-          />
-        </TouchableOpacity>
+        <View style={styles.bannerWrapper}>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => handleSelectCategory('Vegetables & Fruits', 'c1')}
+            style={styles.groceriesBannerCard}
+          >
+            <Image
+              source={require('../../../assets/banners/9minbanner.png')}
+              style={styles.bannerImage}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+        </View>
 
         {/* Section 5: Fresh Vegetables & Fruits (8 products) */}
         <ProductSection
@@ -361,17 +365,19 @@ export const BlinkitHomeScreen: React.FC = () => {
         />
 
         {/* --- BANNER 2: Dairy & Breakfast --- */}
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={() => handleSelectCategory('Dairy, Bread & Eggs', 'c3')}
-          style={styles.bannerContainer}
-        >
-          <Image
-            source={require('../../../assets/banners/dairy_breakfast.jpg')}
-            style={styles.bannerImage}
-            resizeMode="cover"
-          />
-        </TouchableOpacity>
+        <View style={styles.bannerWrapper}>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => handleSelectCategory('Dairy, Bread & Eggs', 'c3')}
+            style={styles.dairyBannerCard}
+          >
+            <Image
+              source={require('../../../assets/banners/dairy_breakfast.jpg')}
+              style={styles.bannerImage}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+        </View>
 
         {/* Section 7: Dairy, Bread & Eggs (8 products) */}
         <ProductSection
@@ -475,35 +481,37 @@ const styles = StyleSheet.create({
     marginTop: 2,
     lineHeight: 15,
   },
-  groceriesBannerContainer: {
-    marginHorizontal: 12,
-    marginVertical: 14,
+  bannerWrapper: {
+    width: '100%',
+    maxWidth: 1400,
+    alignSelf: 'center',
+    paddingHorizontal: 12,
+    marginVertical: 12,
+    overflow: 'hidden',
+  },
+  groceriesBannerCard: {
+    width: '100%',
+    aspectRatio: 1024 / 318,
     borderRadius: 16,
     overflow: 'hidden',
-    aspectRatio: 1024 / 318,
     backgroundColor: '#FAF0FA',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 3,
   },
-  groceriesBannerImage: {
+  dairyBannerCard: {
     width: '100%',
-    height: '100%',
-  },
-  bannerContainer: {
-    marginHorizontal: 12,
-    marginVertical: 14,
+    aspectRatio: 1376 / 768,
     borderRadius: 16,
     overflow: 'hidden',
-    height: 150,
-    backgroundColor: '#F3E8FF',
+    backgroundColor: '#F0F9FF',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 3,
   },
   bannerImage: {
     width: '100%',

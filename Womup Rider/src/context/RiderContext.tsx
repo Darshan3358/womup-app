@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { Alert } from 'react-native';
+import { Alert, AppState, AppStateStatus } from 'react-native';
 import {
   RiderProfile,
   DeliveryRequest,
@@ -512,9 +512,27 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     })();
   }, []);
 
+  // AppState Lifecycle: Pause location telemetry in background; resume when active
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      if (nextState === 'active') {
+        LocationTrackerService.resumeTracking();
+        if (authStep === 'AUTHENTICATED' && isOnline) {
+          refreshDashboard();
+        }
+      } else {
+        LocationTrackerService.pauseTracking();
+      }
+    });
+    return () => {
+      sub.remove();
+    };
+  }, [authStep, isOnline, refreshDashboard]);
+
   useEffect(() => {
     // Start GPS Telemetry only when authenticated and online
     if (authStep === 'AUTHENTICATED' && isOnline) {
+      LocationTrackerService.resumeTracking();
       LocationTrackerService.startTracking(async (coords) => {
         setCurrentLocation(coords);
         const nearest = LocationTrackerService.getNearestHub(coords.latitude, coords.longitude);
