@@ -12,6 +12,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../theme/colors';
 import { AppIcon, IconName } from './AppIcon';
 
+import { useApp } from '../../context/AppContext';
+
 export type BlinkitTabKey =
   | 'Home'
   | 'Local Shop'
@@ -34,10 +36,11 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
+  const { isAuthenticated } = useApp();
 
   const isSmallDevice = width <= 360;
 
-  // 5 clean tabs: Home, Order Again, Categories, Profile, App
+  // Only display Profile tab when user is logged in / registered
   const tabs: {
     key: BlinkitTabKey;
     label: string;
@@ -47,7 +50,9 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
     { key: 'Home', label: 'Home', icon: 'home' },
     { key: 'Order Again', label: 'Orders', icon: 'shopping-basket' },
     { key: 'Categories', label: 'Categories', icon: 'grid' },
-    { key: 'Profile', label: 'Profile', icon: 'user' },
+    ...(isAuthenticated
+      ? [{ key: 'Profile' as BlinkitTabKey, label: 'Profile', icon: 'user' as IconName }]
+      : []),
     { key: 'Local Shop', label: 'App', isWomupAppButton: true },
   ];
 

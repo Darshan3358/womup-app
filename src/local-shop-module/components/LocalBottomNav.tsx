@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useApp } from '../../context/AppContext';
+
 export type LocalTabKey = 'Home' | 'Shops' | 'My Orders' | 'My Coin' | 'My Profile';
 
 interface LocalBottomNavProps {
@@ -17,6 +19,7 @@ export const LocalBottomNav: React.FC<LocalBottomNavProps> = ({
   onBackToMainApp,
 }) => {
   const insets = useSafeAreaInsets();
+  const { isAuthenticated } = useApp();
   const bottomPadding = Math.max(insets.bottom, 6);
 
   const tabs: {
@@ -30,7 +33,9 @@ export const LocalBottomNav: React.FC<LocalBottomNavProps> = ({
     { key: 'Shops', label: 'Shops', icon: 'storefront-outline', iconType: 'ionicons' },
     { key: 'My Orders', label: 'My Orders', icon: 'cart-outline', iconType: 'ionicons' },
     { key: 'My Coin', label: 'My Coin', icon: 'cash-multiple', iconType: 'material' },
-    { key: 'My Profile', label: 'My Profile', icon: 'person-outline', iconType: 'ionicons' },
+    ...(isAuthenticated
+      ? [{ key: 'My Profile' as LocalTabKey, label: 'My Profile', icon: 'person-outline', iconType: 'ionicons' as const }]
+      : []),
   ];
 
   return (
