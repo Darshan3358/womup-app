@@ -22,6 +22,7 @@ import {
   Check,
   Calendar,
   Filter,
+  Barcode,
 } from 'lucide-react-native';
 import { COLORS, RADIUS, SPACING } from '../theme';
 import { useAdminState } from '../context/AdminStateContext';
@@ -45,6 +46,7 @@ export const OrdersScreen: React.FC = () => {
   const [selectedAreaId, setSelectedAreaId] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [dateFilter, setDateFilter] = useState<'All' | 'Today' | 'This Week'>('All');
+  const [orderSearch, setOrderSearch] = useState('');
 
   // Modals for filters
   const [showCityPicker, setShowCityPicker] = useState(false);
@@ -110,17 +112,55 @@ export const OrdersScreen: React.FC = () => {
     return { cityName, areaName, storeName };
   };
 
-  const filteredOrders = orders.filter((o) => {
-    // Live vs History
-    if (topTab === 'Live Orders' && (o.status === 'Delivered' || o.status === 'Cancelled')) return false;
-    if (topTab === 'Order History' && o.status !== 'Delivered' && o.status !== 'Cancelled') return false;
+  const matchesStatusFilter = (orderStatus: OrderStage | string, rawStatus: string | undefined, filter: string): boolean => {
+    if (filter === 'All') return true;
+    const s = String(orderStatus || '').toLowerCase();
+    const raw = String(rawStatus || '').toLowerCase();
 
-    // Status Filter
-    if (statusFilter !== 'All' && o.status !== statusFilter) return false;
+    switch (filter) {
+      case 'Pending':
+        return s === 'order placed' || s === 'pending' || s === 'payment confirmed' || s === 'order accepted' || raw === 'placed' || raw === 'pending';
+      case 'Picking':
+        return s === 'picking' || s === 'packing' || s === 'picker assigned' || s === 'picking completed' || raw === 'packing' || raw === 'picking';
+      case 'Packed':
+        return s === 'packed' || raw === 'packed';
+      case 'Ready for Dispatch':
+        return s === 'ready for dispatch' || s === 'rider assigned' || raw === 'assigned' || raw === 'going_to_store' || raw === 'arrived_at_store' || raw === 'ready_for_dispatch' || raw === 'ready_for_pickup';
+      case 'Out for Delivery':
+        return s === 'out for delivery' || s === 'arrived_at_customer' || raw === 'out_for_delivery' || raw === 'arrived_at_customer';
+      case 'Delivered':
+        return s === 'delivered' || raw === 'delivered' || raw === 'completed';
+      case 'Cancelled':
+        return s === 'cancelled' || raw === 'cancelled' || raw === 'payment_failed';
+      default:
+        return s === filter.toLowerCase() || raw === filter.toLowerCase();
+    }
+  };
+
+  const filteredOrders = orders.filter((o) => {
+    // 0. Search Filter (by Order #, Barcode, Bag Barcode, Customer Name, Phone, Item name)
+    const cleanSearch = orderSearch.trim().toLowerCase();
+    if (cleanSearch) {
+      const matchNum = (o.id || '').toLowerCase().includes(cleanSearch) || (o.orderNumber || '').toLowerCase().includes(cleanSearch);
+      const matchCust = (o.customerName || '').toLowerCase().includes(cleanSearch) || (o.customerPhone || '').toLowerCase().includes(cleanSearch);
+      const matchBarcode = (o.bagBarcode || '').toLowerCase().includes(cleanSearch) || (o.barcode || '').toLowerCase().includes(cleanSearch);
+      const matchItems = (o.items || []).some(it => (it.name || '').toLowerCase().includes(cleanSearch) || (it.barcode || '').toLowerCase().includes(cleanSearch));
+      if (!matchNum && !matchCust && !matchBarcode && !matchItems) return false;
+    }
+
+    // 1. Live vs History (unless an explicit order search is happening, in which case we show it)
+    const isCompleted = o.status === 'Delivered' || o.status === 'Cancelled' || String(o.rawStatus).toUpperCase() === 'DELIVERED' || String(o.rawStatus).toUpperCase() === 'CANCELLED';
+    if (!cleanSearch) {
+      if (topTab === 'Live Orders' && isCompleted) return false;
+      if (topTab === 'Order History' && !isCompleted) return false;
+    }
+
+    // 2. Status Filter
+    if (!matchesStatusFilter(o.status, o.rawStatus, statusFilter)) return false;
 
     const { cityName, areaName } = resolveOrderHierarchy(o);
 
-    // City Filter
+    // 3. City Filter
     if (selectedCityId !== 'ALL' && currentCity) {
       const matchCity =
         (o.cityId && String(o.cityId) === String(currentCity.id || currentCity._id)) ||
@@ -128,7 +168,7 @@ export const OrdersScreen: React.FC = () => {
       if (!matchCity) return false;
     }
 
-    // Area Filter
+    // 4. Area Filter
     if (selectedAreaId !== 'ALL' && currentArea) {
       const matchArea =
         (o.areaId && String(o.areaId) === String(currentArea.id || currentArea._id)) ||
@@ -137,7 +177,7 @@ export const OrdersScreen: React.FC = () => {
       if (!matchArea) return false;
     }
 
-    // Date Filter
+    // 5. Date Filter
     if (dateFilter === 'Today') {
       const orderDate = new Date(o.timestamp);
       const today = new Date();
@@ -181,7 +221,10 @@ export const OrdersScreen: React.FC = () => {
         <View style={styles.mainTabRow}>
           <TouchableOpacity
             style={[styles.mainTab, topTab === 'Live Orders' && styles.activeMainTab]}
-            onPress={() => setTopTab('Live Orders')}
+            onPress={() => {
+              setTopTab('Live Orders');
+              setStatusFilter('All');
+            }}
           >
             <Text
               style={[styles.mainTabText, topTab === 'Live Orders' && styles.activeMainTabText]}
@@ -192,7 +235,10 @@ export const OrdersScreen: React.FC = () => {
 
           <TouchableOpacity
             style={[styles.mainTab, topTab === 'Order History' && styles.activeMainTab]}
-            onPress={() => setTopTab('Order History')}
+            onPress={() => {
+              setTopTab('Order History');
+              setStatusFilter('All');
+            }}
           >
             <Text
               style={[
@@ -203,6 +249,23 @@ export const OrdersScreen: React.FC = () => {
               Order History ({orders.filter((o) => o.status === 'Delivered' || o.status === 'Cancelled').length})
             </Text>
           </TouchableOpacity>
+        </View>
+
+        {/* Global Order Search Bar */}
+        <View style={styles.orderSearchBar}>
+          <Search size={15} color={COLORS.textMuted} style={{ marginRight: 8 }} />
+          <TextInput
+            style={styles.orderSearchInput}
+            placeholder="Search by Order ID (e.g. WORM-792874-284), Barcode, Customer..."
+            placeholderTextColor={COLORS.textMuted}
+            value={orderSearch}
+            onChangeText={setOrderSearch}
+          />
+          {Boolean(orderSearch) && (
+            <TouchableOpacity onPress={() => setOrderSearch('')} style={{ padding: 4 }}>
+              <X size={15} color={COLORS.textMuted} />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Cascading Filter Bar: City + Area + Date */}
@@ -257,7 +320,10 @@ export const OrdersScreen: React.FC = () => {
 
         {/* Status Filter Horizontal Pills */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
-          {['All', 'Pending', 'Picking', 'Packed', 'Ready for Dispatch', 'Out for Delivery', 'Delivered', 'Cancelled'].map((st) => {
+          {(topTab === 'Live Orders'
+            ? ['All', 'Pending', 'Picking', 'Packed', 'Ready for Dispatch', 'Out for Delivery']
+            : ['All', 'Delivered', 'Cancelled']
+          ).map((st) => {
             const isSelected = statusFilter === st;
             return (
               <TouchableOpacity
@@ -316,11 +382,19 @@ export const OrdersScreen: React.FC = () => {
                   </View>
                 </View>
 
-                {/* Breadcrumb Hierarchy Row: City -> Area -> Store */}
-                <View style={styles.breadcrumbCard}>
-                  <Text style={styles.breadcrumbText} numberOfLines={1}>
-                    🏙️ <Text style={styles.crumbBold}>{hierarchy.cityName}</Text> → 📍 <Text style={styles.crumbBold}>{hierarchy.areaName}</Text> → 🏪 <Text style={styles.crumbStore}>{hierarchy.storeName}</Text>
-                  </Text>
+                {/* Bag Barcode & Hierarchy Row */}
+                <View style={styles.orderMetaBar}>
+                  <View style={styles.bagBarcodeTag}>
+                    <Barcode size={13} color={COLORS.purple} />
+                    <Text style={styles.bagBarcodeText}>
+                      {order.bagBarcode || order.barcode || `BAG-${order.id.replace('#', '').slice(-6)}`}
+                    </Text>
+                  </View>
+                  <View style={styles.breadcrumbCard}>
+                    <Text style={styles.breadcrumbText} numberOfLines={1}>
+                      📍 <Text style={styles.crumbBold}>{hierarchy.areaName}</Text> · 🏪 <Text style={styles.crumbStore}>{hierarchy.storeName}</Text>
+                    </Text>
+                  </View>
                 </View>
 
                 {/* Amount & Items Row */}
@@ -948,5 +1022,46 @@ const styles = StyleSheet.create({
   modalItemSub: {
     fontSize: 10,
     color: COLORS.textMuted,
+  },
+  orderSearchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginVertical: 8,
+  },
+  orderSearchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: COLORS.textPrimary,
+    padding: 0,
+  },
+  orderMetaBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginVertical: 4,
+  },
+  bagBarcodeTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#FAF5FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+  },
+  bagBarcodeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.purple,
+    letterSpacing: 0.5,
   },
 });

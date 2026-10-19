@@ -27,6 +27,7 @@ import {
   WalletsSummaryData,
   VendorAdminItem,
   VendorCategoryItem,
+  OrderStage,
 } from '../types/admin';
 
 const getApiBaseUrl = () => {
@@ -274,8 +275,25 @@ export const ApiService = {
             resolvedDarkStore = 'Wom Up Ahmedabad Central Dark Store';
           }
 
+          const orderNum = o.orderNumber || (o._id ? `#WMP-${String(o._id).slice(-6).toUpperCase()}` : '#WMP-000000');
+          const rawSt = String(o.status || '').toUpperCase();
+          const mappedStatus: OrderStage =
+            rawSt === 'PACKING' || rawSt === 'PICKING' ? 'Picking' :
+            rawSt === 'PACKED' ? 'Packed' :
+            rawSt === 'ASSIGNED' || rawSt === 'GOING_TO_STORE' || rawSt === 'ARRIVED_AT_STORE' || rawSt === 'READY_FOR_DISPATCH' ? 'Ready for Dispatch' :
+            rawSt === 'OUT_FOR_DELIVERY' || rawSt === 'ARRIVED_AT_CUSTOMER' ? 'Out for Delivery' :
+            rawSt === 'DELIVERED' || rawSt === 'COMPLETED' ? 'Delivered' :
+            rawSt === 'CANCELLED' || rawSt === 'PAYMENT_FAILED' ? 'Cancelled' :
+            'Order Placed';
+
+          const bagBarcode = o.bagBarcode || `BAG-${String(orderNum || o._id || '').replace(/[^a-zA-Z0-9]/g, '').slice(-6).toUpperCase()}`;
+
           return {
-            id: o.orderNumber || `#WMP-${(o._id || '').slice(-6).toUpperCase()}`,
+            id: orderNum,
+            orderNumber: orderNum,
+            barcode: bagBarcode,
+            bagBarcode,
+            rawStatus: o.status,
             storeId: oStoreIdStr,
             customerId: o.userId ? (o.userId.toString ? o.userId.toString() : o.userId) : 'cust_1',
             customerName: user ? user.name : 'Customer',
@@ -284,17 +302,19 @@ export const ApiService = {
             zoneName: resolvedZoneName,
             darkStore: resolvedDarkStore,
             items: (o.items || []).map((i: any) => ({
-              id: i.productId || 'item_1',
-              name: i.name,
+              id: i.productId ? (i.productId.toString ? i.productId.toString() : i.productId) : 'item_1',
+              name: i.name || 'Fresh Item',
               quantityKg: i.quantity || 1,
-              pricePerKg: i.unitPrice || 0,
-              subtotal: i.subtotal || 0,
+              pricePerKg: i.unitPrice || i.price || 0,
+              subtotal: i.subtotal || ((i.unitPrice || i.price || 0) * (i.quantity || 1)),
+              barcode: i.barcode || i.productBarcode || i.sku || (i.productId ? '890' + String(i.productId).replace(/[^0-9]/g, '').slice(-9).padStart(9, '0') : '8901030383748'),
+              sku: i.sku || (i.productId ? String(i.productId).slice(-6).toUpperCase() : 'SKU-001'),
             })),
             subtotal: o.itemSubtotal || o.totalAmount || 0,
             deliveryFee: o.deliveryFee || 0,
             discount: (o.discount || 0) + (o.couponDiscount || 0) + (o.coinsDiscount || 0),
             total: o.totalAmount || 0,
-            status: o.status === 'PACKING' ? 'Picking' : o.status === 'OUT_FOR_DELIVERY' ? 'Out for Delivery' : o.status === 'DELIVERED' ? 'Delivered' : o.status === 'CANCELLED' ? 'Cancelled' : 'Order Placed',
+            status: mappedStatus,
             pickerName: 'Ramesh Patel (Central Hub)',
             riderName: 'Vikram Solanki (Express)',
             timeAgo: 'Recently',

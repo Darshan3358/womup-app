@@ -146,68 +146,99 @@ export const ST17_OrderHistoryScreen: React.FC = () => {
         }
         renderItem={({ item }) => {
           const isExpanded = expandedOrderId === item.orderId;
-          return (
-            <TouchableOpacity
-              style={styles.orderCard}
-              onPress={() => selectOrderForDetail(item.orderId)}
-              activeOpacity={0.85}
-            >
-              {/* Card Top: Order Number & DELIVERED Badge */}
-              <View style={styles.cardHeader}>
-                <View style={styles.orderNumberRow}>
-                  <Ionicons name="receipt-outline" size={16} color={COLORS.primary} />
-                  <Text style={styles.orderNumberText}>{item.orderNumber}</Text>
+          const st = String(item.status || 'DELIVERED').toUpperCase();
+            const isDelivered = st === 'DELIVERED' || st === 'COMPLETED';
+            const isCancelled = st === 'CANCELLED' || st === 'PAYMENT_FAILED';
+            const isAtStore = st === 'ARRIVED_AT_STORE' || st === 'GOING_TO_STORE' || st === 'ASSIGNED' || st === 'PACKED';
+            const isOut = st === 'OUT_FOR_DELIVERY' || st === 'ARRIVED_AT_CUSTOMER';
+
+            const statusLabel = isDelivered ? 'DELIVERED' : isCancelled ? 'CANCELLED' : isAtStore ? 'AT STORE' : isOut ? 'OUT FOR DELIVERY' : st;
+            const statusColor = isDelivered ? '#10B981' : isCancelled ? '#EF4444' : isAtStore ? '#F59E0B' : '#3B82F6';
+
+            return (
+              <TouchableOpacity
+                style={styles.orderCard}
+                onPress={() => selectOrderForDetail(item.orderId)}
+                activeOpacity={0.85}
+              >
+                {/* Card Top: Order Number & Dynamic Status Badge */}
+                <View style={styles.cardHeader}>
+                  <View style={styles.orderNumberRow}>
+                    <Ionicons name="receipt-outline" size={16} color={COLORS.primary} />
+                    <Text style={styles.orderNumberText}>{item.orderNumber}</Text>
+                  </View>
+
+                  <View style={[styles.deliveredBadge, { backgroundColor: `${statusColor}18`, borderColor: `${statusColor}40` }]}>
+                    <Ionicons
+                      name={isDelivered ? 'checkmark-circle' : isCancelled ? 'close-circle' : 'bicycle'}
+                      size={12}
+                      color={statusColor}
+                    />
+                    <Text style={[styles.deliveredBadgeText, { color: statusColor }]}>{statusLabel}</Text>
+                  </View>
                 </View>
 
-                <View style={styles.deliveredBadge}>
-                  <Ionicons name="checkmark-circle" size={12} color="#10B981" />
-                  <Text style={styles.deliveredBadgeText}>DELIVERED</Text>
-                </View>
-              </View>
+                {/* Bag Barcode Chip */}
+                {Boolean(item.bagBarcode || item.barcode) && (
+                  <View style={styles.bagBarcodeTag}>
+                    <Ionicons name="barcode-outline" size={13} color={COLORS.primary} />
+                    <Text style={styles.bagBarcodeText}>
+                      Bag: {item.bagBarcode || item.barcode}
+                    </Text>
+                  </View>
+                )}
 
-              {/* Card Meta: Date & Time */}
-              <View style={styles.metaRow}>
-                <View style={styles.metaCol}>
-                  <Ionicons name="time-outline" size={12} color={COLORS.textMuted} />
-                  <Text style={styles.metaText}>{formatDeliveredTime(item.deliveredAt)}</Text>
-                </View>
-
-                {Boolean(item.customerName) && (
+                {/* Card Meta: Date & Time */}
+                <View style={styles.metaRow}>
                   <View style={styles.metaCol}>
-                    <Ionicons name="person-outline" size={12} color={COLORS.textMuted} />
-                    <Text style={styles.metaText}>{item.customerName}</Text>
+                    <Ionicons name="time-outline" size={12} color={COLORS.textMuted} />
+                    <Text style={styles.metaText}>{formatDeliveredTime(item.deliveredAt)}</Text>
                   </View>
-                )}
-              </View>
 
-              {/* Items Summary Preview */}
-              <View style={styles.itemsSummaryBox}>
-                <View style={styles.itemsSummaryHeader}>
-                  <Text style={styles.itemsSummaryCount}>
-                    {item.itemCount || (item.items ? item.items.length : 0)} items
-                  </Text>
-                  <Text style={styles.totalAmountText}>₹{item.totalAmount}</Text>
+                  {Boolean(item.customerName) && (
+                    <View style={styles.metaCol}>
+                      <Ionicons name="person-outline" size={12} color={COLORS.textMuted} />
+                      <Text style={styles.metaText}>{item.customerName}</Text>
+                    </View>
+                  )}
                 </View>
 
-                {/* Items list preview */}
-                {(item.items || []).slice(0, 3).map((prod: any, idx: number) => (
-                  <View key={idx} style={styles.itemRow}>
-                    <Text style={styles.itemBullet}>•</Text>
-                    <Text style={styles.itemName} numberOfLines={1}>
-                      {prod.name}
+                {/* Items Summary Preview */}
+                <View style={styles.itemsSummaryBox}>
+                  <View style={styles.itemsSummaryHeader}>
+                    <Text style={styles.itemsSummaryCount}>
+                      {item.itemCount || (item.items ? item.items.length : 0)} items
                     </Text>
-                    <Text style={styles.itemQty}>
-                      {prod.quantity}x {prod.quantityLabel || ''}
-                    </Text>
+                    <Text style={styles.totalAmountText}>₹{item.totalAmount}</Text>
                   </View>
-                ))}
 
-                {(item.items || []).length > 3 && (
-                  <Text style={styles.moreItemsText}>
-                    +{item.items.length - 3} more items
-                  </Text>
-                )}
-              </View>
+                  {/* Items list preview with barcodes */}
+                  {(item.items || []).slice(0, 4).map((prod: any, idx: number) => (
+                    <View key={idx} style={styles.itemRow}>
+                      <Text style={styles.itemBullet}>•</Text>
+                      <View style={{ flex: 1, marginRight: 6 }}>
+                        <Text style={styles.itemName} numberOfLines={1}>
+                          {prod.name}
+                        </Text>
+                        <View style={styles.itemBarcodeMini}>
+                          <Ionicons name="barcode-outline" size={11} color={COLORS.textMuted} />
+                          <Text style={styles.itemBarcodeText}>
+                            Barcode: {prod.barcode || '8901030383748'}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={styles.itemQty}>
+                        {prod.quantity}x {prod.quantityLabel || ''}
+                      </Text>
+                    </View>
+                  ))}
+
+                  {(item.items || []).length > 4 && (
+                    <Text style={styles.moreItemsText}>
+                      +{item.items.length - 4} more items
+                    </Text>
+                  )}
+                </View>
 
               {/* Card Footer: Rider info & View Detail CTA */}
               <View style={styles.cardFooterRow}>
@@ -538,5 +569,37 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '800',
     letterSpacing: 0.5,
+  },
+  bagBarcodeTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(236, 74, 157, 0.08)',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 5,
+    alignSelf: 'flex-start',
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(236, 74, 157, 0.2)',
+  },
+  bagBarcodeText: {
+    color: COLORS.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    fontFamily: 'monospace',
+  },
+  itemBarcodeMini: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginTop: 2,
+  },
+  itemBarcodeText: {
+    color: COLORS.textMuted,
+    fontSize: 9.5,
+    fontWeight: '600',
+    fontFamily: 'monospace',
   },
 });

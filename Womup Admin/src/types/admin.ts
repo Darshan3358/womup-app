@@ -304,6 +304,8 @@ export interface OrderItem {
   quantityKg: number;
   pricePerKg: number;
   subtotal: number;
+  barcode?: string;
+  sku?: string;
 }
 
 export interface OrderAuditStep {
@@ -315,6 +317,10 @@ export interface OrderAuditStep {
 
 export interface Order {
   id: string; // e.g. #WMP10234
+  orderNumber?: string;
+  barcode?: string;
+  bagBarcode?: string;
+  rawStatus?: string;
   storeId?: string;
   customerId: string;
   customerName: string;

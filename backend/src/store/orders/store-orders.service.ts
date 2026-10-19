@@ -241,10 +241,22 @@ export class StoreOrdersService {
     const orders = await this.orderModel
       .find({
         storeId: staff.storeId,
-        status: { $in: [OrderStatus.DELIVERED, 'COMPLETED'] },
+        status: {
+          $in: [
+            OrderStatus.DELIVERED,
+            'COMPLETED',
+            OrderStatus.ARRIVED_AT_STORE,
+            OrderStatus.GOING_TO_STORE,
+            OrderStatus.OUT_FOR_DELIVERY,
+            OrderStatus.ARRIVED_AT_CUSTOMER,
+            OrderStatus.PACKED,
+            OrderStatus.ASSIGNED,
+            OrderStatus.CANCELLED,
+          ],
+        },
       })
       .sort({ updatedAt: -1, createdAt: -1 })
-      .limit(60)
+      .limit(80)
       .populate('userId', 'name phone')
       .populate('deliveryPartnerId', 'fullName phoneNumber vehicleNumber')
       .exec();
@@ -255,6 +267,8 @@ export class StoreOrdersService {
       itemCount: o.items?.length || 0,
       totalAmount: o.totalAmount,
       status: o.status || 'DELIVERED',
+      bagBarcode: o.bagBarcode || `BAG-${String(o.orderNumber || o._id).slice(-6).toUpperCase()}`,
+      barcode: o.bagBarcode || o.barcode || o.orderNumber,
       createdAt: o.createdAt,
       deliveredAt: o.deliveredAt || o.updatedAt || o.createdAt,
       items: o.items?.map((item: any) => ({
@@ -262,13 +276,15 @@ export class StoreOrdersService {
         name: item.name,
         quantity: item.quantity,
         quantityLabel: item.quantityLabel,
-        price: item.price,
+        price: item.price || item.unitPrice,
         imageUrl: item.imageUrl,
+        barcode: item.barcode || item.productBarcode || item.sku || (item.productId ? '890' + String(item.productId).replace(/[^0-9]/g, '').slice(-9).padStart(9, '0') : '8901030383748'),
       })),
       customerName: o.userId?.name || 'Customer',
       customerPhone: o.userId?.phone || null,
       deliveryPartner: o.deliveryPartnerId
         ? {
+            id: o.deliveryPartnerId._id?.toString(),
             name: o.deliveryPartnerId.fullName,
             phone: o.deliveryPartnerId.phoneNumber,
             vehicle: o.deliveryPartnerId.vehicleNumber,
@@ -339,11 +355,27 @@ export class StoreOrdersService {
     const storeCommission = Math.round(itemSubtotal * platformCommissionRate);
     const storeEarnings = Math.max(0, itemSubtotal - storeCommission);
 
+    const resolvedItems = (pickList ? pickList.items : order.items) || [];
+    const enrichedItems = resolvedItems.map((item: any) => {
+      const raw = item?.toObject ? item.toObject() : item;
+      return {
+        ...raw,
+        productId: raw.productId?.toString(),
+        name: raw.name,
+        quantity: raw.quantity,
+        unit: raw.unit || raw.quantityLabel || 'pack',
+        shelfLocation: raw.shelfLocation || 'A1-R1',
+        barcode: raw.barcode || raw.productBarcode || raw.sku || (raw.productId ? '890' + String(raw.productId).replace(/[^0-9]/g, '').slice(-9).padStart(9, '0') : '8901030383748'),
+      };
+    });
+
     return {
       orderId: order._id.toString(),
       orderNumber: order.orderNumber,
       status: order.status,
-      items: pickList ? pickList.items : order.items,
+      bagBarcode: (order as any).bagBarcode || `BAG-${String(order.orderNumber || order._id).slice(-6).toUpperCase()}`,
+      barcode: (order as any).bagBarcode || (order as any).barcode || order.orderNumber,
+      items: enrichedItems,
       pickList: pickList || null,
       assignedRider,
       storeEarnings,

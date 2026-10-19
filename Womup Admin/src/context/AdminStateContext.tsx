@@ -528,12 +528,16 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const targetId = data.orderId;
         setOrders(prev => prev.map(o => {
           if (o.id === targetId || o.id.includes(targetId.slice(-6).toUpperCase())) {
+            const raw = String(data.status || '').toUpperCase();
             const mappedStatus = 
-              data.status === 'PACKING' ? 'Picking' :
-              data.status === 'OUT_FOR_DELIVERY' ? 'Out for Delivery' :
-              data.status === 'DELIVERED' ? 'Delivered' :
-              data.status === 'CANCELLED' ? 'Cancelled' : o.status;
-            return { ...o, status: mappedStatus as any };
+              raw === 'PACKING' || raw === 'PICKING' ? 'Picking' :
+              raw === 'PACKED' ? 'Packed' :
+              raw === 'ASSIGNED' || raw === 'GOING_TO_STORE' || raw === 'ARRIVED_AT_STORE' || raw === 'READY_FOR_DISPATCH' ? 'Ready for Dispatch' :
+              raw === 'OUT_FOR_DELIVERY' || raw === 'ARRIVED_AT_CUSTOMER' ? 'Out for Delivery' :
+              raw === 'DELIVERED' || raw === 'COMPLETED' ? 'Delivered' :
+              raw === 'CANCELLED' || raw === 'PAYMENT_FAILED' ? 'Cancelled' :
+              raw === 'PLACED' ? 'Order Placed' : o.status;
+            return { ...o, status: mappedStatus as any, rawStatus: data.status };
           }
           return o;
         }));

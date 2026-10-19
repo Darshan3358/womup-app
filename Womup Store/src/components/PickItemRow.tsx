@@ -52,9 +52,17 @@ export const PickItemRow: React.FC<PickItemRowProps> = ({
         >
           {item.name}
         </Text>
-        <Text style={styles.skuText}>
-          {item.quantity}x • {item.unit || 'unit'} • SKU: {item.barcode || '890123'}
-        </Text>
+        <View style={styles.skuRow}>
+          <Text style={styles.skuText}>
+            {item.quantity}x • {item.unit || 'unit'}
+          </Text>
+          <View style={styles.barcodeChip}>
+            <Ionicons name="barcode-outline" size={12} color={COLORS.primary} />
+            <Text style={styles.barcodeChipText}>
+              {item.barcode || '8901030383748'}
+            </Text>
+          </View>
+        </View>
         {Boolean(item.notes) && <Text style={styles.notesText}>Note: {item.notes}</Text>}
       </View>
 
@@ -141,10 +149,33 @@ const styles = StyleSheet.create({
   oosText: {
     color: COLORS.danger,
   },
+  skuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+    flexWrap: 'wrap',
+  },
   skuText: {
     color: COLORS.textSecondary,
     fontSize: 11,
-    marginTop: 2,
+  },
+  barcodeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(236, 74, 157, 0.1)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(236, 74, 157, 0.25)',
+  },
+  barcodeChipText: {
+    color: COLORS.primary,
+    fontSize: 10,
+    fontWeight: '700',
+    fontFamily: 'monospace',
   },
   notesText: {
     color: COLORS.warning,

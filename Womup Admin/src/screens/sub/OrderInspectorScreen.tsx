@@ -22,6 +22,7 @@ import {
   MessageSquare,
   Send,
   Phone,
+  Barcode,
 } from 'lucide-react-native';
 import { COLORS, RADIUS, SPACING } from '../../theme';
 import { useAdminState } from '../../context/AdminStateContext';
@@ -162,6 +163,17 @@ export const OrderInspectorScreen: React.FC = () => {
           </Text>
         </View>
 
+        {/* Bag Barcode / Dispatch Identifier */}
+        <View style={styles.headerBarcodeRow}>
+          <Barcode size={18} color={COLORS.purple} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerBarcodeLabel}>BAG BARCODE / DISPATCH TAG</Text>
+            <Text style={styles.headerBarcodeVal}>
+              {selectedOrder.bagBarcode || selectedOrder.barcode || `BAG-${selectedOrder.id.replace('#', '').slice(-6).toUpperCase()}`}
+            </Text>
+          </View>
+        </View>
+
         <TouchableOpacity
           style={styles.printHeaderBtn}
           onPress={() =>
@@ -216,6 +228,12 @@ export const OrderInspectorScreen: React.FC = () => {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.itemName}>{item.name}</Text>
                   <Text style={styles.itemWeight}>{item.quantityKg} kg @ ₹{item.pricePerKg}/kg</Text>
+                  <View style={styles.itemBarcodeTag}>
+                    <Barcode size={12} color="#6366F1" />
+                    <Text style={styles.itemBarcodeText}>
+                      Barcode: {item.barcode || '8901030383748'}
+                    </Text>
+                  </View>
                 </View>
                 <Text style={styles.itemSubtotal}>₹{item.subtotal}</Text>
               </View>
@@ -553,6 +571,50 @@ const styles = StyleSheet.create({
   addressText: {
     fontSize: 12,
     color: COLORS.textMuted,
+  },
+  headerBarcodeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#FAF5FF',
+    padding: 10,
+    borderRadius: RADIUS.sm,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+  },
+  headerBarcodeLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: COLORS.purple,
+    letterSpacing: 0.5,
+  },
+  headerBarcodeVal: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+    letterSpacing: 1,
+    fontFamily: 'monospace',
+    marginTop: 2,
+  },
+  itemBarcodeTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+    marginTop: 3,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  itemBarcodeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#4F46E5',
+    fontFamily: 'monospace',
   },
   printHeaderBtn: {
     flexDirection: 'row',

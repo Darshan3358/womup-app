@@ -122,6 +122,17 @@ export const ST07_OrderDetailScreen: React.FC = () => {
               </Text>
             </View>
           </View>
+
+          {/* Bag Barcode / Dispatch Barcode */}
+          <View style={styles.bagBarcodeRow}>
+            <Ionicons name="barcode-outline" size={18} color={COLORS.primary} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.bagBarcodeLabel}>DISPATCH / BAG BARCODE</Text>
+              <Text style={styles.bagBarcodeVal}>
+                {(activeOrder as any).bagBarcode || (activeOrder as any).barcode || `BAG-${String(activeOrder.orderNumber || activeOrder.orderId || '').replace(/[^a-zA-Z0-9]/g, '').slice(-6).toUpperCase()}`}
+              </Text>
+            </View>
+          </View>
         </View>
 
         {/* Banner Notice */}
@@ -402,6 +413,31 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     fontSize: 14,
     fontWeight: '700',
+  },
+  bagBarcodeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(236, 74, 157, 0.08)',
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(236, 74, 157, 0.25)',
+  },
+  bagBarcodeLabel: {
+    color: COLORS.primary,
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  bagBarcodeVal: {
+    color: COLORS.textPrimary,
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 1,
+    fontFamily: 'monospace',
+    marginTop: 2,
   },
   deliveredBanner: {
     flexDirection: 'row',
