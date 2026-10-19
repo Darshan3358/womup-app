@@ -121,6 +121,9 @@ export const SidebarDrawer: React.FC = () => {
             showsVerticalScrollIndicator={true}
             bounces={true}
             keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled={true}
+            scrollEventThrottle={16}
+            overScrollMode="always"
           >
             <Text style={styles.menuSectionTitle}>PRIMARY MODULES</Text>
 
@@ -433,14 +436,15 @@ const styles = StyleSheet.create({
     width: '84%',
     maxWidth: 340,
     height: '100%',
+    maxHeight: '100%',
     backgroundColor: COLORS.white,
     shadowColor: '#000',
     shadowOffset: { width: -4, height: 0 },
     shadowOpacity: 0.25,
     shadowRadius: 10,
     elevation: 16,
-    display: 'flex',
     flexDirection: 'column',
+    overflow: 'hidden',
   },
   drawerHeader: {
     paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 12 : 45,
@@ -515,6 +519,7 @@ const styles = StyleSheet.create({
   },
   menuScroll: {
     flex: 1,
+    width: '100%',
   },
   menuContent: {
     paddingHorizontal: 10,

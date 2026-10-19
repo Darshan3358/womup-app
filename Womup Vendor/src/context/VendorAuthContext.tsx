@@ -150,6 +150,14 @@ export const VendorAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           console.log('[Vendor Auth] Received real-time Razorpay UPI payment:', paymentData);
           refreshData();
         },
+        () => {
+          console.log('[Vendor Auth] Real-time approval received! Refreshing vendor status...');
+          refreshData();
+        },
+        () => {
+          console.log('[Vendor Auth] Real-time rejection received! Refreshing vendor status...');
+          refreshData();
+        },
       );
     } else {
       vendorSocket.disconnect();

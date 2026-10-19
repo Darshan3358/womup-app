@@ -74,16 +74,10 @@ export const KYCBanner: React.FC<KYCBannerProps> = ({ onPressAction }) => {
     switch (bannerData.ctaAction) {
       case 'OPEN_KYC':
       case 'RESUBMIT':
-        setActiveScreen('C26_Account');
-        break;
-      case 'VIEW_WALLET':
-        setActiveScreen('Blinkit_Money');
-        break;
       case 'VIEW_STATUS':
-        setActiveScreen('Blinkit_Profile');
-        break;
+      case 'VIEW_WALLET':
       default:
-        setActiveScreen('C26_Account');
+        setActiveScreen('KYC');
     }
   };
 

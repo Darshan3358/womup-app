@@ -10,6 +10,7 @@ import {
 import { Camera, Image as ImageIcon, CheckCircle2, RefreshCw, Trash2, AlertCircle } from 'lucide-react-native';
 import { useFileUpload } from '../../hooks/useFileUpload';
 import { COLORS } from '../../theme/colors';
+import { resolveImageUrl } from '../../utils/imageUrl';
 
 interface FileUploadFieldProps {
   label: string;
@@ -87,7 +88,7 @@ export const FileUploadField: React.FC<FileUploadFieldProps> = ({
       ) : activeImage ? (
         /* SUCCESS / PREVIEW STATE */
         <View style={styles.previewBox}>
-          <Image source={{ uri: activeImage }} style={styles.thumbnail} resizeMode="cover" />
+          <Image source={{ uri: resolveImageUrl(activeImage) }} style={styles.thumbnail} resizeMode="cover" />
           <View style={styles.previewActions}>
             <TouchableOpacity
               style={styles.actionBtn}

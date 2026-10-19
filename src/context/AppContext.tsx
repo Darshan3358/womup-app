@@ -594,7 +594,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Blinkit Extensions
-  const [walletBalance, setWalletBalance] = useState<number>(50);
+  const [walletBalance, setWalletBalance] = useState<number>(0);
   const [hideSensitiveItems, setHideSensitiveItems] = useState<boolean>(false);
   const [appearance, setAppearance] = useState<'LIGHT' | 'DARK' | 'SYSTEM'>('LIGHT');
   const [deliveryLocation, setDeliveryLocation] = useState<string>('Set Delivery Location');

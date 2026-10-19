@@ -212,7 +212,7 @@ export const BlinkitHeader: React.FC<BlinkitHeaderProps> = ({
               <Ionicons name="wallet-outline" size={17} color="#FFFFFF" />
               <View style={styles.walletBadge}>
                 <Text style={styles.walletBadgeText}>
-                  ₹{walletBalance || 50}
+                  ₹{walletBalance ?? 0}
                 </Text>
               </View>
             </TouchableOpacity>

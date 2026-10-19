@@ -68,8 +68,11 @@ export class CloudinaryService {
               const filePath = path.join(uploadsDir, cleanFileName);
               fs.writeFileSync(filePath, file.buffer);
 
-              const port = this.configService.get<string>('PORT') || '5050';
-              const localUrl = `http://localhost:${port}/uploads/${cleanFileName}`;
+              const serverBaseUrl =
+                process.env.BACKEND_PUBLIC_URL ||
+                process.env.RENDER_EXTERNAL_URL ||
+                'https://womup-app-uquz.onrender.com';
+              const localUrl = `${serverBaseUrl}/uploads/${cleanFileName}`;
 
               return resolve({
                 url: localUrl,

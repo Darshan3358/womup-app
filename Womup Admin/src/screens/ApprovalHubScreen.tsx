@@ -28,8 +28,6 @@ const CATEGORY_KEYS: ApprovalCategoryKey[] = [
   'vendors',
   'withdrawals',
   'cancellations',
-  'staff',
-  'rate-changes',
 ];
 
 export const ApprovalHubScreen: React.FC = () => {
@@ -151,7 +149,7 @@ export const ApprovalHubScreen: React.FC = () => {
     );
   }
 
-  const totalPending = summary?.totalPending ?? 0;
+  const totalPending = CATEGORY_KEYS.reduce((sum, key) => sum + getCategoryCount(key), 0);
 
   return (
     <ScrollView
@@ -189,15 +187,15 @@ export const ApprovalHubScreen: React.FC = () => {
       {loading && !refreshing ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.purple} />
-          <Text style={styles.loadingText}>Syncing approval queues across all 8 modules...</Text>
+          <Text style={styles.loadingText}>Syncing approval queues across modules...</Text>
         </View>
       ) : (
-        /* 8-Card Grid Layout (Matching user screenshot) */
+        /* 6-Card Grid Layout (3 per row on desktop) */
         <View style={styles.cardsGrid}>
           {(() => {
             const isMobile = width < 540;
             const isTablet = width >= 540 && width < 960;
-            const cardWidth = isMobile ? '100%' : isTablet ? '50%' : '25%';
+            const cardWidth = isMobile ? '100%' : isTablet ? '50%' : '33.333%';
 
             return CATEGORY_KEYS.map((key) => {
               const count = getCategoryCount(key);

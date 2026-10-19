@@ -9,6 +9,24 @@ import { TeamPurchaseIncome, TeamPurchaseIncomeDocument } from './schemas/team-p
 import { UpdateUserDto } from './dto/update-user.dto';
 import { TrackingGateway } from '../tracking/tracking.gateway';
 
+export function sanitizePublicDocUrl(url?: string): string {
+  if (!url || typeof url !== 'string') return '';
+  const trimmed = url.trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('data:') || trimmed.startsWith('file://')) return trimmed;
+  if (trimmed.includes('localhost') || trimmed.includes('127.0.0.1')) {
+    const filename = trimmed.split('/uploads/')[1] || trimmed.split('/').pop();
+    return `https://womup-app-uquz.onrender.com/uploads/${filename}`;
+  }
+  if (trimmed.startsWith('/uploads/')) {
+    return `https://womup-app-uquz.onrender.com${trimmed}`;
+  }
+  if (trimmed.startsWith('http://womup-app-uquz.onrender.com')) {
+    return trimmed.replace('http://', 'https://');
+  }
+  return trimmed;
+}
+
 @Injectable()
 export class UsersService {
   constructor(
@@ -249,12 +267,12 @@ export class UsersService {
     }
 
     if (dto.customer_image_aadhar_front || dto.aadhaarFrontImage) {
-      const front = dto.customer_image_aadhar_front || dto.aadhaarFrontImage;
+      const front = sanitizePublicDocUrl(dto.customer_image_aadhar_front || dto.aadhaarFrontImage);
       user.customer_image_aadhar_front = front;
       user.aadharFrontImage = front;
     }
     if (dto.customer_image_aadhar_back || dto.aadhaarBackImage) {
-      const back = dto.customer_image_aadhar_back || dto.aadhaarBackImage;
+      const back = sanitizePublicDocUrl(dto.customer_image_aadhar_back || dto.aadhaarBackImage);
       user.customer_image_aadhar_back = back;
       user.aadharBackImage = back;
     }
@@ -1057,6 +1075,8 @@ export class UsersService {
       ? `XXXX XXXX ${rawBankAcc.slice(-4)}`
       : (rawBankAcc ? 'XXXX XXXX' : 'Not Provided');
 
+    // sanitizePublicDocUrl used from file scope
+
     return {
       success: true,
       data: {
@@ -1065,8 +1085,8 @@ export class UsersService {
         maskedAccount,
         sponsor,
         documents: {
-          frontImage: customer.customer_image_aadhar_front || customer.aadharFrontImage || '',
-          backImage: customer.customer_image_aadhar_back || customer.aadharBackImage || '',
+          frontImage: sanitizePublicDocUrl(customer.customer_image_aadhar_front || customer.aadharFrontImage || ''),
+          backImage: sanitizePublicDocUrl(customer.customer_image_aadhar_back || customer.aadharBackImage || ''),
         },
       },
     };
@@ -1248,8 +1268,8 @@ export class UsersService {
     const kycStatusNum = customer.customerKycStatus || (customer.verificationStatus === 'VERIFIED' ? 2 : 1);
     const statusLabel = kycStatusNum === 2 ? 'Verified' : (kycStatusNum === 3 ? 'Rejected' : 'Pending');
 
-    const aadhaarFrontUrl = customer.customer_image_aadhar_front || customer.aadharFrontImage || '';
-    const aadhaarBackUrl = customer.customer_image_aadhar_back || customer.aadharBackImage || '';
+    const aadhaarFrontUrl = sanitizePublicDocUrl(customer.customer_image_aadhar_front || customer.aadharFrontImage || '');
+    const aadhaarBackUrl = sanitizePublicDocUrl(customer.customer_image_aadhar_back || customer.aadharBackImage || '');
 
     return {
       success: true,
@@ -1410,8 +1430,9 @@ export class UsersService {
       user.aadharFrontImage ||
       user.customer_image_aadhar_front;
     if (frontImg) {
-      user.aadharFrontImage = frontImg;
-      user.customer_image_aadhar_front = frontImg;
+      const cleanFront = sanitizePublicDocUrl(frontImg);
+      user.aadharFrontImage = cleanFront;
+      user.customer_image_aadhar_front = cleanFront;
     }
 
     const backImg =
@@ -1425,8 +1446,9 @@ export class UsersService {
       user.aadharBackImage ||
       user.customer_image_aadhar_back;
     if (backImg) {
-      user.aadharBackImage = backImg;
-      user.customer_image_aadhar_back = backImg;
+      const cleanBack = sanitizePublicDocUrl(backImg);
+      user.aadharBackImage = cleanBack;
+      user.customer_image_aadhar_back = cleanBack;
     }
 
     if (payload.fullNameAsPerAadhaar) {
@@ -1522,9 +1544,9 @@ export class UsersService {
           ? `XXXX XXXX ${user.aadhaarNumber.slice(-4)}`
           : '',
         rawAadhaarNumber: user.aadhaarNumber || '',
-        aadhaarFrontUrl: user.customer_image_aadhar_front || user.aadharFrontImage || '',
-        aadhaarBackUrl: user.customer_image_aadhar_back || user.aadharBackImage || '',
-        bankProofUrl,
+        aadhaarFrontUrl: sanitizePublicDocUrl(user.customer_image_aadhar_front || user.aadharFrontImage || ''),
+        aadhaarBackUrl: sanitizePublicDocUrl(user.customer_image_aadhar_back || user.aadharBackImage || ''),
+        bankProofUrl: sanitizePublicDocUrl(bankProofUrl),
         bankDetails: {
           bankName: user.bankName || '',
           branchName: user.branchName || '',

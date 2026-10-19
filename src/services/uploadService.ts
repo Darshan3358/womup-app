@@ -20,6 +20,63 @@ export interface UploadResponse {
   message?: string;
 }
 
+// Native-safe XHR multipart uploader (avoids Expo 57 / React Native 0.86 New Architecture WinterCG fetch FormData errors)
+function sendMultipartXhr(
+  url: string,
+  formData: FormData,
+  headers?: Record<string, string>,
+  onProgress?: (progress: number) => void
+): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+
+    if (headers) {
+      Object.entries(headers).forEach(([k, v]) => {
+        if (k.toLowerCase() !== 'content-type') {
+          xhr.setRequestHeader(k, v);
+        }
+      });
+    }
+
+    if (xhr.upload && onProgress) {
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable && event.total > 0) {
+          const pct = Math.min(95, Math.round((event.loaded / event.total) * 100));
+          onProgress(pct);
+        }
+      };
+    }
+
+    xhr.onload = () => {
+      let data: any;
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch {
+        data = { text: xhr.responseText };
+      }
+
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(data);
+      } else {
+        const errorMsg = data?.message || data?.error || `Upload failed with HTTP ${xhr.status}`;
+        reject(new Error(errorMsg));
+      }
+    };
+
+    xhr.onerror = () => {
+      reject(new Error('Network error during file upload. Please check your connection.'));
+    };
+
+    xhr.ontimeout = () => {
+      reject(new Error('Upload timed out. Please try again.'));
+    };
+
+    xhr.timeout = 90000;
+    xhr.send(formData);
+  });
+}
+
 class UniversalUploadService {
   /**
    * Helper to retrieve auth token
@@ -92,7 +149,7 @@ class UniversalUploadService {
     const formData = new FormData();
 
     if (Platform.OS === 'web') {
-      if (typeof fileUriOrBlob === 'string' && fileUriOrBlob.startsWith('blob:') || fileUriOrBlob.startsWith('data:')) {
+      if (typeof fileUriOrBlob === 'string' && (fileUriOrBlob.startsWith('blob:') || fileUriOrBlob.startsWith('data:'))) {
         const res = await fetch(fileUriOrBlob);
         const blob = await res.blob();
         const ext = blob.type.split('/')[1] || 'jpg';
@@ -127,23 +184,20 @@ class UniversalUploadService {
 
     // ── STEP 3: Execute Upload via Backend Service (Resilient with local storage fallback) ──
     try {
-      const proxyRes = await fetch(
+      const proxyData = await sendMultipartXhr(
         `${API_BASE_URL}/uploads/upload?folder=${encodeURIComponent(folder)}`,
-        {
-          method: 'POST',
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-          body: formData,
-        },
+        formData,
+        token ? { Authorization: `Bearer ${token}` } : undefined,
+        (p) => onProgress?.(Math.round(50 + p * 0.3)),
       );
 
-      const proxyData = await proxyRes.json();
-      if (proxyRes.ok && (proxyData.data?.url || proxyData.url)) {
-        finalUrl = proxyData.data?.url || proxyData.url;
-        publicId = proxyData.data?.publicId || proxyData.publicId || '';
+      if (proxyData && (proxyData.data?.url || proxyData.data?.secure_url || proxyData.url)) {
+        finalUrl = proxyData.data?.url || proxyData.data?.secure_url || proxyData.url;
+        publicId = proxyData.data?.publicId || proxyData.data?.public_id || proxyData.publicId || '';
         onProgress?.(80);
       } else {
         throw new Error(
-          proxyData.message || proxyData.error || 'Backend proxy upload failed.',
+          proxyData?.message || proxyData?.error || 'Backend proxy upload failed.',
         );
       }
     } catch (proxyErr: any) {
@@ -158,15 +212,16 @@ class UniversalUploadService {
             formData.append('public_id', signatureData.publicId);
           }
 
-          const cloudRes = await fetch(signatureData.uploadUrl, {
-            method: 'POST',
-            body: formData,
-          });
+          const cloudData = await sendMultipartXhr(
+            signatureData.uploadUrl,
+            formData,
+            undefined,
+            (p) => onProgress?.(Math.round(50 + p * 0.3)),
+          );
 
-          const cloudData = await cloudRes.json();
-          if (cloudRes.ok && cloudData.secure_url) {
-            finalUrl = cloudData.secure_url;
-            publicId = cloudData.public_id;
+          if (cloudData && (cloudData.secure_url || cloudData.url)) {
+            finalUrl = cloudData.secure_url || cloudData.url;
+            publicId = cloudData.public_id || signatureData.publicId || '';
             onProgress?.(80);
           }
         } catch {

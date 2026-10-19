@@ -20,6 +20,8 @@ class VendorSocketService {
     onNewRequest: (req: CollectionRequest) => void,
     onRequestCancelled?: (requestId: string) => void,
     onPaymentReceived?: (data: any) => void,
+    onVendorApproved?: (data: any) => void,
+    onVendorRejected?: (data: any) => void,
   ) {
     this.currentVendorId = vendorId;
     if (this.socket) {
@@ -54,6 +56,20 @@ class VendorSocketService {
         console.log('[Vendor Socket] Incoming Razorpay UPI payment received:', data);
         if (onPaymentReceived) {
           onPaymentReceived(data);
+        }
+      });
+
+      this.socket.on('vendor_approved', (data: any) => {
+        console.log('[Vendor Socket] Vendor approved by admin:', data);
+        if (onVendorApproved) {
+          onVendorApproved(data);
+        }
+      });
+
+      this.socket.on('vendor_rejected', (data: any) => {
+        console.log('[Vendor Socket] Vendor rejected by admin:', data);
+        if (onVendorRejected) {
+          onVendorRejected(data);
         }
       });
     } catch (e) {

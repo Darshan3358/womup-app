@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -21,12 +21,15 @@ import {
   CheckCircle2,
   Lock,
   Smartphone,
+  Mail,
   CreditCard,
   Building2,
   ShieldCheck,
   Compass,
   Sparkles,
   Info,
+  AlertCircle,
+  X,
 } from 'lucide-react-native';
 import { COLORS } from '../theme';
 import { FileUploadField } from '../components/FileUploadField';
@@ -71,59 +74,97 @@ export const VendorRegistrationScreen: React.FC<VendorRegistrationScreenProps> =
   const [submitting, setSubmitting] = useState(false);
 
   // ── Step 1: Basic Information ──
-  const [firmName, setFirmName] = useState('Gokul Vegetables');
-  const [ownerName, setOwnerName] = useState('Ramesh Patel');
+  const [firmName, setFirmName] = useState('');
+  const [ownerName, setOwnerName] = useState('');
   const [businessType, setBusinessType] = useState('Vegetables & Fruits');
   const [businessCategory, setBusinessCategory] = useState('Vegetables');
-  const [mobile, setMobile] = useState('9876543210');
+  const [mobile, setMobile] = useState('');
   const [altMobile, setAltMobile] = useState('');
-  const [email, setEmail] = useState('gokul@example.com');
+  const [email, setEmail] = useState('');
   const [sendingOtp, setSendingOtp] = useState(false);
 
   // ── Step 2: OTP Verification ──
-  const [otpDigits, setOtpDigits] = useState(['1', '2', '3', '4', '5', '6']);
+  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
+  const otpInputRefs = useRef<(TextInput | null)[]>([]);
   const [otpTimer, setOtpTimer] = useState(60);
   const [verificationId, setVerificationId] = useState<string | undefined>(undefined);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
 
   // ── Step 3: Business Location ──
-  const [address, setAddress] = useState('Shop 10-14, Ground Floor, Shukan Hub');
-  const [landmark, setLandmark] = useState('Near Chandlodiya Railway Station');
+  const [address, setAddress] = useState('');
+  const [landmark, setLandmark] = useState('');
   const [country, setCountry] = useState('India');
   const [state, setState] = useState('Gujarat');
   const [district, setDistrict] = useState('Ahmedabad');
   const [taluka, setTaluka] = useState('Daskroi');
   const [city, setCity] = useState('Ahmedabad');
-  const [pincode, setPincode] = useState('382481');
+  const [pincode, setPincode] = useState('');
   const [lat, setLat] = useState('23.1288');
   const [lng, setLng] = useState('72.5507');
 
   // ── Step 4: KYC Documents ──
-  const [aadharNo, setAadharNo] = useState('123412341234');
-  const [aadharFront, setAadharFront] = useState('https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&q=80');
-  const [aadharBack, setAadharBack] = useState('https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&q=80');
-  const [gstNo, setGstNo] = useState('24ABCDE1234F1Z5');
+  const [aadharNo, setAadharNo] = useState('');
+  const [aadharFront, setAadharFront] = useState('');
+  const [aadharBack, setAadharBack] = useState('');
+  const [gstNo, setGstNo] = useState('');
   const [gstCert, setGstCert] = useState('');
-  const [panCard, setPanCard] = useState('https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&q=80');
-  const [tradeLicense, setTradeLicense] = useState('https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&q=80');
-  const [cancelledCheque, setCancelledCheque] = useState('https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&q=80');
+  const [panCard, setPanCard] = useState('');
+  const [tradeLicense, setTradeLicense] = useState('');
+  const [cancelledCheque, setCancelledCheque] = useState('');
   const [businessCard, setBusinessCard] = useState('');
-  const [shopPhoto, setShopPhoto] = useState('https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&q=80');
-  const [ownerPhoto, setOwnerPhoto] = useState('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=600&q=80');
+  const [shopPhoto, setShopPhoto] = useState('');
+  const [ownerPhoto, setOwnerPhoto] = useState('');
 
   // ── Step 5: Bank & Password ──
-  const [bankName, setBankName] = useState('HDFC Bank');
-  const [bankBranch, setBankBranch] = useState('SG Highway');
-  const [accountHolder, setAccountHolder] = useState('Gokul Vegetables');
-  const [accountNumber, setAccountNumber] = useState('123456789012');
-  const [ifscCode, setIfscCode] = useState('HDFC0000123');
-  const [upiId, setUpiId] = useState('gokul@okhdfc');
-  const [password, setPassword] = useState('secure123');
-  const [confirmPassword, setConfirmPassword] = useState('secure123');
-  const [termsAccepted, setTermsAccepted] = useState(true);
+  const [bankName, setBankName] = useState('');
+  const [bankBranch, setBankBranch] = useState('');
+  const [accountHolder, setAccountHolder] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [ifscCode, setIfscCode] = useState('');
+  const [upiId, setUpiId] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   // ── Step 6: Post-Registration Result ──
   const [registeredVendorCode, setRegisteredVendorCode] = useState('VND001');
+
+  // ── Toastify State & Methods ──
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: 'error' | 'success' | 'info' | 'warning';
+  }>({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'error',
+  });
+
+  const toastTimerRef = useRef<any>(null);
+
+  const showToast = (
+    title: string,
+    message: string,
+    type: 'error' | 'success' | 'info' | 'warning' = 'error',
+  ) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({
+      visible: true,
+      title,
+      message,
+      type,
+    });
+    toastTimerRef.current = setTimeout(() => {
+      setToast((prev) => ({ ...prev, visible: false }));
+    }, 4500);
+  };
+
+  const hideToast = () => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast((prev) => ({ ...prev, visible: false }));
+  };
 
   // OTP Countdown timer
   useEffect(() => {
@@ -139,37 +180,51 @@ export const VendorRegistrationScreen: React.FC<VendorRegistrationScreenProps> =
   // Handle Send OTP from Step 1
   const handleStep1SendOtp = async () => {
     if (!firmName.trim()) {
-      Alert.alert('Required', 'Please enter Store / Firm Name.');
+      showToast('Store Name Missing', 'Please enter your Store / Firm Name.', 'error');
       return;
     }
     if (!ownerName.trim()) {
-      Alert.alert('Required', 'Please enter Owner Name.');
+      showToast('Owner Name Missing', 'Please enter Owner Full Name.', 'error');
+      return;
+    }
+    if (!businessType) {
+      showToast('Business Type Missing', 'Please select a Business Type.', 'error');
       return;
     }
     const cleanMobile = mobile.replace(/\D/g, '').slice(-10);
-    if (cleanMobile.length !== 10) {
-      Alert.alert('Required', 'Please enter a valid 10-digit Mobile Number.');
+    if (!cleanMobile) {
+      showToast('Mobile Number Missing', 'Please enter Mobile Number for login & OTP.', 'error');
       return;
     }
-    if (!email.trim() || !email.includes('@')) {
-      Alert.alert('Required', 'Please enter a valid Email Address.');
+    if (cleanMobile.length !== 10) {
+      showToast('Invalid Mobile Number', 'Mobile Number must be exactly 10 digits.', 'error');
+      return;
+    }
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) {
+      showToast('Email Address Missing', 'Please enter your Email Address to receive the verification OTP.', 'error');
+      return;
+    }
+    if (!cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      showToast('Invalid Email Address', 'Please enter a valid Email Address (e.g. shop@example.com).', 'error');
       return;
     }
 
     setSendingOtp(true);
-    const res = await VendorApi.sendOtp(`+91${cleanMobile}`, 'REGISTRATION');
+    const res = await VendorApi.sendOtp(cleanEmail, 'REGISTRATION');
     setSendingOtp(false);
 
     if (res.success) {
       setVerificationId(res.verificationId);
       setOtpTimer(60);
       setCurrentStep(2);
-      Alert.alert(
-        'OTP Sent 📲',
-        `A 6-digit verification code has been sent to +91 ${cleanMobile}.\n${res.devOtp ? `(Dev Code: ${res.devOtp})` : ''}`,
+      showToast(
+        'OTP Sent ✉️',
+        `A 6-digit code has been sent to ${cleanEmail}. ${res.devOtp ? `(Dev Code: ${res.devOtp})` : ''}`,
+        'success',
       );
     } else {
-      Alert.alert('Failed to send OTP', res.error || 'Please check mobile number.');
+      showToast('Failed to Send OTP', res.error || 'Please check your email address and try again.', 'error');
     }
   };
 
@@ -177,51 +232,83 @@ export const VendorRegistrationScreen: React.FC<VendorRegistrationScreenProps> =
   const handleStep2VerifyOtp = async () => {
     const code = otpDigits.join('');
     if (code.length !== 6) {
-      Alert.alert('Incomplete OTP', 'Please enter the 6-digit verification code.');
+      showToast('Incomplete OTP', 'Please enter all 6 digits of the verification code.', 'error');
       return;
     }
 
     setVerifyingOtp(true);
-    const cleanMobile = mobile.replace(/\D/g, '').slice(-10);
-    const res = await VendorApi.verifyOtp(`+91${cleanMobile}`, code, verificationId);
+    const cleanEmail = email.trim().toLowerCase();
+    const res = await VendorApi.verifyOtp(cleanEmail, code, verificationId);
     setVerifyingOtp(false);
 
     if (res.success) {
+      showToast('Email Verified ✓', 'OTP verified successfully. Now pin your store location.', 'success');
       setCurrentStep(3);
     } else {
-      Alert.alert('Verification Failed', res.error || 'Invalid OTP code. Master test OTP is 123456.');
+      showToast('Verification Failed', res.error || 'Invalid OTP code. Master test OTP is 123456.', 'error');
     }
   };
 
   const handleOtpBoxChange = (index: number, val: string) => {
-    const cleaned = val.replace(/\D/g, '');
+    if (val.length > 1) {
+      const clean = val.replace(/\D/g, '').slice(0, 6);
+      const newArr = [...otpDigits];
+      for (let i = 0; i < clean.length; i++) {
+        newArr[i] = clean[i];
+      }
+      setOtpDigits(newArr);
+      const nextFocus = Math.min(clean.length, 5);
+      otpInputRefs.current[nextFocus]?.focus();
+      return;
+    }
+
+    const cleaned = val.replace(/\D/g, '').slice(-1);
     const newArr = [...otpDigits];
-    newArr[index] = cleaned.slice(-1);
+    newArr[index] = cleaned;
     setOtpDigits(newArr);
+
+    if (cleaned && index < 5) {
+      otpInputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyPress = (index: number, e: any) => {
+    if (e.nativeEvent?.key === 'Backspace' && !otpDigits[index] && index > 0) {
+      otpInputRefs.current[index - 1]?.focus();
+    }
   };
 
   // Handle Step 3 Location Next
   const handleStep3Next = () => {
     if (!address.trim()) {
-      Alert.alert('Required', 'Please enter your Full Store Address.');
+      showToast('Store Address Missing', 'Please enter your Full Store Address.', 'error');
       return;
     }
-    if (!pincode.trim() || pincode.trim().length !== 6) {
-      Alert.alert('Required', 'Please enter a valid 6-digit Pincode.');
+    if (!city.trim()) {
+      showToast('City Missing', 'Please enter City Name.', 'error');
+      return;
+    }
+    if (!pincode.trim()) {
+      showToast('Pincode Missing', 'Please enter postal Pincode.', 'error');
+      return;
+    }
+    if (pincode.trim().length !== 6) {
+      showToast('Invalid Pincode', 'Pincode must be exactly 6 digits.', 'error');
       return;
     }
 
     const latNum = parseFloat(lat);
     const lngNum = parseFloat(lng);
     if (isNaN(latNum) || latNum < -90 || latNum > 90 || latNum === 0) {
-      Alert.alert('Location Required', 'Please pin your shop location on the map or enter a valid Latitude (-90 to 90).');
+      showToast('Location Required', 'Please pin your shop on the map or tap Auto GPS.', 'error');
       return;
     }
     if (isNaN(lngNum) || lngNum < -180 || lngNum > 180 || lngNum === 0) {
-      Alert.alert('Location Required', 'Please pin your shop location on the map or enter a valid Longitude (-180 to 180).');
+      showToast('Location Required', 'Please pin your shop on the map or tap Auto GPS.', 'error');
       return;
     }
 
+    showToast('Location Saved 📍', 'Proceeding to KYC Documents verification.', 'success');
     setCurrentStep(4);
   };
 
@@ -229,62 +316,113 @@ export const VendorRegistrationScreen: React.FC<VendorRegistrationScreenProps> =
   const handleAutoGps = () => {
     setLat('23.1288');
     setLng('72.5507');
-    Alert.alert('GPS Location Captured 📍', 'Coordinates set to Lat: 23.1288, Lng: 72.5507');
+    showToast('GPS Location Captured 📍', 'Coordinates set to Lat: 23.1288, Lng: 72.5507', 'success');
   };
 
   // Handle Step 4 KYC Next
   const handleStep4Next = () => {
-    if (!aadharNo.trim() || aadharNo.replace(/\D/g, '').length !== 12) {
-      Alert.alert('Required', 'Please enter a valid 12-digit Aadhaar Number.');
+    const cleanAadhar = aadharNo.replace(/\D/g, '');
+    if (!aadharNo.trim()) {
+      showToast('Aadhaar Card Missing', 'Aadhaar Card Number is required. Please enter 12-digit number.', 'error');
       return;
     }
-    if (!aadharFront || !aadharBack) {
-      Alert.alert('Required', 'Please upload both Aadhaar Front and Back documents.');
+    if (cleanAadhar.length !== 12) {
+      showToast('Invalid Aadhaar Number', `Aadhaar Number must be exactly 12 digits (currently ${cleanAadhar.length} digits).`, 'error');
+      return;
+    }
+    if (!aadharFront) {
+      showToast('Aadhaar Front Missing', 'Please upload Front side photo of Aadhaar Card.', 'error');
+      return;
+    }
+    if (!aadharBack) {
+      showToast('Aadhaar Back Missing', 'Please upload Back side photo of Aadhaar Card.', 'error');
       return;
     }
     if (!panCard) {
-      Alert.alert('Required', 'Please upload PAN Card document.');
+      showToast('PAN Card Missing', 'Please upload PAN Card document image.', 'error');
       return;
     }
     if (!tradeLicense) {
-      Alert.alert('Required', 'Please upload Trade License / Gumastadhara.');
+      showToast('Trade License Missing', 'Please upload Trade License or Gumastadhara certificate.', 'error');
       return;
     }
     if (!cancelledCheque) {
-      Alert.alert('Required', 'Please upload Cancelled Cheque image.');
+      showToast('Cancelled Cheque Missing', 'Please upload Cancelled Cheque or Bank Passbook photo.', 'error');
       return;
     }
-    if (!shopPhoto || !ownerPhoto) {
-      Alert.alert('Required', 'Please upload Shop Front Photo and Owner Photo.');
+    if (!shopPhoto) {
+      showToast('Shop Photo Missing', 'Please upload Shop Front Photo showing your store board.', 'error');
       return;
     }
+    if (!ownerPhoto) {
+      showToast('Owner Photo Missing', 'Please upload Store Owner Passport/Selfie Photo.', 'error');
+      return;
+    }
+
+    showToast('KYC Documents Verified ✓', 'Proceeding to Bank Account setup.', 'success');
     setCurrentStep(5);
   };
 
   // Handle Step 5 Complete Registration
   const handleCompleteRegistration = async () => {
-    if (!bankName.trim() || !bankBranch.trim()) {
-      Alert.alert('Required', 'Please enter Bank Name and Branch.');
+    // Re-verify Step 4 documents in case jumped
+    const cleanAadhar = aadharNo.replace(/\D/g, '');
+    if (!aadharNo.trim()) {
+      showToast('Aadhaar Card Missing', 'Aadhaar Card Number is missing. Please complete Step 4.', 'error');
+      setCurrentStep(4);
+      return;
+    }
+    if (cleanAadhar.length !== 12) {
+      showToast('Invalid Aadhaar Number', `Aadhaar Number must be 12 digits. Please check Step 4.`, 'error');
+      setCurrentStep(4);
+      return;
+    }
+    if (!aadharFront || !aadharBack) {
+      showToast('Aadhaar Images Missing', 'Please upload both Aadhaar Front and Back documents.', 'error');
+      setCurrentStep(4);
+      return;
+    }
+    if (!panCard || !tradeLicense || !cancelledCheque || !shopPhoto || !ownerPhoto) {
+      showToast('KYC Documents Incomplete', 'Please upload all required KYC documents in Step 4.', 'error');
+      setCurrentStep(4);
+      return;
+    }
+
+    // Step 5 Bank checks
+    if (!bankName.trim()) {
+      showToast('Bank Name Missing', 'Please enter your Bank Name.', 'error');
+      return;
+    }
+    if (!bankBranch.trim()) {
+      showToast('Branch Name Missing', 'Please enter Bank Branch Name.', 'error');
       return;
     }
     if (!accountNumber.trim()) {
-      Alert.alert('Required', 'Please enter Bank Account Number.');
+      showToast('Account Number Missing', 'Please enter Bank Account Number.', 'error');
+      return;
+    }
+    if (accountNumber.trim().length < 8) {
+      showToast('Invalid Account Number', 'Bank account number must be at least 8 digits.', 'error');
       return;
     }
     if (!ifscCode.trim()) {
-      Alert.alert('Required', 'Please enter Bank IFSC Code.');
+      showToast('IFSC Code Missing', 'Please enter Bank IFSC Code.', 'error');
+      return;
+    }
+    if (ifscCode.trim().length !== 11) {
+      showToast('Invalid IFSC Code', 'IFSC Code must be exactly 11 characters (e.g. HDFC0001234).', 'error');
       return;
     }
     if (!password || password.length < 6) {
-      Alert.alert('Required', 'Password must be at least 6 characters long.');
+      showToast('Password Too Short', 'Password must be at least 6 characters long.', 'error');
       return;
     }
     if (password !== confirmPassword) {
-      Alert.alert('Mismatch', 'Password and Confirm Password do not match.');
+      showToast('Password Mismatch', 'Password and Confirm Password do not match.', 'error');
       return;
     }
     if (!termsAccepted) {
-      Alert.alert('Terms', 'Please accept the Terms & Conditions to complete registration.');
+      showToast('Terms & Conditions Required', 'Please accept the Terms & Conditions to complete registration.', 'warning');
       return;
     }
 
@@ -339,14 +477,60 @@ export const VendorRegistrationScreen: React.FC<VendorRegistrationScreenProps> =
       if (res.vendor) {
         setVendorProfile(res.vendor);
       }
+      showToast('Registration Successful! 🎉', `Store registered with code ${code}.`, 'success');
       setCurrentStep(6);
     } else {
-      Alert.alert('Registration Failed', res.error || 'Please check your inputs and try again.');
+      showToast('Registration Failed', res.error || 'Please check your inputs and try again.', 'error');
     }
   };
 
   return (
     <LinearGradient colors={['#0F172A', '#1E293B']} style={styles.container}>
+      {/* ═════════════════════════════════════════════════════════════════ */}
+      {/* FLOATING TOASTIFY NOTIFICATION BANNER                             */}
+      {/* ═════════════════════════════════════════════════════════════════ */}
+      {toast.visible && (
+        <View style={styles.toastContainer}>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            style={[
+              styles.toastCard,
+              toast.type === 'error' && styles.toastError,
+              toast.type === 'success' && styles.toastSuccess,
+              toast.type === 'info' && styles.toastInfo,
+              toast.type === 'warning' && styles.toastWarning,
+            ]}
+            onPress={hideToast}
+          >
+            <View style={styles.toastIconWrap}>
+              {toast.type === 'error' && <AlertCircle size={22} color="#EF4444" />}
+              {toast.type === 'success' && <CheckCircle2 size={22} color="#10B981" />}
+              {toast.type === 'info' && <Info size={22} color="#38BDF8" />}
+              {toast.type === 'warning' && <AlertCircle size={22} color="#F59E0B" />}
+            </View>
+
+            <View style={styles.toastTextCol}>
+              <Text
+                style={[
+                  styles.toastTitle,
+                  toast.type === 'error' && { color: '#FCA5A5' },
+                  toast.type === 'success' && { color: '#6EE7B7' },
+                  toast.type === 'info' && { color: '#7DD3FC' },
+                  toast.type === 'warning' && { color: '#FCD34D' },
+                ]}
+              >
+                {toast.title}
+              </Text>
+              <Text style={styles.toastMessage}>{toast.message}</Text>
+            </View>
+
+            <TouchableOpacity onPress={hideToast} style={styles.toastCloseBtn}>
+              <X size={16} color="#94A3B8" />
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
@@ -366,7 +550,7 @@ export const VendorRegistrationScreen: React.FC<VendorRegistrationScreenProps> =
               <Text style={styles.title}>Register Store</Text>
               <Text style={styles.subtitle}>
                 {currentStep === 1 && 'Basic Information'}
-                {currentStep === 2 && 'Verify Mobile OTP'}
+                {currentStep === 2 && 'Verify Email OTP'}
                 {currentStep === 3 && 'Business Location & GPS'}
                 {currentStep === 4 && 'KYC Documents Verification'}
                 {currentStep === 5 && 'Bank Account & Security'}
@@ -509,7 +693,7 @@ export const VendorRegistrationScreen: React.FC<VendorRegistrationScreenProps> =
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
                   <>
-                    <Text style={styles.primaryBtnText}>Send OTP to Mobile</Text>
+                    <Text style={styles.primaryBtnText}>Send OTP to Email</Text>
                     <ArrowRight size={18} color="#FFFFFF" />
                   </>
                 )}
@@ -523,24 +707,27 @@ export const VendorRegistrationScreen: React.FC<VendorRegistrationScreenProps> =
           {currentStep === 2 && (
             <View style={styles.card}>
               <View style={styles.sectionHeader}>
-                <Smartphone size={20} color={COLORS.rose} />
-                <Text style={styles.sectionTitle}>Verify Mobile OTP</Text>
+                <Mail size={20} color={COLORS.rose} />
+                <Text style={styles.sectionTitle}>Verify Email OTP</Text>
               </View>
 
               <Text style={styles.stepDesc}>
-                We sent a 6-digit verification code to{' '}
-                <Text style={{ fontWeight: '800', color: '#FFFFFF' }}>+91 {mobile}</Text>
+                We sent a 6-digit verification code to your email:{' '}
+                <Text style={{ fontWeight: '800', color: '#FFFFFF' }}>{email.trim().toLowerCase()}</Text>
               </Text>
 
               <View style={styles.otpBoxesRow}>
                 {otpDigits.map((digit, idx) => (
                   <TextInput
                     key={idx}
+                    ref={(el) => { otpInputRefs.current[idx] = el; }}
                     style={[styles.otpBox, digit ? styles.otpBoxFilled : null]}
                     value={digit}
                     onChangeText={(v) => handleOtpBoxChange(idx, v)}
+                    onKeyPress={(e) => handleOtpKeyPress(idx, e)}
                     keyboardType="number-pad"
-                    maxLength={1}
+                    maxLength={6}
+                    selectTextOnFocus
                     textAlign="center"
                   />
                 ))}
@@ -670,6 +857,8 @@ export const VendorRegistrationScreen: React.FC<VendorRegistrationScreenProps> =
               <MapPicker
                 initialLatitude={parseFloat(lat) || 23.1288}
                 initialLongitude={parseFloat(lng) || 72.5507}
+                pinTitle="Shop Entrance"
+                confirmLabel="Confirm Pin Location"
                 onLocationSelect={(coords) => {
                   setLat(coords.latitude.toFixed(6));
                   setLng(coords.longitude.toFixed(6));
@@ -678,32 +867,6 @@ export const VendorRegistrationScreen: React.FC<VendorRegistrationScreenProps> =
                   }
                 }}
               />
-
-              {/* Explicit Editable Latitude and Longitude Fields */}
-              <View style={styles.twoCol}>
-                <View style={[styles.inputGroup, { flex: 1 }]}>
-                  <Text style={styles.label}>Latitude (`vendor_lat`) *</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={lat}
-                    onChangeText={setLat}
-                    placeholder="23.128800"
-                    placeholderTextColor="#64748B"
-                    keyboardType="numeric"
-                  />
-                </View>
-                <View style={[styles.inputGroup, { flex: 1 }]}>
-                  <Text style={styles.label}>Longitude (`vendor_long`) *</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={lng}
-                    onChangeText={setLng}
-                    placeholder="72.550700"
-                    placeholderTextColor="#64748B"
-                    keyboardType="numeric"
-                  />
-                </View>
-              </View>
 
               <View style={styles.navRow}>
                 <TouchableOpacity style={styles.backBtn} onPress={() => setCurrentStep(2)}>
@@ -747,14 +910,14 @@ export const VendorRegistrationScreen: React.FC<VendorRegistrationScreenProps> =
               </View>
 
               <FileUploadField
-                label="📄 Aadhaar Front Image"
+                label="Aadhaar Front Image"
                 required
                 value={aadharFront}
                 onUploadComplete={setAadharFront}
               />
 
               <FileUploadField
-                label="📄 Aadhaar Back Image"
+                label="Aadhaar Back Image"
                 required
                 value={aadharBack}
                 onUploadComplete={setAadharBack}
@@ -773,47 +936,47 @@ export const VendorRegistrationScreen: React.FC<VendorRegistrationScreenProps> =
               </View>
 
               <FileUploadField
-                label="📄 GST Certificate (Optional)"
+                label="GST Certificate (Optional)"
                 value={gstCert}
                 onUploadComplete={setGstCert}
               />
 
               <FileUploadField
-                label="📄 PAN Card Image"
+                label="PAN Card Image"
                 required
                 value={panCard}
                 onUploadComplete={setPanCard}
               />
 
               <FileUploadField
-                label="📄 Trade License / Gumastadhara"
+                label="Trade License / Gumastadhara"
                 required
                 value={tradeLicense}
                 onUploadComplete={setTradeLicense}
               />
 
               <FileUploadField
-                label="📄 Cancelled Cheque / Passbook"
+                label="Cancelled Cheque / Passbook"
                 required
                 value={cancelledCheque}
                 onUploadComplete={setCancelledCheque}
               />
 
               <FileUploadField
-                label="📄 Business Card (Optional)"
+                label="Business Card (Optional)"
                 value={businessCard}
                 onUploadComplete={setBusinessCard}
               />
 
               <FileUploadField
-                label="📄 Shop Front Photo"
+                label="Shop Front Photo"
                 required
                 value={shopPhoto}
                 onUploadComplete={setShopPhoto}
               />
 
               <FileUploadField
-                label="📄 Owner Photo / Selfie"
+                label="Owner Photo / Selfie"
                 required
                 value={ownerPhoto}
                 onUploadComplete={setOwnerPhoto}
@@ -1205,12 +1368,18 @@ const styles = StyleSheet.create({
   },
   otpBoxesRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    alignItems: 'center',
     gap: 8,
-    marginVertical: 10,
+    marginVertical: 14,
+    width: '100%',
+    maxWidth: 360,
+    alignSelf: 'center',
   },
   otpBox: {
     flex: 1,
+    minWidth: 0,
+    maxWidth: 48,
     height: 52,
     borderWidth: 1.5,
     borderColor: '#475569',
@@ -1219,6 +1388,9 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '900',
     color: '#FFFFFF',
+    textAlign: 'center',
+    paddingHorizontal: 0,
+    ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}),
   },
   otpBoxFilled: {
     borderColor: COLORS.rose,
@@ -1465,5 +1637,68 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     lineHeight: 16,
     marginTop: -4,
+  },
+  // ── Toastify Floating Notification Styles ──
+  toastContainer: {
+    position: 'absolute',
+    top: Platform.OS === 'web' ? 16 : 48,
+    left: 16,
+    right: 16,
+    zIndex: 999999,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    elevation: 24,
+  },
+  toastCard: {
+    width: '100%',
+    maxWidth: 520,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    backgroundColor: '#0F172A',
+  },
+  toastError: {
+    backgroundColor: '#1E1014',
+    borderColor: '#EF4444',
+  },
+  toastSuccess: {
+    backgroundColor: '#0C1E17',
+    borderColor: '#10B981',
+  },
+  toastInfo: {
+    backgroundColor: '#0C1929',
+    borderColor: '#38BDF8',
+  },
+  toastWarning: {
+    backgroundColor: '#21180A',
+    borderColor: '#F59E0B',
+  },
+  toastIconWrap: {
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  toastTextCol: {
+    flex: 1,
+  },
+  toastTitle: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  toastMessage: {
+    fontSize: 12.5,
+    color: '#E2E8F0',
+    lineHeight: 17,
+  },
+  toastCloseBtn: {
+    padding: 6,
+    marginLeft: 8,
   },
 });

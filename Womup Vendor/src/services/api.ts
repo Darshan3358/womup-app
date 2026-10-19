@@ -77,13 +77,15 @@ export const VendorApi = {
     }
   },
 
-  // 1b. Send Mobile OTP
-  async sendOtp(mobile: string, purpose = 'REGISTRATION'): Promise<{ success: boolean; verificationId?: string; expiresIn?: number; error?: string; devOtp?: string }> {
+  // 1b. Send OTP (Email or Mobile)
+  async sendOtp(target: string, purpose = 'REGISTRATION'): Promise<{ success: boolean; verificationId?: string; expiresIn?: number; error?: string; devOtp?: string }> {
     try {
+      const isEmail = target.includes('@');
+      const body = isEmail ? { email: target.trim().toLowerCase(), purpose } : { mobile: target, purpose };
       const res = await fetch(`${API_BASE}/vendor/auth/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mobile, purpose }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (data.success && data.data) {
@@ -95,13 +97,17 @@ export const VendorApi = {
     }
   },
 
-  // 1c. Verify Mobile OTP
-  async verifyOtp(mobile: string, otp: string, verificationId?: string): Promise<{ success: boolean; verified?: boolean; error?: string }> {
+  // 1c. Verify OTP (Email or Mobile)
+  async verifyOtp(target: string, otp: string, verificationId?: string): Promise<{ success: boolean; verified?: boolean; error?: string }> {
     try {
+      const isEmail = target.includes('@');
+      const body = isEmail
+        ? { email: target.trim().toLowerCase(), otp, verificationId }
+        : { mobile: target, otp, verificationId };
       const res = await fetch(`${API_BASE}/vendor/auth/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mobile, otp, verificationId }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (data.success && data.verified) {
@@ -113,13 +119,17 @@ export const VendorApi = {
     }
   },
 
-  // 1d. Login with Mobile + OTP
-  async loginWithOtp(mobile: string, otp: string): Promise<{ success: boolean; vendor?: VendorProfile; error?: string }> {
+  // 1d. Login with Email / Mobile + OTP
+  async loginWithOtp(target: string, otp: string): Promise<{ success: boolean; vendor?: VendorProfile; error?: string }> {
     try {
+      const isEmail = target.includes('@');
+      const body = isEmail
+        ? { email: target.trim().toLowerCase(), otp }
+        : { mobile: target, otp };
       const res = await fetch(`${API_BASE}/vendor/auth/login-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mobile, otp }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (data.success && data.data) {
@@ -154,13 +164,15 @@ export const VendorApi = {
     }
   },
 
-  // 1f. Forgot Password
-  async forgotPassword(mobile: string): Promise<{ success: boolean; message?: string; error?: string; devOtp?: string }> {
+  // 1f. Forgot Password (Supports Email or Mobile)
+  async forgotPassword(target: string): Promise<{ success: boolean; message?: string; error?: string; devOtp?: string }> {
     try {
+      const isEmail = target.includes('@');
+      const body = isEmail ? { email: target.trim().toLowerCase() } : { mobile: target };
       const res = await fetch(`${API_BASE}/vendor/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mobile }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (data.success) {
@@ -172,13 +184,17 @@ export const VendorApi = {
     }
   },
 
-  // 1g. Reset Password
-  async resetPassword(mobile: string, otp: string, newPassword: string): Promise<{ success: boolean; message?: string; error?: string }> {
+  // 1g. Reset Password (Supports Email or Mobile)
+  async resetPassword(target: string, otp: string, newPassword: string): Promise<{ success: boolean; message?: string; error?: string }> {
     try {
+      const isEmail = target.includes('@');
+      const body = isEmail
+        ? { email: target.trim().toLowerCase(), otp, newPassword }
+        : { mobile: target, otp, newPassword };
       const res = await fetch(`${API_BASE}/vendor/auth/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mobile, otp, newPassword }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (data.success) {

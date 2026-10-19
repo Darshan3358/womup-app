@@ -25,6 +25,7 @@ import {
   Users,
 } from 'lucide-react-native';
 import { ApiService } from '../../services/api';
+import { resolveImageUrl } from '../../utils/imageUrl';
 
 interface CustomerKycReviewModalProps {
   isOpen: boolean;
@@ -439,7 +440,7 @@ const DocBox: React.FC<{ title: string; url?: string; onZoom: () => void }> = ({
     <Text style={styles.docTitle}>{title}</Text>
     {url ? (
       <TouchableOpacity activeOpacity={0.8} onPress={onZoom} style={styles.docImgWrap}>
-        <Image source={{ uri: url }} style={styles.docImg} resizeMode="cover" />
+        <Image source={{ uri: resolveImageUrl(url) }} style={styles.docImg} resizeMode="cover" />
         <View style={styles.zoomOverlay}>
           <Maximize2 size={14} color="#FFFFFF" />
         </View>

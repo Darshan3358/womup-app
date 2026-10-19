@@ -360,22 +360,34 @@ export class StoreApiService {
     let lastError: any = null;
     for (const url of endpoints) {
       try {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers,
-          body: formData,
+        const resJson = await new Promise<any>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', url);
+          if (headers) {
+            Object.entries(headers).forEach(([k, v]) => {
+              if (k.toLowerCase() !== 'content-type') xhr.setRequestHeader(k, v);
+            });
+          }
+          xhr.onload = () => {
+            let data: any;
+            try { data = JSON.parse(xhr.responseText); } catch { data = { text: xhr.responseText }; }
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve(data);
+            } else {
+              reject(new Error(data?.message || data?.error || `Upload failed with status ${xhr.status}`));
+            }
+          };
+          xhr.onerror = () => reject(new Error('Network error during file upload'));
+          xhr.timeout = 60000;
+          xhr.send(formData);
         });
-        const resJson = await response.json();
-        if (response.ok) {
-          const cloudUrl =
-            resJson?.url ||
-            resJson?.secure_url ||
-            resJson?.data?.url ||
-            resJson?.data?.secure_url;
-          if (cloudUrl) return cloudUrl;
-        } else {
-          lastError = new Error(resJson?.message || `Upload failed with status ${response.status}`);
-        }
+
+        const cloudUrl =
+          resJson?.url ||
+          resJson?.secure_url ||
+          resJson?.data?.url ||
+          resJson?.data?.secure_url;
+        if (cloudUrl) return cloudUrl;
       } catch (err) {
         lastError = err;
       }

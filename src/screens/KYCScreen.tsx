@@ -36,6 +36,7 @@ import { useApp } from '../context/AppContext';
 import { KycService, CustomerKycStatusResponse } from '../services/kycService';
 import { useToast } from '../context/ToastContext';
 import { uploadService } from '../services/uploadService';
+import { resolveImageUrl } from '../utils/imageUrl';
 
 export const KYCScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -341,7 +342,7 @@ export const KYCScreen: React.FC = () => {
           <Text style={[styles.label, { marginTop: 14 }]}>Aadhaar Front Image *</Text>
           {aadharFrontUri ? (
             <View style={styles.previewBox}>
-              <Image source={{ uri: aadharFrontUri }} style={styles.previewImage} />
+              <Image source={{ uri: resolveImageUrl(aadharFrontUri) }} style={styles.previewImage} />
               <View style={styles.previewActions}>
                 <TouchableOpacity
                   style={styles.previewBtn}
@@ -384,7 +385,7 @@ export const KYCScreen: React.FC = () => {
           <Text style={[styles.label, { marginTop: 14 }]}>Aadhaar Back Image *</Text>
           {aadharBackUri ? (
             <View style={styles.previewBox}>
-              <Image source={{ uri: aadharBackUri }} style={styles.previewImage} />
+              <Image source={{ uri: resolveImageUrl(aadharBackUri) }} style={styles.previewImage} />
               <View style={styles.previewActions}>
                 <TouchableOpacity
                   style={styles.previewBtn}
@@ -531,7 +532,7 @@ export const KYCScreen: React.FC = () => {
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Document Preview</Text>
             {previewImage && (
-              <Image source={{ uri: previewImage }} style={styles.modalImage} resizeMode="contain" />
+              <Image source={{ uri: resolveImageUrl(previewImage) }} style={styles.modalImage} resizeMode="contain" />
             )}
             <TouchableOpacity
               style={styles.modalCloseBtn}

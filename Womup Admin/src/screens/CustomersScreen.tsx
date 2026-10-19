@@ -43,6 +43,7 @@ import {
 import { COLORS, RADIUS, SPACING } from '../theme';
 import { useAdminState } from '../context/AdminStateContext';
 import { Customer, DeliveryPartnerItem } from '../types/admin';
+import { resolveImageUrl } from '../utils/imageUrl';
 import { ApiService } from '../services/api';
 import { CustomerKycReviewModal } from './modals/CustomerKycReviewModal';
 import { CustomerListSkeleton } from '../components/common/Skeleton';
@@ -1046,7 +1047,7 @@ export const CustomersScreen: React.FC = () => {
                                 onPress={() => setPreviewDoc({ title: 'Driving License (Front)', url: selectedRider.documents?.dlFront || selectedRider.documents?.dlFrontUrl || '' })}
                                 activeOpacity={0.8}
                               >
-                                <Image source={{ uri: selectedRider.documents?.dlFront || selectedRider.documents?.dlFrontUrl }} style={styles.docThumbImg} resizeMode="cover" />
+                                <Image source={{ uri: resolveImageUrl(selectedRider.documents?.dlFront || selectedRider.documents?.dlFrontUrl) }} style={styles.docThumbImg} resizeMode="cover" />
                                 <View style={styles.docThumbOverlay}>
                                   <Eye size={14} color="#FFF" />
                                   <Text style={styles.docThumbText}>Front</Text>
@@ -1055,10 +1056,10 @@ export const CustomersScreen: React.FC = () => {
                               {(selectedRider.documents?.dlBack || selectedRider.documents?.dlBackUrl) && (
                                 <TouchableOpacity
                                   style={styles.docThumbContainer}
-                                  onPress={() => setPreviewDoc({ title: 'Driving License (Back)', url: selectedRider.documents?.dlBack || selectedRider.documents?.dlBackUrl || '' })}
+                                  onPress={() => setPreviewDoc({ title: 'Driving License (Back)', url: resolveImageUrl(selectedRider.documents?.dlBack || selectedRider.documents?.dlBackUrl || '') })}
                                   activeOpacity={0.8}
                                 >
-                                  <Image source={{ uri: selectedRider.documents?.dlBack || selectedRider.documents?.dlBackUrl }} style={styles.docThumbImg} resizeMode="cover" />
+                                  <Image source={{ uri: resolveImageUrl(selectedRider.documents?.dlBack || selectedRider.documents?.dlBackUrl) }} style={styles.docThumbImg} resizeMode="cover" />
                                   <View style={styles.docThumbOverlay}>
                                     <Eye size={14} color="#FFF" />
                                     <Text style={styles.docThumbText}>Back</Text>
@@ -1093,7 +1094,7 @@ export const CustomersScreen: React.FC = () => {
                                 onPress={() => setPreviewDoc({ title: 'Vehicle RC (Front)', url: selectedRider.documents?.rcFront || selectedRider.documents?.rcFrontUrl || '' })}
                                 activeOpacity={0.8}
                               >
-                                <Image source={{ uri: selectedRider.documents?.rcFront || selectedRider.documents?.rcFrontUrl }} style={styles.docThumbImg} resizeMode="cover" />
+                                <Image source={{ uri: resolveImageUrl(selectedRider.documents?.rcFront || selectedRider.documents?.rcFrontUrl) }} style={styles.docThumbImg} resizeMode="cover" />
                                 <View style={styles.docThumbOverlay}>
                                   <Eye size={14} color="#FFF" />
                                   <Text style={styles.docThumbText}>Front</Text>
@@ -1102,10 +1103,10 @@ export const CustomersScreen: React.FC = () => {
                               {(selectedRider.documents?.rcBack || selectedRider.documents?.rcBackUrl) && (
                                 <TouchableOpacity
                                   style={styles.docThumbContainer}
-                                  onPress={() => setPreviewDoc({ title: 'Vehicle RC (Back)', url: selectedRider.documents?.rcBack || selectedRider.documents?.rcBackUrl || '' })}
+                                  onPress={() => setPreviewDoc({ title: 'Vehicle RC (Back)', url: resolveImageUrl(selectedRider.documents?.rcBack || selectedRider.documents?.rcBackUrl || '') })}
                                   activeOpacity={0.8}
                                 >
-                                  <Image source={{ uri: selectedRider.documents?.rcBack || selectedRider.documents?.rcBackUrl }} style={styles.docThumbImg} resizeMode="cover" />
+                                  <Image source={{ uri: resolveImageUrl(selectedRider.documents?.rcBack || selectedRider.documents?.rcBackUrl) }} style={styles.docThumbImg} resizeMode="cover" />
                                   <View style={styles.docThumbOverlay}>
                                     <Eye size={14} color="#FFF" />
                                     <Text style={styles.docThumbText}>Back</Text>
@@ -1137,10 +1138,10 @@ export const CustomersScreen: React.FC = () => {
                             <View style={styles.docThumbsRow}>
                               <TouchableOpacity
                                 style={styles.docThumbContainer}
-                                onPress={() => setPreviewDoc({ title: 'Insurance Policy', url: selectedRider.documents?.insurance || selectedRider.documents?.insuranceUrl || '' })}
+                                onPress={() => setPreviewDoc({ title: 'Insurance Policy', url: resolveImageUrl(selectedRider.documents?.insurance || selectedRider.documents?.insuranceUrl || '') })}
                                 activeOpacity={0.8}
                               >
-                                <Image source={{ uri: selectedRider.documents?.insurance || selectedRider.documents?.insuranceUrl }} style={styles.docThumbImg} resizeMode="cover" />
+                                <Image source={{ uri: resolveImageUrl(selectedRider.documents?.insurance || selectedRider.documents?.insuranceUrl) }} style={styles.docThumbImg} resizeMode="cover" />
                                 <View style={styles.docThumbOverlay}>
                                   <Eye size={14} color="#FFF" />
                                   <Text style={styles.docThumbText}>Policy</Text>
@@ -1171,10 +1172,10 @@ export const CustomersScreen: React.FC = () => {
                             <View style={styles.docThumbsRow}>
                               <TouchableOpacity
                                 style={styles.docThumbContainer}
-                                onPress={() => setPreviewDoc({ title: 'Aadhaar Card (Front)', url: selectedRider.documents?.aadhaarFront || selectedRider.documents?.aadhaarFrontUrl || '' })}
+                                onPress={() => setPreviewDoc({ title: 'Aadhaar Card (Front)', url: resolveImageUrl(selectedRider.documents?.aadhaarFront || selectedRider.documents?.aadhaarFrontUrl || '') })}
                                 activeOpacity={0.8}
                               >
-                                <Image source={{ uri: selectedRider.documents?.aadhaarFront || selectedRider.documents?.aadhaarFrontUrl }} style={styles.docThumbImg} resizeMode="cover" />
+                                <Image source={{ uri: resolveImageUrl(selectedRider.documents?.aadhaarFront || selectedRider.documents?.aadhaarFrontUrl) }} style={styles.docThumbImg} resizeMode="cover" />
                                 <View style={styles.docThumbOverlay}>
                                   <Eye size={14} color="#FFF" />
                                   <Text style={styles.docThumbText}>Front</Text>
@@ -1183,10 +1184,10 @@ export const CustomersScreen: React.FC = () => {
                               {(selectedRider.documents?.aadhaarBack || selectedRider.documents?.aadhaarBackUrl) && (
                                 <TouchableOpacity
                                   style={styles.docThumbContainer}
-                                  onPress={() => setPreviewDoc({ title: 'Aadhaar Card (Back)', url: selectedRider.documents?.aadhaarBack || selectedRider.documents?.aadhaarBackUrl || '' })}
+                                  onPress={() => setPreviewDoc({ title: 'Aadhaar Card (Back)', url: resolveImageUrl(selectedRider.documents?.aadhaarBack || selectedRider.documents?.aadhaarBackUrl || '') })}
                                   activeOpacity={0.8}
                                 >
-                                  <Image source={{ uri: selectedRider.documents?.aadhaarBack || selectedRider.documents?.aadhaarBackUrl }} style={styles.docThumbImg} resizeMode="cover" />
+                                  <Image source={{ uri: resolveImageUrl(selectedRider.documents?.aadhaarBack || selectedRider.documents?.aadhaarBackUrl) }} style={styles.docThumbImg} resizeMode="cover" />
                                   <View style={styles.docThumbOverlay}>
                                     <Eye size={14} color="#FFF" />
                                     <Text style={styles.docThumbText}>Back</Text>

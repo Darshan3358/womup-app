@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import {
   Store,
   Lock,
   Smartphone,
+  Mail,
   KeyRound,
   ArrowRight,
   ShieldCheck,
@@ -45,17 +46,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onRegisterPress }) => 
   const [password, setPassword] = useState('admin123');
   const [showPassword, setShowPassword] = useState(false);
 
-  // OTP Login state
-  const [otpMobile, setOtpMobile] = useState('9876543210');
+  // OTP Login state (Email OTP)
+  const [otpEmail, setOtpEmail] = useState('');
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
+  const otpInputRefs = useRef<(TextInput | null)[]>([]);
   const [otpSent, setOtpSent] = useState(false);
   const [otpTimer, setOtpTimer] = useState(0);
   const [verificationId, setVerificationId] = useState<string | undefined>(undefined);
   const [sendingOtp, setSendingOtp] = useState(false);
 
-  // Forgot Password Modal state
+  // Forgot Password Modal state (Email OTP)
   const [showForgotModal, setShowForgotModal] = useState(false);
-  const [forgotMobile, setForgotMobile] = useState('');
+  const [forgotEmail, setForgotEmail] = useState('');
   const [forgotOtp, setForgotOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [forgotOtpSent, setForgotOtpSent] = useState(false);
@@ -95,16 +97,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onRegisterPress }) => 
     }
   };
 
-  // 2. Handle Send OTP
+  // 2. Handle Send OTP (Email OTP)
   const handleSendOtp = async () => {
-    const cleanMobile = otpMobile.replace(/\D/g, '').slice(-10);
-    if (cleanMobile.length !== 10) {
-      Alert.alert('Invalid Mobile', 'Please enter a valid 10-digit Indian mobile number.');
+    const cleanEmail = otpEmail.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      Alert.alert('Invalid Email', 'Please enter a valid registered store email address.');
       return;
     }
 
     setSendingOtp(true);
-    const res = await VendorApi.sendOtp(`+91${cleanMobile}`, 'LOGIN');
+    const res = await VendorApi.sendOtp(cleanEmail, 'LOGIN');
     setSendingOtp(false);
 
     if (res.success) {
@@ -112,11 +114,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onRegisterPress }) => 
       setVerificationId(res.verificationId);
       setOtpTimer(60);
       Alert.alert(
-        'OTP Sent 📲',
-        `A 6-digit verification code was sent to +91 ${cleanMobile}.\n${res.devOtp ? `(Dev Code: ${res.devOtp})` : ''}`,
+        'OTP Sent ✉️',
+        `A 6-digit verification code was sent to your email:\n${cleanEmail}\n\n${res.devOtp ? `(Dev Code: ${res.devOtp})` : ''}`,
       );
     } else {
-      Alert.alert('OTP Failed', res.error || 'Could not send OTP. Please try again.');
+      Alert.alert('OTP Failed', res.error || 'Could not send OTP. Please check your registered email.');
     }
   };
 
@@ -129,7 +131,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onRegisterPress }) => 
     }
 
     setLoading(true);
-    const success = await loginWithOtp(`+91${otpMobile.replace(/\D/g, '').slice(-10)}`, code);
+    const cleanEmail = otpEmail.trim().toLowerCase();
+    const success = await loginWithOtp(cleanEmail, code);
     setLoading(false);
 
     if (!success) {
@@ -139,25 +142,47 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onRegisterPress }) => 
 
   // Helper for OTP box changes
   const handleOtpChange = (index: number, val: string) => {
-    const cleaned = val.replace(/\D/g, '');
+    if (val.length > 1) {
+      const clean = val.replace(/\D/g, '').slice(0, 6);
+      const newArr = [...otpDigits];
+      for (let i = 0; i < clean.length; i++) {
+        newArr[i] = clean[i];
+      }
+      setOtpDigits(newArr);
+      const nextFocus = Math.min(clean.length, 5);
+      otpInputRefs.current[nextFocus]?.focus();
+      return;
+    }
+
+    const cleaned = val.replace(/\D/g, '').slice(-1);
     const newArr = [...otpDigits];
-    newArr[index] = cleaned.slice(-1);
+    newArr[index] = cleaned;
     setOtpDigits(newArr);
+
+    if (cleaned && index < 5) {
+      otpInputRefs.current[index + 1]?.focus();
+    }
   };
 
-  // 4. Handle Forgot Password Flow
+  const handleOtpKeyPress = (index: number, e: any) => {
+    if (e.nativeEvent?.key === 'Backspace' && !otpDigits[index] && index > 0) {
+      otpInputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  // 4. Handle Forgot Password Flow (Email OTP)
   const handleSendForgotOtp = async () => {
-    const cleanMobile = forgotMobile.replace(/\D/g, '').slice(-10);
-    if (cleanMobile.length !== 10) {
-      Alert.alert('Required', 'Please enter your 10-digit registered mobile number.');
+    const cleanEmail = forgotEmail.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      Alert.alert('Required', 'Please enter your registered store email address.');
       return;
     }
     setForgotLoading(true);
-    const res = await VendorApi.forgotPassword(`+91${cleanMobile}`);
+    const res = await VendorApi.forgotPassword(cleanEmail);
     setForgotLoading(false);
     if (res.success) {
       setForgotOtpSent(true);
-      Alert.alert('OTP Sent', `Reset OTP sent to +91 ${cleanMobile}.\n${res.devOtp ? `(Dev Code: ${res.devOtp})` : ''}`);
+      Alert.alert('OTP Sent ✉️', `Reset OTP sent to:\n${cleanEmail}\n\n${res.devOtp ? `(Dev Code: ${res.devOtp})` : ''}`);
     } else {
       Alert.alert('Failed', res.error || 'Could not send reset OTP.');
     }
@@ -174,7 +199,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onRegisterPress }) => 
     }
 
     setForgotLoading(true);
-    const res = await VendorApi.resetPassword(`+91${forgotMobile.replace(/\D/g, '').slice(-10)}`, forgotOtp.trim(), newPassword);
+    const cleanEmail = forgotEmail.trim().toLowerCase();
+    const res = await VendorApi.resetPassword(cleanEmail, forgotOtp.trim(), newPassword);
     setForgotLoading(false);
 
     if (res.success) {
@@ -184,7 +210,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onRegisterPress }) => 
           onPress: () => {
             setShowForgotModal(false);
             setAuthMode('PASSWORD');
-            setMobileOrId(forgotMobile);
+            setMobileOrId(cleanEmail);
             setPassword(newPassword);
           },
         },
@@ -230,7 +256,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onRegisterPress }) => 
                 onPress={() => setAuthMode('OTP')}
                 activeOpacity={0.8}
               >
-                <Smartphone size={15} color={authMode === 'OTP' ? '#FFFFFF' : '#64748B'} />
+                <Mail size={15} color={authMode === 'OTP' ? '#FFFFFF' : '#64748B'} />
                 <Text style={[styles.toggleText, authMode === 'OTP' && styles.toggleTextActive]}>
                   Login with OTP
                 </Text>
@@ -305,25 +331,25 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onRegisterPress }) => 
                   onPress={() => setAuthMode('OTP')}
                   activeOpacity={0.8}
                 >
-                  <Smartphone size={16} color={COLORS.navy} />
-                  <Text style={styles.secondaryBtnText}>Login with OTP</Text>
+                  <Mail size={16} color={COLORS.navy} />
+                  <Text style={styles.secondaryBtnText}>Login with Email OTP</Text>
                 </TouchableOpacity>
               </View>
             ) : (
               /* TAB 2: OTP LOGIN */
               <View style={styles.form}>
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>📱 Mobile Number *</Text>
+                  <Text style={styles.label}>✉️ Registered Store Email *</Text>
                   <View style={styles.inputWrapper}>
-                    <Text style={styles.prefixText}>+91</Text>
+                    <Mail size={18} color="#64748B" />
                     <TextInput
                       style={styles.input}
-                      value={otpMobile}
-                      onChangeText={setOtpMobile}
-                      placeholder="98765 43210"
+                      value={otpEmail}
+                      onChangeText={setOtpEmail}
+                      placeholder="e.g. store@womup.com"
                       placeholderTextColor="#94A3B8"
-                      keyboardType="phone-pad"
-                      maxLength={10}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
                     />
                     <TouchableOpacity
                       style={styles.inlineSendBtn}
@@ -343,22 +369,25 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onRegisterPress }) => 
 
                 {otpSent && (
                   <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Enter 6-Digit OTP *</Text>
+                    <Text style={styles.label}>Enter 6-Digit Email OTP *</Text>
                     <View style={styles.otpBoxesRow}>
                       {otpDigits.map((digit, idx) => (
                         <TextInput
                           key={idx}
+                          ref={(el) => { otpInputRefs.current[idx] = el; }}
                           style={[styles.otpBox, digit ? styles.otpBoxFilled : null]}
                           value={digit}
                           onChangeText={(v) => handleOtpChange(idx, v)}
+                          onKeyPress={(e) => handleOtpKeyPress(idx, e)}
                           keyboardType="number-pad"
-                          maxLength={1}
+                          maxLength={6}
+                          selectTextOnFocus
                           textAlign="center"
                         />
                       ))}
                     </View>
                     <Text style={styles.otpHint}>
-                      We sent OTP to +91 {otpMobile}.{' '}
+                      We sent OTP to {otpEmail}.{' '}
                       {otpTimer > 0 ? (
                         <Text style={{ color: '#64748B' }}>Resend in 00:{otpTimer < 10 ? `0${otpTimer}` : otpTimer}</Text>
                       ) : (
@@ -440,20 +469,21 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onRegisterPress }) => 
             </View>
 
             <Text style={styles.modalSubtitle}>
-              Enter your registered mobile number to receive a verification OTP.
+              Enter your registered store email to receive a verification OTP.
             </Text>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Registered Mobile Number</Text>
+              <Text style={styles.label}>Registered Store Email</Text>
               <View style={styles.inputWrapper}>
-                <Smartphone size={18} color="#64748B" />
+                <Mail size={18} color="#64748B" />
                 <TextInput
                   style={styles.input}
-                  value={forgotMobile}
-                  onChangeText={setForgotMobile}
-                  placeholder="9876543210"
+                  value={forgotEmail}
+                  onChangeText={setForgotEmail}
+                  placeholder="store@womup.com"
                   placeholderTextColor="#94A3B8"
-                  keyboardType="phone-pad"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
                 />
               </View>
             </View>
@@ -655,13 +685,19 @@ const styles = StyleSheet.create({
   },
   otpBoxesRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    alignItems: 'center',
     gap: 8,
-    marginTop: 4,
+    marginVertical: 10,
+    width: '100%',
+    maxWidth: 360,
+    alignSelf: 'center',
   },
   otpBox: {
     flex: 1,
-    height: 48,
+    minWidth: 0,
+    maxWidth: 48,
+    height: 50,
     borderWidth: 1.5,
     borderColor: '#CBD5E1',
     borderRadius: 10,
@@ -669,6 +705,9 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '800',
     color: '#0F172A',
+    textAlign: 'center',
+    paddingHorizontal: 0,
+    ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as any) : {}),
   },
   otpBoxFilled: {
     borderColor: COLORS.navy,

@@ -93,9 +93,12 @@ export const FileUploadField: React.FC<FileUploadFieldProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.labelRow}>
-        <Text style={styles.label}>
-          {label} {required && <Text style={styles.asterisk}>*</Text>}
-        </Text>
+        <View style={styles.labelLeft}>
+          <FileText size={14} color="#38BDF8" />
+          <Text style={styles.label}>
+            {label.replace(/^📄\s*/, '')} {required && <Text style={styles.asterisk}>*</Text>}
+          </Text>
+        </View>
         {activeImage && !isUploading && (
           <View style={styles.successBadge}>
             <CheckCircle2 size={12} color="#10B981" />
@@ -162,8 +165,8 @@ export const FileUploadField: React.FC<FileUploadFieldProps> = ({
                   onPress={() => handlePickAndUpload('camera')}
                   activeOpacity={0.8}
                 >
-                  <Camera size={16} color="#3B82F6" />
-                  <Text style={styles.pickBtnText}>Camera</Text>
+                  <Camera size={15} color="#38BDF8" />
+                  <Text style={styles.pickBtnText} numberOfLines={1}>Camera</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -171,8 +174,8 @@ export const FileUploadField: React.FC<FileUploadFieldProps> = ({
                   onPress={() => handlePickAndUpload('gallery')}
                   activeOpacity={0.8}
                 >
-                  <ImageIcon size={16} color="#93C5FD" />
-                  <Text style={styles.pickBtnText}>Gallery</Text>
+                  <ImageIcon size={15} color="#818CF8" />
+                  <Text style={styles.pickBtnText} numberOfLines={1}>Gallery</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -183,8 +186,8 @@ export const FileUploadField: React.FC<FileUploadFieldProps> = ({
                 onPress={() => handlePickAndUpload('document')}
                 activeOpacity={0.8}
               >
-                <FileText size={16} color="#F59E0B" />
-                <Text style={styles.pickBtnText}>PDF / Doc</Text>
+                <FileText size={15} color="#F59E0B" />
+                <Text style={styles.pickBtnText} numberOfLines={1}>PDF / Doc</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -222,12 +225,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 8,
+  },
+  labelLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    flex: 1,
   },
   label: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
-    color: '#94A3B8',
+    color: '#E2E8F0',
   },
   asterisk: {
     color: '#EF4444',
@@ -238,8 +247,10 @@ const styles = StyleSheet.create({
     gap: 4,
     backgroundColor: '#064E3B',
     paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingVertical: 3,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(52, 211, 153, 0.3)',
   },
   successText: {
     fontSize: 11,
@@ -253,27 +264,33 @@ const styles = StyleSheet.create({
   },
   emptyBox: {
     borderWidth: 1.5,
-    borderColor: '#334155',
+    borderColor: 'rgba(148, 163, 184, 0.22)',
     borderStyle: 'dashed',
-    borderRadius: 12,
-    padding: 12,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
     alignItems: 'center',
-    backgroundColor: '#0F172A',
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    width: '100%',
   },
   btnRow: {
     flexDirection: 'row',
-    gap: 12,
+    width: '100%',
+    gap: 8,
+    alignItems: 'center',
   },
   pickBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     backgroundColor: '#1E293B',
     borderWidth: 1,
-    borderColor: '#334155',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    borderRadius: 10,
   },
   pickBtnText: {
     fontSize: 12,
@@ -281,9 +298,11 @@ const styles = StyleSheet.create({
     color: '#F8FAFC',
   },
   metaText: {
-    fontSize: 10,
+    fontSize: 11,
     color: '#64748B',
-    marginTop: 6,
+    marginTop: 10,
+    textAlign: 'center',
+    fontWeight: '500',
   },
   uploadingBox: {
     padding: 12,

@@ -29,6 +29,7 @@ import {
   GiftBoxIllustration,
 } from '../../components/blinkit/BlinkitMoneyIllustrations';
 import { FileUploadField } from '../../components/common/FileUploadField';
+import { resolveImageUrl } from '../../utils/imageUrl';
 
 export const BlinkitMoneyScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -1017,7 +1018,7 @@ export const BlinkitMoneyScreen: React.FC = () => {
                   {/* Aadhaar Front Document Card */}
                   <View style={styles.viewDocCard}>
                     {aadhaarFrontUrl ? (
-                      <Image source={{ uri: aadhaarFrontUrl }} style={styles.viewDocThumb} resizeMode="cover" />
+                      <Image source={{ uri: resolveImageUrl(aadhaarFrontUrl) }} style={styles.viewDocThumb} resizeMode="cover" />
                     ) : (
                       <View style={styles.viewDocEmptyThumb}>
                         <Ionicons name="image-outline" size={22} color="#94A3B8" />
@@ -1044,7 +1045,7 @@ export const BlinkitMoneyScreen: React.FC = () => {
                   {/* Aadhaar Back Document Card */}
                   <View style={styles.viewDocCard}>
                     {aadhaarBackUrl ? (
-                      <Image source={{ uri: aadhaarBackUrl }} style={styles.viewDocThumb} resizeMode="cover" />
+                      <Image source={{ uri: resolveImageUrl(aadhaarBackUrl) }} style={styles.viewDocThumb} resizeMode="cover" />
                     ) : (
                       <View style={styles.viewDocEmptyThumb}>
                         <Ionicons name="image-outline" size={22} color="#94A3B8" />

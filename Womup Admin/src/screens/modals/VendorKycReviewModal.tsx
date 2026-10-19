@@ -10,6 +10,8 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  Platform,
+  Linking,
 } from 'react-native';
 import {
   X,
@@ -23,8 +25,10 @@ import {
   Shield,
   Eye,
   Maximize2,
+  ExternalLink,
 } from 'lucide-react-native';
 import { ApiService } from '../../services/api';
+import { resolveImageUrl } from '../../utils/imageUrl';
 
 interface VendorKycReviewModalProps {
   isOpen: boolean;
@@ -204,9 +208,76 @@ export const VendorKycReviewModal: React.FC<VendorKycReviewModalProps> = ({
                   <InfoItem label="Pincode" value={vendor?.pincode || vendor?.businessPincode} />
                   <InfoItem
                     label="Coordinates"
-                    value={`${vendor?.latitude || vendor?.vendorLat || 0}, ${vendor?.longitude || vendor?.vendorLong || 0}`}
+                    value={`${vendor?.latitude || vendor?.vendorLat || vendor?.location?.coordinates?.[1] || 0}, ${vendor?.longitude || vendor?.vendorLong || vendor?.location?.coordinates?.[0] || 0}`}
                   />
                 </View>
+
+                {/* Live OpenStreetMap Leaflet Snapshot with Pin */}
+                {(() => {
+                  const lat = Number(vendor?.latitude || vendor?.vendorLat || vendor?.location?.coordinates?.[1] || 23.127981);
+                  const lng = Number(vendor?.longitude || vendor?.vendorLong || vendor?.location?.coordinates?.[0] || 72.548466);
+                  const storeTitle = String(vendor?.storeName || vendor?.vendorFirmName || 'Vendor Shop').replace(/"/g, '');
+                  const storeAddr = String(vendor?.address || vendor?.businessAddress || '').replace(/"/g, '');
+
+                  return (
+                    <View style={styles.mapCard}>
+                      <View style={styles.mapHeaderRow}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <MapPin size={15} color="#EF4444" />
+                          <Text style={styles.mapLabel}>Pinned Shop Coordinates ({lat.toFixed(6)}, {lng.toFixed(6)})</Text>
+                        </View>
+                        <TouchableOpacity
+                          style={styles.openExternalBtn}
+                          onPress={() => Linking.openURL(`https://www.google.com/maps?q=${lat},${lng}`)}
+                        >
+                          <ExternalLink size={12} color="#38BDF8" />
+                          <Text style={styles.openExternalText}>Open in Google Maps</Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      {Platform.OS === 'web' ? (
+                        <iframe
+                          title="Vendor Shop Location"
+                          srcDoc={`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    body, html, #map { margin: 0; padding: 0; width: 100%; height: 100%; background: #0F172A; }
+    .leaflet-popup-content-wrapper { background: #1E293B; color: #F8FAFC; border-radius: 8px; }
+    .leaflet-popup-tip { background: #1E293B; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script>
+    var map = L.map('map', { zoomControl: true, attributionControl: false }).setView([${lat}, ${lng}], 16);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+    var marker = L.marker([${lat}, ${lng}]).addTo(map);
+    marker.bindPopup("<b>${storeTitle}</b><br/>${storeAddr}").openPopup();
+  </script>
+</body>
+</html>`}
+                          style={{
+                            width: '100%',
+                            height: 220,
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            borderRadius: 10,
+                          }}
+                        />
+                      ) : (
+                        <View style={styles.mapFallbackBox}>
+                          <MapPin size={24} color="#EF4444" />
+                          <Text style={styles.mapFallbackText}>
+                            GPS Pinned Location: {lat.toFixed(6)}, {lng.toFixed(6)}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })()}
               </View>
 
               {/* SECTION 3: 9 KYC DOCUMENTS */}
@@ -221,20 +292,42 @@ export const VendorKycReviewModal: React.FC<VendorKycReviewModalProps> = ({
                 <View style={styles.docsGrid}>
                   <DocThumbnail
                     title="Aadhaar Front"
-                    url={vendor?.vendor_aadhar_front_image || vendor?.aadharFrontImage}
+                    url={
+                      vendor?.vendorAadharFrontImage ||
+                      vendor?.vendor_aadhar_front_image ||
+                      vendor?.aadharFrontImage ||
+                      vendor?.aadhaarFrontUrl ||
+                      vendor?.aadhaarFront
+                    }
                     onZoom={() =>
                       setZoomImage({
-                        url: vendor?.vendor_aadhar_front_image || vendor?.aadharFrontImage,
+                        url:
+                          vendor?.vendorAadharFrontImage ||
+                          vendor?.vendor_aadhar_front_image ||
+                          vendor?.aadharFrontImage ||
+                          vendor?.aadhaarFrontUrl ||
+                          vendor?.aadhaarFront,
                         title: 'Aadhaar Front',
                       })
                     }
                   />
                   <DocThumbnail
                     title="Aadhaar Back"
-                    url={vendor?.vendor_aadhar_back_image || vendor?.aadharBackImage}
+                    url={
+                      vendor?.vendorAadharBackImage ||
+                      vendor?.vendor_aadhar_back_image ||
+                      vendor?.aadharBackImage ||
+                      vendor?.aadhaarBackUrl ||
+                      vendor?.aadhaarBack
+                    }
                     onZoom={() =>
                       setZoomImage({
-                        url: vendor?.vendor_aadhar_back_image || vendor?.aadharBackImage,
+                        url:
+                          vendor?.vendorAadharBackImage ||
+                          vendor?.vendor_aadhar_back_image ||
+                          vendor?.aadharBackImage ||
+                          vendor?.aadhaarBackUrl ||
+                          vendor?.aadhaarBack,
                         title: 'Aadhaar Back',
                       })
                     }
@@ -499,7 +592,7 @@ const DocThumbnail: React.FC<{ title: string; url?: string; onZoom: () => void }
     </Text>
     {url ? (
       <TouchableOpacity activeOpacity={0.8} onPress={onZoom} style={styles.docImgWrap}>
-        <Image source={{ uri: url }} style={styles.docImg} resizeMode="cover" />
+        <Image source={{ uri: resolveImageUrl(url) }} style={styles.docImg} resizeMode="cover" />
         <View style={styles.zoomOverlay}>
           <Maximize2 size={14} color="#FFFFFF" />
         </View>
@@ -623,6 +716,53 @@ const styles = StyleSheet.create({
     color: '#F8FAFC',
     fontWeight: '600',
     marginTop: 2,
+  },
+  mapCard: {
+    marginTop: 12,
+    backgroundColor: '#0F172A',
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  mapHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  mapLabel: {
+    fontSize: 11,
+    color: '#CBD5E1',
+    fontWeight: '600',
+  },
+  openExternalBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(56, 189, 248, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.3)',
+  },
+  openExternalText: {
+    fontSize: 10,
+    color: '#38BDF8',
+    fontWeight: '600',
+  },
+  mapFallbackBox: {
+    height: 120,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#1E293B',
+    borderRadius: 8,
+    gap: 6,
+  },
+  mapFallbackText: {
+    fontSize: 11,
+    color: '#94A3B8',
   },
   docsGrid: {
     flexDirection: 'row',

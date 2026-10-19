@@ -77,6 +77,14 @@ export interface VendorProfile {
   businessCardImage?: string;
   shopPhotoImage?: string;
   ownerPhotoImage?: string;
+  latitude?: number;
+  longitude?: number;
+  vendorLat?: number;
+  vendorLong?: number;
+  location?: {
+    type?: string;
+    coordinates?: [number, number];
+  };
 }
 
 export interface CollectionRequest {

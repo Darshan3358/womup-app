@@ -47,10 +47,20 @@ const OFFLINE_QUEUE_KEY = '@wormup_upload_queue_v1';
 const MAX_FILE_SIZE_MB = 5;
 const DEFAULT_ALLOWED_EXTS = ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
 
+const getApiBaseUrl = () => {
+  if (typeof window !== 'undefined' && window.location) {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') {
+      return 'http://localhost:5050/api/v1';
+    }
+  }
+  return 'https://womup-app-uquz.onrender.com/api/v1';
+};
+
 export function useFileUpload(options: UseFileUploadOptions = {}) {
   const {
     folder = 'wormup/kyc/vendor',
-    backendBaseUrl = 'http://localhost:5050/api/v1',
+    backendBaseUrl = getApiBaseUrl(),
     maxSizeMB = MAX_FILE_SIZE_MB,
     allowedExtensions = DEFAULT_ALLOWED_EXTS,
     entityType = 'vendor',
@@ -270,31 +280,10 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
             (await AsyncStorage.getItem('@womup_auth_token')) ||
             (await AsyncStorage.getItem('accessToken'));
 
-          // 1. Request signature from backend
-          let signatureData: any = null;
-          try {
-            const sigRes = await fetch(`${backendBaseUrl}/uploads/signature`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                ...(token ? { Authorization: `Bearer ${token}` } : {}),
-              },
-              body: JSON.stringify({ folder: targetFolder }),
-              signal,
-            });
-            if (sigRes.ok) {
-              const json = await sigRes.json();
-              signatureData = json.data;
-            }
-          } catch (sigErr: any) {
-            if (sigErr.name === 'AbortError') throw sigErr;
-            console.warn('Backend signature fallback:', sigErr.message);
-          }
-
           setState('UPLOADING');
-          setProgress(40);
+          setProgress(30);
 
-          // 2. Prepare FormData
+          // 1. Prepare FormData
           const formData = new FormData();
           const targetName = fileName || `file_${Date.now()}`;
           const isPdf = targetName.toLowerCase().endsWith('.pdf');
@@ -315,43 +304,60 @@ export function useFileUpload(options: UseFileUploadOptions = {}) {
 
           setProgress(60);
 
+          // 2. Resilient Upload: Upload directly to backend service
+          // The backend executes Cloudinary upload on the server, and automatically
+          // falls back to local storage if Cloudinary returns a 403 / permission error.
           let finalUrl = '';
           let publicId = '';
 
-          // 3. Direct upload to Cloudinary if signature exists
-          if (signatureData?.uploadUrl && signatureData?.apiKey) {
-            formData.append('api_key', signatureData.apiKey);
-            formData.append('timestamp', String(signatureData.timestamp));
-            formData.append('signature', signatureData.signature);
-            formData.append('folder', signatureData.folder);
-
-            const cRes = await fetch(signatureData.uploadUrl, {
-              method: 'POST',
-              body: formData,
-              signal,
+          const sendVendorXhr = (url: string) => {
+            return new Promise<any>((resolve, reject) => {
+              const xhr = new XMLHttpRequest();
+              xhr.open('POST', url);
+              if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+              if (signal) {
+                signal.addEventListener('abort', () => xhr.abort());
+              }
+              xhr.onload = () => {
+                let data: any;
+                try { data = JSON.parse(xhr.responseText); } catch { data = { text: xhr.responseText }; }
+                if (xhr.status >= 200 && xhr.status < 300) {
+                  resolve(data);
+                } else {
+                  reject(new Error(data?.message || data?.error || `Upload failed with status ${xhr.status}`));
+                }
+              };
+              xhr.onerror = () => reject(new Error('Network error during file upload'));
+              xhr.onabort = () => reject(new Error('Upload cancelled'));
+              xhr.timeout = 60000;
+              xhr.send(formData);
             });
+          };
 
-            const cData = await cRes.json();
-            if (cRes.ok && cData.secure_url) {
-              finalUrl = cData.secure_url;
-              publicId = cData.public_id;
+          try {
+            const bData = await sendVendorXhr(`${backendBaseUrl}/uploads/upload?folder=${encodeURIComponent(targetFolder)}`);
+            if (bData && (bData.data?.url || bData.url || bData.data?.secure_url)) {
+              finalUrl = bData.data?.url || bData.url || bData.data?.secure_url;
+              publicId = bData.data?.publicId || bData.public_id || `doc_${Date.now()}`;
             } else {
-              throw new Error(cData.error?.message || 'Cloudinary upload failed');
+              throw new Error(bData?.message || 'Primary backend upload returned an error');
             }
-          } else {
-            // Fallback directly to backend upload endpoint
-            const bRes = await fetch(`${backendBaseUrl}/media/upload?folder=${encodeURIComponent(targetFolder)}`, {
-              method: 'POST',
-              body: formData,
-              signal,
-            });
-            const bData = await bRes.json();
-            if (bRes.ok && bData.data?.url) {
-              finalUrl = bData.data.url;
-              publicId = bData.data.publicId;
+          } catch (primaryErr: any) {
+            if (signal.aborted) throw primaryErr;
+            console.warn('[useFileUpload] Primary /uploads/upload fallback to /media/upload:', primaryErr?.message);
+
+            // Secondary fallback endpoint
+            const altData = await sendVendorXhr(`${backendBaseUrl}/media/upload?folder=${encodeURIComponent(targetFolder)}`);
+            if (altData && (altData.data?.url || altData.url)) {
+              finalUrl = altData.data?.url || altData.url;
+              publicId = altData.data?.publicId || `doc_${Date.now()}`;
             } else {
-              throw new Error(bData.message || 'Backend upload failed');
+              throw new Error(altData?.message || primaryErr.message || 'File upload failed');
             }
+          }
+
+          if (finalUrl.startsWith('/uploads/')) {
+            finalUrl = `${backendBaseUrl.replace('/api/v1', '')}${finalUrl}`;
           }
 
           setProgress(85);

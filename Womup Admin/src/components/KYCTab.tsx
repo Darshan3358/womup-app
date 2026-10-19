@@ -45,6 +45,21 @@ const QUICK_REJECT_REASONS = [
   'Suspicious document',
 ];
 
+export const resolveDocumentUrl = (url?: string | null): string => {
+  if (!url || typeof url !== 'string') return '';
+  const trimmed = url.trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('data:') || trimmed.startsWith('file://')) return trimmed;
+  if (trimmed.includes('localhost') || trimmed.includes('127.0.0.1')) {
+    const filename = trimmed.split('/uploads/')[1] || trimmed.split('/').pop();
+    return `https://womup-app-uquz.onrender.com/uploads/${filename}`;
+  }
+  if (trimmed.startsWith('/uploads/')) {
+    return `https://womup-app-uquz.onrender.com${trimmed}`;
+  }
+  return trimmed;
+};
+
 export const KYCTab: React.FC<KYCTabProps> = ({ customer, onStatusChange }) => {
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
@@ -188,17 +203,19 @@ export const KYCTab: React.FC<KYCTabProps> = ({ customer, onStatusChange }) => {
     );
   }
 
-  const frontUrl =
+  const frontUrl = resolveDocumentUrl(
     kycData?.aadhaarFrontUrl ||
     customer.customer_image_aadhar_front ||
     customer.aadhaarFrontImage ||
-    '';
+    ''
+  );
 
-  const backUrl =
+  const backUrl = resolveDocumentUrl(
     kycData?.aadhaarBackUrl ||
     customer.customer_image_aadhar_back ||
     customer.aadhaarBackImage ||
-    '';
+    ''
+  );
 
   return (
     <View style={styles.container}>

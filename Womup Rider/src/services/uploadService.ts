@@ -25,6 +25,63 @@ const API_BASE_URL = isLocalWeb
   ? 'http://localhost:5050/api/v1'
   : 'https://womup-app-uquz.onrender.com/api/v1';
 
+// Native-safe XHR multipart uploader (avoids Expo 57 / React Native 0.86 New Architecture WinterCG fetch FormData errors)
+function sendMultipartXhr(
+  url: string,
+  formData: FormData,
+  headers?: Record<string, string>,
+  onProgress?: (progress: number) => void
+): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+
+    if (headers) {
+      Object.entries(headers).forEach(([k, v]) => {
+        if (k.toLowerCase() !== 'content-type') {
+          xhr.setRequestHeader(k, v);
+        }
+      });
+    }
+
+    if (xhr.upload && onProgress) {
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable && event.total > 0) {
+          const pct = Math.min(95, Math.round((event.loaded / event.total) * 100));
+          onProgress(pct);
+        }
+      };
+    }
+
+    xhr.onload = () => {
+      let data: any;
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch {
+        data = { text: xhr.responseText };
+      }
+
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(data);
+      } else {
+        const errorMsg = data?.message || data?.error || `Upload failed with HTTP ${xhr.status}`;
+        reject(new Error(errorMsg));
+      }
+    };
+
+    xhr.onerror = () => {
+      reject(new Error('Network error during file upload. Please check your connection.'));
+    };
+
+    xhr.ontimeout = () => {
+      reject(new Error('Upload timed out. Please try again.'));
+    };
+
+    xhr.timeout = 90000;
+    xhr.send(formData);
+  });
+}
+
 class RiderUploadService {
   private async getAuthToken(): Promise<string | null> {
     try {
@@ -117,21 +174,18 @@ class RiderUploadService {
 
     // Direct resilient upload via backend proxy (100% authenticated Cloudinary upload)
     try {
-      const proxyRes = await fetch(
+      const proxyData = await sendMultipartXhr(
         `${API_BASE_URL}/uploads/upload?folder=${encodeURIComponent(folder)}`,
-        {
-          method: 'POST',
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-          body: formData,
-        },
+        formData,
+        token ? { Authorization: `Bearer ${token}` } : undefined,
+        (p) => onProgress?.(Math.round(50 + p * 0.3)),
       );
-      const proxyData = await proxyRes.json();
-      if (proxyRes.ok && (proxyData.data?.secure_url || proxyData.data?.url || proxyData.url)) {
+      if (proxyData && (proxyData.data?.secure_url || proxyData.data?.url || proxyData.url)) {
         finalUrl = proxyData.data?.secure_url || proxyData.data?.url || proxyData.url;
         publicId = proxyData.data?.publicId || proxyData.data?.public_id || proxyData.publicId || '';
         onProgress?.(80);
       } else {
-        throw new Error(proxyData.message || 'Server upload failed');
+        throw new Error(proxyData?.message || 'Server upload failed');
       }
     } catch (proxyErr: any) {
       throw new Error(`Upload failed: ${proxyErr.message || 'Network error'}`);

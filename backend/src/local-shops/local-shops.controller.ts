@@ -307,20 +307,22 @@ export class LocalShopsController {
   }
 
   @Post('vendor/auth/login-otp')
-  @ApiOperation({ summary: 'Vendor login with Mobile + OTP' })
+  @ApiOperation({ summary: 'Vendor login with Email or Mobile + OTP' })
   async vendorLoginOtp(@Body() body: VendorLoginOtpDto) {
-    const vendor = await this.localShopsService.vendorLoginWithOtp(body.mobile, body.otp);
+    const target = (body.email || body.mobile || '').trim();
+    const vendor = await this.localShopsService.vendorLoginWithOtp(target, body.otp);
     return { success: true, data: vendor };
   }
 
   @Post('vendor/auth/forgot-password')
-  @ApiOperation({ summary: 'Request password reset OTP for vendor mobile' })
+  @ApiOperation({ summary: 'Request password reset OTP for vendor email or mobile' })
   async vendorForgotPassword(@Body() body: VendorForgotPasswordDto) {
-    return this.localShopsService.vendorForgotPassword(body.mobile);
+    const target = (body.email || body.mobile || '').trim();
+    return this.localShopsService.vendorForgotPassword(target);
   }
 
   @Post('vendor/auth/reset-password')
-  @ApiOperation({ summary: 'Reset vendor password using mobile OTP' })
+  @ApiOperation({ summary: 'Reset vendor password using email or mobile OTP' })
   async vendorResetPassword(@Body() dto: VendorResetPasswordDto) {
     return this.localShopsService.vendorResetPassword(dto);
   }

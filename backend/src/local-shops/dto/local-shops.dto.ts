@@ -449,10 +449,15 @@ export class WithdrawWalletDto {
 }
 
 export class SendVendorOtpDto {
-  @ApiProperty({ example: '+919876543210' })
+  @ApiPropertyOptional({ example: '+919876543210' })
   @IsString()
-  @IsNotEmpty()
-  mobile: string;
+  @IsOptional()
+  mobile?: string;
+
+  @ApiPropertyOptional({ example: 'store@example.com' })
+  @IsString()
+  @IsOptional()
+  email?: string;
 
   @ApiPropertyOptional({ example: 'REGISTRATION', enum: ['REGISTRATION', 'LOGIN', 'FORGOT_PASSWORD'] })
   @IsString()
@@ -461,10 +466,15 @@ export class SendVendorOtpDto {
 }
 
 export class VerifyVendorOtpDto {
-  @ApiProperty({ example: '+919876543210' })
+  @ApiPropertyOptional({ example: '+919876543210' })
   @IsString()
-  @IsNotEmpty()
-  mobile: string;
+  @IsOptional()
+  mobile?: string;
+
+  @ApiPropertyOptional({ example: 'store@example.com' })
+  @IsString()
+  @IsOptional()
+  email?: string;
 
   @ApiProperty({ example: '123456' })
   @IsString()
@@ -478,48 +488,63 @@ export class VerifyVendorOtpDto {
 }
 
 export class VendorLoginDto {
-  @ApiProperty({ example: '+919876543210 or VND001' })
+  @ApiProperty()
   @IsString()
   @IsNotEmpty()
   loginId: string;
 
-  @ApiPropertyOptional({ example: 'secure123' })
+  @ApiPropertyOptional()
   @IsString()
   @IsOptional()
   password?: string;
 }
 
 export class VendorLoginOtpDto {
-  @ApiProperty({ example: '+919876543210' })
+  @ApiPropertyOptional()
   @IsString()
-  @IsNotEmpty()
-  mobile: string;
+  @IsOptional()
+  mobile?: string;
 
-  @ApiProperty({ example: '123456' })
+  @ApiPropertyOptional({ example: 'store@example.com' })
+  @IsString()
+  @IsOptional()
+  email?: string;
+
+  @ApiProperty()
   @IsString()
   @IsNotEmpty()
   otp: string;
 }
 
 export class VendorForgotPasswordDto {
-  @ApiProperty({ example: '+919876543210' })
+  @ApiPropertyOptional()
   @IsString()
-  @IsNotEmpty()
-  mobile: string;
+  @IsOptional()
+  mobile?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  email?: string;
 }
 
 export class VendorResetPasswordDto {
-  @ApiProperty({ example: '+919876543210' })
+  @ApiPropertyOptional()
   @IsString()
-  @IsNotEmpty()
-  mobile: string;
+  @IsOptional()
+  mobile?: string;
 
-  @ApiProperty({ example: '123456' })
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  email?: string;
+
+  @ApiProperty()
   @IsString()
   @IsNotEmpty()
   otp: string;
 
-  @ApiProperty({ example: 'newPassword123' })
+  @ApiProperty()
   @IsString()
   @IsNotEmpty()
   newPassword: string;
@@ -532,17 +557,17 @@ export class RegisterVendorDto {
   verificationId?: string;
 
   // Step 1: Basic Info
-  @ApiProperty({ example: 'Gokul Vegetables' })
+  @ApiProperty()
   @IsString()
   @IsNotEmpty()
   firmName: string;
 
-  @ApiProperty({ example: 'Ramesh Patel' })
+  @ApiProperty()
   @IsString()
   @IsNotEmpty()
   ownerName: string;
 
-  @ApiProperty({ example: 'Kirana / Vegetables' })
+  @ApiProperty()
   @IsString()
   @IsNotEmpty()
   businessType: string;
@@ -557,17 +582,17 @@ export class RegisterVendorDto {
   @IsOptional()
   businessCategoryId?: string;
 
-  @ApiProperty({ example: '+919876543210' })
+  @ApiProperty()
   @IsString()
   @IsNotEmpty()
   mobile: string;
 
-  @ApiPropertyOptional({ example: '+919876543211' })
+  @ApiPropertyOptional()
   @IsString()
   @IsOptional()
   alternateMobile?: string;
 
-  @ApiProperty({ example: 'gokul@example.com' })
+  @ApiProperty()
   @IsString()
   @IsNotEmpty()
   email: string;
@@ -639,12 +664,12 @@ export class RegisterVendorDto {
   @IsNotEmpty()
   aadhaarNumber: string;
 
-  @ApiProperty({ example: 'https://...' })
+  @ApiProperty()
   @IsString()
   @IsNotEmpty()
   aadhaarFrontUrl: string;
 
-  @ApiProperty({ example: 'https://...' })
+  @ApiProperty()
   @IsString()
   @IsNotEmpty()
   aadhaarBackUrl: string;
@@ -654,37 +679,37 @@ export class RegisterVendorDto {
   @IsOptional()
   gstNumber?: string;
 
-  @ApiPropertyOptional({ example: 'https://...' })
+  @ApiPropertyOptional()
   @IsString()
   @IsOptional()
   gstCertificateUrl?: string;
 
-  @ApiProperty({ example: 'https://...' })
+  @ApiProperty()
   @IsString()
   @IsNotEmpty()
   panCardUrl: string;
 
-  @ApiProperty({ example: 'https://...' })
+  @ApiProperty()
   @IsString()
   @IsNotEmpty()
   tradeLicenseUrl: string;
 
-  @ApiProperty({ example: 'https://...' })
+  @ApiProperty()
   @IsString()
   @IsNotEmpty()
   cancelledChequeUrl: string;
 
-  @ApiPropertyOptional({ example: 'https://...' })
+  @ApiPropertyOptional()
   @IsString()
   @IsOptional()
   businessCardUrl?: string;
 
-  @ApiProperty({ example: 'https://...' })
+  @ApiProperty()
   @IsString()
   @IsNotEmpty()
   shopPhotoUrl: string;
 
-  @ApiProperty({ example: 'https://...' })
+  @ApiProperty()
   @IsString()
   @IsNotEmpty()
   ownerPhotoUrl: string;

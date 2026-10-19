@@ -37,6 +37,7 @@ import {
 import { DocumentViewerModal } from './DocumentViewerModal';
 import { ApproveModal } from './ApproveModal';
 import { RejectModal } from './RejectModal';
+import { VendorKycReviewModal } from '../../screens/modals/VendorKycReviewModal';
 
 interface CategoryQueueViewProps {
   categoryKey: ApprovalCategoryKey;
@@ -64,6 +65,7 @@ export const CategoryQueueView: React.FC<CategoryQueueViewProps> = ({
 
   const [activeItemForApprove, setActiveItemForApprove] = useState<ApprovalQueueItem | null>(null);
   const [activeItemForReject, setActiveItemForReject] = useState<ApprovalQueueItem | null>(null);
+  const [reviewVendorId, setReviewVendorId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
 
   // Fetch queue items
@@ -347,7 +349,15 @@ export const CategoryQueueView: React.FC<CategoryQueueViewProps> = ({
                     )}
                   </TouchableOpacity>
 
-                  <View style={styles.itemMeta}>
+                  <TouchableOpacity
+                    style={styles.itemMeta}
+                    activeOpacity={categoryKey === 'vendors' ? 0.7 : 1}
+                    onPress={() => {
+                      if (categoryKey === 'vendors') {
+                        setReviewVendorId(item.id);
+                      }
+                    }}
+                  >
                     <View style={styles.itemNameRow}>
                       <Text style={styles.itemName}>{item.name}</Text>
                       {item.priority === 'HIGH' && (
@@ -355,11 +365,16 @@ export const CategoryQueueView: React.FC<CategoryQueueViewProps> = ({
                           <Text style={styles.priorityText}>HIGH</Text>
                         </View>
                       )}
+                      {categoryKey === 'vendors' && (
+                        <View style={styles.clickableChip}>
+                          <Text style={styles.clickableChipText}>Click to Inspect Profile</Text>
+                        </View>
+                      )}
                     </View>
                     <Text style={styles.itemSubText}>
                       {item.code} · {item.mobile} {item.email !== 'N/A' && `· ${item.email}`}
                     </Text>
-                  </View>
+                  </TouchableOpacity>
 
                   <View style={styles.timeBadge}>
                     <Clock size={12} color="#64748B" />
@@ -413,17 +428,29 @@ export const CategoryQueueView: React.FC<CategoryQueueViewProps> = ({
 
                 {/* Bottom Action Buttons */}
                 <View style={styles.itemActionsRow}>
-                  {item.documents && item.documents.length > 0 && (
-                    <TouchableOpacity
-                      style={styles.viewDocsBtn}
-                      onPress={() => handleOpenDocs(item.documents, 0)}
-                    >
-                      <Eye size={13} color="#2563EB" />
-                      <Text style={styles.viewDocsBtnText}>
-                        Docs ({item.documents.length})
-                      </Text>
-                    </TouchableOpacity>
-                  )}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    {categoryKey === 'vendors' && (
+                      <TouchableOpacity
+                        style={styles.viewFullProfileBtn}
+                        onPress={() => setReviewVendorId(item.id)}
+                      >
+                        <Eye size={13} color="#FFFFFF" />
+                        <Text style={styles.viewFullProfileBtnText}>View Profile & KYC</Text>
+                      </TouchableOpacity>
+                    )}
+
+                    {item.documents && item.documents.length > 0 && (
+                      <TouchableOpacity
+                        style={styles.viewDocsBtn}
+                        onPress={() => handleOpenDocs(item.documents, 0)}
+                      >
+                        <FileText size={13} color="#2563EB" />
+                        <Text style={styles.viewDocsBtnText}>
+                          Docs ({item.documents.length})
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
 
                   <View style={styles.actionButtonsRight}>
                     <TouchableOpacity
@@ -472,6 +499,25 @@ export const CategoryQueueView: React.FC<CategoryQueueViewProps> = ({
         onConfirm={handleConfirmReject}
         onClose={() => setActiveItemForReject(null)}
       />
+
+      {/* Full Screen Vendor KYC & Location Review Modal */}
+      {categoryKey === 'vendors' && (
+        <VendorKycReviewModal
+          isOpen={reviewVendorId !== null}
+          vendorId={reviewVendorId}
+          onClose={() => setReviewVendorId(null)}
+          onApproved={() => {
+            setReviewVendorId(null);
+            loadQueue();
+            onRefreshSummary();
+          }}
+          onRejected={() => {
+            setReviewVendorId(null);
+            loadQueue();
+            onRefreshSummary();
+          }}
+        />
+      )}
     </View>
   );
 };
@@ -856,5 +902,34 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: COLORS.white,
+  },
+  viewFullProfileBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: RADIUS.sm,
+    backgroundColor: '#2563EB',
+    flexShrink: 0,
+  },
+  viewFullProfileBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  clickableChip: {
+    marginLeft: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    backgroundColor: 'rgba(37, 99, 235, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(37, 99, 235, 0.25)',
+  },
+  clickableChipText: {
+    fontSize: 10,
+    color: '#2563EB',
+    fontWeight: '600',
   },
 });
