@@ -15,6 +15,7 @@ import {
   RiderAssignmentStatus,
 } from '../schemas/delivery-partner.schema';
 import { Order, OrderDocument } from '../../orders/schemas/order.schema';
+import { OrderStatus } from '../../common/enums/order-status.enum';
 import { Store, StoreDocument } from '../../stores/schemas/store.schema';
 import { TrackingGateway } from '../../tracking/tracking.gateway';
 import { DeliveryPartnerCacheService } from '../common/partner-cache.service';
