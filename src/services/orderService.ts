@@ -147,6 +147,8 @@ export const OrderService = {
     deliveryInstructions?: string;
     address?: any;
     tip?: number;
+    deliveryFee?: number;
+    handlingFee?: number;
     items?: {
       productId: string;
       quantity: number;

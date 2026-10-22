@@ -2074,6 +2074,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         paymentMethod,
         items: orderItems,
         tip: options?.tip || 0,
+        deliveryFee: typeof options?.deliveryFee === 'number' ? options.deliveryFee : (isBlinkit ? 25 : cartSummary.deliveryFee),
+        handlingFee: isBlinkit ? 5 : cartSummary.handlingFee,
         deliveryInstructions: options?.deliveryInstructions || 'Ring bell & leave at door',
         address: {
           houseFlat: selectedAddress.houseFlat || resolvedAreaName,

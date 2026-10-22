@@ -644,8 +644,10 @@ export class OrdersService {
       );
 
       // Fraud / Extreme variance safety guard:
-      // If adjustment swings total by more than 50% of original total, reject
-      if (originalTotal > 0 && Math.abs(totalAmount - originalTotal) > originalTotal * 0.5) {
+      // Only reject if price change swings total by more than ₹100 AND more than 50% of original total.
+      // Small grocery subtotal differences (e.g. ₹5 - ₹20) are automatically absorbed to avoid blocking customers.
+      const priceDiff = Math.abs(totalAmount - originalTotal);
+      if (originalTotal > 0 && priceDiff > 100 && priceDiff > originalTotal * 0.5) {
         throw new BadRequestException('Significant price change detected. Please refresh your cart.');
       }
     }

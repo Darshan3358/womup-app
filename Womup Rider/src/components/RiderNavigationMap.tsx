@@ -7,6 +7,7 @@ import {
   Dimensions,
   Platform,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { routeService, RouteData } from '../services/routeService';
@@ -302,6 +303,22 @@ export const RiderNavigationMap: React.FC<RiderNavigationMapProps> = ({
     }
   };
 
+  let NativeWebViewComponent: any = null;
+  try {
+    NativeWebViewComponent = require('react-native-webview').WebView;
+  } catch {
+    NativeWebViewComponent = null;
+  }
+
+  const handleOpenExternalMaps = () => {
+    const originLat = riderCoords?.latitude || 23.0225;
+    const originLng = riderCoords?.longitude || 72.5714;
+    const destLat = targetCoords?.latitude || 23.0312;
+    const destLng = targetCoords?.longitude || 72.5342;
+    const url = `https://www.google.com/maps/dir/?api=1&origin=${originLat},${originLng}&destination=${destLat},${destLng}&travelmode=driving`;
+    Linking.openURL(url).catch(() => {});
+  };
+
   return (
     <View style={[styles.container, { height }]}>
       {/* Dynamic Map Iframe (Web & WebView compatible) */}
@@ -317,9 +334,34 @@ export const RiderNavigationMap: React.FC<RiderNavigationMapProps> = ({
           }}
           title="Rider Navigation Map"
         />
+      ) : NativeWebViewComponent ? (
+        <NativeWebViewComponent
+          originWhitelist={['*']}
+          source={{ html: mapHtml }}
+          style={{ width: '100%', height: '100%', borderRadius: 16 }}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+          scrollEnabled={false}
+        />
       ) : (
         <View style={styles.nativeFallback}>
-          <Text style={styles.nativeFallbackText}>Live Map Telemetry Active</Text>
+          <View style={styles.nativeRouteBadge}>
+            <Ionicons name="navigate-circle" size={32} color="#38BDF8" />
+            <Text style={styles.nativeRouteTitle}>
+              {mode === 'PICKUP' ? 'Store Pickup Navigation' : 'Customer Dropoff Navigation'}
+            </Text>
+            <Text style={styles.nativeRouteAddress} numberOfLines={2}>
+              {targetName} • {targetAddress || ''}
+            </Text>
+            <TouchableOpacity
+              style={styles.nativeGmapsBtn}
+              onPress={handleOpenExternalMaps}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="map" size={14} color="#0F172A" />
+              <Text style={styles.nativeGmapsBtnText}>Open Google Maps</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -408,10 +450,51 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#0F172A',
+    padding: 20,
   },
   nativeFallbackText: {
     color: '#94A3B8',
     fontSize: 13,
     fontWeight: '600',
+  },
+  nativeRouteBadge: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(30, 41, 59, 0.85)',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.3)',
+    maxWidth: '92%',
+  },
+  nativeRouteTitle: {
+    color: '#F8FAFC',
+    fontSize: 14,
+    fontWeight: '800',
+    marginTop: 6,
+    textAlign: 'center',
+  },
+  nativeRouteAddress: {
+    color: '#94A3B8',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 4,
+    lineHeight: 16,
+  },
+  nativeGmapsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#38BDF8',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    marginTop: 12,
+  },
+  nativeGmapsBtnText: {
+    color: '#0F172A',
+    fontSize: 12,
+    fontWeight: '800',
   },
 });

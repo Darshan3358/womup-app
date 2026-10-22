@@ -616,8 +616,9 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       try {
         await refreshDashboard();
         const activeJob = await RiderApiService.getActiveDelivery();
-        if (activeJob) {
-          setActiveDelivery(activeJob);
+        setActiveDelivery(activeJob || null);
+        if (!activeJob) {
+          await RiderApiService.clearActiveDelivery();
         }
         RiderApiService.getUnreadNotificationCount().then(setRiderUnreadCount).catch(() => {});
       } catch {

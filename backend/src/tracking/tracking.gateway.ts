@@ -532,10 +532,12 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
       // NOTE: global server.emit removed — it caused cross-store order leakage (SRS §13.1)
       if (storeId) {
         this.server.to(`store_${storeId}`).emit('new_order', payload);
+        this.server.to(`store:${storeId}`).emit('new_order', payload);
       }
       for (const bId of broadcastIds) {
         if (bId !== storeId) {
           this.server.to(`store_${bId}`).emit('new_order', payload);
+          this.server.to(`store:${bId}`).emit('new_order', payload);
         }
       }
       this.server.to('admin').emit('new_order', payload);

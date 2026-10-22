@@ -920,10 +920,28 @@ export const BlinkitCheckoutScreen: React.FC = () => {
         startCelebrationVideo();
       } catch (error: any) {
         console.error('Failed to place order:', error);
-        Alert.alert(
-          'Order Placement Failed',
-          error?.message || 'Could not place order. Delivery is currently not available for your area.'
-        );
+        const errMsg = error?.message || '';
+        if (errMsg.toLowerCase().includes('price change')) {
+          Alert.alert(
+            'Prices Updated',
+            'Some prices have been updated to reflect the latest live store catalog. Please verify your cart total and tap Place Order to proceed.',
+            [
+              {
+                text: 'Verify Cart',
+                onPress: () => {
+                  if (typeof calculateDeliveryFee === 'function') {
+                    calculateDeliveryFee();
+                  }
+                },
+              },
+            ]
+          );
+        } else {
+          Alert.alert(
+            'Order Placement Failed',
+            errMsg || 'Could not place order. Delivery is currently not available for your area.'
+          );
+        }
       } finally {
         setIsSubmitting(false);
       }

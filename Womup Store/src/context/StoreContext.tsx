@@ -465,10 +465,14 @@ const enrichStore = (rawStore: any): StoreHub | null => {
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
-      const becameActive = isAppActiveRef.current === false && nextAppState === 'active';
-      isAppActiveRef.current = nextAppState === 'active';
+      const becameActive = nextAppState === 'active';
+      isAppActiveRef.current = becameActive;
       if (becameActive && authStep === 'AUTHENTICATED') {
-        // App returned to foreground: quick sync
+        const activeStoreId = store?.id || (store as any)?._id;
+        if (activeStoreId) {
+          storeSocket.connect(activeStoreId);
+        }
+        // App returned to foreground: immediate live sync
         refreshIncoming();
         refreshPicking();
       }
@@ -477,9 +481,9 @@ const enrichStore = (rawStore: any): StoreHub | null => {
     return () => {
       subscription.remove();
     };
-  }, [authStep, refreshIncoming, refreshPicking]);
+  }, [authStep, store?.id, refreshIncoming, refreshPicking]);
 
-  // Smart Fallback Polling (25 seconds) - ONLY runs when app is active
+  // Robust Fallback Polling (10 seconds) - Ensures store receives new orders even if WebSocket drops in background
   useEffect(() => {
     if (authStep !== 'AUTHENTICATED') return;
 
@@ -488,10 +492,9 @@ const enrichStore = (rawStore: any): StoreHub | null => {
     refreshPicking();
 
     const pollInterval = setInterval(() => {
-      // Pause completely if app is in background
       if (!isAppActiveRef.current) return;
       refreshIncoming();
-    }, 25000);
+    }, 10000);
 
     return () => clearInterval(pollInterval);
   }, [authStep, store?.id, refreshIncoming, refreshPicking]);

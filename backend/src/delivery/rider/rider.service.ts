@@ -99,57 +99,69 @@ export class RiderService {
     let activeDeliveryData: any = null;
     if (activeAssignment) {
       const order = await this.orderModel.findById(activeAssignment.orderId);
-      let store: StoreDocument | null = null;
-      if (order?.storeId) {
-        store = await this.storeModel.findById(order.storeId);
+      const isTerminal = !order || order.status === OrderStatus.CANCELLED || order.status === OrderStatus.DELIVERED;
+      const assignmentAgeHours = (Date.now() - new Date((activeAssignment as any).createdAt || Date.now()).getTime()) / (1000 * 60 * 60);
+
+      if (isTerminal || assignmentAgeHours > 8) {
+        activeAssignment.status = RiderAssignmentStatus.CANCELLED;
+        await activeAssignment.save();
+        if (partner.currentOrderId?.toString() === activeAssignment.orderId?.toString()) {
+          partner.currentOrderId = undefined;
+          await partner.save();
+        }
+      } else {
+        let store: StoreDocument | null = null;
+        if (order?.storeId) {
+          store = await this.storeModel.findById(order.storeId);
+        }
+
+        const deliveryAddress: any = order?.deliveryAddress || {};
+        const customerName = deliveryAddress.name || deliveryAddress.fullName || 'Customer';
+        const addressParts = [
+          deliveryAddress.houseFlat || deliveryAddress.houseNumber || deliveryAddress.addressLine1,
+          deliveryAddress.areaLandmark || deliveryAddress.street || deliveryAddress.addressLine2,
+          deliveryAddress.city,
+          deliveryAddress.pincode,
+        ].filter(Boolean);
+        const customerAddress = addressParts.length > 0 ? addressParts.join(', ') : (partner.city || 'Satellite, Ahmedabad');
+        const customerCoordinates = {
+          latitude: deliveryAddress.location?.coordinates?.[1] ?? deliveryAddress.coordinates?.[1] ?? 23.0312,
+          longitude: deliveryAddress.location?.coordinates?.[0] ?? deliveryAddress.coordinates?.[0] ?? 72.5342,
+        };
+
+        const storeName = store?.name || partner.hubName || 'Satellite Hub Dark Store';
+        const storeAddress = store ? `${store.address}, ${store.city} - ${store.pincode}` : 'GF-04, Galaxy Complex, Satellite, Ahmedabad';
+        const storeCoordinates = {
+          latitude: store?.location?.coordinates?.[1] ?? 23.0245,
+          longitude: store?.location?.coordinates?.[0] ?? 72.5298,
+        };
+
+        activeDeliveryData = {
+          id: activeAssignment._id.toString(),
+          orderId: activeAssignment.orderId.toString(),
+          orderNumber: order?.orderNumber || '#WUP-84920',
+          status: activeAssignment.status,
+          stepStatus: activeAssignment.status,
+          payoutAmount: activeAssignment.payoutAmount ?? 0,
+          distanceKm: activeAssignment.distanceKm ?? 0,
+          etaMinutes: activeAssignment.etaMinutes ?? 0,
+          storeName,
+          storeAddress,
+          storeCoordinates,
+          customerName,
+          customerAddress,
+          customerCoordinates,
+          itemCount: order?.items?.length || 0,
+          items: order?.items?.map((it: any, idx: number) => ({
+            id: it._id?.toString() || `ITM-${idx + 1}`,
+            name: it.name,
+            quantity: it.quantity,
+            price: it.price || it.unitPrice || 0,
+          })) || [],
+          // Security rule: Never expose raw delivery OTP in dashboard. Only notify that OTP is required on delivery.
+          deliveryOtpRequired: true,
+        };
       }
-
-      const deliveryAddress: any = order?.deliveryAddress || {};
-      const customerName = deliveryAddress.name || deliveryAddress.fullName || 'Customer';
-      const addressParts = [
-        deliveryAddress.houseFlat || deliveryAddress.houseNumber || deliveryAddress.addressLine1,
-        deliveryAddress.areaLandmark || deliveryAddress.street || deliveryAddress.addressLine2,
-        deliveryAddress.city,
-        deliveryAddress.pincode,
-      ].filter(Boolean);
-      const customerAddress = addressParts.length > 0 ? addressParts.join(', ') : (partner.city || 'Satellite, Ahmedabad');
-      const customerCoordinates = {
-        latitude: deliveryAddress.location?.coordinates?.[1] ?? deliveryAddress.coordinates?.[1] ?? 23.0312,
-        longitude: deliveryAddress.location?.coordinates?.[0] ?? deliveryAddress.coordinates?.[0] ?? 72.5342,
-      };
-
-      const storeName = store?.name || partner.hubName || 'Satellite Hub Dark Store';
-      const storeAddress = store ? `${store.address}, ${store.city} - ${store.pincode}` : 'GF-04, Galaxy Complex, Satellite, Ahmedabad';
-      const storeCoordinates = {
-        latitude: store?.location?.coordinates?.[1] ?? 23.0245,
-        longitude: store?.location?.coordinates?.[0] ?? 72.5298,
-      };
-
-      activeDeliveryData = {
-        id: activeAssignment._id.toString(),
-        orderId: activeAssignment.orderId.toString(),
-        orderNumber: order?.orderNumber || '#WUP-84920',
-        status: activeAssignment.status,
-        stepStatus: activeAssignment.status,
-        payoutAmount: activeAssignment.payoutAmount ?? 0,
-        distanceKm: activeAssignment.distanceKm ?? 0,
-        etaMinutes: activeAssignment.etaMinutes ?? 0,
-        storeName,
-        storeAddress,
-        storeCoordinates,
-        customerName,
-        customerAddress,
-        customerCoordinates,
-        itemCount: order?.items?.length || 0,
-        items: order?.items?.map((it: any, idx: number) => ({
-          id: it._id?.toString() || `ITM-${idx + 1}`,
-          name: it.name,
-          quantity: it.quantity,
-          price: it.price || it.unitPrice || 0,
-        })) || [],
-        // Security rule: Never expose raw delivery OTP in dashboard. Only notify that OTP is required on delivery.
-        deliveryOtpRequired: true,
-      };
     }
 
     // 2. Aggregate Today's Operational Settlement
@@ -160,7 +172,7 @@ export class RiderService {
 
     const totalEarnings = todaySettlements.reduce((sum, s) => sum + (s.total || 0), 0);
     const completedToday = todaySettlements.length;
-    const inProgressCount = activeAssignment ? 1 : 0;
+    const inProgressCount = activeDeliveryData ? 1 : 0;
 
     return {
       rider: {

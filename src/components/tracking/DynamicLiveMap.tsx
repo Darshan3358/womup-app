@@ -7,6 +7,7 @@ import {
   Animated,
   Dimensions,
   Platform,
+  Linking,
 } from 'react-native';
 import Svg, {
   Path,
@@ -494,6 +495,44 @@ export const DynamicLiveMap: React.FC<DynamicLiveMapProps> = ({
     );
   }
 
+  // Native Mobile Render (Use WebView when available, otherwise high-clarity SVG with Google Maps intent)
+  let NativeWebViewComponent: any = null;
+  try {
+    NativeWebViewComponent = require('react-native-webview').WebView;
+  } catch {
+    NativeWebViewComponent = null;
+  }
+
+  const handleOpenExternalMaps = () => {
+    const url = `https://www.google.com/maps/dir/?api=1&origin=${storeLat},${storeLng}&destination=${custLat},${custLng}&travelmode=driving`;
+    Linking.openURL(url).catch(() => {});
+  };
+
+  if (NativeWebViewComponent) {
+    return (
+      <View style={styles.container}>
+        <View style={[styles.mapViewport, { height: mapHeight, overflow: 'hidden' }]}>
+          <NativeWebViewComponent
+            originWhitelist={['*']}
+            source={{ html: mapHtml }}
+            style={{ width: '100%', height: '100%', borderRadius: 18 }}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            scrollEnabled={false}
+          />
+          <TouchableOpacity
+            style={styles.openExternalMapBtn}
+            onPress={handleOpenExternalMaps}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="map" size={13} color="#0F172A" />
+            <Text style={styles.openExternalMapText}>Google Maps</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   // Native Mobile SVG Fallback
   const paddingX = 48;
   const storeX = paddingX;
@@ -534,6 +573,16 @@ export const DynamicLiveMap: React.FC<DynamicLiveMapProps> = ({
           <View style={styles.nativeEtaDot} />
           <Text style={styles.nativeEtaText}>⚡ {etaText}</Text>
         </View>
+
+        {/* Floating Google Maps Intent */}
+        <TouchableOpacity
+          style={styles.openExternalMapBtn}
+          onPress={handleOpenExternalMaps}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="map" size={13} color="#0F172A" />
+          <Text style={styles.openExternalMapText}>Google Maps</Text>
+        </TouchableOpacity>
 
         {/* Store Pin */}
         <View style={[styles.pinWrapper, { left: storeX - 20, top: storeY - 20 }]}>
@@ -589,6 +638,31 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
     zIndex: 10,
+  },
+  openExternalMapBtn: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    zIndex: 10,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+  },
+  openExternalMapText: {
+    color: '#0F172A',
+    fontSize: 11,
+    fontWeight: '700',
   },
   nativeEtaDot: {
     width: 8,
