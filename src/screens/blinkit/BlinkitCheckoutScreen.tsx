@@ -925,16 +925,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
           Alert.alert(
             'Prices Updated',
             'Some prices have been updated to reflect the latest live store catalog. Please verify your cart total and tap Place Order to proceed.',
-            [
-              {
-                text: 'Verify Cart',
-                onPress: () => {
-                  if (typeof calculateDeliveryFee === 'function') {
-                    calculateDeliveryFee();
-                  }
-                },
-              },
-            ]
+            [{ text: 'OK' }]
           );
         } else {
           Alert.alert(
