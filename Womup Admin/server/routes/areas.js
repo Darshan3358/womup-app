@@ -382,6 +382,13 @@ router.post('/pricing', async (req, res) => {
       ],
     };
 
+    const existingMatches = await db.collection('area_pricing').find(filter).toArray();
+    let targetDocId = existingMatches.length > 0 ? existingMatches[0]._id : null;
+    if (existingMatches.length > 1) {
+      const idsToDelete = existingMatches.slice(1).map((m) => m._id);
+      await db.collection('area_pricing').deleteMany({ _id: { $in: idsToDelete } });
+    }
+
     const updateDoc = {
       $set: {
         productId: pObjId,
@@ -394,12 +401,15 @@ router.post('/pricing', async (req, res) => {
         isAvailable: isAvailable !== false,
         updatedAt: new Date(),
       },
-      $setOnInsert: {
-        createdAt: new Date(),
-      },
     };
 
-    const result = await db.collection('area_pricing').updateOne(filter, updateDoc, { upsert: true });
+    let result;
+    if (targetDocId) {
+      result = await db.collection('area_pricing').updateOne({ _id: targetDocId }, updateDoc);
+    } else {
+      updateDoc.$set.createdAt = new Date();
+      result = await db.collection('area_pricing').insertOne(updateDoc.$set);
+    }
 
     // CRITICAL: We do NOT modify product_variants.sellingPrice or products.sellingPrice.
     // area_pricing is the sole source of truth for zone-specific selling price.

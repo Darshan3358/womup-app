@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Notification, NotificationSchema } from './schemas/notification.schema';
 import { User, UserSchema } from '../users/schemas/user.schema';
@@ -8,6 +8,7 @@ import { NotificationDispatcherService } from './dispatcher.service';
 import { NotificationsController } from './notifications.controller';
 import { TrackingModule } from '../tracking/tracking.module';
 
+@Global()
 @Module({
   imports: [
     MongooseModule.forFeature([

@@ -7,6 +7,7 @@ import { VendorCollectionRequest, VendorCollectionRequestSchema } from './schema
 import { VendorSettlement, VendorSettlementSchema } from './schemas/vendor-settlement.schema';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { IncomeTransaction, IncomeTransactionSchema } from '../users/schemas/income-transaction.schema';
+import { CoinTransaction, CoinTransactionSchema } from '../coins/schemas/coin-transaction.schema';
 import { TrackingModule } from '../tracking/tracking.module';
 import { AuthModule } from '../auth/auth.module';
 import { LocalShopsController } from './local-shops.controller';
@@ -22,6 +23,7 @@ import { LocalShopsService } from './local-shops.service';
       { name: VendorSettlement.name, schema: VendorSettlementSchema },
       { name: User.name, schema: UserSchema },
       { name: IncomeTransaction.name, schema: IncomeTransactionSchema },
+      { name: CoinTransaction.name, schema: CoinTransactionSchema },
     ]),
     TrackingModule,
     AuthModule,

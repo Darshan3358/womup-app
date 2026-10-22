@@ -40,6 +40,12 @@ export const S24_OrderTrackingScreen: React.FC = () => {
         const found = (res as any)?._id ? res : res?.data;
         if (found) {
           setFreshOrder(found);
+          if (found.status) {
+            setLiveStatus(found.status.toUpperCase());
+          }
+          if (found.deliveryOtp) {
+            setDeliveryPin(String(found.deliveryOtp));
+          }
         }
       }).catch(() => { });
     }
@@ -48,6 +54,27 @@ export const S24_OrderTrackingScreen: React.FC = () => {
   // Real-time tracking state
   const [liveStatus, setLiveStatus] = useState<string>((activeOrder?.status || 'PLACED').toUpperCase());
   const [deliveryPin, setDeliveryPin] = useState<string>(String(activeOrder?.deliveryOtp || '4821'));
+
+  // Sync state whenever freshOrder or activeOrder status changes
+  useEffect(() => {
+    if (freshOrder?.status) {
+      setLiveStatus(freshOrder.status.toUpperCase());
+    } else if (currentOrder?.status) {
+      setLiveStatus(currentOrder.status.toUpperCase());
+    }
+  }, [freshOrder?.status, currentOrder?.status]);
+
+  useEffect(() => {
+    if (freshOrder?.deliveryOtp) {
+      setDeliveryPin(String(freshOrder.deliveryOtp));
+    } else if (currentOrder?.deliveryOtp) {
+      setDeliveryPin(String(currentOrder.deliveryOtp));
+    }
+  }, [freshOrder?.deliveryOtp, currentOrder?.deliveryOtp]);
+
+  const isDelivered = liveStatus === 'DELIVERED';
+  const isCancelled = liveStatus === 'CANCELLED';
+  const isTerminal = isDelivered || isCancelled;
 
   const rawPartnerName =
     activeOrder?.deliveryPartner?.name ||
@@ -131,6 +158,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
       : { latitude: 23.1165, longitude: 72.5460 };
 
   useEffect(() => {
+    if (isTerminal) return;
     const savedDist = Number((activeOrder as any)?.deliveryDistanceKm);
     if (savedDist && savedDist > 0) {
       setRouteDistanceKm(savedDist);
@@ -241,8 +269,41 @@ export const S24_OrderTrackingScreen: React.FC = () => {
     liveStatusRef.current = liveStatus;
   }, [liveStatus]);
 
-  // Connect to WebSocket Gateway
+  // Connect to WebSocket Gateway (only for active delivery)
   useEffect(() => {
+    // If order is terminal (DELIVERED or CANCELLED), stop live telemetry & disconnect socket
+    if (isTerminal) {
+      if (socketRef.current) {
+        try {
+          if (orderId) socketRef.current.emit('leave_order', { orderId });
+          if (orderNum) socketRef.current.emit('leave_order', { orderId: orderNum });
+          socketRef.current.disconnect();
+        } catch {}
+        socketRef.current = null;
+      }
+      setIsConnected(false);
+
+      // Single fetch to ensure fresh final order data if not yet loaded
+      if (!freshOrder && (orderId || orderNum)) {
+        const targetQuery = (activeOrder as any)?._id || (orderNum && orderNum.replace(/^#/, '')) || orderNum || orderId;
+        if (targetQuery && targetQuery !== 'W12345678') {
+          fetch(`http://localhost:5050/api/v1/orders/${encodeURIComponent(targetQuery)}`)
+            .then((res) => res.json())
+            .then((json) => {
+              const fresh = json.data || json;
+              if (fresh) {
+                setFreshOrder(fresh);
+                if (fresh.statusTimeline && Array.isArray(fresh.statusTimeline)) {
+                  setTimelineList(fresh.statusTimeline);
+                }
+              }
+            })
+            .catch(() => {});
+        }
+      }
+      return;
+    }
+
     const socket = io('http://localhost:5050/tracking', {
       transports: ['websocket', 'polling'],
       reconnection: true,
@@ -294,6 +355,11 @@ export const S24_OrderTrackingScreen: React.FC = () => {
           setEtaText('Arrived at Doorstep');
         } else if (newStatus === 'DELIVERED') {
           setEtaText('Delivered');
+          setIsConnected(false);
+          socket.disconnect();
+        } else if (newStatus === 'CANCELLED') {
+          setIsConnected(false);
+          socket.disconnect();
         }
       }
 
@@ -344,20 +410,43 @@ export const S24_OrderTrackingScreen: React.FC = () => {
     const handleLocationUpdate = (data: any) => {
       if (!data) return;
       const eventOrderId = data.orderId?.toString();
-      if (eventOrderId && orderId && eventOrderId !== orderId && eventOrderId !== orderNum) return;
-      const lat = data.lat ?? data.latitude;
-      const lng = data.lng ?? data.longitude;
+      const cleanEventOrderId = eventOrderId?.replace(/^#/, '');
+      const curOrderId = orderId?.toString();
+      const cleanCurOrderId = curOrderId?.replace(/^#/, '');
+      const curOrderNum = orderNum?.toString();
+      const cleanCurOrderNum = curOrderNum?.replace(/^#/, '');
+
+      const isMatch =
+        !eventOrderId ||
+        eventOrderId === curOrderId ||
+        cleanEventOrderId === cleanCurOrderId ||
+        eventOrderId === curOrderNum ||
+        cleanEventOrderId === cleanCurOrderNum;
+
+      if (!isMatch) return;
+
+      const lat = data.lat ?? data.latitude ?? data.riderLocation?.lat;
+      const lng = data.lng ?? data.longitude ?? data.riderLocation?.lng;
       if (lat && lng) {
         setRiderCoords({ latitude: lat, longitude: lng });
         if (data.heading !== undefined) {
           setRiderHeading(data.heading);
         }
-        if (data.etaMinutes) {
-          setEtaText(`Arriving in ${data.etaMinutes} mins${data.distanceKm ? ` (${data.distanceKm} km)` : ''}`);
+        const dist = data.distanceToCustomer ?? data.distanceKm;
+        const mins = data.eta ?? data.etaMinutes;
+        if (dist !== undefined && dist !== null) {
+          const numDist = Number(dist);
+          if (numDist > 0) {
+            setRouteDistanceKm(numDist);
+          }
+        }
+        if (mins || dist) {
+          setEtaText(`Arriving in ${mins ? `${mins} mins` : 'a few mins'}${dist ? ` (${dist} km away)` : ''}`);
         }
       }
     };
 
+    socket.on('location_updated', handleLocationUpdate);
     socket.on('rider_location_update', handleLocationUpdate);
     socket.on('update_delivery_location', handleLocationUpdate);
     socket.on('update_rider_location', handleLocationUpdate);
@@ -365,7 +454,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
 
     // Helper to refresh order data with self-healing REST fallback
     const refreshOrderData = async () => {
-      if (liveStatusRef.current === 'DELIVERED') return;
+      if (liveStatusRef.current === 'DELIVERED' || liveStatusRef.current === 'CANCELLED') return;
       const targetQuery = (activeOrder as any)?._id || (orderNum && orderNum.replace(/^#/, '')) || orderNum || orderId;
       if (!targetQuery || targetQuery === 'W12345678') return;
 
@@ -385,8 +474,10 @@ export const S24_OrderTrackingScreen: React.FC = () => {
               setEtaText('5-7 minutes');
             } else if (targetStatus === 'ARRIVED_AT_CUSTOMER') {
               setEtaText('Arrived at Doorstep');
-            } else if (targetStatus === 'DELIVERED') {
-              setEtaText('Delivered');
+            } else if (targetStatus === 'DELIVERED' || targetStatus === 'CANCELLED') {
+              setEtaText(targetStatus === 'DELIVERED' ? 'Delivered' : 'Cancelled');
+              setIsConnected(false);
+              socket.disconnect();
             }
           }
           if (fresh?.deliveryOtp) setDeliveryPin(fresh.deliveryOtp);
@@ -454,9 +545,8 @@ export const S24_OrderTrackingScreen: React.FC = () => {
       socket.off('update_delivery_location');
       socket.disconnect();
     };
-  }, [orderId, orderNum]);
+  }, [orderId, orderNum, isTerminal]);
 
-  const isDelivered = liveStatus === 'DELIVERED';
   const isOutForDelivery = liveStatus === 'OUT_FOR_DELIVERY' || liveStatus === 'ARRIVED_AT_CUSTOMER' || isDelivered;
   const isPacked = ['GOING_TO_STORE', 'ARRIVED_AT_STORE', 'PACKING', 'PACKED', 'OUT_FOR_DELIVERY', 'ARRIVED_AT_CUSTOMER', 'DELIVERED'].includes(liveStatus);
 
@@ -470,10 +560,31 @@ export const S24_OrderTrackingScreen: React.FC = () => {
     }
   };
 
+  const formatDeliveredDateTime = (ts?: string | Date) => {
+    const raw = ts || (activeOrder as any)?.deliveredAt || (activeOrder as any)?.updatedAt || (activeOrder as any)?.createdAt;
+    if (!raw) {
+      return (typeof activeOrder?.date === 'string' && activeOrder.date) ? activeOrder.date : 'Today';
+    }
+    try {
+      const d = new Date(raw);
+      if (isNaN(d.getTime())) {
+        return (typeof activeOrder?.date === 'string' && activeOrder.date) ? activeOrder.date : 'Today';
+      }
+      const day = d.getDate();
+      const month = d.toLocaleDateString('en-IN', { month: 'short' });
+      const year = d.getFullYear();
+      const timeStr = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+      return `${day} ${month} ${year}, ${timeStr}`;
+    } catch {
+      return (typeof activeOrder?.date === 'string' && activeOrder.date) ? activeOrder.date : 'Today';
+    }
+  };
+
   const placedEntry = timelineList.find((t) => t.status === 'PLACED');
   const packedEntry = timelineList.find((t) => ['PACKED', 'PACKING', 'ARRIVED_AT_STORE', 'READY_FOR_PICKUP'].includes(t.status));
   const outEntry = timelineList.find((t) => ['OUT_FOR_DELIVERY', 'ARRIVED_AT_CUSTOMER'].includes(t.status));
   const deliveredEntry = timelineList.find((t) => t.status === 'DELIVERED');
+  const deliveredDateText = formatDeliveredDateTime(deliveredEntry?.timestamp);
 
   // Stepper steps based on real-time authoritative status
   const steps = [
@@ -581,7 +692,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
   return (
     <View style={[styles.flex, { paddingTop: insets.top }]}>
       <Header
-        title="Live Order Tracking"
+        title={isDelivered ? 'Order Details' : (isCancelled ? 'Order Details' : 'Live Order Tracking')}
         onBack={goBack}
       />
 
@@ -590,28 +701,68 @@ export const S24_OrderTrackingScreen: React.FC = () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Connection Status Banner */}
-        <View style={styles.connectionBar}>
-          <View style={[styles.statusDot, isConnected ? styles.dotConnected : styles.dotDisconnected]} />
-          <Text style={styles.connectionText}>
-            {isConnected ? 'Live WebSocket Telemetry Connected' : 'Connecting to live tracking...'}
-          </Text>
-        </View>
+        {/* Connection Status Banner - Only shown during active live tracking */}
+        {!isTerminal && (
+          <View style={styles.connectionBar}>
+            <View style={[styles.statusDot, isConnected ? styles.dotConnected : styles.dotDisconnected]} />
+            <Text style={styles.connectionText}>
+              {isConnected ? 'Live WebSocket Telemetry Connected' : 'Connecting to live tracking...'}
+            </Text>
+          </View>
+        )}
 
-        {/* Order Info & Status Header */}
-        <View style={styles.orderInfoCard}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.orderNumberTitle}>{orderNum || 'Order Details'}</Text>
-            <Text style={styles.orderDateSubtitle}>
-              Placed on {activeOrder?.createdAt ? new Date(activeOrder.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : (activeOrder?.date || 'Today')}
-            </Text>
+        {/* 1. If DELIVERED: Show Dedicated Delivery Completion Hero Card */}
+        {isDelivered && (
+          <View style={styles.deliveredSummaryCard}>
+            <View style={styles.deliveredCheckCircle}>
+              <Ionicons name="checkmark" size={32} color="#FFFFFF" />
+            </View>
+            <Text style={styles.deliveredMainTitle}>Delivered Successfully</Text>
+            <Text style={styles.deliveredOrderNumber}>{orderNum || 'Order'}</Text>
+            <Text style={styles.deliveredTimestamp}>Delivered on {deliveredDateText}</Text>
+
+            <View style={styles.deliveredDivider} />
+
+            <View style={styles.deliveredBadgesRow}>
+              <View style={styles.deliveredBadge}>
+                <Ionicons name="checkmark-circle" size={16} color="#059669" />
+                <Text style={styles.deliveredBadgeText}>Delivery completed</Text>
+              </View>
+              <View style={styles.deliveredBadge}>
+                <Ionicons name="shield-checkmark" size={16} color="#059669" />
+                <Text style={styles.deliveredBadgeText}>Handover completed</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.deliveredRateBtn}
+              onPress={() => setIsReviewModalOpen(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="star" size={18} color="#F59E0B" />
+              <Text style={styles.deliveredRateBtnText}>
+                {hasReviewed ? '★ Rated Delivery Experience' : 'Rate Delivery Experience'}
+              </Text>
+            </TouchableOpacity>
           </View>
-          <View style={[styles.statusPill, isDelivered ? styles.statusPillDelivered : (liveStatus === 'CANCELLED' ? styles.statusPillCancelled : styles.statusPillActive)]}>
-            <Text style={[styles.statusPillText, isDelivered ? styles.statusTextDelivered : (liveStatus === 'CANCELLED' ? styles.statusTextCancelled : styles.statusTextActive)]}>
-              {liveStatus}
-            </Text>
+        )}
+
+        {/* If Active or Cancelled (not delivered): Order Info & Status Header */}
+        {!isDelivered && (
+          <View style={styles.orderInfoCard}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.orderNumberTitle}>{orderNum || 'Order Details'}</Text>
+              <Text style={styles.orderDateSubtitle}>
+                Placed on {activeOrder?.createdAt ? new Date(activeOrder.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : (activeOrder?.date || 'Today')}
+              </Text>
+            </View>
+            <View style={[styles.statusPill, liveStatus === 'CANCELLED' ? styles.statusPillCancelled : styles.statusPillActive]}>
+              <Text style={[styles.statusPillText, liveStatus === 'CANCELLED' ? styles.statusTextCancelled : styles.statusTextActive]}>
+                {liveStatus}
+              </Text>
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Cancelled Banner if Order was cancelled */}
         {liveStatus === 'CANCELLED' && (
@@ -631,8 +782,8 @@ export const S24_OrderTrackingScreen: React.FC = () => {
           </View>
         )}
 
-        {/* 1. Live Interactive Map (Top 40%) */}
-        {(() => {
+        {/* 1. Live Interactive Map (Top 40%) - Only during active delivery */}
+        {!isTerminal && (() => {
           const customerAddressText =
             activeOrder?.deliveryAddress?.houseFlat
               ? `${activeOrder.deliveryAddress.houseFlat}, ${activeOrder.deliveryAddress.areaLandmark || ''}`.trim()
@@ -675,101 +826,101 @@ export const S24_OrderTrackingScreen: React.FC = () => {
           );
         })()}
 
-        {/* 2. Rider Status Card */}
-        <View style={styles.riderStatusCard}>
-          <View style={styles.riderStatusLeft}>
-            <View style={styles.bikeIconCircle}>
-              <Ionicons name="bicycle" size={22} color="#E11D48" />
-            </View>
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={styles.riderStatusTitle}>
-                {liveStatus === 'DELIVERED'
-                  ? 'Delivered Successfully'
-                  : liveStatus === 'ARRIVED_AT_CUSTOMER'
+        {/* 2. Rider Status Card - Only during active delivery */}
+        {!isTerminal && (
+          <View style={styles.riderStatusCard}>
+            <View style={styles.riderStatusLeft}>
+              <View style={styles.bikeIconCircle}>
+                <Ionicons name="bicycle" size={22} color="#E11D48" />
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={styles.riderStatusTitle}>
+                  {liveStatus === 'ARRIVED_AT_CUSTOMER'
                     ? 'Rider is at your doorstep'
                     : liveStatus === 'OUT_FOR_DELIVERY'
                       ? 'Rider on the way'
                       : liveStatus === 'ARRIVED_AT_STORE'
                         ? 'Rider arrived at store hub'
                         : 'Preparing & packing your order'}
-              </Text>
-              <Text style={styles.riderStatusEta}>
-                {liveStatus === 'DELIVERED' ? 'Handover completed' : etaText}
-              </Text>
-            </View>
-          </View>
-
-          {isPartnerAssigned && partner.phone ? (
-            <TouchableOpacity
-              style={styles.callCircleBtn}
-              onPress={handleCallPartner}
-              activeOpacity={0.8}
-              accessibilityLabel="Call Delivery Partner"
-            >
-              <Ionicons name="call" size={18} color="#FFFFFF" />
-            </TouchableOpacity>
-          ) : null}
-        </View>
-
-        {/* 3. Rider Details Card (Blinkit-Style) */}
-        {isPartnerAssigned ? (
-          <View style={styles.blinkitRiderCard}>
-            <View style={styles.riderAvatarWrap}>
-              <Image
-                source={{
-                  uri: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-                }}
-                style={styles.blinkitRiderAvatar}
-              />
-              <View style={styles.riderOnlineDot} />
-            </View>
-
-            <View style={styles.riderInfoCol}>
-              <Text style={styles.blinkitRiderName} numberOfLines={1}>
-                {String(partner.name || '').replace(/\s*\(Wom(?:r)?\s*Up\s*Express\)/gi, '').trim() || 'DARSHAN THANKI'}
-              </Text>
-              <View style={styles.riderMetaRow}>
-                <Text style={styles.riderVehicleText}>{partner.vehicleNumber || 'GJ 01 AB 3456'}</Text>
-                <Text style={styles.riderMetaSep}>•</Text>
-                <View style={styles.riderRatingPill}>
-                  <Ionicons name="star" size={11} color="#F59E0B" />
-                  <Text style={styles.riderRatingVal}>4.9 (128+)</Text>
-                </View>
+                </Text>
+                <Text style={styles.riderStatusEta}>{etaText}</Text>
               </View>
             </View>
 
-            <View style={styles.riderActionButtons}>
+            {isPartnerAssigned && partner.phone ? (
               <TouchableOpacity
+                style={styles.callCircleBtn}
                 onPress={handleCallPartner}
-                style={styles.riderCallPill}
                 activeOpacity={0.8}
+                accessibilityLabel="Call Delivery Partner"
               >
-                <Ionicons name="call" size={14} color="#059669" />
-                <Text style={styles.riderCallPillText}>Call</Text>
+                <Ionicons name="call" size={18} color="#FFFFFF" />
               </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setIsChatModalOpen(true)}
-                style={styles.riderChatIconBtn}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="chatbubble-ellipses" size={16} color="#4F46E5" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : (
-          <View style={styles.assigningCard}>
-            <View style={styles.assigningPulse}>
-              <ActivityIndicator size="small" color="#E11D48" />
-            </View>
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={styles.assigningTitle}>Assigning delivery partner...</Text>
-              <Text style={styles.assigningSub}>Locating nearest available rider at dark store</Text>
-            </View>
+            ) : null}
           </View>
         )}
 
-        {/* 4. ANTI-FRAUD DELIVERY PIN CARD */}
-        {!isDelivered ? (
+        {/* 3. Rider Details Card (Blinkit-Style) - Only during active delivery */}
+        {!isTerminal && (
+          isPartnerAssigned ? (
+            <View style={styles.blinkitRiderCard}>
+              <View style={styles.riderAvatarWrap}>
+                <Image
+                  source={{
+                    uri: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+                  }}
+                  style={styles.blinkitRiderAvatar}
+                />
+                <View style={styles.riderOnlineDot} />
+              </View>
+
+              <View style={styles.riderInfoCol}>
+                <Text style={styles.blinkitRiderName} numberOfLines={1}>
+                  {String(partner.name || '').replace(/\s*\(Wom(?:r)?\s*Up\s*Express\)/gi, '').trim() || 'DARSHAN THANKI'}
+                </Text>
+                <View style={styles.riderMetaRow}>
+                  <Text style={styles.riderVehicleText}>{partner.vehicleNumber || 'GJ 01 AB 3456'}</Text>
+                  <Text style={styles.riderMetaSep}>•</Text>
+                  <View style={styles.riderRatingPill}>
+                    <Ionicons name="star" size={11} color="#F59E0B" />
+                    <Text style={styles.riderRatingVal}>4.9 (128+)</Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.riderActionButtons}>
+                <TouchableOpacity
+                  onPress={handleCallPartner}
+                  style={styles.riderCallPill}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="call" size={14} color="#059669" />
+                  <Text style={styles.riderCallPillText}>Call</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setIsChatModalOpen(true)}
+                  style={styles.riderChatIconBtn}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="chatbubble-ellipses" size={16} color="#4F46E5" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.assigningCard}>
+              <View style={styles.assigningPulse}>
+                <ActivityIndicator size="small" color="#E11D48" />
+              </View>
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={styles.assigningTitle}>Assigning delivery partner...</Text>
+                <Text style={styles.assigningSub}>Locating nearest available rider at dark store</Text>
+              </View>
+            </View>
+          )
+        )}
+
+        {/* 4. ANTI-FRAUD DELIVERY PIN CARD - Only during active delivery */}
+        {!isTerminal && (
           <View style={styles.pinCard}>
             <LinearGradient
               colors={['#1E1B4B', '#2E1065']}
@@ -810,89 +961,63 @@ export const S24_OrderTrackingScreen: React.FC = () => {
               </View>
             </LinearGradient>
           </View>
-        ) : (
-          <View style={styles.deliveredSuccessCard}>
-            <LinearGradient
-              colors={['#065F46', '#047857']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.deliveredGradient}
-            >
-              <Ionicons name="checkmark-circle" size={32} color="#FFFFFF" />
-              <View style={{ marginLeft: 12, flex: 1 }}>
-                <Text style={styles.deliveredTitle}>Order Delivered & Verified!</Text>
-                <Text style={styles.deliveredSubtitle}>
-                  Handover PIN verified. 10% Shopping Coins credited to your wallet!
-                </Text>
-              </View>
-            </LinearGradient>
+        )}
 
-            {/* Rate Delivery Partner Action Button */}
-            <TouchableOpacity
-              style={styles.ratePartnerBtn}
-              onPress={() => setIsReviewModalOpen(true)}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="star" size={18} color="#F59E0B" />
-              <Text style={styles.ratePartnerBtnText}>
-                {hasReviewed ? '★ Rated Delivery Partner' : 'Rate Your Delivery Experience'}
-              </Text>
-            </TouchableOpacity>
+        {/* 5. Timeline Progress - Only during active delivery */}
+        {!isTerminal && (
+          <View style={styles.timelineCard}>
+            <Text style={styles.timelineHeading}>Order Status</Text>
+
+            {steps.map((step, idx) => {
+              const isCompleted = step.status === 'completed';
+              const isActive = step.status === 'active';
+              const isLast = idx === steps.length - 1;
+
+              return (
+                <View key={idx} style={styles.timelineItem}>
+                  <View style={styles.timelineIconCol}>
+                    <View
+                      style={[
+                        styles.stepCircle,
+                        isCompleted && styles.stepCircleCompleted,
+                        isActive && styles.stepCircleActive,
+                      ]}
+                    >
+                      {isCompleted ? (
+                        <Ionicons name="checkmark" size={12} color={COLORS.white} />
+                      ) : isActive ? (
+                        <View style={styles.activeDot} />
+                      ) : (
+                        <View style={styles.pendingDot} />
+                      )}
+                    </View>
+                    {!isLast && (
+                      <View
+                        style={[
+                          styles.timelineLine,
+                          isCompleted && styles.timelineLineCompleted,
+                        ]}
+                      />
+                    )}
+                  </View>
+
+                  <View style={styles.timelineTextCol}>
+                    <Text
+                      style={[
+                        styles.stepTitle,
+                        (isCompleted || isActive) && styles.stepTitleBold,
+                      ]}
+                    >
+                      {step.title}
+                    </Text>
+                    <Text style={styles.stepTime}>{step.time}</Text>
+                  </View>
+                </View>
+              );
+            })}
           </View>
         )}
 
-        {/* Timeline Progress */}
-        <View style={styles.timelineCard}>
-          <Text style={styles.timelineHeading}>Order Status</Text>
-
-          {steps.map((step, idx) => {
-            const isCompleted = step.status === 'completed';
-            const isActive = step.status === 'active';
-            const isLast = idx === steps.length - 1;
-
-            return (
-              <View key={idx} style={styles.timelineItem}>
-                <View style={styles.timelineIconCol}>
-                  <View
-                    style={[
-                      styles.stepCircle,
-                      isCompleted && styles.stepCircleCompleted,
-                      isActive && styles.stepCircleActive,
-                    ]}
-                  >
-                    {isCompleted ? (
-                      <Ionicons name="checkmark" size={12} color={COLORS.white} />
-                    ) : isActive ? (
-                      <View style={styles.activeDot} />
-                    ) : (
-                      <View style={styles.pendingDot} />
-                    )}
-                  </View>
-                  {!isLast && (
-                    <View
-                      style={[
-                        styles.timelineLine,
-                        isCompleted && styles.timelineLineCompleted,
-                      ]}
-                    />
-                  )}
-                </View>
-
-                <View style={styles.timelineTextCol}>
-                  <Text
-                    style={[
-                      styles.stepTitle,
-                      (isCompleted || isActive) && styles.stepTitleBold,
-                    ]}
-                  >
-                    {step.title}
-                  </Text>
-                  <Text style={styles.stepTime}>{step.time}</Text>
-                </View>
-              </View>
-            );
-          })}
-        </View>
 
         {/* Ordered Items Breakdown Card */}
         {(() => {
@@ -1164,7 +1289,18 @@ export const S24_OrderTrackingScreen: React.FC = () => {
 
 
 
-        {/* Action Buttons: Repeat Order and Help */}
+        {/* Action Buttons: Repeat Order, View Orders, and Help */}
+        {isDelivered && (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => setActiveScreen('C25_OrderHistory')}
+            style={styles.viewOrderDetailsBtn}
+          >
+            <Ionicons name="receipt-outline" size={18} color={COLORS.navy} style={{ marginRight: 8 }} />
+            <Text style={styles.viewOrderDetailsBtnText}>View All Orders</Text>
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity
           activeOpacity={0.88}
           onPress={handleRepeatOrder}
@@ -1379,49 +1515,115 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#94A3B8',
   },
-  deliveredSuccessCard: {
-    borderRadius: 16,
-    overflow: 'hidden',
+  deliveredSummaryCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
     marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
   },
-  deliveredGradient: {
+  deliveredCheckCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#059669',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 14,
+    shadowColor: '#059669',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  deliveredMainTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 6,
+    letterSpacing: -0.3,
+  },
+  deliveredOrderNumber: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.hotPink,
+    marginBottom: 4,
+  },
+  deliveredTimestamp: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#64748B',
+    marginBottom: 16,
+  },
+  deliveredDivider: {
+    height: 1,
+    width: '100%',
+    backgroundColor: '#F1F5F9',
+    marginBottom: 16,
+  },
+  deliveredBadgesRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 10,
+    marginBottom: 16,
+    flexWrap: 'wrap',
+  },
+  deliveredBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    gap: 6,
   },
-  deliveredTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  deliveredSubtitle: {
+  deliveredBadgeText: {
     fontSize: 12,
-    color: '#D1FAE5',
-    marginTop: 2,
-    lineHeight: 16,
+    fontWeight: '700',
+    color: '#065F46',
   },
-  ratePartnerBtn: {
+  deliveredRateBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
     paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     borderRadius: 12,
-    marginTop: 10,
     borderWidth: 1.5,
-    borderColor: '#FDE68A',
+    borderColor: '#E2E8F0',
     gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    width: '100%',
   },
-  ratePartnerBtnText: {
+  deliveredRateBtnText: {
     fontSize: 14,
-    fontWeight: '800',
-    color: '#7C3AED',
+    fontWeight: '700',
+    color: COLORS.navy,
+  },
+  viewOrderDetailsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 14,
+    borderRadius: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  viewOrderDetailsBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.navy,
   },
   mapCard: {
     backgroundColor: COLORS.white,

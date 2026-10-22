@@ -26,7 +26,7 @@ export const R01_SplashScreen: React.FC = () => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#071B52" translucent />
       <Image
-        source={require('../../../assets/screen1.png')}
+        source={require('../../../assets/splash_rider.png')}
         style={styles.splashImage}
         resizeMode="cover"
       />

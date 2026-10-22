@@ -47,8 +47,10 @@ export interface LocalTransaction {
   vendorCategory: string;
   amount: number;
   coinsEarned: number;
+  coinsUsed?: number;
+  cashPaid?: number;
   paymentMethod: 'UPI' | 'WALLET' | 'CARD' | 'CASH' | 'COIN';
-  status: 'SUCCESS' | 'PENDING' | 'FAILED';
+  status: 'SUCCESS' | 'PENDING' | 'FAILED' | 'VERIFIED' | 'COMPLETED';
   date: string;
   createdAt?: string;
   qrScanned?: boolean;

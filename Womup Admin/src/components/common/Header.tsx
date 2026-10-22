@@ -4,6 +4,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Bell, ArrowLeft, Layers, Menu, LogOut } from 'lucide-react-native';
 import { COLORS, GRADIENTS, RADIUS, SPACING } from '../../theme';
 import { useAdminState } from '../../context/AdminStateContext';
+import { AdminNotificationModal } from './AdminNotificationModal';
+import { adminNotificationService } from '../../services/adminNotificationService';
 
 interface HeaderProps {
   title?: string;
@@ -14,6 +16,24 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ title, showBack, onBack }) => {
   const { activeTab, setActiveTab, subView, setSubView, goBackSubView, toggleSidebar, logoutAdmin } = useAdminState();
   const [showApprovalsModal, setShowApprovalsModal] = React.useState(false);
+  const [showNotificationModal, setShowNotificationModal] = React.useState(false);
+  const [adminUnreadCount, setAdminUnreadCount] = React.useState(0);
+
+  React.useEffect(() => {
+    let mounted = true;
+    const fetchCount = async () => {
+      try {
+        const count = await adminNotificationService.getUnreadCount();
+        if (mounted) setAdminUnreadCount(count);
+      } catch {}
+    };
+    fetchCount();
+    const interval = setInterval(fetchCount, 30000); // 30s fallback check
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   const isSubScreen = showBack || subView !== 'none';
 
@@ -63,11 +83,17 @@ export const Header: React.FC<HeaderProps> = ({ title, showBack, onBack }) => {
 
           <TouchableOpacity
             style={styles.iconButton}
-            onPress={() => setShowApprovalsModal(true)}
-            accessibilityLabel="View Pending Approvals"
+            onPress={() => setShowNotificationModal(true)}
+            accessibilityLabel="View Admin Notifications"
           >
             <Bell color={COLORS.white} size={20} />
-            <View style={styles.badge} />
+            {adminUnreadCount > 0 ? (
+              <View style={[styles.badge, styles.badgePill]}>
+                <Text style={styles.badgeText}>{adminUnreadCount > 99 ? '99+' : adminUnreadCount}</Text>
+              </View>
+            ) : (
+              <View style={styles.badge} />
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -78,6 +104,14 @@ export const Header: React.FC<HeaderProps> = ({ title, showBack, onBack }) => {
           </TouchableOpacity>
         </View>
       </View>
+
+      <AdminNotificationModal
+        visible={showNotificationModal}
+        onClose={() => {
+          setShowNotificationModal(false);
+          adminNotificationService.getUnreadCount().then(setAdminUnreadCount).catch(() => {});
+        }}
+      />
 
       {/* APPROVALS QUEUE MODAL */}
       <Modal
@@ -221,6 +255,23 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: COLORS.hotPink,
+  },
+  badgePill: {
+    top: 2,
+    right: 2,
+    width: 'auto',
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EF4444',
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '700',
   },
   modalOverlay: {
     flex: 1,

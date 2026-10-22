@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,8 +9,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MOCK_COIN_LEDGER } from '../data/mockLocalShops';
 import { CoinLedgerItem } from '../types/localShop.types';
+import { LocalShopApi } from '../api/localShopApi';
+import { useApp } from '../../context/AppContext';
 
 interface MyCoinWalletScreenProps {
   onGoBack: () => void;
@@ -18,8 +19,21 @@ interface MyCoinWalletScreenProps {
 
 export const MyCoinWalletScreen: React.FC<MyCoinWalletScreenProps> = ({ onGoBack }) => {
   const insets = useSafeAreaInsets();
-  const [balance, setBalance] = useState(2000);
-  const [ledger] = useState<CoinLedgerItem[]>(MOCK_COIN_LEDGER);
+  const { user } = useApp();
+  const balance = user?.shoppingCoins ?? 0;
+  const [ledger, setLedger] = useState<CoinLedgerItem[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    LocalShopApi.getCoinHistory().then((history) => {
+      if (isMounted && history) {
+        setLedger(history);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleRedeem = () => {
     Alert.alert(
@@ -122,46 +136,56 @@ export const MyCoinWalletScreen: React.FC<MyCoinWalletScreenProps> = ({ onGoBack
           <Text style={styles.ledgerCount}>{ledger.length} entries</Text>
         </View>
 
-        <View style={styles.ledgerList}>
-          {ledger.map((item) => {
-            const isEarned = item.type === 'EARNED';
+        {ledger.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="receipt-outline" size={56} color="#CBD5E1" />
+            <Text style={styles.emptyTitle}>No Coin Transactions Yet</Text>
+            <Text style={styles.emptySub}>
+              Earn shopping coins every time you order online or scan at local partner stores!
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.ledgerList}>
+            {ledger.map((item) => {
+              const isEarned = item.type === 'EARNED';
 
-            return (
-              <View key={item.id} style={styles.ledgerCard}>
-                <View
-                  style={[
-                    styles.txTypeCircle,
-                    { backgroundColor: isEarned ? '#ECFDF5' : '#FEF2F2' },
-                  ]}
-                >
-                  <Ionicons
-                    name={isEarned ? 'arrow-down-outline' : 'arrow-up-outline'}
-                    size={18}
-                    color={isEarned ? '#059669' : '#DC2626'}
-                  />
-                </View>
-
-                <View style={styles.txDetails}>
-                  <Text style={styles.txVendorName}>{item.vendorName}</Text>
-                  <Text style={styles.txDescription}>{item.description}</Text>
-                  <Text style={styles.txDate}>{item.date}</Text>
-                </View>
-
-                <View style={styles.txAmountCol}>
-                  <Text
+              return (
+                <View key={item.id} style={styles.ledgerCard}>
+                  <View
                     style={[
-                      styles.txAmount,
-                      { color: isEarned ? '#059669' : '#DC2626' },
+                      styles.txTypeCircle,
+                      { backgroundColor: isEarned ? '#ECFDF5' : '#FEF2F2' },
                     ]}
                   >
-                    {isEarned ? `+${item.coins}` : `-${item.coins}`}
-                  </Text>
-                  <Text style={styles.txBalanceSub}>Bal: {item.balanceAfter}</Text>
+                    <Ionicons
+                      name={isEarned ? 'arrow-down-outline' : 'arrow-up-outline'}
+                      size={18}
+                      color={isEarned ? '#059669' : '#DC2626'}
+                    />
+                  </View>
+
+                  <View style={styles.txDetails}>
+                    <Text style={styles.txVendorName}>{item.vendorName}</Text>
+                    <Text style={styles.txDescription}>{item.description}</Text>
+                    <Text style={styles.txDate}>{item.date}</Text>
+                  </View>
+
+                  <View style={styles.txAmountCol}>
+                    <Text
+                      style={[
+                        styles.txAmount,
+                        { color: isEarned ? '#059669' : '#DC2626' },
+                      ]}
+                    >
+                      {isEarned ? `+${item.coins}` : `-${item.coins}`}
+                    </Text>
+                    <Text style={styles.txBalanceSub}>Bal: {item.balanceAfter}</Text>
+                  </View>
                 </View>
-              </View>
-            );
-          })}
-        </View>
+              );
+            })}
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -401,5 +425,24 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#94A3B8',
     marginTop: 2,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 24,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#334155',
+    marginTop: 12,
+  },
+  emptySub: {
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 6,
+    lineHeight: 18,
   },
 });

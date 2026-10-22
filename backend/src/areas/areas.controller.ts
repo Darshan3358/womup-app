@@ -63,11 +63,11 @@ export class AreasController {
 
   @Post('detect-area')
   @ApiOperation({ summary: 'Detect delivery area and dark store using GeoJSON Point-in-Polygon spatial query' })
-  @ApiBody({ schema: { properties: { cityId: { type: 'string' }, lat: { type: 'number' }, lng: { type: 'number' }, latitude: { type: 'number' }, longitude: { type: 'number' } } } })
-  async detectAreaLocation(@Body() body: { cityId?: string; lat?: number; lng?: number; latitude?: number; longitude?: number }) {
+  @ApiBody({ schema: { properties: { cityId: { type: 'string' }, areaId: { type: 'string' }, lat: { type: 'number' }, lng: { type: 'number' }, latitude: { type: 'number' }, longitude: { type: 'number' } } } })
+  async detectAreaLocation(@Body() body: { cityId?: string; areaId?: string; lat?: number; lng?: number; latitude?: number; longitude?: number }) {
     const lat = Number(body.lat ?? body.latitude);
     const lng = Number(body.lng ?? body.longitude);
-    return this.areasService.detectArea(lat, lng, body.cityId);
+    return this.areasService.detectArea(lat, lng, body.cityId, body.areaId);
   }
 }
 
@@ -78,11 +78,11 @@ export class DetectAreaController {
 
   @Post('detect-area')
   @ApiOperation({ summary: 'Detect delivery area from coordinates using GeoJSON boundaries in MongoDB' })
-  @ApiBody({ schema: { properties: { cityId: { type: 'string' }, lat: { type: 'number' }, lng: { type: 'number' }, latitude: { type: 'number' }, longitude: { type: 'number' } } } })
-  async detectArea(@Body() body: { cityId?: string; lat?: number; lng?: number; latitude?: number; longitude?: number }) {
+  @ApiBody({ schema: { properties: { cityId: { type: 'string' }, areaId: { type: 'string' }, lat: { type: 'number' }, lng: { type: 'number' }, latitude: { type: 'number' }, longitude: { type: 'number' } } } })
+  async detectArea(@Body() body: { cityId?: string; areaId?: string; lat?: number; lng?: number; latitude?: number; longitude?: number }) {
     const lat = Number(body.lat ?? body.latitude);
     const lng = Number(body.lng ?? body.longitude);
-    return this.areasService.detectArea(lat, lng, body.cityId);
+    return this.areasService.detectArea(lat, lng, body.cityId, body.areaId);
   }
 }
 

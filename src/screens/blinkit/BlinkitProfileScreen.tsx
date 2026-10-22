@@ -25,7 +25,7 @@ import { api } from '../../services/api';
 import { AddressService } from '../../services/addressService';
 import { AuthService } from '../../services/authService';
 import { SettingsService } from '../../services/settingsService';
-
+import { KycBankVerificationModal } from '../../components/common/KycBankVerificationModal';
 
 export const BlinkitProfileScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -139,6 +139,7 @@ export const BlinkitProfileScreen: React.FC = () => {
   const [isNotificationsModalVisible, setNotificationsModalVisible] = useState(false);
   const [isHelpModalVisible, setHelpModalVisible] = useState(false);
   const [isSensitiveInfoModalVisible, setSensitiveInfoModalVisible] = useState(false);
+  const [isKycModalVisible, setKycModalVisible] = useState(false);
 
   // --- Functional Interactive Form States ---
   // Birthday — initialized from MongoDB via user.birthday (survives refresh)
@@ -736,34 +737,6 @@ export const BlinkitProfileScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Hide Sensitive Items Row */}
-          <View style={styles.cardBlockStandalone}>
-            <View style={styles.sensitiveRow}>
-              <View style={styles.sensitiveLeftIcon}>
-                <AppIcon name="eye-off" size={20} color={COLORS.primary} />
-              </View>
-              <View style={styles.sensitiveCenterText}>
-                <Text style={[TYPOGRAPHY.bodyMdMedium, styles.sensitiveTitle]}>
-                  Hide sensitive items
-                </Text>
-                <Text style={[TYPOGRAPHY.caption, styles.sensitiveDesc]}>
-                  Sexual wellness, nicotine products and other sensitive items will be hidden
-                </Text>
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={() => setSensitiveInfoModalVisible(true)}
-                >
-                  <Text style={styles.knowMoreText}>Know more</Text>
-                </TouchableOpacity>
-              </View>
-              <Switch
-                value={hideSensitiveItems}
-                onValueChange={setHideSensitiveItems}
-                trackColor={{ false: COLORS.border, true: COLORS.primary }}
-                thumbColor={COLORS.white}
-              />
-            </View>
-          </View>
 
           {/* Section 1: Your Information */}
           {renderSectionCard('Your information', [
@@ -778,6 +751,17 @@ export const BlinkitProfileScreen: React.FC = () => {
               label: 'Your wishlist',
               badge: wishlist.length > 0 ? `${wishlist.length}` : undefined,
               onPress: () => setActiveScreen('Blinkit_Wishlist'),
+            },
+            {
+              icon: 'shield',
+              label: 'KYC & Bank Verification',
+              badge:
+                user.verificationStatus === 'VERIFIED' || user.customerKycStatus === 2 || user.aadhaarVerified
+                  ? 'Verified'
+                  : user.verificationStatus === 'PENDING' || user.customerKycStatus === 1
+                  ? 'Under Review'
+                  : 'Add Details',
+              onPress: () => setKycModalVisible(true),
             },
           ])}
 
@@ -807,15 +791,6 @@ export const BlinkitProfileScreen: React.FC = () => {
             },
           ])}
 
-          {/* Section 3: Eternal Foundation */}
-          {renderSectionCard('Eternal Foundation', [
-            {
-              icon: 'heart',
-              label: 'Feeding India impact',
-              badge: '8 meals funded',
-              onPress: () => setFeedingIndiaModalVisible(true),
-            },
-          ])}
 
           {/* Section 4: Other Information */}
           {renderSectionCard('Other Information', [
@@ -859,6 +834,12 @@ export const BlinkitProfileScreen: React.FC = () => {
           </View>
         </View>
       </ScrollView>
+
+      {/* KYC & Bank Verification Modal */}
+      <KycBankVerificationModal
+        visible={isKycModalVisible}
+        onClose={() => setKycModalVisible(false)}
+      />
 
       {/* ─────────────────────────────────────────────────────────────
           1. BIRTHDAY MODAL
@@ -950,7 +931,16 @@ export const BlinkitProfileScreen: React.FC = () => {
             </View>
 
             <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
-              {user.savedAddresses?.map((addr, idx) => {
+              {(user.savedAddresses || [])
+                .filter((a) => a.type !== 'Current' && !a.id?.startsWith('current_'))
+                .filter((a, idx, arr) =>
+                  arr.findIndex((other) =>
+                    (a.id && other.id && (a.id === other.id || (a as any)._id === (other as any)._id)) ||
+                    (a.houseFlat?.trim().toLowerCase() === other.houseFlat?.trim().toLowerCase() &&
+                     a.areaLandmark?.trim().toLowerCase() === other.areaLandmark?.trim().toLowerCase() &&
+                     a.city?.trim().toLowerCase() === other.city?.trim().toLowerCase())
+                  ) === idx
+                ).map((addr, idx) => {
                 const isSelected = selectedAddress?.id === addr.id;
                 return (
                   <TouchableOpacity
@@ -1254,18 +1244,6 @@ export const BlinkitProfileScreen: React.FC = () => {
               </View>
             </View>
 
-            <View style={[styles.preferenceRow, { paddingHorizontal: 0, marginTop: 14 }]}>
-              <View>
-                <Text style={styles.inputFieldLabel}>Cash on Delivery (COD)</Text>
-                <Text style={styles.sheetSub}>Allow paying via cash upon doorstep delivery</Text>
-              </View>
-              <Switch
-                value={isCodEnabled}
-                onValueChange={handleToggleCod}
-                trackColor={{ false: COLORS.border, true: COLORS.primary }}
-                thumbColor={COLORS.white}
-              />
-            </View>
           </View>
         </View>
       </Modal>

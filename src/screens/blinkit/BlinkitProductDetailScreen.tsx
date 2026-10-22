@@ -20,6 +20,7 @@ import { FloatingCartPill } from '../../components/common/FloatingCartPill';
 import { ProductService } from '../../services/productService';
 import { useApp, mapProductToBlinkit } from '../../context/AppContext';
 import { BlinkitProduct } from '../../types';
+import { resolveImageDetail } from '../../utils/imageUrl';
 
 export const BlinkitProductDetailScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -57,21 +58,6 @@ export const BlinkitProductDetailScreen: React.FC = () => {
   const quantity = product ? getBlinkitQty(product.id, activeVariant?.id) : 0;
   let displayPrice = activeVariant ? activeVariant.price : product?.sellingPrice || 0;
   let displayMrp = activeVariant ? activeVariant.mrp : product?.mrp || 0;
-
-  // Only apply fallback dynamic pricing if product has NO active variants defined
-  if (!activeVariant && (product?.name || '').toLowerCase().includes('tomato')) {
-    const isThaltej = (currentAreaName || '').toLowerCase().includes('thaltej');
-    const isChandlodiya =
-      (currentAreaName || '').toLowerCase().includes('chandlodiya') ||
-      (currentAreaName || '').toLowerCase().includes('tragad');
-    if (isThaltej) {
-      displayPrice = 12;
-      displayMrp = 15;
-    } else if (isChandlodiya) {
-      displayPrice = 7;
-      displayMrp = 15;
-    }
-  }
 
   const displayPackSize = activeVariant ? activeVariant.label : product?.packSize || '1 unit';
 
@@ -198,7 +184,7 @@ export const BlinkitProductDetailScreen: React.FC = () => {
         <View style={styles.imageCarouselWrapper}>
           <View style={styles.carouselImageContainer}>
             <Image
-              source={{ uri: product.galleryImages?.[activeImageIndex] || product.imageUrl }}
+              source={{ uri: resolveImageDetail(product.galleryImages?.[activeImageIndex] || product.imageUrl) }}
               style={styles.carouselImage}
               resizeMode="cover"
             />

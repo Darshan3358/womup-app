@@ -1,8 +1,7 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Image, ActivityIndicator } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Store } from 'lucide-react-native';
-import { COLORS, GRADIENTS } from '../theme';
+import { View, StyleSheet, Image, ActivityIndicator, StatusBar, Dimensions } from 'react-native';
+
+const { width, height } = Dimensions.get('window');
 
 interface SplashScreenProps {
   onFinish?: () => void;
@@ -12,86 +11,48 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
   useEffect(() => {
     const timer = setTimeout(() => {
       if (onFinish) onFinish();
-    }, 1800);
+    }, 2000);
     return () => clearTimeout(timer);
   }, [onFinish]);
 
   return (
-    <LinearGradient colors={GRADIENTS.navyHeader} style={styles.container}>
-      <View style={styles.centerBox}>
-        <View style={styles.iconCircle}>
-          <Store size={48} color={COLORS.rose} />
-        </View>
-
-        <Text style={styles.appName}>WOMUP VENDOR</Text>
-        <Text style={styles.tagline}>Merchant Terminal & Counter QR Billing</Text>
-
-        <View style={styles.loadingBox}>
-          <ActivityIndicator color={COLORS.rose} size="small" />
-          <Text style={styles.loadingText}>Connecting to merchant network...</Text>
-        </View>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#071B52" translucent />
+      <Image
+        source={require('../../assets/splashstorescreen.png')}
+        style={styles.splashImage}
+        resizeMode="cover"
+      />
+      <View style={styles.loaderArea}>
+        <ActivityIndicator size="small" color="#FF3B98" />
       </View>
-
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>Enterprise Partner Edition • v1.0.0</Text>
-      </View>
-    </LinearGradient>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 50,
-  },
-  centerBox: {
-    alignItems: 'center',
-    marginTop: 'auto',
-    marginBottom: 'auto',
-  },
-  iconCircle: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: '#FFE4E6',
-    alignItems: 'center',
+    backgroundColor: '#071B52',
     justifyContent: 'center',
-    marginBottom: 20,
-    shadowColor: COLORS.rose,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  appName: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    letterSpacing: 1.5,
-  },
-  tagline: {
-    fontSize: 13,
-    color: '#94A3B8',
-    marginTop: 6,
-    fontWeight: '600',
-  },
-  loadingBox: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginTop: 32,
+    position: 'relative',
   },
-  loadingText: {
-    fontSize: 12,
-    color: '#CBD5E1',
+  splashImage: {
+    width: width,
+    height: height,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
-  footer: {
-    alignItems: 'center',
-  },
-  footerText: {
-    fontSize: 11,
-    color: '#64748B',
+  loaderArea: {
+    position: 'absolute',
+    bottom: 40,
+    alignSelf: 'center',
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(7, 27, 82, 0.4)',
   },
 });

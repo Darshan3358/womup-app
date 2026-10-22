@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
-  ScrollView,
+  FlatList,
   TouchableOpacity,
   StyleSheet,
   useWindowDimensions,
@@ -22,13 +22,6 @@ import { KYCBanner } from '../../components/KYCBanner';
 import { useApp, mapProductToBlinkit } from '../../context/AppContext';
 import { ProductService } from '../../services/productService';
 import {
-  DEALS_OF_THE_DAY_PRODUCTS,
-  FAST_DELIVERY_PRODUCTS,
-  FRESH_VEG_FRUITS_PRODUCTS,
-  DAIRY_BREAD_EGGS_PRODUCTS,
-  BESTSELLERS_PRODUCTS,
-  NEW_ARRIVALS_PRODUCTS,
-  UNDER_50_PRODUCTS,
   resolveCategoryGroup,
 } from '../../data/blinkitData';
 import { Product, Category, BlinkitProduct } from '../../types';
@@ -47,50 +40,64 @@ export const BlinkitHomeScreen: React.FC = () => {
     deliveryEtaMinutes,
     setLocationModalVisible,
     requestLocationPermissionAndDetect,
+    catalogVersion,
   } = useApp();
 
-  // Direct app open: Request location permission & detect location without registration
+  // Direct app open: Request location permission & detect location once on initial mount
   useEffect(() => {
     requestLocationPermissionAndDetect?.();
-  }, [requestLocationPermissionAndDetect]);
+  }, []);
 
   const [activeTab, setActiveTab] = useState('Home');
   const [isLoading, setIsLoading] = useState(true);
   const [dbProducts, setDbProducts] = useState<Product[]>([]);
   const [backendSections, setBackendSections] = useState<Record<string, BlinkitProduct[]>>({});
 
-  // Fetch unified home data + raw catalog products
+  // Fetch unified home data — sections already contain all product lists
+  // (B-01 fix: removed redundant fetchProducts; fetchHomeSections returns all 7 sections
+  //  with up to 8 products each so a separate full-catalogue call is wasteful)
   useEffect(() => {
     let isMounted = true;
+    const controller = new AbortController(); // B-06 fix: cancel stale requests on area change
+
     (async () => {
       try {
         setIsLoading(true);
-        const [homeData, prods] = await Promise.all([
-          ProductService.fetchHomeSections({
+        const homeData = await ProductService.fetchHomeSections(
+          {
             areaId: currentAreaId || undefined,
             storeId: currentStoreId || undefined,
-          }).catch(() => null),
-          ProductService.fetchProducts({
-            areaId: currentAreaId || undefined,
-            storeId: currentStoreId || undefined,
-          }).catch(() => []),
-        ]);
+          },
+          controller.signal,
+        ).catch(() => null);
 
         if (!isMounted) return;
 
-        if (prods && prods.length > 0) {
-          setDbProducts(prods);
-        }
-
-        if (homeData && homeData.sections) {
+        if (homeData) {
+          // Populate section map from the unified home response
           const map: Record<string, BlinkitProduct[]> = {};
-          for (const sec of homeData.sections) {
+          for (const sec of homeData.sections || []) {
             map[sec.id] = (sec.products || []).map(mapProductToBlinkit);
           }
           setBackendSections(map);
+
+          // Build a deduplicated flat product list from the sections for fallback logic
+          const seen = new Set<string>();
+          const allProds: Product[] = [];
+          for (const sec of homeData.sections || []) {
+            for (const p of sec.products || []) {
+              if (!seen.has(p.id)) {
+                seen.add(p.id);
+                allProds.push(p);
+              }
+            }
+          }
+          if (allProds.length > 0) setDbProducts(allProds);
         }
-      } catch (e) {
-        console.warn('Error loading home data:', e);
+      } catch (e: any) {
+        if (e?.name !== 'AbortError') {
+          console.warn('Error loading home data:', e);
+        }
       } finally {
         if (isMounted) {
           setIsLoading(false);
@@ -100,8 +107,10 @@ export const BlinkitHomeScreen: React.FC = () => {
 
     return () => {
       isMounted = false;
+      controller.abort(); // Cancel any in-flight request when deps change
     };
-  }, [currentAreaId, currentStoreId, currentAreaName]);
+  // Auto-refreshes when area changes OR when admin pushes real-time price/catalog update (catalogVersion)
+  }, [currentAreaId, currentStoreId, catalogVersion]);
 
   const handleOpenProductDetail = (prod: BlinkitProduct) => {
     setSelectedBlinkitProduct(prod);
@@ -160,8 +169,7 @@ export const BlinkitHomeScreen: React.FC = () => {
     if (fromApi && fromApi.length > 0) return fromApi;
     const liveDeals = liveBlinkitProducts.filter((p) => p.mrp > p.sellingPrice);
     if (liveDeals.length > 0) return liveDeals.slice(0, 10);
-    if (liveBlinkitProducts.length > 0) return liveBlinkitProducts.slice(0, 10);
-    return DEALS_OF_THE_DAY_PRODUCTS.slice(0, 10);
+    return [];
   }, [isLoading, backendSections, liveBlinkitProducts]);
 
   // 2. 9-Minute Delivery (Fast-Moving Items)
@@ -169,10 +177,9 @@ export const BlinkitHomeScreen: React.FC = () => {
     if (isLoading) return [];
     const fromApi = backendSections['fast_delivery'];
     if (fromApi && fromApi.length > 0) return fromApi;
-    const liveFast = liveBlinkitProducts.filter((p) => p.stock > 15 && p.deliveryMinutes <= 10);
+    const liveFast = liveBlinkitProducts.filter((p) => p.stock > 0 && p.deliveryMinutes <= 15);
     if (liveFast.length > 0) return liveFast.slice(0, 10);
-    if (liveBlinkitProducts.length > 0) return liveBlinkitProducts.slice(0, 10);
-    return FAST_DELIVERY_PRODUCTS.slice(0, 10);
+    return [];
   }, [isLoading, backendSections, liveBlinkitProducts]);
 
   // 3. Fresh Vegetables & Fruits
@@ -185,8 +192,7 @@ export const BlinkitHomeScreen: React.FC = () => {
       return text.includes('veg') || text.includes('fruit') || text.includes('tomato') || text.includes('onion') || text.includes('banana');
     });
     if (liveVeg.length > 0) return liveVeg.slice(0, 10);
-    if (liveBlinkitProducts.length > 0) return liveBlinkitProducts.slice(0, 10);
-    return FRESH_VEG_FRUITS_PRODUCTS.slice(0, 10);
+    return [];
   }, [isLoading, backendSections, liveBlinkitProducts]);
 
   // 4. Dairy, Bread & Eggs
@@ -206,8 +212,7 @@ export const BlinkitHomeScreen: React.FC = () => {
       );
     });
     if (liveDairy.length > 0) return liveDairy.slice(0, 10);
-    if (liveBlinkitProducts.length > 0) return liveBlinkitProducts.slice(0, 10);
-    return DAIRY_BREAD_EGGS_PRODUCTS.slice(0, 10);
+    return [];
   }, [isLoading, backendSections, liveBlinkitProducts]);
 
   // 5. Bestsellers (Rated 4.5+, high sales)
@@ -217,8 +222,7 @@ export const BlinkitHomeScreen: React.FC = () => {
     if (fromApi && fromApi.length > 0) return fromApi;
     const liveBs = liveBlinkitProducts.filter((p) => p.rating >= 4.5);
     if (liveBs.length > 0) return liveBs.slice(0, 10);
-    if (liveBlinkitProducts.length > 0) return liveBlinkitProducts.slice(0, 10);
-    return BESTSELLERS_PRODUCTS.slice(0, 10);
+    return [];
   }, [isLoading, backendSections, liveBlinkitProducts]);
 
   // 6. New Arrivals
@@ -227,7 +231,7 @@ export const BlinkitHomeScreen: React.FC = () => {
     const fromApi = backendSections['new_arrivals'];
     if (fromApi && fromApi.length > 0) return fromApi;
     if (liveBlinkitProducts.length > 0) return liveBlinkitProducts.slice(0, 8);
-    return NEW_ARRIVALS_PRODUCTS.slice(0, 8);
+    return [];
   }, [isLoading, backendSections, liveBlinkitProducts]);
 
   // 7. Under ₹50 (Everyday Savings)
@@ -237,9 +241,199 @@ export const BlinkitHomeScreen: React.FC = () => {
     if (fromApi && fromApi.length > 0) return fromApi;
     const liveU50 = liveBlinkitProducts.filter((p) => p.sellingPrice <= 50);
     if (liveU50.length > 0) return liveU50.slice(0, 10);
-    if (liveBlinkitProducts.length > 0) return liveBlinkitProducts.slice(0, 10);
-    return UNDER_50_PRODUCTS.slice(0, 10);
+    return [];
   }, [isLoading, backendSections, liveBlinkitProducts]);
+
+  // ── FlatList section data ─────────────────────────────────────────────────
+  // Each entry is one virtualised row. Sections that are heavy (ProductSection)
+  // are deferred by FlatList — only visible ones mount.
+  type HomeSection =
+    | { type: 'deals' }
+    | { type: 'fast_delivery' }
+    | { type: 'banner_veggies' }
+    | { type: 'fresh_veggies' }
+    | { type: 'bestsellers' }
+    | { type: 'banner_dairy' }
+    | { type: 'dairy_bread' }
+    | { type: 'popular_brands' }
+    | { type: 'new_arrivals' }
+    | { type: 'under_50' };
+
+  const SECTION_DATA: HomeSection[] = useMemo(() => [
+    { type: 'deals' },
+    { type: 'fast_delivery' },
+    { type: 'banner_veggies' },
+    { type: 'fresh_veggies' },
+    { type: 'bestsellers' },
+    { type: 'banner_dairy' },
+    { type: 'dairy_bread' },
+    { type: 'popular_brands' },
+    { type: 'new_arrivals' },
+    { type: 'under_50' },
+  ], []);
+
+  const renderSection = useCallback(({ item }: { item: HomeSection }) => {
+    switch (item.type) {
+      case 'deals':
+        return (
+          <ProductSection
+            id="deals"
+            title="Deals of the Day"
+            subtitle="Save big on daily essentials"
+            products={dealsList}
+            onOpenProduct={handleOpenProductDetail}
+            onViewAll={() => setActiveScreen('C15_ProductListing')}
+            viewAllText="View All"
+            isLoading={isLoading}
+          />
+        );
+      case 'fast_delivery':
+        return (
+          <ProductSection
+            id="fast_delivery"
+            title="9-Minute Delivery"
+            subtitle="In stock at your nearest dark store"
+            products={fastDeliveryList}
+            onOpenProduct={handleOpenProductDetail}
+            onViewAll={() => setActiveScreen('C15_ProductListing')}
+            viewAllText="View All"
+            isLoading={isLoading}
+          />
+        );
+      case 'banner_veggies':
+        return (
+          <View style={styles.bannerWrapper}>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => handleSelectCategory('Vegetables & Fruits', 'c1')}
+              style={styles.groceriesBannerCard}
+            >
+              <Image
+                source={require('../../../assets/banners/9minbanner.png')}
+                style={styles.bannerImage}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+          </View>
+        );
+      case 'fresh_veggies':
+        return (
+          <ProductSection
+            id="fresh_veggies"
+            title="Fresh Vegetables & Fruits"
+            subtitle="Farm fresh, delivered in 9 minutes"
+            products={freshVegFruitsList}
+            onOpenProduct={handleOpenProductDetail}
+            onViewAll={() => handleSelectCategory('Vegetables & Fruits', 'c1')}
+            viewAllText="View All"
+            isLoading={isLoading}
+          />
+        );
+      case 'bestsellers':
+        return (
+          <ProductSection
+            id="bestsellers"
+            title="Bestsellers"
+            subtitle="Loved by 1000+ customers"
+            products={bestsellersList}
+            onOpenProduct={handleOpenProductDetail}
+            onViewAll={() => setActiveScreen('C15_ProductListing')}
+            viewAllText="View All"
+            isLoading={isLoading}
+          />
+        );
+      case 'banner_dairy':
+        return (
+          <View style={styles.bannerWrapper}>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => handleSelectCategory('Dairy, Bread & Eggs', 'c3')}
+              style={styles.dairyBannerCard}
+            >
+              <Image
+                source={require('../../../assets/banners/dairy_breakfast.jpg')}
+                style={styles.bannerImage}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+          </View>
+        );
+      case 'dairy_bread':
+        return (
+          <ProductSection
+            id="dairy_bread"
+            title="Dairy, Bread & Eggs"
+            subtitle="Start your day right"
+            products={dairyBreadEggsList}
+            onOpenProduct={handleOpenProductDetail}
+            onViewAll={() => handleSelectCategory('Dairy, Bread & Eggs', 'c3')}
+            viewAllText="View All"
+            isLoading={isLoading}
+          />
+        );
+      case 'popular_brands':
+        return (
+          <WomupPopularBrands
+            onSelectBrand={(brand) => navigateToProductListing(brand, [])}
+            onViewAll={() => setActiveScreen('C15_ProductListing')}
+          />
+        );
+      case 'new_arrivals':
+        return (
+          <ProductSection
+            id="new_arrivals"
+            title="New Arrivals"
+            subtitle="Just landed in our stores"
+            products={newArrivalsList}
+            onOpenProduct={handleOpenProductDetail}
+            onViewAll={() => setActiveScreen('C15_ProductListing')}
+            viewAllText="View All"
+            isLoading={isLoading}
+          />
+        );
+      case 'under_50':
+        return (
+          <ProductSection
+            id="under_50"
+            title="Under ₹50"
+            subtitle="Everyday savings"
+            products={under50List}
+            onOpenProduct={handleOpenProductDetail}
+            onViewAll={() => setActiveScreen('C15_ProductListing')}
+            viewAllText="View All"
+            isLoading={isLoading}
+          />
+        );
+      default:
+        return null;
+    }
+  }, [dealsList, fastDeliveryList, freshVegFruitsList, bestsellersList,
+      dairyBreadEggsList, newArrivalsList, under50List, isLoading,
+      handleOpenProductDetail, handleSelectCategory, navigateToProductListing, setActiveScreen]);
+
+  const ListHeader = useMemo(() => (
+    <>
+      <KYCBanner />
+      <HeroBannerCarousel onBannerPress={handleBannerPress} />
+      <WomupCategoryGrid
+        onSelectCategory={(name, id) => {
+          if (name.toLowerCase().includes('more') || id === 'c12') {
+            setActiveScreen('Blinkit_Categories');
+          } else {
+            handleSelectCategory(name, id);
+          }
+        }}
+        onViewAll={() => setActiveScreen('Blinkit_Categories')}
+      />
+    </>
+  ), [handleBannerPress, handleSelectCategory, setActiveScreen]);
+
+  const ListFooter = useMemo(() => (
+    <>
+      <MonthlyBenefitsBanner onJoinPress={() => setActiveScreen('Blinkit_Money')} />
+      <View style={{ height: 90 }} />
+    </>
+  ), [setActiveScreen]);
 
   return (
     <View style={styles.mainContainer}>
@@ -267,174 +461,32 @@ export const BlinkitHomeScreen: React.FC = () => {
           onPress={() => setLocationModalVisible(true)}
           style={styles.unserviceableBanner}
         >
-          <Feather name="map-pin" size={17} color="#B45309" />
+          <Feather name="alert-triangle" size={18} color="#DC2626" />
           <View style={styles.unserviceableTextWrap}>
-            <Text style={styles.unserviceableTitle}>
-              {!currentStoreName ? 'Delivery Location Required' : 'Outside Active Delivery Zone'}
+            <Text style={[styles.unserviceableTitle, { color: '#DC2626' }]}>
+              ⚠️ Sorry, WormUp is not serviceable in your area.
             </Text>
             <Text style={styles.unserviceableSubtitle}>
-              {!currentStoreName
-                ? 'Tap here to allow GPS or select your address to see accurate store inventory and delivery ETA.'
-                : 'We currently fulfill orders from 8 dark stores in Ahmedabad. Tap to select a serviceable address.'}
+              We are expanding soon! You can browse products, but ordering is disabled for unsupported locations.
             </Text>
           </View>
         </TouchableOpacity>
       )}
 
-      {/* Scrollable Homepage Body in Exact SRS Order */}
-      <ScrollView
-        style={styles.scrollView}
+      {/* Virtualised homepage body — only visible sections are mounted */}
+      <FlatList
+        data={SECTION_DATA}
+        keyExtractor={(item) => item.type}
+        renderItem={renderSection}
+        ListHeaderComponent={ListHeader}
+        ListFooterComponent={ListFooter}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* Prime Visibility KYC Status Banner (Variant 1-4) */}
-        <KYCBanner />
-
-        {/* Section 1: Hero Carousel (Top) */}
-        <HeroBannerCarousel onBannerPress={handleBannerPress} />
-
-        {/* Section 2: Shop by Category (12 tiles) */}
-        <WomupCategoryGrid
-          onSelectCategory={(name, id) => {
-            if (name.toLowerCase().includes('more') || id === 'c12') {
-              setActiveScreen('Blinkit_Categories');
-            } else {
-              handleSelectCategory(name, id);
-            }
-          }}
-          onViewAll={() => setActiveScreen('Blinkit_Categories')}
-        />
-
-        {/* Section 3: Deals of the Day (6-8 products) */}
-        <ProductSection
-          id="deals"
-          title="Deals of the Day"
-          subtitle="Save big on daily essentials"
-          products={dealsList}
-          onOpenProduct={handleOpenProductDetail}
-          onViewAll={() => setActiveScreen('C15_ProductListing')}
-          viewAllText="View All"
-          isLoading={isLoading}
-        />
-
-        {/* Section 4: 9-Minute Delivery (8 products) */}
-        <ProductSection
-          id="fast_delivery"
-          title="9-Minute Delivery"
-          subtitle="In stock at your nearest dark store"
-          products={fastDeliveryList}
-          onOpenProduct={handleOpenProductDetail}
-          onViewAll={() => setActiveScreen('C15_ProductListing')}
-          viewAllText="View All"
-          isLoading={isLoading}
-        />
-
-        {/* --- BANNER 1: Fresh Groceries (Delivered in 9 Minutes) --- */}
-        <View style={styles.bannerWrapper}>
-          <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={() => handleSelectCategory('Vegetables & Fruits', 'c1')}
-            style={styles.groceriesBannerCard}
-          >
-            <Image
-              source={require('../../../assets/banners/9minbanner.png')}
-              style={styles.bannerImage}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-        </View>
-
-        {/* Section 5: Fresh Vegetables & Fruits (8 products) */}
-        <ProductSection
-          id="fresh_veggies"
-          title="Fresh Vegetables & Fruits"
-          subtitle="Farm fresh, delivered in 9 minutes"
-          products={freshVegFruitsList}
-          onOpenProduct={handleOpenProductDetail}
-          onViewAll={() => handleSelectCategory('Vegetables & Fruits', 'c1')}
-          viewAllText="View All"
-          isLoading={isLoading}
-        />
-
-        {/* Section 6: Bestsellers (8 products) */}
-        <ProductSection
-          id="bestsellers"
-          title="Bestsellers"
-          subtitle="Loved by 1000+ customers"
-          products={bestsellersList}
-          onOpenProduct={handleOpenProductDetail}
-          onViewAll={() => setActiveScreen('C15_ProductListing')}
-          viewAllText="View All"
-          isLoading={isLoading}
-        />
-
-        {/* --- BANNER 2: Dairy & Breakfast --- */}
-        <View style={styles.bannerWrapper}>
-          <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={() => handleSelectCategory('Dairy, Bread & Eggs', 'c3')}
-            style={styles.dairyBannerCard}
-          >
-            <Image
-              source={require('../../../assets/banners/dairy_breakfast.jpg')}
-              style={styles.bannerImage}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-        </View>
-
-        {/* Section 7: Dairy, Bread & Eggs (8 products) */}
-        <ProductSection
-          id="dairy_bread"
-          title="Dairy, Bread & Eggs"
-          subtitle="Start your day right"
-          products={dairyBreadEggsList}
-          onOpenProduct={handleOpenProductDetail}
-          onViewAll={() => handleSelectCategory('Dairy, Bread & Eggs', 'c3')}
-          viewAllText="View All"
-          isLoading={isLoading}
-        />
-
-        {/* Section 8: Popular Brands (Moved right above New Arrivals) */}
-        <WomupPopularBrands
-          onSelectBrand={(brand) => {
-            navigateToProductListing(brand, []);
-          }}
-          onViewAll={() => setActiveScreen('C15_ProductListing')}
-        />
-
-        {/* Section 9: New Arrivals (6-8 products) */}
-        <ProductSection
-          id="new_arrivals"
-          title="New Arrivals"
-          subtitle="Just landed in our stores"
-          products={newArrivalsList}
-          onOpenProduct={handleOpenProductDetail}
-          onViewAll={() => setActiveScreen('C15_ProductListing')}
-          viewAllText="View All"
-          isLoading={isLoading}
-        />
-
-        {/* Section 10: Under ₹50 (8 products) */}
-        <ProductSection
-          id="under_50"
-          title="Under ₹50"
-          subtitle="Everyday savings"
-          products={under50List}
-          onOpenProduct={handleOpenProductDetail}
-          onViewAll={() => setActiveScreen('C15_ProductListing')}
-          viewAllText="View All"
-          isLoading={isLoading}
-        />
-
-        {/* Section 11: 📢 Monthly Benefits Banner */}
-        <MonthlyBenefitsBanner
-          onJoinPress={() => setActiveScreen('Blinkit_Money')}
-        />
-
-        {/* Bottom space for tab bar */}
-        <View style={{ height: 90 }} />
-      </ScrollView>
+        contentContainerStyle={styles.listContent}
+        initialNumToRender={3}
+        maxToRenderPerBatch={2}
+        windowSize={5}
+        removeClippedSubviews={true}
+      />
 
       {/* Floating "View Cart" Pill Button */}
       <FloatingCartPill bottomOffset={20} />
@@ -451,11 +503,7 @@ const styles = StyleSheet.create({
     minHeight: 0,
     overflow: 'hidden',
   },
-  scrollView: {
-    flex: 1,
-    width: '100%',
-  },
-  scrollContent: {
+  listContent: {
     paddingBottom: 110,
     width: '100%',
     maxWidth: '100%',

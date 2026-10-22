@@ -15,6 +15,9 @@ export interface HomeSectionResponse {
   products: any[];
 }
 
+import { getHomeCache, setHomeCache, clearHomeCache } from './home-cache';
+export { clearHomeCache } from './home-cache';
+
 @Injectable()
 export class HomeService {
   constructor(
@@ -24,6 +27,12 @@ export class HomeService {
   ) {}
 
   async getHomeSections(storeId?: string, areaId?: string) {
+    const cacheKey = `${storeId || 'none'}:${areaId || 'none'}`;
+    const cached = getHomeCache(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const [heroBanners, categories, allProductsResult] = await Promise.all([
       this.bannersService.findAll('HOME_HERO').then((b) => (b.length ? b : this.bannersService.findAll())),
       this.categoriesService.findAll(),
@@ -155,7 +164,7 @@ export class HomeService {
       },
     ];
 
-    return {
+    const result = {
       success: true,
       data: {
         hero: heroBanners,
@@ -163,5 +172,9 @@ export class HomeService {
         sections,
       },
     };
+
+    // Store result in cache
+    setHomeCache(cacheKey, result);
+    return result;
   }
 }

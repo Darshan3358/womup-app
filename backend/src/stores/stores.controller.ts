@@ -1,9 +1,9 @@
-import { Controller, Get, Post, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { StoresService } from './stores.service';
 
 @ApiTags('Stores & Serviceability')
-@Controller('api/v1')
+@Controller(['api/v1', 'api', ''])
 export class StoresController {
   constructor(private readonly storesService: StoresService) {}
 
@@ -34,8 +34,11 @@ export class StoresController {
   async resolveLocation(
     @Body() body: { latitude: number; longitude: number; pincode?: string },
   ) {
-    const res = await this.storesService.checkServiceability(body.latitude, body.longitude);
+    const lat = typeof body?.latitude === 'number' ? body.latitude : Number(body?.latitude);
+    const lng = typeof body?.longitude === 'number' ? body.longitude : Number(body?.longitude);
+    const res = await this.storesService.checkServiceability(lat, lng);
     return {
+      success: true,
       serviceable: res.serviceable,
       areaId: res.areaId,
       areaName: res.areaName,
@@ -44,7 +47,7 @@ export class StoresController {
       storeCode: res.storeCode,
       city: 'Ahmedabad',
       deliveryMinutes: res.estimatedDeliveryMinutes || 9,
-      distanceKm: (res as any).distanceKm,
+      distanceKm: (res as any).distanceKm || 0,
       message: res.message,
     };
   }
@@ -53,8 +56,8 @@ export class StoresController {
   @Get('admin/stores')
   @ApiOperation({ summary: 'List all dark stores with status and search filters' })
   async adminGetStores(
-    @Param('status') status?: string,
-    @Param('search') search?: string,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
   ) {
     const data = await this.storesService.adminGetStores({ status, search });
     return { success: true, data };

@@ -148,6 +148,16 @@ export class RegisterDto {
   @IsOptional()
   aadhaarNumber?: string;
 
+  @ApiProperty({ example: 'https://...', required: false, description: 'Aadhaar front image URL' })
+  @IsString()
+  @IsOptional()
+  aadhaarFrontImage?: string;
+
+  @ApiProperty({ example: 'https://...', required: false, description: 'Aadhaar back image URL' })
+  @IsString()
+  @IsOptional()
+  aadhaarBackImage?: string;
+
   @ApiProperty({ example: '65f...cityId', required: false })
   @IsString()
   @IsOptional()

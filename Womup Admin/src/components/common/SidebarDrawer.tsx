@@ -34,6 +34,7 @@ import {
 } from 'lucide-react-native';
 import { COLORS, GRADIENTS, RADIUS, SPACING } from '../../theme';
 import { useAdminState, ActiveTab, ActiveSubView } from '../../context/AdminStateContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export const SidebarDrawer: React.FC = () => {
   const {
@@ -43,10 +44,14 @@ export const SidebarDrawer: React.FC = () => {
     setActiveTab,
     subView,
     setSubView,
+    locationSubTab,
+    setLocationSubTab,
     adminUser,
     adminSponsorId,
     logoutAdmin,
   } = useAdminState();
+
+  const insets = useSafeAreaInsets();
 
   const handleNavigateTab = (tab: ActiveTab) => {
     setSubView('none');
@@ -66,6 +71,7 @@ export const SidebarDrawer: React.FC = () => {
       animationType="fade"
       onRequestClose={() => setIsSidebarOpen(false)}
       statusBarTranslucent={true}
+      presentationStyle="overFullScreen"
     >
       <View style={styles.backdrop}>
         {/* Clickable Backdrop overlay on the left side of the drawer */}
@@ -301,15 +307,38 @@ export const SidebarDrawer: React.FC = () => {
             <TouchableOpacity
               style={[
                 styles.menuItem,
-                activeTab === 'Locations' && subView === 'none' && styles.menuItemActive,
+                activeTab === 'Locations' && locationSubTab !== 'Pincodes' && subView === 'none' && styles.menuItemActive,
               ]}
-              onPress={() => handleNavigateTab('Locations')}
+              onPress={() => {
+                setLocationSubTab('Cities');
+                handleNavigateTab('Locations');
+              }}
             >
-              <View style={[styles.iconContainer, activeTab === 'Locations' && subView === 'none' && styles.iconActive]}>
-                <MapPin size={18} color={activeTab === 'Locations' && subView === 'none' ? COLORS.white : COLORS.success} />
+              <View style={[styles.iconContainer, activeTab === 'Locations' && locationSubTab !== 'Pincodes' && subView === 'none' && styles.iconActive]}>
+                <MapPin size={18} color={activeTab === 'Locations' && locationSubTab !== 'Pincodes' && subView === 'none' ? COLORS.white : COLORS.success} />
               </View>
-              <Text style={[styles.menuLabel, activeTab === 'Locations' && subView === 'none' && styles.menuLabelActive]}>
+              <Text style={[styles.menuLabel, activeTab === 'Locations' && locationSubTab !== 'Pincodes' && subView === 'none' && styles.menuLabelActive]}>
                 Cities & Operational Areas
+              </Text>
+              <ChevronRight size={16} color={COLORS.secondaryText} />
+            </TouchableOpacity>
+
+            {/* 9b. GeoJSON Pincodes & Serviceability */}
+            <TouchableOpacity
+              style={[
+                styles.menuItem,
+                activeTab === 'Locations' && locationSubTab === 'Pincodes' && subView === 'none' && styles.menuItemActive,
+              ]}
+              onPress={() => {
+                setLocationSubTab('Pincodes');
+                handleNavigateTab('Locations');
+              }}
+            >
+              <View style={[styles.iconContainer, activeTab === 'Locations' && locationSubTab === 'Pincodes' && styles.iconActive]}>
+                <Layers size={18} color={activeTab === 'Locations' && locationSubTab === 'Pincodes' ? COLORS.white : COLORS.purple} />
+              </View>
+              <Text style={[styles.menuLabel, activeTab === 'Locations' && locationSubTab === 'Pincodes' && styles.menuLabelActive]}>
+                GeoJSON Pincodes & Serviceability
               </Text>
               <ChevronRight size={16} color={COLORS.secondaryText} />
             </TouchableOpacity>
@@ -405,7 +434,7 @@ export const SidebarDrawer: React.FC = () => {
           </ScrollView>
 
             {/* Footer Logout Button */}
-            <View style={styles.drawerFooter}>
+            <View style={[styles.drawerFooter, { paddingBottom: Math.max(insets.bottom, SPACING.md) }]}>
               <TouchableOpacity
                 style={styles.logoutBtn}
                 onPress={() => {
@@ -436,7 +465,6 @@ const styles = StyleSheet.create({
     width: '84%',
     maxWidth: 340,
     height: '100%',
-    maxHeight: '100%',
     backgroundColor: COLORS.white,
     shadowColor: '#000',
     shadowOffset: { width: -4, height: 0 },
@@ -444,7 +472,6 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 16,
     flexDirection: 'column',
-    overflow: 'hidden',
   },
   drawerHeader: {
     paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 12 : 45,
@@ -520,12 +547,12 @@ const styles = StyleSheet.create({
   menuScroll: {
     flex: 1,
     width: '100%',
+    flexShrink: 1,
   },
   menuContent: {
     paddingHorizontal: 10,
     paddingTop: 12,
-    paddingBottom: 60,
-    flexGrow: 1,
+    paddingBottom: 80,
   },
   menuSectionTitle: {
     fontSize: 10,

@@ -40,36 +40,43 @@ export const RiderDashboardScreen: React.FC = () => {
     detectLocation,
     setSimulatedHub,
     clearSelectedHub,
+    riderUnreadCount,
+    refreshRiderUnreadCount,
   } = useRider();
 
   const [showHubModal, setShowHubModal] = useState(false);
   const [isDetecting, setIsDetecting] = useState(false);
   const [showPayAdminModal, setShowPayAdminModal] = useState(false);
 
-  // Automatically auto-detect GPS location every 1 second continuously
+  const isRealDelivery = Boolean(
+    activeDelivery &&
+    activeDelivery.stepStatus !== 'OFFERED'
+  );
+
+  // Duty-state-aware GPS polling (B-02 fix: was unconditional 1-second loop)
+  // • Offline rider  → 30 s  (hub location is stable; no orders to track)
+  // • Online, no job → 10 s  (ready to receive; needs fresh location for dispatch)
+  // • Active delivery →  5 s  (customer and admin need timely ETA updates)
   useEffect(() => {
     let isMounted = true;
 
-    // Initial immediate auto-detection
-    detectLocation();
+    // When offline, do not poll GPS repeatedly
+    if (!isOnline && !isRealDelivery) {
+      return;
+    }
 
-    // Re-detect continuously every 1 second
+    const gpsIntervalMs = isRealDelivery ? 5000 : 15000;
+
     const interval = setInterval(() => {
-      if (isMounted) {
-        detectLocation();
-      }
-    }, 1000);
+      if (isMounted) detectLocation();
+    }, gpsIntervalMs);
 
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [detectLocation]);
-
-  const isRealDelivery = Boolean(
-    activeDelivery &&
-    activeDelivery.stepStatus !== 'OFFERED'
-  );
+  // Re-create interval whenever duty state changes so we always use the right cadence
+  }, [detectLocation, isOnline, isRealDelivery]);
 
   const [refreshing, setRefreshing] = useState(false);
   const [pendingSettlementRequest, setPendingSettlementRequest] = useState<any | null>(null);
@@ -84,9 +91,13 @@ export const RiderDashboardScreen: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => {
-    checkPendingSettlements();
-  }, [checkPendingSettlements, settlementSummary]);
+  useEffect(() => { 
+    // Defer pending settlements check to avoid startup connection congestion
+    const timer = setTimeout(() => {
+      checkPendingSettlements();
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [checkPendingSettlements]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -174,6 +185,11 @@ export const RiderDashboardScreen: React.FC = () => {
           activeOpacity={0.7}
         >
           <Ionicons name="notifications-outline" size={20} color="#071B52" />
+          {riderUnreadCount > 0 && (
+            <View style={styles.bellBadge}>
+              <Text style={styles.bellBadgeText}>{riderUnreadCount > 99 ? '99+' : riderUnreadCount}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -532,41 +548,38 @@ export const RiderDashboardScreen: React.FC = () => {
                 <View style={styles.offerPulseDot} />
                 <Text style={styles.offerPillText}>INCOMING JOB OFFER</Text>
               </View>
-              {incomingJobOffer.isFromOwnHub === false ? (
-                <View style={styles.nearbyHubBadge}>
-                  <Ionicons name="navigate" size={10} color="#E65100" style={{ marginRight: 3 }} />
-                  <Text style={styles.nearbyHubBadgeText}>
-                    NEARBY HUB ({incomingJobOffer.distanceToStoreKm ?? '0'} km)
-                  </Text>
-                </View>
-              ) : (
-                <View style={styles.ownHubBadge}>
-                  <Ionicons name="storefront" size={10} color="#2E7D32" style={{ marginRight: 3 }} />
-                  <Text style={styles.ownHubBadgeText}>YOUR HUB</Text>
-                </View>
-              )}
+              <View style={{ backgroundColor: '#ECFDF5', borderColor: '#A7F3D0', borderWidth: 1, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Ionicons name="bicycle" size={11} color="#059669" />
+                <Text style={{ color: '#047857', fontWeight: '800', fontSize: 10 }}>DELIVERY ORDER</Text>
+              </View>
             </View>
             <Text style={styles.orderIdText}>{incomingJobOffer.orderNumber}</Text>
           </View>
 
-          <View style={styles.orderRouteRow}>
+          <View style={[styles.orderRouteRow, { flexDirection: 'column', gap: 10 }]}>
             <View style={styles.locationBlock}>
-              <Text style={styles.locLabel}>PICKUP STORE</Text>
-              <Text style={styles.locTitle} numberOfLines={1}>
-                {incomingJobOffer.storeName}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                <Ionicons name="storefront" size={13} color="#2563EB" />
+                <Text style={styles.locLabel}>PICKUP FROM DARK STORE / VENDOR</Text>
+              </View>
+              <Text style={[styles.locTitle, { fontSize: 13 }]}>
+                {incomingJobOffer.storeName || 'Dark Store / Vendor'}
               </Text>
-              <Text style={styles.locSubText} numberOfLines={1}>
-                {incomingJobOffer.storeAddress}
+              <Text style={[styles.locSubText, { color: '#334155', fontSize: 12, lineHeight: 16, marginTop: 2 }]}>
+                {incomingJobOffer.storeAddress || 'Address details available upon dispatch'}
               </Text>
             </View>
-            <Ionicons name="arrow-forward" size={14} color={COLORS.hotPink} style={{ marginHorizontal: 6 }} />
-            <View style={styles.locationBlock}>
-              <Text style={styles.locLabel}>DROP CUSTOMER</Text>
-              <Text style={styles.locTitle} numberOfLines={1}>
-                {incomingJobOffer.customerName}
+
+            <View style={[styles.locationBlock, { borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 8 }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                <Ionicons name="location" size={13} color={COLORS.hotPink} />
+                <Text style={styles.locLabel}>DROP TO CUSTOMER</Text>
+              </View>
+              <Text style={[styles.locTitle, { fontSize: 13 }]}>
+                {incomingJobOffer.customerName || 'Customer'}
               </Text>
-              <Text style={styles.locSubText} numberOfLines={1}>
-                {incomingJobOffer.customerAddress}
+              <Text style={[styles.locSubText, { color: '#334155', fontSize: 12, lineHeight: 16, marginTop: 2 }]}>
+                {incomingJobOffer.customerAddress || 'Customer Address'}
               </Text>
             </View>
           </View>
@@ -1163,6 +1176,26 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 1,
+    position: 'relative',
+  },
+  bellBadge: {
+    position: 'absolute',
+    top: -3,
+    right: -3,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#FF3B98',
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  bellBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
   },
   todayEarningCard: {
     borderRadius: 20,

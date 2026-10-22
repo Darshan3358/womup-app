@@ -215,6 +215,17 @@ export const ST07_OrderDetailScreen: React.FC = () => {
               {activeOrder.assignedRider?.phone || (activeOrder as any).deliveryPartner?.phone || '7676677757'}
             </Text>
           </View>
+
+          {Boolean((activeOrder as any).distanceToStore || (activeOrder as any).distanceToCustomer || activeOrder.distanceKm) && (
+            <View style={[styles.detailRow, { backgroundColor: '#F0FDF4', padding: 8, borderRadius: 8, marginTop: 6 }]}>
+              <Text style={[styles.detailLabel, { color: '#15803D', fontWeight: '700' }]}>Live Proximity:</Text>
+              <Text style={[styles.detailValue, { color: '#15803D', fontWeight: '800' }]}>
+                {(activeOrder as any).distanceToStore
+                  ? `Rider is ${(activeOrder as any).distanceToStore} km from store`
+                  : `Rider is ${(activeOrder as any).distanceToCustomer || activeOrder.distanceKm} km from customer`}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Item List with Shelf Slots */}

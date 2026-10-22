@@ -62,17 +62,41 @@ export const WalletsRevenueScreen: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [refreshing, setRefreshing] = useState<boolean>(false);
 
+  // Wallets Summary & Dynamic Aggregates from Live MongoDB Backend
+  const [walletsSummary, setWalletsSummary] = useState<WalletsSummaryData | null>(null);
+
+  // Store Wallets (live from backend API)
+  const [storeWallets, setStoreWallets] = useState<any[]>([]);
+
+  // Rider Khata & Settlements (live from backend API)
+  const [riderWallets, setRiderWallets] = useState<any[]>([]);
+
+  // Ledger Transactions (live from backend API)
+  const [ledgerTransactions, setLedgerTransactions] = useState<any[]>([]);
+
   // Dark Store Selector Dropdown
-  const [selectedDarkStore, setSelectedDarkStore] = useState<string>('All Dark Stores & Shops (12)');
+  const darkStoresList = useMemo(() => {
+    const list = storeWallets.length > 0
+      ? storeWallets.map((s) => s.storeName).filter(Boolean)
+      : darkStores.map((s) => s.name).filter(Boolean);
+    const count = storeWallets.length || darkStores.length;
+    return [`All Dark Stores & Shops (${count})`, ...list];
+  }, [storeWallets, darkStores]);
+
+  const [selectedDarkStore, setSelectedDarkStore] = useState<string>('All Dark Stores & Shops');
   const [showDarkStoreModal, setShowDarkStoreModal] = useState<boolean>(false);
-  const darkStoresList = [
-    'All Dark Stores & Shops (12)',
-    'Satellite Hub Dark Store',
-    'Chandlodiya - Tragad Dark Store',
-    'Prahlad Nagar Express Store',
-    'Vastrapur - Bodakdev Hub',
-    'Navrangpura Quick Hub',
-  ];
+
+  useEffect(() => {
+    const count = storeWallets.length || darkStores.length;
+    setSelectedDarkStore(`All Dark Stores & Shops (${count})`);
+  }, [storeWallets.length, darkStores.length]);
+
+  const displayedStoreWallets = useMemo(() => {
+    if (!selectedDarkStore || selectedDarkStore.startsWith('All Dark Stores')) {
+      return storeWallets;
+    }
+    return storeWallets.filter((s) => s.storeName === selectedDarkStore);
+  }, [storeWallets, selectedDarkStore]);
 
   // Search & Filter for Ledger
   const [search, setSearch] = useState<string>('');
@@ -107,192 +131,53 @@ export const WalletsRevenueScreen: React.FC = () => {
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [copiedUtrId, setCopiedUtrId] = useState<string | null>(null);
 
-  // 100% Website Parity Live Data (Matching localhost:5175)
-  const totalGMV = 4672;
-  const storeBalanceTotal = 3831;
-  const riderBalanceTotal = 467;
-  const platformRevenueTotal = 841;
-  const platformNetProfit = 631;
+  const storeBalanceTotal = useMemo(() => {
+    if (walletsSummary?.stores?.totalBalance !== undefined) return walletsSummary.stores.totalBalance;
+    return storeWallets.reduce((sum, s) => sum + (s.balance || 0), 0);
+  }, [walletsSummary, storeWallets]);
 
-  // Store Wallets (100% Website Parity)
-  const [storeWallets, setStoreWallets] = useState<any[]>([
-    {
-      storeId: 'store_1',
-      storeName: 'Wom Up Chandlodiya Dark Store',
-      code: 'DS-AMD-01',
-      cityName: 'Ahmedabad',
-      balance: 1840,
-      totalEarned: 2240,
-      bankAccount: {
-        bankName: 'HDFC Bank Ltd',
-        accountNumber: '•••• •••• 4820',
-        ifsc: 'HDFC0001024',
-      },
-    },
-    {
-      storeId: 'store_2',
-      storeName: 'Wom Up Satellite Hub Store',
-      code: 'DS-AMD-02',
-      cityName: 'Ahmedabad',
-      balance: 1420,
-      totalEarned: 1730,
-      bankAccount: {
-        bankName: 'ICICI Bank',
-        accountNumber: '•••• •••• 9102',
-        ifsc: 'ICIC0000341',
-      },
-    },
-    {
-      storeId: 'store_3',
-      storeName: 'Wom Up Prahlad Nagar Hub',
-      code: 'DS-AMD-03',
-      cityName: 'Ahmedabad',
-      balance: 571,
-      totalEarned: 702,
-      bankAccount: {
-        bankName: 'Axis Bank Ltd',
-        accountNumber: '•••• •••• 3341',
-        ifsc: 'UTIB0000122',
-      },
-    },
-  ]);
+  const riderBalanceTotal = useMemo(() => {
+    if (walletsSummary?.riders?.totalBalance !== undefined) return walletsSummary.riders.totalBalance;
+    return riderWallets.reduce((sum, r) => sum + (r.balance || 0), 0);
+  }, [walletsSummary, riderWallets]);
 
-  // Rider Khata & Settlements (100% SRS Aligned)
-  const [riderWallets, setRiderWallets] = useState<any[]>([
-    {
-      riderId: 'rdr_1',
-      riderName: 'Darshan Parmar',
-      partnerCode: 'RDR-0012',
-      phone: '+91 98765 43210',
-      totalOrders: 15,
-      totalCodCollected: 1500,
-      totalOnlineEarnings: 300,
-      totalEarnings: 300,
-      balance: 300,
-      netBalance: 1200,
-      isBlocked: true,
-      outstandingCashLimit: 500,
-      riderOwesAdmin: 1200,
-      adminOwesRider: 0,
-      settlementType: 'COLLECT_FROM_RIDER',
-      bankAccount: {
-        bankName: 'State Bank of India',
-        accountNumber: '•••• •••• 2840',
-        ifsc: 'SBIN0004921',
-      },
-    },
-    {
-      riderId: 'rdr_2',
-      riderName: 'Yash Solanki',
-      partnerCode: 'RDR-0015',
-      phone: '+91 98251 12345',
-      totalOrders: 20,
-      totalCodCollected: 500,
-      totalOnlineEarnings: 800,
-      totalEarnings: 800,
-      balance: 800,
-      netBalance: -300,
-      isBlocked: false,
-      outstandingCashLimit: 500,
-      riderOwesAdmin: 0,
-      adminOwesRider: 300,
-      settlementType: 'PAY_TO_RIDER',
-      bankAccount: {
-        bankName: 'Bank of Baroda',
-        accountNumber: '•••• •••• 7712',
-        ifsc: 'BARB0SATELL',
-      },
-    },
-    {
-      riderId: 'rdr_3',
-      riderName: 'Amit Patel',
-      partnerCode: 'RDR-0018',
-      phone: '+91 97240 88991',
-      totalOrders: 8,
-      totalCodCollected: 200,
-      totalOnlineEarnings: 200,
-      totalEarnings: 200,
-      balance: 200,
-      netBalance: 0,
-      isBlocked: false,
-      outstandingCashLimit: 500,
-      riderOwesAdmin: 0,
-      adminOwesRider: 0,
-      settlementType: 'SETTLED',
-      bankAccount: {
-        bankName: 'Kotak Mahindra Bank',
-        accountNumber: '•••• •••• 6190',
-        ifsc: 'KKBK0000812',
-      },
-    },
-  ]);
+  const platformRevenueTotal = useMemo(() => {
+    if (walletsSummary?.platform?.totalRevenue !== undefined) return walletsSummary.platform.totalRevenue;
+    return Math.round((storeBalanceTotal + riderBalanceTotal) * 0.18);
+  }, [walletsSummary, storeBalanceTotal, riderBalanceTotal]);
 
-  // Ledger Transactions (100% Website Parity matching image)
-  const [ledgerTransactions, setLedgerTransactions] = useState<any[]>([
-    {
-      id: 'TXN-90412',
-      type: 'STORE',
-      title: 'Store Settlement Payout',
-      party: 'Wom Up Chandlodiya Dark Store',
-      amount: 4820,
-      direction: 'DEBIT',
-      method: 'Bank NEFT',
-      status: 'SETTLED',
-      time: '10 mins ago',
-    },
-    {
-      id: 'TXN-90411',
-      type: 'PLATFORM',
-      title: 'Order Commission (18%)',
-      party: 'Platform Revenue Collection',
-      amount: 142,
-      direction: 'CREDIT',
-      method: 'Order Auto-Split',
-      status: 'SETTLED',
-      time: '25 mins ago',
-    },
-    {
-      id: 'TXN-90410',
-      type: 'RIDER',
-      title: 'Instant Rider Earnings IMPS',
-      party: 'Rahul Parmar (RDR-0012)',
-      amount: 480,
-      direction: 'DEBIT',
-      method: 'Instant IMPS',
-      status: 'SETTLED',
-      time: '1 hour ago',
-    },
-    {
-      id: 'TXN-90409',
-      type: 'STORE',
-      title: 'Gross Cart Order Credit',
-      party: 'Wom Up Satellite Hub Store',
-      amount: 790,
-      direction: 'CREDIT',
-      method: 'Customer Online Pay',
-      status: 'SETTLED',
-      time: '2 hours ago',
-    },
-  ]);
+  const totalGMV = useMemo(() => {
+    if (walletsSummary?.stores?.totalGross !== undefined) return walletsSummary.stores.totalGross;
+    return storeWallets.reduce((sum, s) => sum + (s.totalEarned || s.balance || 0), 0);
+  }, [walletsSummary, storeWallets]);
+
+  const platformNetProfit = useMemo(() => {
+    if (walletsSummary?.platform?.netProfit !== undefined) return walletsSummary.platform.netProfit;
+    return Math.round(platformRevenueTotal * 0.75);
+  }, [walletsSummary, platformRevenueTotal]);
 
   // Load from backend
   const loadData = async () => {
     try {
       setLoading(true);
-      const [storesRes, ridersRes, txRes, settleReqRes, upiRes] = await Promise.all([
+      const [summaryRes, storesRes, ridersRes, txRes, settleReqRes, upiRes] = await Promise.all([
+        ApiService.getWalletsSummary(),
         ApiService.getStoreWallets(),
         ApiService.getRiderWallets(),
         ApiService.getWalletTransactions({ limit: 50 }),
         ApiService.getRiderSettlementRequests(),
         ApiService.getCompanyUpiSettings(),
       ]);
-      if (storesRes?.success && storesRes.data && storesRes.data.length > 0) {
+      if (summaryRes?.success && summaryRes.data) {
+        setWalletsSummary(summaryRes.data);
+      }
+      if (storesRes?.success && Array.isArray(storesRes.data)) {
         setStoreWallets(storesRes.data);
       }
-      if (ridersRes?.success && ridersRes.data && ridersRes.data.length > 0) {
+      if (ridersRes?.success && Array.isArray(ridersRes.data)) {
         setRiderWallets(ridersRes.data);
       }
-      if (txRes?.success && txRes.data && txRes.data.length > 0) {
+      if (txRes?.success && Array.isArray(txRes.data)) {
         setLedgerTransactions(txRes.data);
       }
       if (settleReqRes?.success && Array.isArray(settleReqRes.data)) {
@@ -303,8 +188,8 @@ export const WalletsRevenueScreen: React.FC = () => {
         if (upiRes.data.adminUpiName) setCompanyUpiName(upiRes.data.adminUpiName);
         if (upiRes.data.supportPhone) setCompanySupportPhone(upiRes.data.supportPhone);
       }
-    } catch {
-      // Keep website live parity fallback
+    } catch (err: any) {
+      console.warn('Failed loading wallets data:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -790,9 +675,15 @@ export const WalletsRevenueScreen: React.FC = () => {
       =============================================================== */}
       {activeSubTab === 'STORES' && (
         <View style={styles.subTabContentCard}>
-          <Text style={styles.subTabContentTitle}>Dark Store Balances & Payouts ({storeWallets.length})</Text>
+          <Text style={styles.subTabContentTitle}>Dark Store Balances & Payouts ({displayedStoreWallets.length})</Text>
 
-          {storeWallets.map((sw) => (
+          {displayedStoreWallets.length === 0 ? (
+            <View style={{ padding: 32, alignItems: 'center' }}>
+              <Store size={36} color="#94A3B8" />
+              <Text style={{ marginTop: 12, fontSize: 14, color: '#64748B', fontWeight: '600' }}>No Dark Stores Found</Text>
+            </View>
+          ) : (
+            displayedStoreWallets.map((sw) => (
             <View key={sw.storeId} style={styles.storeWalletCard}>
               <View style={styles.storeWalletTop}>
                 <View style={{ flex: 1 }}>
@@ -829,7 +720,7 @@ export const WalletsRevenueScreen: React.FC = () => {
                 </Text>
               </View>
             </View>
-          ))}
+          )))}
         </View>
       )}
 
@@ -855,7 +746,13 @@ export const WalletsRevenueScreen: React.FC = () => {
             </Text>
           </View>
 
-          {riderWallets.map((rw) => {
+          {riderWallets.length === 0 ? (
+            <View style={{ padding: 32, alignItems: 'center' }}>
+              <Bike size={36} color="#94A3B8" />
+              <Text style={{ marginTop: 12, fontSize: 14, color: '#64748B', fontWeight: '600' }}>No Active Rider Khatas Found</Text>
+            </View>
+          ) : (
+            riderWallets.map((rw) => {
             const net = rw.netBalance ?? ((rw.totalCodCollected || 0) - (rw.totalOnlineEarnings || rw.totalEarnings || rw.balance || 0));
             const isBlocked = rw.isBlocked || net >= (rw.outstandingCashLimit || 500);
 
@@ -994,7 +891,7 @@ export const WalletsRevenueScreen: React.FC = () => {
                 </View>
               </View>
             );
-          })}
+          }))}
         </View>
       )}
 

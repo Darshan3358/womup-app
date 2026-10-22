@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Platform } from 'react-native';
 import {
   Product,
@@ -197,6 +197,7 @@ interface AppContextType {
   setDeliveryEtaMinutes: (minutes: number | null) => void;
   setCurrentArea: (areaId: string, areaName: string) => void;
   setCurrentStore: (storeId: string | null, storeName: string | null) => void;
+  catalogVersion: number;
 
   // Onboarding & Auth State
   isAuthenticated: boolean;
@@ -344,6 +345,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedAddress, setSelectedAddressState] = useState<Address>(INITIAL_ADDRESS);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [selectedAddressSource, setSelectedAddressSource] = useState<'SAVED' | 'GPS'>('SAVED');
+  const selectedAddressSourceRef = useRef<'SAVED' | 'GPS'>('SAVED');
+  const selectedAddressRef = useRef<Address>(INITIAL_ADDRESS);
+  selectedAddressSourceRef.current = selectedAddressSource;
+  selectedAddressRef.current = selectedAddress;
   const activeSelectionEpochRef = useRef<number>(0);
 
   const setSelectedAddress = useCallback((addr: Address) => {
@@ -363,21 +368,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const setActiveDeliveryAddress = useCallback(async (address: Address) => {
     const epoch = ++activeSelectionEpochRef.current;
     const addrId = address.id || (address as any)._id || null;
-    console.log(`[AppContext] 🏠 setActiveDeliveryAddress [epoch=${epoch}]: addrId=${addrId}, type=${address.type}, coords=[${address.latitude}, ${address.longitude}]`);
 
     // Ensure valid coordinates
     let targetLat = typeof address.latitude === 'number' && !isNaN(address.latitude) ? address.latitude : undefined;
     let targetLng = typeof address.longitude === 'number' && !isNaN(address.longitude) ? address.longitude : undefined;
 
-    if (targetLat === undefined || targetLng === undefined) {
+    // Check if the address specifies a known area (e.g. "Prahlad Nagar")
+    const matchedArea = matchAreaByName(address.areaLandmark || address.street || address.houseFlat || address.city);
+    if (matchedArea) {
+      if (targetLat === undefined || targetLng === undefined) {
+        targetLat = matchedArea.lat;
+        targetLng = matchedArea.lng;
+      } else {
+        // If stored coordinates are geographically divergent from the selected area (e.g., GPS coords from Tragad while address is Prahlad Nagar),
+        // re-anchor coordinates to the chosen area center so the correct local dark store is resolved.
+        const dLat = (targetLat - matchedArea.lat) * 111;
+        const dLng = (targetLng - matchedArea.lng) * 111 * Math.cos((matchedArea.lat * Math.PI) / 180);
+        const distKm = Math.sqrt(dLat * dLat + dLng * dLng);
+        if (distKm > 6.0) {
+          targetLat = matchedArea.lat;
+          targetLng = matchedArea.lng;
+        }
+      }
+    } else if (targetLat === undefined || targetLng === undefined) {
       const queryStr = `${address.houseFlat || ''} ${address.street || ''} ${address.areaLandmark || ''} ${address.city || ''}`;
       const matched = matchAreaByName(queryStr);
       if (matched) {
         targetLat = matched.lat;
         targetLng = matched.lng;
-        console.log(`[AppContext] Geocoded saved address via matchAreaByName: [${targetLat}, ${targetLng}]`);
       }
     }
+
+    CartService.clearCache();
 
     const normalized: Address = {
       ...address,
@@ -412,7 +434,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
 
         if (area) {
-          console.log(`[AppContext] ✅ Saved address resolved: areaId=${area.areaId} (${area.areaName}), storeId=${area.storeId} (${area.storeName}), city=${area.city}`);
           setCurrentAreaId(area.areaId);
           setCurrentAreaName(area.areaName);
           setCurrentCityName(area.city || user.preferredCityName || 'Ahmedabad');
@@ -444,7 +465,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const setActiveGpsLocation = useCallback(async (loc: any) => {
     if (!loc) return;
     const epoch = ++activeSelectionEpochRef.current;
-    console.log(`[AppContext] 📍 setActiveGpsLocation [epoch=${epoch}]: coords=[${loc.latitude}, ${loc.longitude}]`);
 
     const shortLabel = loc.shortAddress || loc.readableAddress;
     const displayLabel = `Current Location — ${shortLabel}`;
@@ -484,7 +504,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       if (area) {
-        console.log(`[AppContext] ✅ GPS resolved: areaId=${area.areaId} (${area.areaName}), storeId=${area.storeId} (${area.storeName})`);
         setCurrentAreaId(area.areaId);
         setCurrentAreaName(area.areaName);
         setCurrentCityName(area.city || user.preferredCityName || 'Ahmedabad');
@@ -520,6 +539,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [currentStoreName, setCurrentStoreName] = useState<string | null>(null);
   const [isServiceable, setIsServiceable] = useState<boolean>(false);
   const [deliveryEtaMinutes, setDeliveryEtaMinutes] = useState<number | null>(null);
+  const [catalogVersion, setCatalogVersion] = useState<number>(0);
 
   // Cross-device live checkout synchronization
   const [liveCheckoutState, setLiveCheckoutState] = useState<{
@@ -662,18 +682,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsAuthPromptVisible(false);
   }, []);
 
-  const requestLocationPermissionAndDetect = useCallback(async () => {
+  const isDetectingGpsRef = useRef(false);
+  const hasDetectedGpsOnceRef = useRef(false);
+
+  const requestLocationPermissionAndDetect = useCallback(async (force = false) => {
+    if (isDetectingGpsRef.current) return;
+    if (!force && hasDetectedGpsOnceRef.current) return;
+
+    // If user has already selected a saved address, DO NOT override with device GPS!
+    if (
+      selectedAddressSourceRef.current === 'SAVED' &&
+      selectedAddressRef.current &&
+      selectedAddressRef.current.type !== 'Current' &&
+      !selectedAddressRef.current.id?.startsWith('current_')
+    ) {
+      return;
+    }
+
+    isDetectingGpsRef.current = true;
     try {
       const loc = await LocationService.getCurrentLocation();
       if (loc) {
+        hasDetectedGpsOnceRef.current = true;
+        if (
+          selectedAddressSourceRef.current === 'SAVED' &&
+          selectedAddressRef.current &&
+          selectedAddressRef.current.type !== 'Current' &&
+          !selectedAddressRef.current.id?.startsWith('current_')
+        ) {
+          return;
+        }
         await setActiveGpsLocation(loc);
       }
     } catch (err) {
-      console.log('[AppContext] Location permission prompt / detection:', err);
+      // non-fatal: location permission denied or GPS unavailable
+    } finally {
+      isDetectingGpsRef.current = false;
     }
   }, [setActiveGpsLocation]);
 
   const handleOnboardingSkip = () => {
+    StorageService.saveItem(StorageService.KEYS.ONBOARDING_DONE, true);
     navigateTo('Blinkit_Home');
   };
 
@@ -858,6 +907,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...prev,
         ...payload,
       }));
+    });
+
+    // Real-time Catalog & Price synchronization from Admin
+    socket.on('catalog:updated', (payload: any) => {
+      console.log('[AppContext] Real-time catalog update received from Admin:', payload);
+      ProductService.clearHomeCache();
+      setCatalogVersion((v) => v + 1);
+    });
+
+    socket.on('catalog:price-updated', (payload: any) => {
+      console.log('[AppContext] Real-time price update received from Admin:', payload);
+      ProductService.clearHomeCache();
+      setCatalogVersion((v) => v + 1);
+    });
+
+    socket.on('inventory_update', (payload: any) => {
+      console.log('[AppContext] Real-time inventory update received:', payload);
+      ProductService.clearHomeCache();
+      setCatalogVersion((v) => v + 1);
     });
 
     // Real-time Wishlist synchronization
@@ -1112,11 +1180,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setCart(newCart);
           const newBlinkitCart: Record<string, { product: BlinkitProduct; quantity: number }> = {};
           newCart.forEach((ci) => {
-            newBlinkitCart[ci.product.id] = {
-              product: mapProductToBlinkit(ci.product),
+            const bp = mapProductToBlinkit(ci.product);
+            bp.packSize = ci.product.quantityLabel || '1 unit';
+            (bp as any).selectedVariantId = (ci.product as any).selectedVariantId;
+            const k = (ci.product as any).selectedVariantId ? `${ci.product.id}_${(ci.product as any).selectedVariantId}` : ci.product.id;
+            newBlinkitCart[k] = {
+              product: bp,
               quantity: ci.quantity,
             };
           });
+          setBlinkitCart(newBlinkitCart);
+          StorageService.saveItem(StorageService.KEYS.BLINKIT_CART, newBlinkitCart);
         }
       });
     });
@@ -1374,20 +1448,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   const vMrp = item.variant?.mrp !== undefined
                     ? Number(item.variant.mrp)
                     : Number(prod.mrp ?? (item.totalMrp && qty ? item.totalMrp / qty : vPrice));
-                  const vLabel = item.variant?.label || prod.quantityLabel || '1 unit';
+                  const vLabel = item.variant?.label || item.variant?.weightOrVolume || prod.quantityLabel || '1 unit';
+                  const resolvedVId = item.variantId || item.variant?.id || item.variant?._id;
                   const bp = mapProductToBlinkit({
                     ...prod,
                     sellingPrice: vPrice,
                     mrp: vMrp,
                     quantityLabel: vLabel,
                   });
-                  mergedBlinkit[pId] = {
+                  bp.packSize = vLabel;
+                  (bp as any).selectedVariantId = resolvedVId;
+                  const cartKey = resolvedVId ? `${pId}_${resolvedVId}` : pId;
+                  mergedBlinkit[cartKey] = {
                     product: bp,
                     quantity: qty,
                   };
-                  const exIdx = mergedCart.findIndex((i) => i.product.id === pId);
+                  if (resolvedVId && mergedBlinkit[pId]) {
+                    delete mergedBlinkit[pId];
+                  }
+                  const exIdx = mergedCart.findIndex(
+                    (i) => i.product.id === pId && ((i.product as any).selectedVariantId === resolvedVId || !resolvedVId)
+                  );
                   if (exIdx >= 0) {
                     mergedCart[exIdx].quantity = qty;
+                    mergedCart[exIdx].product.sellingPrice = vPrice;
+                    mergedCart[exIdx].product.mrp = vMrp;
                   } else {
                     mergedCart.push({
                       product: mapBlinkitToProduct(bp),
@@ -1470,7 +1555,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             initialLng = Number(savedAddress.longitude);
           }
           hasRestoredSavedAddress = true;
-          console.log(`[AppContext] Boot restored address: id=${addrId}, source=${isGps ? 'GPS' : 'SAVED'}, coords=[${initialLat}, ${initialLng}]`);
         }
       } catch (e) {
         console.warn('Error restoring saved address:', e);
@@ -1509,7 +1593,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             hasRestoredSavedAddress = true;
           }
         } catch (err) {
-          console.log('[AppContext] Auto GPS on boot waiting for permission or unavailable:', err);
+          // non-fatal: GPS permission not yet granted on boot
         }
       }
 
@@ -1642,7 +1726,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               let targetMrp = matched ? matched.mrp : item.product.mrp;
               let targetStock = matched ? (matched.stock ?? item.product.stock) : item.product.stock;
 
-              // Check if item has a specific variant (e.g. 1 kg variant of Atta with dynamic area price)
+              // Check if item has a specific variant (e.g. 250 g variant of Tomato with dynamic area price)
               if (matched?.variants && matched.variants.length > 0) {
                 const matchedVariant = matched.variants.find((v: any) =>
                   (v.id && (item.product as any).selectedVariantId === v.id) ||
@@ -1654,21 +1738,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   targetPrice = matchedVariant.price ?? targetPrice;
                   targetMrp = matchedVariant.mrp ?? targetMrp;
                   targetStock = matchedVariant.stock ?? targetStock;
-                }
-              }
-
-              // Area-specific catalog price override for 250g base Tomato
-              if (
-                item.product.name.toLowerCase().includes('tomato') &&
-                (!item.product.packSize || item.product.packSize === '250 g')
-              ) {
-                if (currentAreaName?.toLowerCase().includes('thaltej')) {
-                  targetPrice = 12;
-                } else if (
-                  currentAreaName?.toLowerCase().includes('chandlodiya') ||
-                  currentAreaName?.toLowerCase().includes('tragad')
-                ) {
-                  targetPrice = 7;
                 }
               }
 
@@ -1685,7 +1754,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 };
               }
             });
-            return hasChanged ? updated : prev;
+            if (hasChanged) {
+              StorageService.saveItem(StorageService.KEYS.BLINKIT_CART, updated);
+              return updated;
+            }
+            return prev;
           });
 
           // Also pull authoritative server cart with resolved area and store
@@ -1740,7 +1813,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       });
     }
-  }, [currentAreaId, currentStoreId, currentAreaName]);
+  }, [currentAreaId, currentStoreId, currentAreaName, catalogVersion]);
+
+  // Re-reconcile cart whenever user navigates to Cart Screen
+  useEffect(() => {
+    if (activeScreen === 'Blinkit_Cart' && (currentAreaId || currentStoreId)) {
+      CartService.getServerCart(currentAreaId || undefined, currentStoreId || undefined).then((serverCart) => {
+        if (serverCart && Array.isArray(serverCart.items) && serverCart.items.length > 0) {
+          const newCart: CartItem[] = serverCart.items.map((it: any) => {
+            const vPrice = it.variant?.price !== undefined
+              ? Number(it.variant.price)
+              : Number(it.product.sellingPrice ?? (it.subtotal && it.quantity ? it.subtotal / it.quantity : 0));
+            const vMrp = it.variant?.mrp !== undefined
+              ? Number(it.variant.mrp)
+              : Number(it.product.mrp ?? (it.totalMrp && it.quantity ? it.totalMrp / it.quantity : vPrice));
+            const vLabel = it.variant?.label || it.variant?.weightOrVolume || it.product.quantityLabel || '1 unit';
+            const resolvedVId = it.variantId || it.variant?.id || it.variant?._id;
+            return {
+              product: {
+                id: it.product.id || it.product._id,
+                name: it.product.name,
+                brand: it.product.brand || '',
+                categoryId: it.product.categoryId || '',
+                sellingPrice: vPrice,
+                mrp: vMrp,
+                discountPercent: vMrp > vPrice ? Math.round(((vMrp - vPrice) / vMrp) * 100) : (it.product.discountPercent || 0),
+                stock: it.variant?.stock ?? it.product.stock ?? 100,
+                imageUrl: it.product.imageUrl,
+                quantityLabel: vLabel,
+                shoppingCoins: 0,
+                rating: 4.8,
+                reviewCount: 50,
+                deliveryMinutes: 9,
+                selectedVariantId: resolvedVId,
+              } as any,
+              quantity: it.quantity,
+            };
+          });
+          setCart(newCart);
+          const newBlinkitCart: Record<string, { product: BlinkitProduct; quantity: number }> = {};
+          newCart.forEach((ci) => {
+            const bp = mapProductToBlinkit(ci.product);
+            bp.packSize = ci.product.quantityLabel || '1 unit';
+            (bp as any).selectedVariantId = (ci.product as any).selectedVariantId;
+            const k = (ci.product as any).selectedVariantId ? `${ci.product.id}_${(ci.product as any).selectedVariantId}` : ci.product.id;
+            newBlinkitCart[k] = {
+              product: bp,
+              quantity: ci.quantity,
+            };
+          });
+          setBlinkitCart(newBlinkitCart);
+          StorageService.saveItem(StorageService.KEYS.BLINKIT_CART, newBlinkitCart);
+        }
+      }).catch(() => {});
+    }
+  }, [activeScreen, currentAreaId, currentStoreId]);
 
   // Save cart changes (only after hydration is complete to prevent wiping on refresh)
   useEffect(() => {
@@ -1853,11 +1980,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addAddress = (address: Address) => {
-    setUser((prev) => ({
-      ...prev,
-      savedAddresses: [...prev.savedAddresses, address],
-    }));
     setSelectedAddress(address);
+    if (address.type === 'Current') {
+      return;
+    }
+    setUser((prev) => {
+      const existingList = prev.savedAddresses || [];
+      const isDuplicate = existingList.some((addr) => {
+        if (addr.id && address.id && addr.id === address.id) return true;
+        if (addr._id && address._id && addr._id === address._id) return true;
+        const sameCoords =
+          typeof addr.latitude === 'number' &&
+          typeof address.latitude === 'number' &&
+          typeof addr.longitude === 'number' &&
+          typeof address.longitude === 'number' &&
+          Math.abs(addr.latitude - address.latitude) < 0.0001 &&
+          Math.abs(addr.longitude - address.longitude) < 0.0001;
+        const sameText =
+          Boolean(addr.houseFlat && address.houseFlat) &&
+          addr.houseFlat?.trim().toLowerCase() === address.houseFlat?.trim().toLowerCase() &&
+          addr.areaLandmark?.trim().toLowerCase() === address.areaLandmark?.trim().toLowerCase();
+        return Boolean(sameCoords || sameText);
+      });
+
+      if (isDuplicate) {
+        return {
+          ...prev,
+          savedAddresses: existingList.map((addr) =>
+            (addr.id && addr.id === address.id) || (addr._id && addr._id === address._id)
+              ? { ...addr, ...address }
+              : addr
+          ),
+        };
+      }
+
+      return {
+        ...prev,
+        savedAddresses: [...existingList, address],
+      };
+    });
   };
 
   const placeOrder = async (
@@ -1879,6 +2040,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       quantityLabel: i.product.quantityLabel || i.product.packSize || '1 unit',
     }));
 
+    const initialCoins = user.shoppingCoins;
+    const initialWallet = walletBalance;
+
     // Deduct wallet balance if applied
     if (options?.walletDeduction && options.walletDeduction > 0) {
       setWalletBalance((prev) => Math.max(0, prev - options.walletDeduction!));
@@ -1895,6 +2059,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     let liveOrder: Order | null = null;
     try {
+      const matchedAddrArea = matchAreaByName(
+        selectedAddress.areaLandmark || (selectedAddress as any).area || currentAreaName || deliveryLocation
+      );
+      const resolvedLat = Number(selectedAddress.latitude) || matchedAddrArea?.lat || 23.0125;
+      const resolvedLng = Number(selectedAddress.longitude) || matchedAddrArea?.lng || 72.5082;
+      const resolvedAreaName = matchedAddrArea?.name || selectedAddress.areaLandmark || currentAreaName || 'Prahlad Nagar';
+
       // Authoritative backend creation in MongoDB Atlas
       const res = await OrderService.createOrder({
         addressId: selectedAddress.id?.startsWith('current_') || selectedAddress.id === 'default_addr' ? undefined : selectedAddress.id,
@@ -1905,93 +2076,72 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         tip: options?.tip || 0,
         deliveryInstructions: options?.deliveryInstructions || 'Ring bell & leave at door',
         address: {
-          houseFlat: selectedAddress.houseFlat || 'Chandlodiya',
-          areaLandmark: selectedAddress.areaLandmark || 'Chandlodiya, Ahmedabad',
-          city: selectedAddress.city || 'Ahmedabad',
-          pincode: selectedAddress.pincode || '382481',
-          latitude: selectedAddress.latitude || 23.0827,
-          longitude: selectedAddress.longitude || 72.5606,
+          houseFlat: selectedAddress.houseFlat || resolvedAreaName,
+          areaLandmark: selectedAddress.areaLandmark || resolvedAreaName,
+          city: selectedAddress.city || currentCityName || 'Ahmedabad',
+          pincode: selectedAddress.pincode || matchedAddrArea?.pincode || '380015',
+          latitude: resolvedLat,
+          longitude: resolvedLng,
           label: selectedAddress.type || 'Home',
         },
       });
 
       const anyRes = res as any;
-      const liveData = (anyRes?.success && anyRes?.data) ? anyRes.data : (anyRes?._id || anyRes?.orderNumber) ? anyRes : null;
-      if (liveData) {
-        const livePartner = liveData.deliveryPartner || liveData.deliveryPartnerId;
-        liveOrder = {
-          id: liveData._id || liveData.id || `ord_${Date.now()}`,
-          _id: liveData._id,
-          orderNumber: liveData.orderNumber || `#WUP-${Date.now().toString().slice(-6)}`,
-          date: 'Just now',
-          status: liveData.status || 'PLACED',
-          itemCount: liveData.items?.length || orderItems.length,
-          items: orderItems,
-          subtotal: liveData.itemSubtotal || (isBlinkit ? blinkitCartTotal : cartSummary.subtotalSelling),
-          discount: liveData.discount ?? (isBlinkit ? Math.max(0, blinkitMrpTotal - blinkitCartTotal) : cartSummary.productDiscount),
-          couponDiscount: liveData.couponDiscount ?? (isBlinkit ? couponDiscount : 0),
-          shoppingCoinsUsed: liveData.coinsUsed ?? (isBlinkit ? appliedCoins : cartSummary.shoppingCoinDiscount),
-          coinsDiscount: liveData.coinsDiscount ?? (isBlinkit ? appliedCoins : cartSummary.shoppingCoinDiscount),
-          deliveryFee: liveData.deliveryFee ?? (typeof options?.deliveryFee === 'number' ? options.deliveryFee : (isBlinkit ? 39 : cartSummary.deliveryFee)),
-          handlingFee: liveData.handlingFee ?? (isBlinkit ? 5 : cartSummary.handlingFee),
-          tip: liveData.tip ?? (options?.tip || 0),
-          totalAmount: liveData.totalAmount || (isBlinkit ? Math.max(0, blinkitCartTotal + (typeof options?.deliveryFee === 'number' ? options.deliveryFee : 39) + 5 - couponDiscount - appliedCoins + (options?.tip || 0)) : cartSummary.totalPayable),
-          deliveryAddress: selectedAddress,
-          deliverySlot: 'Today, within 9 minutes',
-          paymentMethod,
-          estimatedArrival: '9 min',
-          deliveryOtp: liveData.deliveryOtp || '4821',
-          deliveryPartner: livePartner && livePartner.fullName ? {
-            name: livePartner.fullName || livePartner.name,
-            phone: livePartner.phoneNumber || livePartner.phone,
-            vehicleNumber: livePartner.vehicleNumber,
-          } : undefined,
-        };
+      if (anyRes && anyRes.success === false) {
+        throw new Error(anyRes.message || 'Delivery is currently not available in your area');
       }
-    } catch (err) {
+      const liveData = (anyRes?.success && anyRes?.data) ? anyRes.data : (anyRes?._id || anyRes?.orderNumber) ? anyRes : null;
+      if (!liveData) {
+        throw new Error(anyRes?.message || 'Failed to create order on server');
+      }
+
+      const livePartner = liveData.deliveryPartner || liveData.deliveryPartnerId;
+      liveOrder = {
+        id: liveData._id || liveData.id || `ord_${Date.now()}`,
+        _id: liveData._id,
+        orderNumber: liveData.orderNumber || `#WUP-${Date.now().toString().slice(-6)}`,
+        date: 'Just now',
+        status: liveData.status || 'PLACED',
+        itemCount: liveData.items?.length || orderItems.length,
+        items: orderItems,
+        subtotal: liveData.itemSubtotal || (isBlinkit ? blinkitCartTotal : cartSummary.subtotalSelling),
+        discount: liveData.discount ?? (isBlinkit ? Math.max(0, blinkitMrpTotal - blinkitCartTotal) : cartSummary.productDiscount),
+        couponDiscount: liveData.couponDiscount ?? (isBlinkit ? couponDiscount : 0),
+        shoppingCoinsUsed: liveData.coinsUsed ?? (isBlinkit ? appliedCoins : cartSummary.shoppingCoinDiscount),
+        coinsDiscount: liveData.coinsDiscount ?? (isBlinkit ? appliedCoins : cartSummary.shoppingCoinDiscount),
+        deliveryFee: liveData.deliveryFee ?? (typeof options?.deliveryFee === 'number' ? options.deliveryFee : (isBlinkit ? 39 : cartSummary.deliveryFee)),
+        handlingFee: liveData.handlingFee ?? (isBlinkit ? 5 : cartSummary.handlingFee),
+        tip: liveData.tip ?? (options?.tip || 0),
+        totalAmount: liveData.totalAmount || (isBlinkit ? Math.max(0, blinkitCartTotal + (typeof options?.deliveryFee === 'number' ? options.deliveryFee : 39) + 5 - couponDiscount - appliedCoins + (options?.tip || 0)) : cartSummary.totalPayable),
+        deliveryAddress: selectedAddress,
+        deliverySlot: 'Today, within 9 minutes',
+        paymentMethod,
+        estimatedArrival: '9 min',
+        deliveryOtp: liveData.deliveryOtp || '4821',
+        deliveryPartner: livePartner && livePartner.fullName ? {
+          name: livePartner.fullName || livePartner.name,
+          phone: livePartner.phoneNumber || livePartner.phone,
+          vehicleNumber: livePartner.vehicleNumber,
+        } : undefined,
+      };
+    } catch (err: any) {
       console.warn('Backend order creation error:', err);
+      // Rollback optimistic balances
+      if (options?.walletDeduction && options.walletDeduction > 0) {
+        setWalletBalance(initialWallet);
+      }
+      setUser((prev) => ({
+        ...prev,
+        shoppingCoins: initialCoins,
+      }));
+      throw err;
     }
 
-    const orderToSave: Order = liveOrder || {
-      id: `ord_${Date.now()}`,
-      orderNumber: `#W${Math.floor(10000000 + Math.random() * 90000000)}`,
-      date: 'Just now',
-      status: 'PLACED',
-      itemCount: activeCount,
-      items: isBlinkit
-        ? blinkitCartList.map((i) => ({
-            productId: i.product.id,
-            name: `${i.product.name} ${i.product.packSize || (i.product as any).quantityLabel || ''}`.trim(),
-            quantity: i.quantity,
-            price: i.product.sellingPrice,
-            image: (i.product as any).image,
-            imageUrl: (i.product as any).imageUrl,
-          }))
-        : cart.map((i) => ({
-            productId: i.product.id,
-            name: `${i.product.name} ${i.product.quantityLabel}`,
-            quantity: i.quantity,
-            price: i.product.sellingPrice,
-            image: i.product.image,
-            imageUrl: i.product.imageUrl,
-          })),
-      subtotal: isBlinkit ? blinkitCartTotal : cartSummary.subtotalSelling,
-      discount: isBlinkit ? Math.max(0, blinkitMrpTotal - blinkitCartTotal) : cartSummary.productDiscount,
-      couponDiscount: isBlinkit ? couponDiscount : 0,
-      shoppingCoinsUsed: isBlinkit ? appliedCoins : cartSummary.shoppingCoinDiscount,
-      coinsDiscount: isBlinkit ? appliedCoins : cartSummary.shoppingCoinDiscount,
-      deliveryFee: typeof options?.deliveryFee === 'number' ? options.deliveryFee : (isBlinkit ? 39 : cartSummary.deliveryFee),
-      handlingFee: isBlinkit ? 5 : cartSummary.handlingFee,
-      tip: options?.tip || 0,
-      totalAmount: isBlinkit
-        ? Math.max(0, blinkitCartTotal + (typeof options?.deliveryFee === 'number' ? options.deliveryFee : 39) + 5 - couponDiscount - appliedCoins + (options?.tip || 0))
-        : cartSummary.totalPayable,
-      deliveryAddress: selectedAddress,
-      deliverySlot: 'Today, within 9 minutes',
-      paymentMethod,
-      estimatedArrival: '9 min',
-      deliveryPartner: undefined,
-    };
+    if (!liveOrder) {
+      throw new Error('Order could not be verified by backend');
+    }
+
+    const orderToSave: Order = liveOrder;
 
     setOrders((prev) => {
       const updated = [orderToSave, ...prev.filter((o) => o.id !== orderToSave.id && o.orderNumber !== orderToSave.orderNumber)];
@@ -2011,34 +2161,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // --- Blinkit Cart Operations ---
   const blinkitCartList = Object.values(blinkitCart).filter((e) => e.quantity > 0);
   const blinkitCartCount = blinkitCartList.reduce((sum, item) => sum + item.quantity, 0);
-  const isThaltejArea = (currentAreaName || '').toLowerCase().includes('thaltej');
-  const isChandlodiyaArea =
-    (currentAreaName || '').toLowerCase().includes('chandlodiya') ||
-    (currentAreaName || '').toLowerCase().includes('tragad');
-
   const blinkitCartTotal = blinkitCartList.reduce((sum, item) => {
-    let price = item.product.sellingPrice;
-    if (
-      item.product.name.toLowerCase().includes('tomato') &&
-      (!item.product.packSize || item.product.packSize === '250 g')
-    ) {
-      if (isThaltejArea) {
-        price = 12;
-      } else if (isChandlodiyaArea) {
-        price = 7;
-      }
-    }
+    const price = typeof item.product.sellingPrice === 'number' ? item.product.sellingPrice : 0;
     return sum + price * item.quantity;
   }, 0);
 
   const blinkitMrpTotal = blinkitCartList.reduce((sum, item) => {
-    let mrp = item.product.mrp;
-    if (
-      item.product.name.toLowerCase().includes('tomato') &&
-      (!item.product.packSize || item.product.packSize === '250 g')
-    ) {
-      mrp = 15;
-    }
+    const mrp = typeof item.product.mrp === 'number' ? item.product.mrp : (typeof item.product.sellingPrice === 'number' ? item.product.sellingPrice : 0);
     return sum + mrp * item.quantity;
   }, 0);
 
@@ -2081,24 +2210,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       (product.variants && product.variants.find((v) => v.isDefault)?.id);
     const cartKey = resolvedVariantId ? `${product.id}_${resolvedVariantId}` : product.id;
 
-    const isTomato = (product.name || '').toLowerCase().includes('tomato');
-    const isThaltej = (currentAreaName || '').toLowerCase().includes('thaltej');
-    const isChandlodiya =
-      (currentAreaName || '').toLowerCase().includes('chandlodiya') ||
-      (currentAreaName || '').toLowerCase().includes('tragad');
-
-    const effectiveProd: BlinkitProduct =
-      isTomato && (!product.packSize || product.packSize === '250 g')
-        ? {
-            ...product,
-            sellingPrice: isThaltej ? 12 : (isChandlodiya ? 7 : product.sellingPrice),
-            mrp: 15,
-            selectedVariantId: resolvedVariantId,
-          }
-        : {
-            ...product,
-            selectedVariantId: resolvedVariantId,
-          };
+    const effectiveProd: BlinkitProduct = {
+      ...product,
+      selectedVariantId: resolvedVariantId,
+    };
 
     // 1. Update blinkitCart
     setBlinkitCart((prev) => {
@@ -2176,8 +2291,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return next;
     });
 
-    // 3. Fire-and-forget sync to backend API with variantId
-    CartService.updateQuantityOnServer(product.id, delta, resolvedVariantId).catch(() => {});
+    // 3. Fire-and-forget sync to backend API with variantId and areaId
+    CartService.updateQuantityOnServer(
+      product.id,
+      delta,
+      resolvedVariantId,
+      currentAreaId || undefined,
+      currentStoreId || undefined
+    ).catch(() => {});
   };
 
   const clearBlinkitCart = () => {
@@ -2223,116 +2344,140 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAppliedCoupon(null);
   };
 
-  return (
-    <AppContext.Provider
-      value={{
-        activeScreen,
-        setActiveScreen: navigateTo,
-        goBack,
-        canGoBack,
-        user,
-        setUser,
-        selectedAddress,
-        selectedAddressId,
-        selectedAddressSource,
-        setSelectedAddress,
-        setActiveDeliveryAddress,
-        setActiveGpsLocation,
-        addAddress,
-        cart,
-        cartCount,
-        addToCart,
-        removeFromCart,
-        updateQuantity,
-        clearCart,
-        cartSummary,
-        appliedCoins,
-        setAppliedCoins,
-        orders,
-        currentOrder,
-        setCurrentOrder,
-        placeOrder,
-        selectedProduct,
-        setSelectedProduct,
-        selectedCategoryId,
-        setSelectedCategoryId,
-        selectedCategoryIds,
-        setSelectedCategoryIds,
-        selectedCategoryName,
-        setSelectedCategoryName,
-        navigateToProductListing,
-        searchQuery,
-        setSearchQuery,
-        isVoiceSearchActive,
-        setIsVoiceSearchActive,
-        filters,
-        setFilters,
-        resetFilters,
-        isJumperVisible,
-        setJumperVisible,
+  // Memoised context value — prevents every useApp() consumer from re-rendering
+  // when an unrelated piece of AppProvider state changes.
+  const contextValue = useMemo(() => ({
+    activeScreen,
+    setActiveScreen: navigateTo,
+    goBack,
+    canGoBack,
+    user,
+    setUser,
+    selectedAddress,
+    selectedAddressId,
+    selectedAddressSource,
+    setSelectedAddress,
+    setActiveDeliveryAddress,
+    setActiveGpsLocation,
+    addAddress,
+    cart,
+    cartCount,
+    addToCart,
+    removeFromCart,
+    updateQuantity,
+    clearCart,
+    cartSummary,
+    appliedCoins,
+    setAppliedCoins,
+    orders,
+    currentOrder,
+    setCurrentOrder,
+    placeOrder,
+    selectedProduct,
+    setSelectedProduct,
+    selectedCategoryId,
+    setSelectedCategoryId,
+    selectedCategoryIds,
+    setSelectedCategoryIds,
+    selectedCategoryName,
+    setSelectedCategoryName,
+    navigateToProductListing,
+    searchQuery,
+    setSearchQuery,
+    isVoiceSearchActive,
+    setIsVoiceSearchActive,
+    filters,
+    setFilters,
+    resetFilters,
+    isJumperVisible,
+    setJumperVisible,
+    // Blinkit extensions
+    walletBalance,
+    addWalletBalance,
+    hideSensitiveItems,
+    setHideSensitiveItems,
+    appearance,
+    setAppearance,
+    deliveryLocation,
+    setDeliveryLocation,
+    isLocationModalVisible,
+    setLocationModalVisible,
+    isDistrictModalVisible,
+    setDistrictModalVisible,
+    blinkitCart,
+    blinkitCartList,
+    blinkitCartCount,
+    blinkitCartTotal,
+    blinkitMrpTotal,
+    updateBlinkitQty,
+    getBlinkitQty,
+    clearBlinkitCart,
+    appliedCoupon,
+    couponDiscount,
+    applyCoupon,
+    removeCoupon,
+    selectedBlinkitProduct,
+    setSelectedBlinkitProduct,
+    wishlist,
+    toggleWishlist,
+    isInWishlist,
+    clearWishlist,
+    currentAreaId,
+    currentAreaName,
+    currentCityName,
+    setCurrentCityName,
+    currentCityId,
+    setCurrentCityId,
+    currentStoreId,
+    currentStoreName,
+    isServiceable,
+    setIsServiceable,
+    deliveryEtaMinutes,
+    setDeliveryEtaMinutes,
+    setCurrentArea,
+    setCurrentStore,
+    catalogVersion,
+    authVerificationId,
+    setAuthVerificationId,
+    tempRegistration,
+    setTempRegistration,
+    isAuthenticated,
+    handleOnboardingSkip,
+    logout,
+    liveCheckoutState,
+    emitCheckoutChange,
+    isAuthPromptVisible,
+    authPromptMessage,
+    authPromptActionName,
+    openAuthPrompt,
+    closeAuthPrompt,
+    requestLocationPermissionAndDetect,
+  }), [
+    activeScreen, navigateTo, goBack, canGoBack,
+    user, selectedAddress, selectedAddressId, selectedAddressSource,
+    setSelectedAddress, setActiveDeliveryAddress, setActiveGpsLocation, addAddress,
+    cart, cartCount, addToCart, removeFromCart, updateQuantity, clearCart, cartSummary,
+    appliedCoins, orders, currentOrder, placeOrder,
+    selectedProduct, selectedCategoryId, selectedCategoryIds, selectedCategoryName,
+    navigateToProductListing, searchQuery, isVoiceSearchActive, filters, isJumperVisible,
+    walletBalance, addWalletBalance, hideSensitiveItems, appearance,
+    deliveryLocation, isLocationModalVisible, isDistrictModalVisible,
+    blinkitCart, blinkitCartList, blinkitCartCount, blinkitCartTotal, blinkitMrpTotal,
+    updateBlinkitQty, getBlinkitQty, clearBlinkitCart,
+    appliedCoupon, couponDiscount, applyCoupon, removeCoupon,
+    selectedBlinkitProduct, wishlist, toggleWishlist, isInWishlist, clearWishlist,
+    currentAreaId, currentAreaName, currentCityName, currentCityId,
+    currentStoreId, currentStoreName, isServiceable, deliveryEtaMinutes,
+    setCurrentArea, setCurrentStore, catalogVersion,
+    authVerificationId, tempRegistration, isAuthenticated,
+    handleOnboardingSkip, logout,
+    liveCheckoutState, emitCheckoutChange,
+    isAuthPromptVisible, authPromptMessage, authPromptActionName,
+    openAuthPrompt, closeAuthPrompt, requestLocationPermissionAndDetect,
+  ]);
 
-        // Blinkit extensions
-        walletBalance,
-        addWalletBalance,
-        hideSensitiveItems,
-        setHideSensitiveItems,
-        appearance,
-        setAppearance,
-        deliveryLocation,
-        setDeliveryLocation,
-        isLocationModalVisible,
-        setLocationModalVisible,
-        isDistrictModalVisible,
-        setDistrictModalVisible,
-        blinkitCart,
-        blinkitCartList,
-        blinkitCartCount,
-        blinkitCartTotal,
-        blinkitMrpTotal,
-        updateBlinkitQty,
-        getBlinkitQty,
-        clearBlinkitCart,
-        appliedCoupon,
-        couponDiscount,
-        applyCoupon,
-        removeCoupon,
-        selectedBlinkitProduct,
-        setSelectedBlinkitProduct,
-         wishlist,
-        toggleWishlist,
-        isInWishlist,
-        clearWishlist,
-        currentAreaId,
-        currentAreaName,
-        currentCityName,
-        setCurrentCityName,
-        currentCityId,
-        setCurrentCityId,
-        currentStoreId,
-        currentStoreName,
-        isServiceable,
-        setIsServiceable,
-        deliveryEtaMinutes,
-        setDeliveryEtaMinutes,
-        setCurrentArea,
-        setCurrentStore,
-        authVerificationId,
-        setAuthVerificationId,
-        tempRegistration,
-        setTempRegistration,
-        isAuthenticated,
-        handleOnboardingSkip,
-        logout,
-        liveCheckoutState,
-        emitCheckoutChange,
-        isAuthPromptVisible,
-        authPromptMessage,
-        authPromptActionName,
-        openAuthPrompt,
-        closeAuthPrompt,
-        requestLocationPermissionAndDetect,
-      }}
-    >
+  return (
+    <AppContext.Provider value={contextValue}>
       {children}
     </AppContext.Provider>
   );

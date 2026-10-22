@@ -52,15 +52,20 @@ export const LocationManagementScreen: React.FC = () => {
     deleteAreaSafe,
     refreshFromDb,
     setActiveTab,
+    locationSubTab,
+    setLocationSubTab,
   } = useAdminState();
 
-  // Active Main Tab: 'Cities' or 'Areas'
-  const [activeSubTab, setActiveSubTab] = useState<'Cities' | 'Areas'>('Cities');
+  // Active Main Tab: 'Cities' | 'Areas' | 'Pincodes'
+  const activeSubTab = locationSubTab || 'Cities';
+  const setActiveSubTab = setLocationSubTab;
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCityFilter, setSelectedCityFilter] = useState<string>('All');
   const [storeStatusFilter, setStoreStatusFilter] = useState<'All' | 'Assigned' | 'Available'>('All');
+  const [pincodeStatusFilter, setPincodeStatusFilter] = useState<'All' | 'Active' | 'Inactive'>('All');
+  const [togglingAreaId, setTogglingAreaId] = useState<string | null>(null);
 
   // City Modal State
   const [showCityModal, setShowCityModal] = useState(false);
@@ -167,6 +172,93 @@ export const LocationManagementScreen: React.FC = () => {
       return true;
     });
   }, [zones, selectedCityFilter, storeStatusFilter, searchQuery, darkStores]);
+
+  // Complete GeoJSON Database Pincodes List
+  const geojsonPincodes = useMemo(() => {
+    const list: Array<{
+      pincode: string;
+      areaId: string;
+      areaName: string;
+      areaCode?: string;
+      cityName: string;
+      cityId?: string;
+      isActive: boolean;
+      polygonCoordsCount: number;
+      assignedStoreName: string;
+      slaMinutes: number;
+      centerLat?: number;
+      centerLng?: number;
+      allPins: string[];
+    }> = [];
+
+    zones.forEach((z) => {
+      const city = cities.find((c) => c.id === z.cityId || (c as any)._id === z.cityId);
+      const cityName = z.cityName || city?.name || (z as any).city || 'Ahmedabad';
+      const store = darkStores.find((s: any) => s.areaId === z.id || s.id === (z as any).hubStoreId);
+      const storeName = store?.name || (z.hasActiveStore ? 'Assigned Dark Store' : 'No Store Assigned');
+      const polygonCoords = z.polygon?.coordinates?.[0]?.length || (z as any).geometry?.coordinates?.[0]?.length || 0;
+      const pins = Array.isArray(z.pincodes) && z.pincodes.length > 0
+        ? z.pincodes
+        : ((z as any).pincode ? [(z as any).pincode] : []);
+
+      pins.forEach((pin) => {
+        list.push({
+          pincode: pin,
+          areaId: z.id || (z as any)._id,
+          areaName: z.name,
+          areaCode: z.code,
+          cityName,
+          cityId: z.cityId || undefined,
+          isActive: z.isActive !== false,
+          polygonCoordsCount: polygonCoords,
+          assignedStoreName: storeName,
+          slaMinutes: Number(z.slaMinutes) || 9,
+          centerLat: z.centerLat,
+          centerLng: z.centerLng,
+          allPins: pins,
+        });
+      });
+    });
+
+    return list;
+  }, [zones, cities, darkStores]);
+
+  // Filtered GeoJSON Pincodes
+  const filteredPincodes = useMemo(() => {
+    return geojsonPincodes.filter((item) => {
+      if (pincodeStatusFilter === 'Active' && !item.isActive) return false;
+      if (pincodeStatusFilter === 'Inactive' && item.isActive) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const pinMatch = item.pincode.toLowerCase().includes(q);
+        const areaMatch = item.areaName.toLowerCase().includes(q);
+        const cityMatch = item.cityName.toLowerCase().includes(q);
+        if (!pinMatch && !areaMatch && !cityMatch) return false;
+      }
+      return true;
+    });
+  }, [geojsonPincodes, pincodeStatusFilter, searchQuery]);
+
+  // Toggle Pincode / Area Status by Admin (Active vs Inactive)
+  const handleToggleAreaStatus = async (areaId: string, setActive: boolean) => {
+    setTogglingAreaId(areaId);
+    try {
+      const res = await ApiService.updateArea(areaId, { isActive: setActive });
+      if (res && res.success !== false) {
+        Alert.alert(
+          'Serviceability Updated',
+          `Area & Pincodes marked as ${setActive ? 'ACTIVE (Serviceable)' : 'INACTIVE (Unserviceable)'} successfully.`
+        );
+        refreshFromDb();
+      } else {
+        Alert.alert('Update Failed', res?.error || 'Failed to update serviceability.');
+      }
+    } catch (err: any) {
+      Alert.alert('Network Error', err.message || 'Error updating area serviceability.');
+    } finally {
+      setTogglingAreaId(null);
+    }
+  };
 
   // Handle Open Create City
   const handleOpenCreateCity = () => {
@@ -580,25 +672,46 @@ export const LocationManagementScreen: React.FC = () => {
               Areas & Store Allocations ({zones.length})
             </Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.tabNavBtn, activeSubTab === 'Pincodes' && styles.tabNavBtnActive]}
+            onPress={() => setActiveSubTab('Pincodes')}
+            activeOpacity={0.8}
+          >
+            <Layers
+              size={15}
+              color={activeSubTab === 'Pincodes' ? COLORS.white : COLORS.textMuted}
+            />
+            <Text
+              style={[
+                styles.tabNavText,
+                activeSubTab === 'Pincodes' && styles.tabNavTextActive,
+              ]}
+            >
+              GeoJSON Pincodes & Serviceability ({geojsonPincodes.length})
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        <TouchableOpacity
-          style={styles.actionAddBtn}
-          onPress={activeSubTab === 'Cities' ? handleOpenCreateCity : handleOpenCreateArea}
-          activeOpacity={0.85}
-        >
-          <LinearGradient
-            colors={GRADIENTS.primary}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.actionAddBtnGradient}
+        {activeSubTab !== 'Pincodes' && (
+          <TouchableOpacity
+            style={styles.actionAddBtn}
+            onPress={activeSubTab === 'Cities' ? handleOpenCreateCity : handleOpenCreateArea}
+            activeOpacity={0.85}
           >
-            <Plus size={15} color={COLORS.white} />
-            <Text style={styles.actionAddBtnText}>
-              {activeSubTab === 'Cities' ? 'Add City' : 'Add Area'}
-            </Text>
-          </LinearGradient>
-        </TouchableOpacity>
+            <LinearGradient
+              colors={GRADIENTS.primary}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.actionAddBtnGradient}
+            >
+              <Plus size={15} color={COLORS.white} />
+              <Text style={styles.actionAddBtnText}>
+                {activeSubTab === 'Cities' ? 'Add City' : 'Add Area'}
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* 3. Search & Filter Bar */}
@@ -610,6 +723,8 @@ export const LocationManagementScreen: React.FC = () => {
             placeholder={
               activeSubTab === 'Cities'
                 ? 'Search cities by name, code, or state...'
+                : activeSubTab === 'Pincodes'
+                ? 'Search by 6-digit pincode, area, or city...'
                 : 'Search areas by name, code, pincode, or store...'
             }
             placeholderTextColor={COLORS.textMuted}
@@ -622,6 +737,31 @@ export const LocationManagementScreen: React.FC = () => {
             </TouchableOpacity>
           ) : null}
         </View>
+
+        {activeSubTab === 'Pincodes' && (
+          <View style={[styles.filterGroup, { marginTop: 8 }]}>
+            <Text style={styles.filterLabel}>Serviceability Status:</Text>
+            {(['All', 'Active', 'Inactive'] as const).map((st) => (
+              <TouchableOpacity
+                key={st}
+                style={[
+                  styles.filterChip,
+                  pincodeStatusFilter === st && styles.filterChipActive,
+                ]}
+                onPress={() => setPincodeStatusFilter(st)}
+              >
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    pincodeStatusFilter === st && styles.filterChipTextActive,
+                  ]}
+                >
+                  {st} ({st === 'All' ? geojsonPincodes.length : st === 'Active' ? geojsonPincodes.filter((p) => p.isActive).length : geojsonPincodes.filter((p) => !p.isActive).length})
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         {activeSubTab === 'Areas' && (
           <ScrollView
@@ -1074,6 +1214,192 @@ export const LocationManagementScreen: React.FC = () => {
                     </View>
                   );
                 })}
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* ================= VIEW: PINCODES TABLE ================= */}
+        {activeSubTab === 'Pincodes' && (
+          <View>
+            <View style={styles.sectionHeadingRow}>
+              <View>
+                <Text style={styles.sectionHeading}>
+                  GeoJSON Pincodes & Serviceability Master ({filteredPincodes.length})
+                </Text>
+                <Text style={styles.sectionSub}>
+                  All database pincodes extracted from verified Admin GeoJSON boundaries. Control customer app ordering eligibility per area.
+                </Text>
+              </View>
+            </View>
+
+            {/* Quick Helper Notice */}
+            <View style={styles.pincodeInfoNotice}>
+              <ShieldCheck size={16} color={COLORS.navy} />
+              <Text style={styles.pincodeInfoNoticeText}>
+                <Text style={{ fontWeight: '800' }}>Admin Serviceability Rules: </Text>
+                Each pincode is tied to its GeoJSON Polygon Area. Clicking <Text style={{ color: COLORS.success, fontWeight: '800' }}>Active</Text> allows customer app auto-detection & instant checkout. Clicking <Text style={{ color: COLORS.error, fontWeight: '800' }}>Inactive</Text> immediately displays &quot;Sorry, WormUp is not serviceable in your area&quot; and disables ordering.
+              </Text>
+            </View>
+
+            {filteredPincodes.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Layers size={40} color={COLORS.textMuted} />
+                <Text style={styles.emptyTitle}>No Pincodes Found</Text>
+                <Text style={styles.emptySub}>
+                  Try adjusting your search query or filter by status above.
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.pincodeTableCard}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+                  <View style={styles.pincodeTableWrapper}>
+                    {/* Table Header */}
+                    <View style={styles.pincodeTableHeader}>
+                      <Text style={[styles.pincodeTh, { width: 110 }]}>PINCODE</Text>
+                      <Text style={[styles.pincodeTh, { width: 170 }]}>AREA / ZONE</Text>
+                      <Text style={[styles.pincodeTh, { width: 120 }]}>CITY</Text>
+                      <Text style={[styles.pincodeTh, { width: 160 }]}>GEOJSON POLYGON</Text>
+                      <Text style={[styles.pincodeTh, { width: 220 }]}>ACTIVE DARK STORE</Text>
+                      <Text style={[styles.pincodeTh, { width: 110, textAlign: 'center' }]}>STATUS</Text>
+                      <Text style={[styles.pincodeTh, { width: 210, textAlign: 'center' }]}>ADMIN ACTION</Text>
+                    </View>
+
+                    {/* Table Rows */}
+                    {filteredPincodes.map((item, index) => {
+                      const isToggling = togglingAreaId === item.areaId;
+                      return (
+                        <View
+                          key={`${item.areaId}-${item.pincode}-${index}`}
+                          style={[
+                            styles.pincodeTableRow,
+                            index % 2 === 1 && styles.pincodeTableRowAlt,
+                          ]}
+                        >
+                          {/* 1. Pincode */}
+                          <View style={[styles.pincodeTd, { width: 110, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
+                            <Layers size={14} color={COLORS.purple} />
+                            <Text style={styles.pincodeCodeText}>{item.pincode}</Text>
+                          </View>
+
+                          {/* 2. Area */}
+                          <View style={[styles.pincodeTd, { width: 170 }]}>
+                            <Text style={styles.pincodeAreaNameText} numberOfLines={1}>
+                              {item.areaName}
+                            </Text>
+                            {item.areaCode ? (
+                              <Text style={styles.pincodeAreaCodeText}>Code: {item.areaCode}</Text>
+                            ) : null}
+                          </View>
+
+                          {/* 3. City */}
+                          <View style={[styles.pincodeTd, { width: 120, flexDirection: 'row', alignItems: 'center', gap: 5 }]}>
+                            <Building2 size={13} color={COLORS.textMuted} />
+                            <Text style={styles.pincodeCityText}>{item.cityName}</Text>
+                          </View>
+
+                          {/* 4. GeoJSON Polygon */}
+                          <View style={[styles.pincodeTd, { width: 160 }]}>
+                            <View style={styles.pincodePolygonBadge}>
+                              <CheckCircle2 size={11} color={COLORS.success} />
+                              <Text style={styles.pincodePolygonText}>
+                                {item.polygonCoordsCount > 0
+                                  ? `${item.polygonCoordsCount} Vertices GeoJSON`
+                                  : 'Center Lat/Lng Radius'}
+                              </Text>
+                            </View>
+                          </View>
+
+                          {/* 5. Dark Store */}
+                          <View style={[styles.pincodeTd, { width: 220, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
+                            <Store size={14} color={COLORS.navy} />
+                            <Text style={styles.pincodeStoreText} numberOfLines={1}>
+                              {item.assignedStoreName}
+                            </Text>
+                          </View>
+
+                          {/* 6. Current Status Badge */}
+                          <View style={[styles.pincodeTd, { width: 110, alignItems: 'center', justifyContent: 'center' }]}>
+                            <View
+                              style={[
+                                styles.statusBadge,
+                                item.isActive ? styles.statusBadgeActive : styles.statusBadgeInactive,
+                              ]}
+                            >
+                              <View
+                                style={[
+                                  styles.statusDot,
+                                  item.isActive ? styles.statusDotActive : styles.statusDotInactive,
+                                ]}
+                              />
+                              <Text
+                                style={[
+                                  styles.statusBadgeText,
+                                  item.isActive
+                                    ? styles.statusBadgeTextActive
+                                    : styles.statusBadgeTextInactive,
+                                ]}
+                              >
+                                {item.isActive ? 'Active' : 'Inactive'}
+                              </Text>
+                            </View>
+                          </View>
+
+                          {/* 7. Admin 2-Option Buttons: Active vs Inactive */}
+                          <View style={[styles.pincodeTd, { width: 210, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }]}>
+                            {isToggling ? (
+                              <ActivityIndicator size="small" color={COLORS.navy} />
+                            ) : (
+                              <>
+                                <TouchableOpacity
+                                  style={[
+                                    styles.adminPincodeBtn,
+                                    styles.adminPincodeBtnActive,
+                                    item.isActive && styles.adminPincodeBtnActiveSelected,
+                                  ]}
+                                  onPress={() => handleToggleAreaStatus(item.areaId, true)}
+                                  activeOpacity={0.8}
+                                >
+                                  {item.isActive && <Check size={12} color={COLORS.white} />}
+                                  <Text
+                                    style={[
+                                      styles.adminPincodeBtnText,
+                                      styles.adminPincodeBtnTextActive,
+                                      item.isActive && styles.adminPincodeBtnTextActiveSelected,
+                                    ]}
+                                  >
+                                    Active
+                                  </Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                  style={[
+                                    styles.adminPincodeBtn,
+                                    styles.adminPincodeBtnInactive,
+                                    !item.isActive && styles.adminPincodeBtnInactiveSelected,
+                                  ]}
+                                  onPress={() => handleToggleAreaStatus(item.areaId, false)}
+                                  activeOpacity={0.8}
+                                >
+                                  {!item.isActive && <X size={12} color={COLORS.white} />}
+                                  <Text
+                                    style={[
+                                      styles.adminPincodeBtnText,
+                                      styles.adminPincodeBtnTextInactive,
+                                      !item.isActive && styles.adminPincodeBtnTextInactiveSelected,
+                                    ]}
+                                  >
+                                    Inactive
+                                  </Text>
+                                </TouchableOpacity>
+                              </>
+                            )}
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
               </View>
             )}
           </View>
@@ -2459,6 +2785,155 @@ const styles = StyleSheet.create({
   submitBtnText: {
     fontSize: 12,
     fontWeight: '700',
+    color: COLORS.white,
+  },
+
+  /* Pincodes Master Table Styles */
+  pincodeInfoNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    borderRadius: RADIUS.card,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 16,
+    gap: 10,
+  },
+  pincodeInfoNoticeText: {
+    fontSize: 12,
+    color: '#312E81',
+    flex: 1,
+    lineHeight: 18,
+  },
+  pincodeTableCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+    marginBottom: 40,
+  },
+  pincodeTableWrapper: {
+    minWidth: 1100,
+  },
+  pincodeTableHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#F8FAFC',
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  pincodeTh: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: COLORS.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  pincodeTableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  pincodeTableRowAlt: {
+    backgroundColor: '#FBFBFC',
+  },
+  pincodeTd: {
+    justifyContent: 'center',
+  },
+  pincodeCodeText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+    letterSpacing: 0.5,
+  },
+  pincodeAreaNameText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  pincodeAreaCodeText: {
+    fontSize: 10,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+  pincodeCityText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  pincodePolygonBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: RADIUS.pill,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  pincodePolygonText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#065F46',
+  },
+  pincodeStoreText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.navy,
+  },
+  adminPincodeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
+  },
+  adminPincodeBtnActive: {
+    borderColor: '#10B981',
+    backgroundColor: '#F0FDF4',
+  },
+  adminPincodeBtnActiveSelected: {
+    backgroundColor: '#10B981',
+    borderColor: '#059669',
+  },
+  adminPincodeBtnInactive: {
+    borderColor: '#EF4444',
+    backgroundColor: '#FEF2F2',
+  },
+  adminPincodeBtnInactiveSelected: {
+    backgroundColor: '#EF4444',
+    borderColor: '#DC2626',
+  },
+  adminPincodeBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  adminPincodeBtnTextActive: {
+    color: '#059669',
+  },
+  adminPincodeBtnTextActiveSelected: {
+    color: COLORS.white,
+  },
+  adminPincodeBtnTextInactive: {
+    color: '#DC2626',
+  },
+  adminPincodeBtnTextInactiveSelected: {
     color: COLORS.white,
   },
 });

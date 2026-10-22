@@ -18,10 +18,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../theme/colors';
 import { SPACING, RADIUS } from '../theme/spacing';
 import { GradientButton } from '../components/common/GradientButton';
+import { FileUploadField } from '../components/common/FileUploadField';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { AuthService } from '../services/authService';
 import { StorageService } from '../services/storageService';
+import { LocationService } from '../services/locationService';
 
 interface CityItem {
   id: string;
@@ -47,7 +49,17 @@ export const S08_CreateAccountScreen: React.FC = () => {
   const [fullName, setFullName] = useState(user.fullName || '');
   const [email, setEmail] = useState(user.email || '');
   const [phone, setPhone] = useState(user.phoneNumber || '');
-  const [pincode, setPincode] = useState(user.registrationPincode || '');
+  const [pincode, setPincode] = useState(user.registrationPincode || '382481');
+
+  // Optional Aadhaar KYC Fields (Must remain optional and never block registration)
+  const [aadhaarNumber, setAadhaarNumber] = useState(user.aadhaarNumber || '');
+  const [aadhaarFrontUrl, setAadhaarFrontUrl] = useState(
+    user.customer_image_aadhar_front || (user as any).aadharFrontImage || ''
+  );
+  const [aadhaarBackUrl, setAadhaarBackUrl] = useState(
+    user.customer_image_aadhar_back || (user as any).aadharBackImage || ''
+  );
+  const [showAadhaarSection, setShowAadhaarSection] = useState(false);
 
   // Sponsor ID State (Optional with live validation)
   const [sponsorCode, setSponsorCode] = useState(user.sponsorCode || tempRegistration?.sponsorCode || '');
@@ -63,8 +75,8 @@ export const S08_CreateAccountScreen: React.FC = () => {
 
   // Pincode Serviceability State
   const [pincodeChecking, setPincodeChecking] = useState(false);
-  const [pincodeServiceable, setPincodeServiceable] = useState<boolean | null>(null);
-  const [pincodeStatusText, setPincodeStatusText] = useState('');
+  const [pincodeServiceable, setPincodeServiceable] = useState<boolean | null>(true);
+  const [pincodeStatusText, setPincodeStatusText] = useState('✓ Serviceable (Auto-detected)');
 
   // Service City State
   const [cities, setCities] = useState<CityItem[]>([]);
@@ -94,11 +106,47 @@ export const S08_CreateAccountScreen: React.FC = () => {
       }
     });
 
+    // Auto-detect GPS location to strictly populate and lock City & Pincode
+    (async () => {
+      setPincodeChecking(true);
+      try {
+        const loc = await LocationService.getCurrentLocation();
+        if (loc) {
+          const area = await LocationService.resolveArea(loc.latitude, loc.longitude, true);
+          if (area && area.success && area.serviceable) {
+            const detectedPin = area.pincode || (area.pincodes && area.pincodes[0]) || loc.pincode || '382481';
+            const detectedCity = area.cityName || area.city || 'Ahmedabad';
+            setPincode(detectedPin);
+            setSelectedCityName(detectedCity);
+            if (area.cityId) setSelectedCityId(area.cityId);
+            setPincodeServiceable(true);
+            setPincodeStatusText(`✓ Serviceable: ${area.areaName || ''} (${detectedCity})`);
+          } else {
+            setPincodeServiceable(false);
+            setPincodeStatusText('Sorry, WormUp is not serviceable in your area.');
+          }
+        } else {
+          // Default fallback verification
+          const fallbackArea = await LocationService.resolveArea(23.1288, 72.5507, true);
+          if (fallbackArea && fallbackArea.serviceable) {
+            setPincode(fallbackArea.pincode || '382481');
+            setSelectedCityName(fallbackArea.cityName || fallbackArea.city || 'Ahmedabad');
+            if (fallbackArea.cityId) setSelectedCityId(fallbackArea.cityId);
+            setPincodeServiceable(true);
+            setPincodeStatusText(`✓ Serviceable: ${fallbackArea.areaName || 'Chandlodiya - Tragad'}`);
+          }
+        }
+      } catch (err) {
+        console.warn('GPS location auto-detect failed:', err);
+      } finally {
+        setPincodeChecking(false);
+      }
+    })();
+
     // Fetch active cities configured by Admin
     AuthService.getCities().then((fetchedCities) => {
       if (fetchedCities && fetchedCities.length > 0) {
         setCities(fetchedCities);
-        // If not yet selected or preferred city matches
         const existing = fetchedCities.find(
           (c) => c.name.toLowerCase() === selectedCityName.toLowerCase() || c.id === selectedCityId
         );
@@ -106,7 +154,6 @@ export const S08_CreateAccountScreen: React.FC = () => {
           setSelectedCityId(existing.id);
           setSelectedCityName(existing.name);
         } else {
-          // Default to first active city
           setSelectedCityId(fetchedCities[0].id);
           setSelectedCityName(fetchedCities[0].name);
         }
@@ -221,6 +268,7 @@ export const S08_CreateAccountScreen: React.FC = () => {
     }
 
     const finalSponsor = cleanSponsor || 'WORMUP001';
+    const cleanAadhaar = aadhaarNumber.replace(/\D/g, '').trim();
 
     setUser({
       ...user,
@@ -237,7 +285,14 @@ export const S08_CreateAccountScreen: React.FC = () => {
       sponsorCode: finalSponsor,
       isCompanySponsored: !cleanSponsor,
       shoppingCoins: user.shoppingCoins || 2000,
-      verificationStatus: user.verificationStatus || 'NON_VERIFIED',
+      verificationStatus: cleanAadhaar ? 'PENDING' : (user.verificationStatus || 'NON_VERIFIED'),
+      customerKycStatus: cleanAadhaar ? 1 : (user.customerKycStatus || 0),
+      aadhaarNumber: cleanAadhaar || user.aadhaarNumber,
+      aadharNumber: cleanAadhaar || (user as any).aadharNumber,
+      customer_image_aadhar_front: aadhaarFrontUrl || user.customer_image_aadhar_front,
+      customer_image_aadhar_back: aadhaarBackUrl || user.customer_image_aadhar_back,
+      aadharFrontImage: aadhaarFrontUrl || (user as any).aadharFrontImage,
+      aadharBackImage: aadhaarBackUrl || (user as any).aadharBackImage,
     });
 
     setTempRegistration({
@@ -269,6 +324,9 @@ export const S08_CreateAccountScreen: React.FC = () => {
           selectedCityName,
           fullName.trim(),
           finalSponsor,
+          cleanAadhaar || undefined,
+          aadhaarFrontUrl || undefined,
+          aadhaarBackUrl || undefined,
         );
         setIsSubmitting(false);
         if (res.success && res.user) {
@@ -289,7 +347,14 @@ export const S08_CreateAccountScreen: React.FC = () => {
             pendingIncome: res.user.pendingIncome ?? 0,
             availableIncome: res.user.availableIncome ?? 0,
             appDownloadIncome: res.user.appDownloadIncome ?? 0,
-            verificationStatus: res.user.verificationStatus || 'NON_VERIFIED',
+            verificationStatus: res.user.verificationStatus || (cleanAadhaar ? 'PENDING' : 'NON_VERIFIED'),
+            customerKycStatus: res.user.customerKycStatus || (cleanAadhaar ? 1 : 0),
+            aadhaarNumber: cleanAadhaar || res.user.aadhaarNumber,
+            aadharNumber: cleanAadhaar || res.user.aadharNumber,
+            customer_image_aadhar_front: aadhaarFrontUrl || res.user.customer_image_aadhar_front,
+            customer_image_aadhar_back: aadhaarBackUrl || res.user.customer_image_aadhar_back,
+            aadharFrontImage: aadhaarFrontUrl || res.user.aadharFrontImage,
+            aadharBackImage: aadhaarBackUrl || res.user.aadharBackImage,
             aadhaarVerified: res.user.aadhaarVerified || false,
           };
           setUser(updatedUser);
@@ -549,18 +614,24 @@ export const S08_CreateAccountScreen: React.FC = () => {
             </Text>
           )}
 
-          {/* Delivery Pincode Input with live service check */}
+          {/* Delivery Pincode Input (Non-editable, Auto-detected from GPS) */}
           <View style={styles.labelRow}>
             <Text style={styles.label}>
               Delivery Pincode <Text style={styles.requiredAsterisk}>*</Text>
             </Text>
-            {pincodeChecking && (
-              <Text style={styles.pincodeCheckingText}>Checking area...</Text>
+            {pincodeChecking ? (
+              <Text style={styles.pincodeCheckingText}>Detecting location...</Text>
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Ionicons name="lock-closed" size={12} color="#64748B" />
+                <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '600' }}>Auto-detected</Text>
+              </View>
             )}
           </View>
           <View
             style={[
               styles.inputContainer,
+              { backgroundColor: '#F8FAFC', borderColor: pincodeServiceable === false ? COLORS.error : '#E2E8F0' },
               errors.pincode ? styles.inputError : null,
               pincodeServiceable === true ? styles.inputSuccess : null,
             ]}
@@ -578,17 +649,13 @@ export const S08_CreateAccountScreen: React.FC = () => {
               style={styles.inputIcon}
             />
             <TextInput
-              style={styles.input}
-              placeholder="6-digit delivery pincode (e.g. 380015)"
+              style={[styles.input, { color: '#1E293B', fontWeight: '700' }]}
+              placeholder="Detecting location pincode..."
               placeholderTextColor={COLORS.secondaryText}
               keyboardType="number-pad"
               maxLength={6}
               value={pincode}
-              onChangeText={(text) => {
-                const cleaned = text.replace(/\D/g, '');
-                setPincode(cleaned);
-                if (errors.pincode) setErrors({ ...errors, pincode: undefined });
-              }}
+              editable={false}
             />
             {pincodeServiceable === true && (
               <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
@@ -597,6 +664,9 @@ export const S08_CreateAccountScreen: React.FC = () => {
               <Ionicons name="close-circle" size={20} color={COLORS.error} />
             )}
           </View>
+          <Text style={{ fontSize: 11, color: '#64748B', marginTop: 3, marginBottom: 8 }}>
+            🔒 City and PIN code are auto-detected from your GPS location and cannot be edited.
+          </Text>
           {errors.pincode ? (
             <Text style={styles.errorText}>{errors.pincode}</Text>
           ) : pincodeStatusText ? (
@@ -617,22 +687,34 @@ export const S08_CreateAccountScreen: React.FC = () => {
             <View style={styles.sectionLine} />
           </View>
 
-          <Text style={styles.label}>
-            Select City <Text style={styles.requiredAsterisk}>*</Text>
-          </Text>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setIsCityModalVisible(true)}
-            style={[styles.inputContainer, styles.cityDropdownBtn, errors.city ? styles.inputError : null]}
+          <View style={styles.labelRow}>
+            <Text style={styles.label}>
+              Select City <Text style={styles.requiredAsterisk}>*</Text>
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Ionicons name="lock-closed" size={12} color="#64748B" />
+              <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '600' }}>Auto-detected</Text>
+            </View>
+          </View>
+          <View
+            style={[
+              styles.inputContainer,
+              styles.cityDropdownBtn,
+              { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' },
+              errors.city ? styles.inputError : null,
+            ]}
           >
             <View style={styles.cityDropdownLeft}>
               <Text style={styles.cityIcon}>🏙️</Text>
-              <Text style={[styles.cityText, !selectedCityName && styles.cityPlaceholder]}>
-                {selectedCityName || 'Select your city'}
+              <Text style={[styles.cityText, { color: '#1E293B', fontWeight: '700' }]}>
+                {selectedCityName || 'Ahmedabad'}
               </Text>
             </View>
-            <Ionicons name="chevron-down" size={18} color={COLORS.textMuted} />
-          </TouchableOpacity>
+            <Ionicons name="lock-closed" size={16} color={COLORS.textMuted} />
+          </View>
+          <Text style={{ fontSize: 11, color: '#64748B', marginTop: 3, marginBottom: 8 }}>
+            🔒 City is matched to your detected GPS location and configured service area.
+          </Text>
           {errors.city ? <Text style={styles.errorText}>{errors.city}</Text> : null}
 
           {/* Info Badge */}
@@ -643,17 +725,111 @@ export const S08_CreateAccountScreen: React.FC = () => {
             </Text>
           </View>
 
+          {pincodeServiceable === false && (
+            <View style={{ backgroundColor: '#FEF2F2', borderColor: '#FCA5A5', borderWidth: 1, borderRadius: 10, padding: 12, marginVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Ionicons name="alert-circle" size={20} color="#DC2626" />
+              <Text style={{ color: '#991B1B', fontSize: 12, flex: 1, fontWeight: '600' }}>
+                Sorry, WormUp is not serviceable in your area. We are expanding soon!
+              </Text>
+            </View>
+          )}
+
+          {/* Optional Aadhaar Details Section */}
+          <View style={styles.aadhaarCardContainer}>
+            <TouchableOpacity
+              style={styles.aadhaarHeaderRow}
+              onPress={() => setShowAadhaarSection((prev) => !prev)}
+              activeOpacity={0.8}
+            >
+              <View style={styles.aadhaarHeaderLeft}>
+                <View style={styles.aadhaarShieldWrap}>
+                  <Ionicons name="shield-checkmark" size={16} color="#059669" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={styles.aadhaarSectionTitle}>Aadhaar Verification</Text>
+                    <View style={styles.optionalBadge}>
+                      <Text style={styles.optionalBadgeText}>Optional</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.aadhaarSectionSub}>
+                    {showAadhaarSection
+                      ? 'Add now or manage later in Profile for withdrawals'
+                      : 'Tap to add Aadhaar & image uploads (Optional)'}
+                  </Text>
+                </View>
+              </View>
+              <Ionicons
+                name={showAadhaarSection ? 'chevron-up' : 'chevron-down'}
+                size={20}
+                color={COLORS.textMuted}
+              />
+            </TouchableOpacity>
+
+            {showAadhaarSection && (
+              <View style={styles.aadhaarBody}>
+                {/* 1. Aadhaar Card Number */}
+                <View style={styles.aadhaarFieldGroup}>
+                  <Text style={styles.label}>
+                    Aadhaar Card Number{' '}
+                    <Text style={styles.optionalText}>(Optional)</Text>
+                  </Text>
+                  <View style={styles.inputContainer}>
+                    <Ionicons name="card-outline" size={18} color={COLORS.textMuted} style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="12-digit Aadhaar (e.g. 1234 5678 9012)"
+                      placeholderTextColor={COLORS.textMuted}
+                      keyboardType="numeric"
+                      maxLength={14}
+                      value={aadhaarNumber}
+                      onChangeText={(t) => {
+                        const cleaned = t.replace(/\D/g, '').slice(0, 12);
+                        const formatted = cleaned.match(/.{1,4}/g)?.join(' ') || cleaned;
+                        setAadhaarNumber(formatted);
+                      }}
+                    />
+                  </View>
+                </View>
+
+                {/* 2. Aadhaar Front Image */}
+                <View style={styles.aadhaarFieldGroup}>
+                  <FileUploadField
+                    label="Aadhaar Front Image (Optional)"
+                    required={false}
+                    value={aadhaarFrontUrl}
+                    folder="womup/kyc/customer"
+                    onUploadComplete={(url) => setAadhaarFrontUrl(url)}
+                    helperText="Upload front side showing photo & 12-digit number"
+                  />
+                </View>
+
+                {/* 3. Aadhaar Back Image */}
+                <View style={styles.aadhaarFieldGroup}>
+                  <FileUploadField
+                    label="Aadhaar Back Image (Optional)"
+                    required={false}
+                    value={aadhaarBackUrl}
+                    folder="womup/kyc/customer"
+                    onUploadComplete={(url) => setAadhaarBackUrl(url)}
+                    helperText="Upload back side showing permanent address"
+                  />
+                </View>
+              </View>
+            )}
+          </View>
+
           <Text style={styles.noticeText}>
             🔒 Each email and mobile number can only be registered once.
           </Text>
 
           {/* Continue Button */}
           <GradientButton
-            title="Continue"
+            title={pincodeServiceable === false ? 'Area Not Serviceable' : 'Continue'}
             onPress={handleContinue}
             loading={isSubmitting}
-            disabled={isSubmitting}
-            style={styles.button}
+            disabled={isSubmitting || pincodeServiceable === false}
+            style={pincodeServiceable === false ? { ...styles.button, opacity: 0.5 } : styles.button}
           />
         </View>
 
@@ -1218,5 +1394,61 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     marginBottom: SPACING.sm,
     marginLeft: 2,
+  },
+
+  /* Optional Aadhaar Section Styles */
+  aadhaarCardContainer: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginTop: 10,
+    marginBottom: 16,
+    overflow: 'hidden',
+  },
+  aadhaarHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 14,
+    backgroundColor: '#F1F5F9',
+  },
+  aadhaarHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  aadhaarShieldWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aadhaarSectionTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  aadhaarSectionSub: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  aadhaarBody: {
+    padding: 14,
+    backgroundColor: COLORS.white,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  aadhaarFieldGroup: {
+    marginBottom: 12,
+  },
+  optionalText: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    fontWeight: '400',
   },
 });

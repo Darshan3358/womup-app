@@ -30,12 +30,14 @@ import { AdminOrdersController } from './admin-orders.controller';
 import { CartModule } from '../cart/cart.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { TrackingModule } from '../tracking/tracking.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
     CartModule,
     InventoryModule,
     TrackingModule,
+    NotificationsModule,
     MongooseModule.forFeature([
       { name: Order.name, schema: OrderSchema },
       { name: OrderStatusHistory.name, schema: OrderStatusHistorySchema },

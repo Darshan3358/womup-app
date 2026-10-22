@@ -34,7 +34,7 @@ const getApiBaseUrl = () => {
   if (typeof window !== 'undefined' && window.location) {
     const host = window.location.hostname;
     if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') {
-      return 'http://localhost:5001';
+      return 'http://localhost:5050';
     }
   }
   return 'https://womup-app-uquz.onrender.com';
@@ -159,7 +159,7 @@ export const ApiService = {
             status: (u.isBlocked === 1 || u.isActive === false) ? 'Blocked' : 'Active',
             spend: totalSpend,
             totalOrders: userOrders.length,
-            avatar: u.avatar || (idx === 0 ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&q=80' : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&q=80'),
+            avatar: u.avatar || '',
             walletBalance: u.walletBalance || 0,
             shoppingCoinBalance: u.shoppingCoins || 0,
             kycStatus: (u.customerKycStatus === 2 || u.verificationStatus === 'VERIFIED') ? 'Verified' : (u.customerKycStatus === 3 ? 'Rejected' : 'Pending'),
@@ -211,7 +211,7 @@ export const ApiService = {
           name: r.fullName || 'Delivery Partner',
           phone: r.phoneNumber || '',
           email: r.email || '',
-          avatar: r.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&q=80',
+          avatar: r.avatar || '',
           hubName: r.hubName || 'Satellite Hub Dark Store',
           city: r.city || 'Ahmedabad',
           vehicleType: r.vehicleType || 'EV_SCOOTER',
@@ -455,7 +455,7 @@ export const ApiService = {
                 mrp: Number(p.mrp) || Number(p.sellingPrice) || 50,
                 stockKg: Number(p.stockKg) || 100,
                 isActive: p.isActive !== false,
-                image: p.imageUrl || p.image || 'https://images.unsplash.com/photo-1546094096-0df4bcaaa337?w=400&q=80',
+                image: p.imageUrl || p.image || '',
                 imageUrl: p.imageUrl || p.image || '',
                 images: p.images || (p.imageUrl ? [p.imageUrl] : []),
                 variants: pVariants,
@@ -541,19 +541,25 @@ export const ApiService = {
           discountPercent: ap.discountPercent !== undefined ? Number(ap.discountPercent) : undefined,
           stock: ap.stock !== undefined ? Number(ap.stock) : undefined,
           isAvailable: ap.isAvailable !== false,
+          updatedAt: ap.updatedAt ? new Date(ap.updatedAt).getTime() : 0,
         }));
+
+        // Sort ascending by updatedAt so newer records always take precedence
+        areaPricingRecords.sort((a: any, b: any) => (a.updatedAt || 0) - (b.updatedAt || 0));
 
         // areaPricingMap: variantId -> areaId / zoneName -> price
         const areaPricingMap: Record<string, Record<string, number>> = {};
         for (const ap of areaPricingRecords) {
-          if (!areaPricingMap[ap.variantId]) {
-            areaPricingMap[ap.variantId] = {};
+          const vId = String(ap.variantId);
+          const aId = String(ap.areaId);
+          if (!areaPricingMap[vId]) {
+            areaPricingMap[vId] = {};
           }
-          areaPricingMap[ap.variantId][ap.areaId] = ap.price;
+          areaPricingMap[vId][aId] = ap.price;
 
-          const zoneName = areaIdToName[ap.areaId];
+          const zoneName = areaIdToName[aId];
           if (zoneName) {
-            areaPricingMap[ap.variantId][zoneName] = ap.price;
+            areaPricingMap[vId][zoneName] = ap.price;
           }
         }
 
@@ -657,7 +663,7 @@ export const ApiService = {
             status: 'On Duty',
             activeOrdersCount: 0,
             rating: 5.0,
-            avatar: u.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&q=80',
+            avatar: u.avatar || '',
           }));
 
         // 11. DYNAMICALLY MAP MARKETING CAMPAIGNS FROM REAL COUPONS & BANNERS IN MONGODB
@@ -1280,10 +1286,23 @@ export const ApiService = {
   // 17. FETCH ALL STORES ENRICHED
   async fetchStores(): Promise<DarkStoreItem[]> {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/stores`);
+      let res = await fetch(`${API_BASE_URL}/api/admin/stores`);
+      if (!res.ok) {
+        res = await fetch(`${NEST_API_BASE_URL}/admin/stores`);
+      }
+      if (!res.ok) {
+        res = await fetch(`${API_BASE_URL}/api/v1/stores`);
+      }
+      if (!res.ok) {
+        res = await fetch(`${API_BASE_URL}/stores`);
+      }
       if (!res.ok) return [];
       const json = await res.json();
-      return json.data || [];
+      const rawList = Array.isArray(json) ? json : (json.data || json.stores || []);
+      return rawList.map((s: any) => ({
+        ...s,
+        id: s.id || (s._id ? String(s._id) : ''),
+      }));
     } catch (err) {
       console.error('[API] Error fetching stores:', err);
       return [];
@@ -1518,7 +1537,13 @@ export const ApiService = {
     error?: string;
   }> {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/payout-rates`);
+      let res = await fetch(`${API_BASE_URL}/api/admin/payout-rates`);
+      if (!res.ok) {
+        res = await fetch(`${NEST_API_BASE_URL}/admin/payout-rates`);
+      }
+      if (!res.ok) {
+        res = await fetch(`${API_BASE_URL}/payout-rates`);
+      }
       const json = await res.json();
       return json;
     } catch (err: any) {

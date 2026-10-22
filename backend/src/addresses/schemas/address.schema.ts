@@ -50,6 +50,15 @@ export class Address {
 
   @Prop({ default: '' })
   deliveryInstructions: string;
+
+  @Prop({ type: Types.ObjectId, ref: 'Area', required: false })
+  areaId?: Types.ObjectId;
+
+  @Prop({ required: false })
+  areaName?: string;
+
+  @Prop({ type: Types.ObjectId, ref: 'Store', required: false })
+  storeId?: Types.ObjectId;
 }
 
 export const AddressSchema = SchemaFactory.createForClass(Address);

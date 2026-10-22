@@ -10,9 +10,9 @@ export class CoinTransaction {
 
   @Prop({
     required: true,
-    enum: ['EARN', 'SPEND', 'REFUND', 'BONUS'],
+    enum: ['EARN', 'SPEND', 'DEBIT', 'REFUND', 'BONUS'],
   })
-  type: 'EARN' | 'SPEND' | 'REFUND' | 'BONUS';
+  type: 'EARN' | 'SPEND' | 'DEBIT' | 'REFUND' | 'BONUS';
 
   @Prop({ required: true })
   coins: number; // Positive integer
@@ -23,7 +23,7 @@ export class CoinTransaction {
   @Prop({ required: true })
   balanceAfter: number;
 
-  @Prop({ enum: ['ORDER', 'REFERRAL', 'PROMOTION', 'ADMIN_ADJUSTMENT', 'SIGNUP_BONUS', 'TIER_COIN_INCOME', 'VENDOR_REDEEM'], default: 'ORDER' })
+  @Prop({ enum: ['ORDER', 'REFERRAL', 'PROMOTION', 'ADMIN_ADJUSTMENT', 'SIGNUP_BONUS', 'TIER_COIN_INCOME', 'VENDOR_REDEEM', 'LOCAL_STORE'], default: 'ORDER' })
   referenceType: string;
 
   @Prop()

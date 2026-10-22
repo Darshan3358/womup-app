@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, GRADIENTS } from '../../theme/colors';
 import { AppIcon } from './AppIcon';
 import { useApp } from '../../context/AppContext';
+import { CartService } from '../../services/cartService';
+import { matchAreaByName } from '../../data/areas';
 
 interface FloatingCartPillProps {
   bottomOffset?: number; // Adjust offset when placed above sticky bar vs bottom nav
@@ -15,10 +17,56 @@ export const FloatingCartPill: React.FC<FloatingCartPillProps> = ({
   const {
     blinkitCartCount,
     blinkitCartTotal,
+    blinkitCartList,
+    currentCityName,
+    currentAreaName,
+    currentStoreId,
+    selectedAddress,
+    selectedAddressSource,
     setActiveScreen,
     isAuthenticated,
     openAuthPrompt,
   } = useApp();
+
+  // Pre-warm dynamic delivery fee calculation cache before user navigates to cart
+  useEffect(() => {
+    if (blinkitCartCount > 0) {
+      const isSavedAddress = selectedAddressSource === 'SAVED' && selectedAddress && selectedAddress.type !== 'Current';
+      const matchedArea = matchAreaByName(
+        (isSavedAddress ? (selectedAddress?.areaLandmark || (selectedAddress as any)?.area || selectedAddress?.street || selectedAddress?.houseFlat) : null) ||
+        currentAreaName ||
+        selectedAddress?.areaLandmark
+      );
+      const activeLat = isSavedAddress
+        ? (matchedArea?.lat || Number(selectedAddress?.latitude) || 23.0125)
+        : (Number(selectedAddress?.latitude) || matchedArea?.lat || 23.0125);
+      const activeLng = isSavedAddress
+        ? (matchedArea?.lng || Number(selectedAddress?.longitude) || 72.5082)
+        : (Number(selectedAddress?.longitude) || matchedArea?.lng || 72.5082);
+      const areaKey = (isSavedAddress ? (selectedAddress?.areaLandmark || matchedArea?.name) : null) ||
+        matchedArea?.name || currentAreaName || selectedAddress?.areaLandmark || 'Prahlad Nagar';
+      const cityKey = (isSavedAddress ? selectedAddress?.city : null) || currentCityName || 'Ahmedabad';
+
+      CartService.calculateDynamicDeliveryFee({
+        items: blinkitCartList.map((item) => ({
+          name: item.product.name,
+          price: item.product.sellingPrice,
+          mrp: item.product.mrp,
+          quantity: item.quantity,
+        })),
+        cityName: cityKey,
+        areaName: areaKey,
+        storeId: currentStoreId || undefined,
+        distanceKm: 1.2,
+        deliveryAddress: {
+          latitude: activeLat,
+          longitude: activeLng,
+          area: areaKey,
+          city: cityKey,
+        },
+      }).catch(() => {});
+    }
+  }, [blinkitCartCount, currentAreaName, currentCityName, currentStoreId, selectedAddress, selectedAddressSource]);
 
   if (blinkitCartCount <= 0) return null;
 

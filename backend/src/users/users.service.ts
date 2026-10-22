@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User, UserDocument } from './schemas/user.schema';
@@ -8,6 +8,7 @@ import { CoinTransaction, CoinTransactionDocument } from '../coins/schemas/coin-
 import { TeamPurchaseIncome, TeamPurchaseIncomeDocument } from './schemas/team-purchase-income.schema';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { TrackingGateway } from '../tracking/tracking.gateway';
+import { NotificationService } from '../notifications/notification.service';
 
 export function sanitizePublicDocUrl(url?: string): string {
   if (!url || typeof url !== 'string') return '';
@@ -39,6 +40,7 @@ export class UsersService {
     @InjectModel(TeamPurchaseIncome.name)
     private teamIncomeModel: Model<TeamPurchaseIncomeDocument>,
     private readonly trackingGateway: TrackingGateway,
+    @Optional() private readonly notificationService?: NotificationService,
   ) {}
 
   private getNextMidnight(): Date {
@@ -322,6 +324,22 @@ export class UsersService {
       accountNumber: user.accountNumber,
       ifscCode: user.ifscCode,
     });
+
+    if (this.notificationService) {
+      this.notificationService.create({
+        recipientType: 'ADMIN',
+        recipientId: 'admin',
+        role: 'ADMIN',
+        type: 'CUSTOMER_KYC_REQUEST',
+        title: '👤 New Customer KYC Submitted',
+        message: `${user.name || 'A customer'} submitted KYC & bank details for verification.`,
+        entityType: 'CUSTOMER_KYC',
+        entityId: String(user._id),
+        actionType: 'CUSTOMER_APPROVAL',
+        dedupeKey: `CUSTOMER_KYC_SUBMITTED:${String(user._id)}:${user.kycSubmittedAt ? new Date(user.kycSubmittedAt).getTime() : Date.now()}`,
+        metadata: { userId: String(user._id), userName: user.name, phone: user.phone },
+      }).catch(err => console.warn(`Failed creating admin KYC notification: ${err.message}`));
+    }
 
     return {
       success: true,

@@ -237,10 +237,13 @@ export interface RiderVehicle {
 
 export interface RiderNotification {
   id: string;
+  _id?: string;
   title: string;
   message: string;
-  type: 'ORDER' | 'SYSTEM' | 'PAYOUT' | 'SAFETY';
+  type: string;
+  orderId?: string;
   timestamp: string;
+  rawDate?: string;
   isRead: boolean;
 }
 

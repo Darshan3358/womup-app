@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User, UserDocument } from '../users/schemas/user.schema';
@@ -9,6 +9,7 @@ import { Order, OrderDocument } from '../orders/schemas/order.schema';
 import { OrderStatus } from '../common/enums/order-status.enum';
 import { AdminAuditLog, AdminAuditLogDocument } from './schemas/admin-audit-log.schema';
 import { TrackingGateway } from '../tracking/tracking.gateway';
+import { NotificationService } from '../notifications/notification.service';
 
 export interface ApprovalSummaryResponse {
   customerKyc: number;
@@ -61,12 +62,26 @@ export class AdminApprovalsService {
     @InjectModel(Order.name) private readonly orderModel: Model<OrderDocument>,
     @InjectModel(AdminAuditLog.name) private readonly auditLogModel: Model<AdminAuditLogDocument>,
     private readonly trackingGateway: TrackingGateway,
+    @Optional() private readonly notificationService?: NotificationService,
   ) {}
+
+  private cachedSummary: ApprovalSummaryResponse | null = null;
+  private cacheExpiresAt = 0;
+
+  invalidateSummaryCache() {
+    this.cachedSummary = null;
+    this.cacheExpiresAt = 0;
+  }
 
   /**
    * 1. GET UNIFIED APPROVALS SUMMARY (FOR DASHBOARD WIDGET & 8-CATEGORY HUB)
    */
-  async getApprovalsSummary(): Promise<ApprovalSummaryResponse> {
+  async getApprovalsSummary(force = false): Promise<ApprovalSummaryResponse> {
+    const now = Date.now();
+    if (!force && this.cachedSummary && now < this.cacheExpiresAt) {
+      return this.cachedSummary;
+    }
+
     try {
       const [
         customerKyc,
@@ -77,22 +92,9 @@ export class AdminApprovalsService {
         withdrawals,
       ] = await Promise.all([
         this.userModel.countDocuments({
-          $and: [
-            {
-              $or: [
-                { customer_kyc_status: 1 },
-                { customerKycStatus: 1 },
-                { kycStatus: 'Pending' },
-              ],
-            },
-            {
-              customerKycStatus: { $ne: 2 },
-              customer_kyc_status: { $ne: 2 },
-              verificationStatus: { $ne: 'VERIFIED' },
-              kycStatus: { $ne: 'Verified' },
-              aadhaarVerified: { $ne: true },
-            },
-          ],
+          customerKycStatus: 1,
+          verificationStatus: { $ne: 'VERIFIED' },
+          kycStatus: { $ne: 'Verified' },
         }),
         this.riderModel.countDocuments({
           status: 'PENDING',
@@ -124,7 +126,7 @@ export class AdminApprovalsService {
       const totalPending =
         customerKyc + riders + stores + vendors + staff + orders + withdrawals + rateChanges;
 
-      return {
+      const result: ApprovalSummaryResponse = {
         customerKyc,
         riders,
         stores,
@@ -145,6 +147,10 @@ export class AdminApprovalsService {
           rateChanges: { pending: rateChanges, reviewedToday: 0 },
         },
       };
+
+      this.cachedSummary = result;
+      this.cacheExpiresAt = now + 10000; // 10-second TTL
+      return result;
     } catch (err: any) {
       this.logger.error(`Error calculating approval summary: ${err.message}`);
       return {
@@ -568,32 +574,29 @@ export class AdminApprovalsService {
   async approveCategoryItem(category: string, id: string, payload: any = {}, adminId = 'SUPER_ADMIN') {
     const cat = (category || '').toLowerCase().trim();
 
+    let res: any;
     if (cat === 'customer-kyc' || cat === 'customers' || cat === 'customer') {
-      return this.approveCustomerKyc(id, adminId, payload.notes);
-    }
-    if (cat === 'riders' || cat === 'rider') {
-      return this.approveRider(id, adminId, payload.notes);
-    }
-    if (cat === 'dark-stores' || cat === 'stores' || cat === 'store') {
-      return this.approveStore(id, adminId);
-    }
-    if (cat === 'vendors' || cat === 'vendor' || cat === 'local-vendors') {
-      return this.approveVendor(id, payload.extraData || payload, adminId);
-    }
-    if (cat === 'withdrawals' || cat === 'withdrawal') {
-      return this.approveWithdrawal(id, adminId);
-    }
-    if (cat === 'cancellations' || cat === 'orders' || cat === 'order') {
-      return this.approveCancellation(id, adminId, payload.notes);
-    }
-    if (cat === 'staff') {
-      return { success: true, message: `Staff request #${id} approved` };
-    }
-    if (cat === 'rate-changes' || cat === 'rates') {
-      return this.updatePayoutRate(payload, adminId);
+      res = await this.approveCustomerKyc(id, adminId, payload.notes);
+    } else if (cat === 'riders' || cat === 'rider') {
+      res = await this.approveRider(id, adminId, payload.notes);
+    } else if (cat === 'dark-stores' || cat === 'stores' || cat === 'store') {
+      res = await this.approveStore(id, adminId);
+    } else if (cat === 'vendors' || cat === 'vendor' || cat === 'local-vendors') {
+      res = await this.approveVendor(id, payload.extraData || payload, adminId);
+    } else if (cat === 'withdrawals' || cat === 'withdrawal') {
+      res = await this.approveWithdrawal(id, adminId);
+    } else if (cat === 'cancellations' || cat === 'orders' || cat === 'order') {
+      res = await this.approveCancellation(id, adminId, payload.notes);
+    } else if (cat === 'staff') {
+      res = { success: true, message: `Staff request #${id} approved` };
+    } else if (cat === 'rate-changes' || cat === 'rates') {
+      res = await this.updatePayoutRate(payload, adminId);
+    } else {
+      throw new BadRequestException(`Unsupported category for approval: ${category}`);
     }
 
-    throw new BadRequestException(`Unsupported category for approval: ${category}`);
+    this.invalidateSummaryCache();
+    return res;
   }
 
   /**
@@ -603,32 +606,29 @@ export class AdminApprovalsService {
     const cat = (category || '').toLowerCase().trim();
     const reason = payload.reason || payload.notes || 'Document verification failed';
 
+    let res: any;
     if (cat === 'customer-kyc' || cat === 'customers' || cat === 'customer') {
-      return this.rejectCustomerKyc(id, reason, adminId, payload.notes);
-    }
-    if (cat === 'riders' || cat === 'rider') {
-      return this.rejectRider(id, reason, adminId, payload.notes);
-    }
-    if (cat === 'dark-stores' || cat === 'stores' || cat === 'store') {
-      return this.rejectStore(id, reason, adminId);
-    }
-    if (cat === 'vendors' || cat === 'vendor' || cat === 'local-vendors') {
-      return this.rejectVendor(id, reason, adminId);
-    }
-    if (cat === 'withdrawals' || cat === 'withdrawal') {
-      return this.rejectWithdrawal(id, reason, adminId);
-    }
-    if (cat === 'cancellations' || cat === 'orders' || cat === 'order') {
-      return this.rejectCancellation(id, reason, adminId);
-    }
-    if (cat === 'staff') {
-      return { success: true, message: `Staff request #${id} rejected: ${reason}` };
-    }
-    if (cat === 'rate-changes' || cat === 'rates') {
-      return { success: true, message: `Rate change proposal #${id} rejected: ${reason}` };
+      res = await this.rejectCustomerKyc(id, reason, adminId, payload.notes);
+    } else if (cat === 'riders' || cat === 'rider') {
+      res = await this.rejectRider(id, reason, adminId, payload.notes);
+    } else if (cat === 'dark-stores' || cat === 'stores' || cat === 'store') {
+      res = await this.rejectStore(id, reason, adminId);
+    } else if (cat === 'vendors' || cat === 'vendor' || cat === 'local-vendors') {
+      res = await this.rejectVendor(id, reason, adminId);
+    } else if (cat === 'withdrawals' || cat === 'withdrawal') {
+      res = await this.rejectWithdrawal(id, reason, adminId);
+    } else if (cat === 'cancellations' || cat === 'orders' || cat === 'order') {
+      res = await this.rejectCancellation(id, reason, adminId);
+    } else if (cat === 'staff') {
+      res = { success: true, message: `Staff request #${id} rejected: ${reason}` };
+    } else if (cat === 'rate-changes' || cat === 'rates') {
+      res = { success: true, message: `Rate change proposal #${id} rejected: ${reason}` };
+    } else {
+      throw new BadRequestException(`Unsupported category for rejection: ${category}`);
     }
 
-    throw new BadRequestException(`Unsupported category for rejection: ${category}`);
+    this.invalidateSummaryCache();
+    return res;
   }
 
   /**
@@ -708,6 +708,24 @@ export class AdminApprovalsService {
       customerKycStatus: 2,
       customerIsVerify: 1,
     });
+
+    if (this.notificationService) {
+      this.notificationService.create({
+        recipientType: 'CUSTOMER',
+        recipientId: String(user._id),
+        role: 'CUSTOMER',
+        customerId: String(user._id),
+        type: 'CUSTOMER_KYC_APPROVED',
+        title: '✓ KYC Approved',
+        message: 'Your KYC verification has been approved! Income features are now unlocked.',
+        entityType: 'USER',
+        entityId: String(user._id),
+        actionType: 'KYC_STATUS',
+        dedupeKey: `CUSTOMER_KYC_APPROVED:${String(user._id)}`,
+        metadata: { customerKycStatus: 2 },
+      }).catch(err => this.logger.warn(`Failed creating customer KYC approved notification: ${err.message}`));
+    }
+
     this.broadcastSummary();
 
     return { success: true, message: `Customer ${user.name} KYC approved successfully`, data: user };
@@ -737,6 +755,24 @@ export class AdminApprovalsService {
       reason: user.kycRejectReason,
       customerKycStatus: 3,
     });
+
+    if (this.notificationService) {
+      this.notificationService.create({
+        recipientType: 'CUSTOMER',
+        recipientId: String(user._id),
+        role: 'CUSTOMER',
+        customerId: String(user._id),
+        type: 'CUSTOMER_KYC_REJECTED',
+        title: '❌ KYC Rejected',
+        message: `Your KYC verification was rejected: ${user.kycRejectReason}`,
+        entityType: 'USER',
+        entityId: String(user._id),
+        actionType: 'KYC_STATUS',
+        dedupeKey: `CUSTOMER_KYC_REJECTED:${String(user._id)}`,
+        metadata: { customerKycStatus: 3, reason: user.kycRejectReason },
+      }).catch(err => this.logger.warn(`Failed creating customer KYC rejected notification: ${err.message}`));
+    }
+
     this.broadcastSummary();
 
     return { success: true, message: `Customer ${user.name} KYC rejected: ${user.kycRejectReason}`, data: user };
@@ -768,6 +804,24 @@ export class AdminApprovalsService {
       partnerCode: rider.partnerCode,
       name: rider.fullName,
     });
+
+    if (this.notificationService) {
+      this.notificationService.create({
+        recipientType: 'RIDER',
+        recipientId: String(rider._id),
+        role: 'RIDER',
+        riderId: String(rider._id),
+        type: 'KYC_APPROVED',
+        title: '✓ KYC Approved',
+        message: 'Your rider verification has been approved! You can now go online and accept delivery orders.',
+        entityType: 'RIDER',
+        entityId: String(rider._id),
+        actionType: 'RIDER_PROFILE',
+        dedupeKey: `RIDER_KYC_APPROVED:${String(rider._id)}`,
+        metadata: { partnerCode: rider.partnerCode },
+      }).catch(err => this.logger.warn(`Failed creating rider KYC approved notification: ${err.message}`));
+    }
+
     this.broadcastSummary();
 
     return { success: true, message: `Rider ${rider.fullName} approved and added to active fleet`, data: rider };
@@ -794,6 +848,24 @@ export class AdminApprovalsService {
       partnerCode: rider.partnerCode,
       reason,
     });
+
+    if (this.notificationService) {
+      this.notificationService.create({
+        recipientType: 'RIDER',
+        recipientId: String(rider._id),
+        role: 'RIDER',
+        riderId: String(rider._id),
+        type: 'KYC_REJECTED',
+        title: '❌ KYC Rejected',
+        message: `Your rider verification was rejected: ${reason || 'Invalid documents'}`,
+        entityType: 'RIDER',
+        entityId: String(rider._id),
+        actionType: 'RIDER_PROFILE',
+        dedupeKey: `RIDER_KYC_REJECTED:${String(rider._id)}`,
+        metadata: { partnerCode: rider.partnerCode, reason },
+      }).catch(err => this.logger.warn(`Failed creating rider KYC rejected notification: ${err.message}`));
+    }
+
     this.broadcastSummary();
 
     return { success: true, message: `Rider ${rider.fullName} rejected: ${reason}`, data: rider };
@@ -835,6 +907,24 @@ export class AdminApprovalsService {
       storeName: store.name,
       code: store.code,
     });
+
+    if (this.notificationService) {
+      this.notificationService.create({
+        recipientType: 'STORE',
+        recipientId: String(store._id),
+        role: 'STORE',
+        storeId: String(store._id),
+        type: 'STORE_KYC_APPROVED',
+        title: '✓ Store Approved',
+        message: `Dark Store "${store.name}" has been approved and activated.`,
+        entityType: 'STORE',
+        entityId: String(store._id),
+        actionType: 'STORE_DASHBOARD',
+        dedupeKey: `STORE_KYC_APPROVED:${String(store._id)}`,
+        metadata: { storeCode: store.code },
+      }).catch(err => this.logger.warn(`Failed creating store approved notification: ${err.message}`));
+    }
+
     this.broadcastSummary();
 
     return { success: true, message: `Store ${store.name} approved successfully`, data: store };
@@ -854,8 +944,25 @@ export class AdminApprovalsService {
       action: 'REJECT_STORE',
       entity: 'Store',
       entityId: String(store._id),
-      newValue: { status: 'REJECTED', rejectionReason: reason },
+      newValue: { status: 'REJECTED', reason },
     });
+
+    if (this.notificationService) {
+      this.notificationService.create({
+        recipientType: 'STORE',
+        recipientId: String(store._id),
+        role: 'STORE',
+        storeId: String(store._id),
+        type: 'STORE_KYC_REJECTED',
+        title: '❌ Store Verification Rejected',
+        message: `Store verification was rejected: ${reason || 'Documents invalid'}`,
+        entityType: 'STORE',
+        entityId: String(store._id),
+        actionType: 'STORE_DASHBOARD',
+        dedupeKey: `STORE_KYC_REJECTED:${String(store._id)}`,
+        metadata: { storeCode: store.code, reason },
+      }).catch(err => this.logger.warn(`Failed creating store rejected notification: ${err.message}`));
+    }
 
     this.trackingGateway.server?.emit('store_rejected', {
       storeId: String(store._id),

@@ -68,3 +68,32 @@ export const resolveImageUrl = (url?: string | null): string => {
 
   return trimmed;
 };
+
+// ─── Cloudinary Transformation Helpers (SRS §9.1) ────────────────────────────
+
+/**
+ * Injects Cloudinary size + quality transforms into an upload URL.
+ * Produces: /upload/<transforms>/v.../filename
+ * Non-Cloudinary URLs are passed through resolveImageUrl unchanged.
+ */
+const _injectCloudinaryTransform = (url: string, transform: string): string => {
+  const resolved = resolveImageUrl(url);
+  if (!resolved.includes('res.cloudinary.com')) return resolved;
+  // Insert transforms between /upload/ and the version/public-id segment
+  return resolved.replace('/upload/', `/upload/${transform}/`);
+};
+
+/**
+ * Returns a ~200 px wide thumbnail URL for product cards.
+ * Cloudinary: w_200,c_fill,q_auto,f_auto  (~15–30 KB typical)
+ */
+export const resolveImageThumbnail = (url?: string | null): string =>
+  _injectCloudinaryTransform(url || '', 'w_200,c_fill,q_auto,f_auto');
+
+/**
+ * Returns a full-quality image URL for product-detail screens.
+ * Cloudinary: w_800,c_limit,q_auto,f_auto
+ */
+export const resolveImageDetail = (url?: string | null): string =>
+  _injectCloudinaryTransform(url || '', 'w_800,c_limit,q_auto,f_auto');
+

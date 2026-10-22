@@ -7,11 +7,16 @@ export interface ResolvedArea {
   areaId: string;
   areaName: string;
   city: string;
+  cityName?: string;
+  cityId?: string;
   deliveryMinutes: number;
   serviceable?: boolean;
+  success?: boolean;
   storeId?: string;
   storeName?: string;
   storeCode?: string;
+  pincode?: string;
+  pincodes?: string[];
   distanceKm?: number;
   message?: string;
 }
@@ -39,6 +44,8 @@ interface CachedAreaEntry {
 
 const _areaMemoryCache = new Map<string, CachedAreaEntry>();
 const _inFlightAreaRequests = new Map<string, Promise<ResolvedArea | null>>();
+const _reverseGeocodeCache = new Map<string, { data: DetectedLocation; ts: number }>();
+const _inFlightReverseGeocode = new Map<string, Promise<DetectedLocation>>();
 
 export const LocationService = {
   /**
@@ -76,8 +83,8 @@ export const LocationService = {
       // Call backend for authoritative live serviceability resolution
       try {
         const res = await api.post<any>('/location/resolve', {
-          latitude: lat ?? null,
-          longitude: lng ?? null,
+          latitude: typeof lat === 'number' && !isNaN(lat) ? lat : 23.0141,
+          longitude: typeof lng === 'number' && !isNaN(lng) ? lng : 72.5067,
         });
         const resData = (res && (res as any).data) ? (res as any).data : res;
         if (res && res.success && resData) {
@@ -90,11 +97,16 @@ export const LocationService = {
             areaId: resData.areaId || '',
             areaName: resData.areaName || 'Ahmedabad Hub',
             city: resData.city || resData.cityName || 'Ahmedabad',
+            cityName: resData.cityName || resData.city || 'Ahmedabad',
+            cityId: resData.cityId,
             deliveryMinutes: resData.deliveryMinutes ?? 9,
             serviceable,
+            success: Boolean(res.success),
             storeId: resData.storeId,
             storeName: resData.storeName || (serviceable ? 'Wom Up Dark Store' : undefined),
             storeCode: resData.storeCode,
+            pincode: resData.pincode,
+            pincodes: resData.pincodes,
             distanceKm: resData.distanceKm,
             message: resData.message,
           };
@@ -119,6 +131,8 @@ export const LocationService = {
   clearCache() {
     _areaMemoryCache.clear();
     _inFlightAreaRequests.clear();
+    _reverseGeocodeCache.clear();
+    _inFlightReverseGeocode.clear();
     StorageService.removeItem(AREA_CACHE_KEY);
   },
 
@@ -198,57 +212,80 @@ export const LocationService = {
 
   /**
    * Reverse Geocode Real GPS coordinates to Street, Area, City, and Pincode.
-   * Does NOT invent fake addresses if the external geocoding service is unavailable.
+   * Deduplicates concurrent in-flight requests and caches by ~100m coordinate resolution for 30 minutes.
    */
   async reverseGeocode(lat: number, lng: number): Promise<DetectedLocation> {
-    try {
-      const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`;
-      const response = await fetch(url);
-      if (response.ok) {
-        const data = await response.json();
-        const locality = data.locality || data.principalSubdivision || data.city || '';
-        const city = data.city || data.principalSubdivision || '';
-        const postcode = data.postcode || '';
-        const road = data.localityInfo?.administrative?.[3]?.name || locality || '';
-
-        const rawParts = [road, locality, city]
-          .filter(Boolean)
-          .map((part) => String(part).trim())
-          .filter(Boolean);
-
-        // Deduplicate case-insensitively while preserving natural hierarchy
-        const dedupedParts = rawParts.filter(
-          (part, i) => rawParts.findIndex((p) => p.toLowerCase() === part.toLowerCase()) === i
-        );
-
-        const shortAddress = locality || city || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-        const readableAddress = dedupedParts.join(', ') || shortAddress;
-
-        return {
-          latitude: lat,
-          longitude: lng,
-          readableAddress,
-          shortAddress,
-          street: road || shortAddress,
-          areaLandmark: locality,
-          city: city || 'Ahmedabad',
-          pincode: postcode,
-        };
-      }
-    } catch (e) {
-      console.warn('[LocationService] Reverse geocode lookup failed:', e);
+    const cacheKey = `${lat.toFixed(3)}_${lng.toFixed(3)}`;
+    const cached = _reverseGeocodeCache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < 30 * 60 * 1000) {
+      return {
+        ...cached.data,
+        latitude: lat,
+        longitude: lng,
+      };
     }
 
-    // Honest fallback: Real GPS coordinates without fabricating fake street names
-    return {
-      latitude: lat,
-      longitude: lng,
-      readableAddress: `GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)}`,
-      shortAddress: `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
-      street: `Coordinates: ${lat.toFixed(4)}, ${lng.toFixed(4)}`,
-      areaLandmark: '',
-      city: 'Ahmedabad',
-      pincode: '',
-    };
+    if (_inFlightReverseGeocode.has(cacheKey)) {
+      return _inFlightReverseGeocode.get(cacheKey)!;
+    }
+
+    const task = (async (): Promise<DetectedLocation> => {
+      try {
+        const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`;
+        const response = await fetch(url);
+        if (response.ok) {
+          const data = await response.json();
+          const locality = data.locality || data.principalSubdivision || data.city || '';
+          const city = data.city || data.principalSubdivision || '';
+          const postcode = data.postcode || '';
+          const road = data.localityInfo?.administrative?.[3]?.name || locality || '';
+
+          const rawParts = [road, locality, city]
+            .filter(Boolean)
+            .map((part) => String(part).trim())
+            .filter(Boolean);
+
+          // Deduplicate case-insensitively while preserving natural hierarchy
+          const dedupedParts = rawParts.filter(
+            (part, i) => rawParts.findIndex((p) => p.toLowerCase() === part.toLowerCase()) === i
+          );
+
+          const shortAddress = locality || city || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+          const readableAddress = dedupedParts.join(', ') || shortAddress;
+
+          const result: DetectedLocation = {
+            latitude: lat,
+            longitude: lng,
+            readableAddress,
+            shortAddress,
+            street: road || shortAddress,
+            areaLandmark: locality,
+            city: city || 'Ahmedabad',
+            pincode: postcode,
+          };
+          _reverseGeocodeCache.set(cacheKey, { data: result, ts: Date.now() });
+          return result;
+        }
+      } catch (e) {
+        console.warn('[LocationService] Reverse geocode lookup failed:', e);
+      } finally {
+        _inFlightReverseGeocode.delete(cacheKey);
+      }
+
+      // Honest fallback: Real GPS coordinates without fabricating fake street names
+      return {
+        latitude: lat,
+        longitude: lng,
+        readableAddress: `GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+        shortAddress: `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+        street: `Coordinates: ${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+        areaLandmark: '',
+        city: 'Ahmedabad',
+        pincode: '',
+      };
+    })();
+
+    _inFlightReverseGeocode.set(cacheKey, task);
+    return task;
   },
 };

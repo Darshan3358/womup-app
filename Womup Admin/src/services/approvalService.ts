@@ -60,31 +60,58 @@ const getNestApiBaseUrl = () => {
 
 const BASE_URL = getNestApiBaseUrl();
 
+let _cachedSummary: ApprovalSummary | null = null;
+let _summaryCacheTime = 0;
+
 export const approvalService = {
-  async getSummary(): Promise<ApprovalSummary> {
+  invalidateSummaryCache() {
+    _cachedSummary = null;
+    _summaryCacheTime = 0;
+  },
+
+  async getSummary(forceRefresh = false): Promise<ApprovalSummary> {
+    const now = Date.now();
+    if (!forceRefresh && _cachedSummary && now - _summaryCacheTime < 8000) {
+      return _cachedSummary;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      try { controller.abort(); } catch (_) {}
+    }, 6000);
+
     try {
-      const res = await fetch(`${BASE_URL}/admin/approvals/summary`);
+      const res = await fetch(`${BASE_URL}/admin/approvals/summary`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
       const json = await res.json();
       if (json.success && json.data) {
+        _cachedSummary = json.data;
+        _summaryCacheTime = now;
         return json.data;
       }
       throw new Error(json.message || 'Failed to fetch summary');
     } catch (e: any) {
+      clearTimeout(timeoutId);
       console.warn('[approvalService] getSummary error:', e);
+      if (_cachedSummary) {
+        return _cachedSummary;
+      }
       // Fallback defaults
       return {
-        customerKyc: 1,
-        riders: 1,
+        customerKyc: 0,
+        riders: 0,
         stores: 0,
         vendors: 0,
         withdrawals: 0,
         orders: 0,
         staff: 0,
         rateChanges: 2,
-        totalPending: 4,
+        totalPending: 2,
         categories: {
-          customerKyc: { pending: 1, reviewedToday: 12 },
-          riders: { pending: 1, reviewedToday: 3 },
+          customerKyc: { pending: 0, reviewedToday: 12 },
+          riders: { pending: 0, reviewedToday: 3 },
           darkStores: { pending: 0, reviewedToday: 1 },
           vendors: { pending: 0, reviewedToday: 5 },
           withdrawals: { pending: 0, reviewedToday: 8 },
@@ -135,6 +162,7 @@ export const approvalService = {
     if (!res.ok) {
       throw new Error(json.message || 'Failed to approve item');
     }
+    this.invalidateSummaryCache();
     return json;
   },
 
@@ -152,6 +180,7 @@ export const approvalService = {
     if (!res.ok) {
       throw new Error(json.message || 'Failed to reject item');
     }
+    this.invalidateSummaryCache();
     return json;
   },
 

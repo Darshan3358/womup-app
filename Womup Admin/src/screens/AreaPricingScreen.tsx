@@ -217,7 +217,19 @@ export const AreaPricingScreen: React.FC = () => {
   };
 
   const handleEditProduct = (product: ProductItem) => {
-    setSelectedProduct(product);
+    const areaAwareProduct = {
+      ...product,
+      selectedAreaId: currentAreaId || (currentArea ? String(currentArea.id || (currentArea as any)._id) : ''),
+      selectedAreaName: currentAreaName || currentArea?.name || '',
+      variants: (product.variants || []).map((v) => {
+        const { price } = getVariantZonePrice(v);
+        return {
+          ...v,
+          sellingPrice: price !== undefined && price > 0 ? price : (v.sellingPrice || 0),
+        };
+      }),
+    };
+    setSelectedProduct(areaAwareProduct);
     setActiveModal('EditProduct');
   };
 
@@ -250,15 +262,7 @@ export const AreaPricingScreen: React.FC = () => {
 
   const getProductThumbnail = (name: string, defaultUrl?: string) => {
     if (defaultUrl && defaultUrl.startsWith('http')) return defaultUrl;
-    const n = (name || '').toLowerCase();
-    if (n.includes('tomato')) return 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=200&auto=format&fit=crop&q=80';
-    if (n.includes('potato')) return 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=200&auto=format&fit=crop&q=80';
-    if (n.includes('onion')) return 'https://images.unsplash.com/photo-1618512496248-a07fe83aa8cb?w=200&auto=format&fit=crop&q=80';
-    if (n.includes('banana')) return 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=200&auto=format&fit=crop&q=80';
-    if (n.includes('capsicum') || n.includes('pepper')) return 'https://images.unsplash.com/photo-1563565375-f3fdfdbefa83?w=200&auto=format&fit=crop&q=80';
-    if (n.includes('apple')) return 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=200&auto=format&fit=crop&q=80';
-    if (n.includes('milk')) return 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=200&auto=format&fit=crop&q=80';
-    return defaultUrl || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=200&auto=format&fit=crop&q=80';
+    return '';
   };
 
   return (
@@ -448,11 +452,17 @@ export const AreaPricingScreen: React.FC = () => {
                 {/* TOP HEADER: THUMBNAIL, INFO, ACTIONS */}
                 <View style={styles.pricingCardTopRow}>
                   {/* Thumbnail Image */}
-                  <Image
-                    source={{ uri: thumbUrl }}
-                    style={styles.productThumbImg}
-                    resizeMode="cover"
-                  />
+                  {thumbUrl ? (
+                    <Image
+                      source={{ uri: thumbUrl }}
+                      style={styles.productThumbImg}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={[styles.productThumbImg, { backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }]}>
+                      <Package size={18} color="#94A3B8" />
+                    </View>
+                  )}
 
                   {/* Middle Info */}
                   <View style={styles.productInfoCol}>

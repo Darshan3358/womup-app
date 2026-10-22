@@ -280,7 +280,10 @@ export interface Zone {
   centerLng?: number;
   radiusKm?: number;
   defaultDeliveryMinutes?: number;
+  slaMinutes?: number;
   pincodes?: string[];
+  polygon?: any;
+  geometry?: any;
   sortOrder?: number;
 }
 
@@ -351,6 +354,11 @@ export interface Order {
   cancelReason?: string;
   isRefunded?: boolean;
   refundAmount?: number;
+  distanceKm?: number;
+  distanceToCustomer?: number;
+  distanceToStore?: number;
+  deliveryDistanceKm?: number;
+  eta?: string;
 }
 
 export interface InventoryItem {

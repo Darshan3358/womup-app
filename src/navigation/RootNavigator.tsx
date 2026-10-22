@@ -118,12 +118,12 @@ export const RootNavigator: React.FC = () => {
   }, [activeScreen, canGoBack, goBack]);
 
   // Screens that show bottom navigation bar (Guest & Authenticated)
+  // Note: Local_Home manages its own dedicated LocalBottomNav, so main BottomNavigation is excluded
   const isMainTabScreen =
     activeScreen === 'Blinkit_Home' ||
     activeScreen === 'Blinkit_OrderAgain' ||
     activeScreen === 'Blinkit_Categories' ||
     activeScreen === 'Blinkit_Profile' ||
-    activeScreen === 'Local_Home' ||
     activeScreen === 'C12_Home' ||
     activeScreen === 'C13_Category' ||
     activeScreen === 'C19_Cart' ||
@@ -158,7 +158,14 @@ export const RootNavigator: React.FC = () => {
         break;
       case 'Local Shop':
       case 'App':
-        setActiveScreen('Local_Home');
+        if (!isAuthenticated) {
+          openAuthPrompt(
+            'To open Local Store app, please login or register first.',
+            'Local Store App'
+          );
+        } else {
+          setActiveScreen('Local_Home');
+        }
         break;
       case 'Categories':
         setActiveScreen('Blinkit_Categories');
@@ -172,7 +179,7 @@ export const RootNavigator: React.FC = () => {
         break;
       case 'Profile':
         if (!isAuthenticated) {
-          openAuthPrompt('Please sign in or register to access your account profile, addresses, and settings.', 'My Profile');
+          openAuthPrompt('Please login or register to access your account profile, addresses, and settings.', 'Login or Register');
         } else {
           setActiveScreen('Blinkit_Profile');
         }

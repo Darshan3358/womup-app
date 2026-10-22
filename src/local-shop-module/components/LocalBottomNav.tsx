@@ -29,7 +29,6 @@ export const LocalBottomNav: React.FC<LocalBottomNavProps> = ({
     iconType: 'ionicons' | 'material';
     isBackAction?: boolean;
   }[] = [
-    { key: 'Home', label: 'Home', icon: 'home', iconType: 'ionicons' },
     { key: 'Shops', label: 'Shops', icon: 'storefront-outline', iconType: 'ionicons' },
     { key: 'My Orders', label: 'My Orders', icon: 'cart-outline', iconType: 'ionicons' },
     { key: 'My Coin', label: 'My Coin', icon: 'cash-multiple', iconType: 'material' },
@@ -71,7 +70,7 @@ export const LocalBottomNav: React.FC<LocalBottomNavProps> = ({
                 ) : (
                   <Ionicons
                     name={
-                      (isActive && tab.key === 'Home' ? 'home' : tab.icon) as any
+                      (isActive && tab.key === 'Shops' ? 'storefront' : tab.icon) as any
                     }
                     size={isBack ? 20 : 21}
                     color={isBack ? '#B45309' : isActive ? activeColor : inactiveColor}

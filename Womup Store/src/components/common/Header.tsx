@@ -10,10 +10,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../context/StoreContext';
 import { COLORS } from '../../theme/colors';
+import { StoreNotificationModal } from './StoreNotificationModal';
 
 export const Header: React.FC = () => {
-  const { staff, store, subScreen, setSubScreen, toggleShift, shiftLoading, setSidebarOpen } = useStore();
+  const { staff, store, subScreen, setSubScreen, toggleShift, shiftLoading, setSidebarOpen, storeUnreadCount, refreshUnreadCount } = useStore();
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isNotificationModalVisible, setNotificationModalVisible] = useState(false);
 
   const isOnShift = staff?.isOnShift ?? false;
 
@@ -42,6 +44,10 @@ export const Header: React.FC = () => {
       pulseAnim.setValue(1);
     }
   }, [isOnShift, pulseAnim]);
+
+  useEffect(() => {
+    refreshUnreadCount?.();
+  }, [store?.id]);
 
   // Clean Store Name Truncation Rule
   let displayStoreName = store?.name || 'Prahlad Nagar Dark Store';
@@ -140,6 +146,22 @@ export const Header: React.FC = () => {
             )}
           </TouchableOpacity>
 
+          {/* 🔔 Notification Bell Button */}
+          <TouchableOpacity
+            style={styles.bellBtn}
+            onPress={() => setNotificationModalVisible(true)}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel="Store Notifications"
+          >
+            <Ionicons name="notifications" size={19} color="#FFF" />
+            {storeUnreadCount > 0 && (
+              <View style={styles.bellBadge}>
+                <Text style={styles.bellBadgeText}>{storeUnreadCount > 99 ? '99+' : storeUnreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
           {/* ☰ Hamburger Menu Button */}
           <TouchableOpacity
             style={styles.hamburgerBtn}
@@ -172,6 +194,15 @@ export const Header: React.FC = () => {
           <Text style={styles.toastText}>{toastMessage}</Text>
         </View>
       )}
+
+      {/* Unified Scoped Store Notification Modal */}
+      <StoreNotificationModal
+        visible={isNotificationModalVisible}
+        onClose={() => {
+          setNotificationModalVisible(false);
+          refreshUnreadCount?.();
+        }}
+      />
     </View>
   );
 };
@@ -244,6 +275,36 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  bellBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    position: 'relative',
+  },
+  bellBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#0F172A',
+  },
+  bellBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
   },
   shiftPill: {
     flexDirection: 'row',

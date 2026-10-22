@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LocalTransaction } from '../types/localShop.types';
-import { MOCK_LOCAL_TRANSACTIONS } from '../data/mockLocalShops';
+import { LocalShopApi } from '../api/localShopApi';
 
 interface MyOrdersScreenProps {
   onGoBack: () => void;
@@ -25,7 +25,19 @@ export const MyOrdersScreen: React.FC<MyOrdersScreenProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<'All' | 'Ongoing' | 'Completed'>('All');
-  const [orders, setOrders] = useState<LocalTransaction[]>(MOCK_LOCAL_TRANSACTIONS);
+  const [orders, setOrders] = useState<LocalTransaction[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    LocalShopApi.getLocalOrders().then((liveOrders) => {
+      if (isMounted && liveOrders) {
+        setOrders(liveOrders);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Modals
   const [receiptOrder, setReceiptOrder] = useState<LocalTransaction | null>(null);
@@ -36,7 +48,7 @@ export const MyOrdersScreen: React.FC<MyOrdersScreenProps> = ({
   const filteredOrders = orders.filter((o) => {
     if (activeTab === 'All') return true;
     if (activeTab === 'Ongoing') return o.status === 'PENDING';
-    if (activeTab === 'Completed') return o.status === 'SUCCESS';
+    if (activeTab === 'Completed') return o.status === 'SUCCESS' || o.status === 'VERIFIED' || o.status === 'COMPLETED';
     return true;
   });
 
@@ -130,19 +142,30 @@ export const MyOrdersScreen: React.FC<MyOrdersScreenProps> = ({
               {/* Financials Row */}
               <View style={styles.financialsRow}>
                 <View style={styles.finCol}>
-                  <Text style={styles.finLabel}>Amount Paid</Text>
+                  <Text style={styles.finLabel}>Bill Amount</Text>
                   <Text style={styles.finValue}>₹{order.amount}</Text>
                 </View>
 
+                {Boolean(order.coinsUsed && order.coinsUsed > 0) && (
+                  <View style={styles.finCol}>
+                    <Text style={styles.finLabel}>Coins Used</Text>
+                    <Text style={[styles.finValue, { color: '#E11D48', fontWeight: '800' }]}>
+                      -₹{order.coinsUsed}
+                    </Text>
+                  </View>
+                )}
+
                 <View style={styles.finCol}>
-                  <Text style={styles.finLabel}>Payment Method</Text>
+                  <Text style={styles.finLabel}>Payment</Text>
                   <Text style={styles.finValueSecondary}>{order.paymentMethod}</Text>
                 </View>
 
-                <View style={styles.coinsEarnedCol}>
-                  <Ionicons name="sparkles" size={14} color="#B45309" />
-                  <Text style={styles.coinsEarnedText}>+{order.coinsEarned} Coins</Text>
-                </View>
+                {Boolean(order.coinsEarned && order.coinsEarned > 0) && (
+                  <View style={styles.coinsEarnedCol}>
+                    <Ionicons name="sparkles" size={14} color="#B45309" />
+                    <Text style={styles.coinsEarnedText}>+{order.coinsEarned} Coins</Text>
+                  </View>
+                )}
               </View>
 
               {/* Action Buttons */}
@@ -200,18 +223,32 @@ export const MyOrdersScreen: React.FC<MyOrdersScreenProps> = ({
                   <Text style={styles.receiptLineLabel}>Bill Subtotal</Text>
                   <Text style={styles.receiptLineValue}>₹{receiptOrder.amount}</Text>
                 </View>
-                <View style={styles.receiptLine}>
-                  <Text style={styles.receiptLineLabel}>WOMUP Shopping Coins Earned</Text>
-                  <Text style={[styles.receiptLineValue, { color: '#059669', fontWeight: '800' }]}>
-                    +{receiptOrder.coinsEarned} Coins
-                  </Text>
-                </View>
+
+                {Boolean(receiptOrder.coinsUsed && receiptOrder.coinsUsed > 0) && (
+                  <View style={styles.receiptLine}>
+                    <Text style={styles.receiptLineLabel}>Shopping Coins Redeemed</Text>
+                    <Text style={[styles.receiptLineValue, { color: '#E11D48', fontWeight: '800' }]}>
+                      -₹{receiptOrder.coinsUsed} Coins
+                    </Text>
+                  </View>
+                )}
+
+                {Boolean(receiptOrder.coinsEarned && receiptOrder.coinsEarned > 0) && (
+                  <View style={styles.receiptLine}>
+                    <Text style={styles.receiptLineLabel}>WOMUP Shopping Coins Earned</Text>
+                    <Text style={[styles.receiptLineValue, { color: '#059669', fontWeight: '800' }]}>
+                      +{receiptOrder.coinsEarned} Coins
+                    </Text>
+                  </View>
+                )}
 
                 <View style={styles.receiptDivider} />
 
                 <View style={styles.receiptTotalLine}>
-                  <Text style={styles.receiptTotalLabel}>Total Paid</Text>
-                  <Text style={styles.receiptTotalValue}>₹{receiptOrder.amount}</Text>
+                  <Text style={styles.receiptTotalLabel}>Total Cash / UPI Paid</Text>
+                  <Text style={styles.receiptTotalValue}>
+                    ₹{receiptOrder.cashPaid !== undefined ? receiptOrder.cashPaid : Math.max(0, receiptOrder.amount - (receiptOrder.coinsUsed || 0))}
+                  </Text>
                 </View>
 
                 <TouchableOpacity

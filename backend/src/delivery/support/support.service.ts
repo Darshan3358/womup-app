@@ -8,6 +8,8 @@ import {
   SupportTicketDocument,
 } from '../schemas/delivery-partner.schema';
 
+import { DeliveryPartnerCacheService } from '../common/partner-cache.service';
+
 @Injectable()
 export class SupportService {
   constructor(
@@ -15,14 +17,11 @@ export class SupportService {
     private partnerModel: Model<DeliveryPartnerDocument>,
     @InjectModel(SupportTicket.name)
     private ticketModel: Model<SupportTicketDocument>,
+    private readonly partnerCacheService: DeliveryPartnerCacheService,
   ) {}
 
   private async getPartner(userId: string): Promise<DeliveryPartnerDocument> {
-    const partner = await this.partnerModel.findOne({ userId: new Types.ObjectId(userId) });
-    if (!partner) {
-      throw new NotFoundException('Delivery partner not found');
-    }
-    return partner;
+    return this.partnerCacheService.getPartner(userId);
   }
 
   async getSupportOptions() {
@@ -62,7 +61,12 @@ export class SupportService {
   }
 
   async getNotifications(userId: string) {
+    const t0 = Date.now();
     await this.getPartner(userId);
+    const t1 = Date.now();
+    if (t1 - t0 > 100) {
+      console.log(`[supportService.getNotifications] getPartner took ${t1 - t0}ms`);
+    }
     return [
       {
         id: 'NOTIF-1',

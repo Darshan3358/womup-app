@@ -168,6 +168,9 @@ export const AuthService = {
     city?: string,
     fullNameAsPerAadhaar?: string,
     sponsorCode?: string,
+    aadhaarNumber?: string,
+    aadhaarFrontImage?: string,
+    aadhaarBackImage?: string,
   ): Promise<{ success: boolean; user?: any; token?: string; message?: string }> {
     const res = await api.post<any>('/auth/register', {
       verificationId,
@@ -180,6 +183,9 @@ export const AuthService = {
       pincode,
       city: city || preferredCityName,
       fullNameAsPerAadhaar,
+      aadhaarNumber,
+      aadhaarFrontImage,
+      aadhaarBackImage,
     });
     if (res.success && res.data) {
       if (res.data.accessToken) {
@@ -281,6 +287,14 @@ export const AuthService = {
       return { success: true, data: res.data };
     }
     return { success: false, message: res.message || 'Failed to fetch income history' };
+  },
+
+  async getCoinTransactions(page = 1, limit = 50): Promise<{ success: boolean; data?: any; message?: string }> {
+    const res = await api.get<any>(`/coins/transactions?page=${page}&limit=${limit}`);
+    if (res.success && res.data) {
+      return { success: true, data: res.data };
+    }
+    return { success: false, message: res.message || 'Failed to fetch token transaction history' };
   },
 
   async withdrawIncome(amount: number, bankDetails?: any): Promise<{ success: boolean; message: string; data?: any }> {

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import {
@@ -8,6 +8,9 @@ import {
   DeliveryPartnerDocumentRecord,
 } from '../schemas/delivery-partner.schema';
 
+import { DeliveryPartnerCacheService } from '../common/partner-cache.service';
+import { NotificationService } from '../../notifications/notification.service';
+
 @Injectable()
 export class DocumentService {
   constructor(
@@ -15,19 +18,12 @@ export class DocumentService {
     private partnerModel: Model<DeliveryPartnerDocument>,
     @InjectModel(DeliveryPartnerDocumentItem.name)
     private docModel: Model<DeliveryPartnerDocumentRecord>,
+    private readonly partnerCacheService: DeliveryPartnerCacheService,
+    @Optional() private readonly notificationService?: NotificationService,
   ) {}
 
   private async getPartner(userId: string): Promise<DeliveryPartnerDocument> {
-    const partner = await this.partnerModel.findOne({
-      $or: [
-        { userId: Types.ObjectId.isValid(userId) ? new Types.ObjectId(userId) : undefined },
-        { _id: Types.ObjectId.isValid(userId) ? new Types.ObjectId(userId) : undefined },
-      ].filter(Boolean),
-    });
-    if (!partner) {
-      throw new NotFoundException('Delivery partner not found');
-    }
-    return partner;
+    return this.partnerCacheService.getPartner(userId);
   }
 
   async getDocuments(userId: string) {
@@ -131,6 +127,23 @@ export class DocumentService {
     }
 
     await partner.save();
+
+    if (this.notificationService) {
+      this.notificationService.create({
+        recipientType: 'ADMIN',
+        recipientId: 'admin',
+        role: 'ADMIN',
+        type: 'RIDER_KYC_REQUEST',
+        title: '🚴 Rider Document Updated',
+        message: `Rider ${partner.fullName || partner.phoneNumber || 'Partner'} updated ${docId}. Verification pending.`,
+        entityType: 'RIDER_KYC',
+        entityId: partner._id.toString(),
+        actionType: 'RIDER_APPROVAL',
+        dedupeKey: `RIDER_DOC_SUBMITTED:${partner._id.toString()}:${docId}`,
+        metadata: { riderId: partner._id.toString(), name: partner.fullName, docId },
+      }).catch(err => console.warn(`Failed creating rider doc notification: ${err.message}`));
+    }
+
     return this.getDocuments(userId);
   }
 

@@ -62,6 +62,10 @@ interface StoreContextType {
   setSidebarOpen: (open: boolean) => void;
   toggleSidebar: () => void;
 
+  storeUnreadCount: number;
+  setStoreUnreadCount: React.Dispatch<React.SetStateAction<number>>;
+  refreshUnreadCount: () => Promise<void>;
+
   // Actions
   loginWithStoreCredentials: (loginId: string, password: string) => Promise<boolean>;
   sendOtp: (email: string) => Promise<boolean>;
@@ -119,6 +123,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [error, setError] = useState<string | null>(null);
   const [isSidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const toggleSidebar = () => setSidebarOpen((prev) => !prev);
+  const [storeUnreadCount, setStoreUnreadCount] = useState<number>(0);
 
 const enrichStore = (rawStore: any): StoreHub | null => {
   if (!rawStore) return null;
@@ -181,7 +186,7 @@ const enrichStore = (rawStore: any): StoreHub | null => {
           setTimeout(() => setAuthStep('LOGIN'), 1800);
         }
       } catch (err) {
-        console.log('[StoreContext] Init session error, routing to login:', err);
+        // non-fatal: session restore failed, routing to login
         setTimeout(() => setAuthStep('LOGIN'), 1800);
       }
     };
@@ -198,14 +203,20 @@ const enrichStore = (rawStore: any): StoreHub | null => {
 
     // 1. New Order incoming
     storeSocket.on('new_order', (payload: any) => {
-      console.log('[StoreContext] 🔔 WS new_order received:', payload);
       refreshIncoming();
       refreshPicking();
     });
 
+    // 1b. Unified scoped notification:new event
+    storeSocket.on('notification:new', (payload: any) => {
+      setStoreUnreadCount((prev) => prev + 1);
+      if (payload?.type === 'NEW_ORDER') {
+        refreshIncoming();
+      }
+    });
+
     // 2. Rider arrived at counter
     storeSocket.on('rider_at_store', (payload: any) => {
-      console.log('[StoreContext] 🛵 WS rider_at_store alert:', payload);
       setRiderArrivalAlert({
         orderId: payload.orderId,
         orderNumber: payload.orderNumber || '#WORM-ORDER',
@@ -216,14 +227,58 @@ const enrichStore = (rawStore: any): StoreHub | null => {
     });
 
     // 3. Inventory update
-    storeSocket.on('inventory_update', (payload: any) => {
-      console.log('[StoreContext] 📦 WS inventory_update:', payload);
+    storeSocket.on('inventory_update', (_payload: any) => {
       refreshInventory();
+    });
+
+    // 3b. Real-time Catalog & Price sync from Admin
+    storeSocket.on('catalog:updated', () => {
+      refreshInventory();
+    });
+    storeSocket.on('catalog:price-updated', () => {
+      refreshInventory();
+    });
+    storeSocket.on('stores:updated', () => {
+      refreshIncoming();
+    });
+
+    // 3c. Real-time Location & Distance updates from Rider / Tracking Gateway
+    storeSocket.on('location_updated', (payload: any) => {
+      if (!payload?.orderId) return;
+      const orderId = payload.orderId.toString();
+      const cleanOrderId = orderId.replace(/^#/, '');
+
+      const updateOrderProximity = (orderList: any[]) =>
+        orderList.map((ord) => {
+          const ordId = (ord.orderId || ord.id || ord._id || '').toString();
+          const ordNum = (ord.orderNumber || '').toString();
+          if (
+            ordId === orderId ||
+            ordId === cleanOrderId ||
+            ordNum === orderId ||
+            ordNum === `#${cleanOrderId}` ||
+            ordNum.replace(/^#/, '') === cleanOrderId
+          ) {
+            return {
+              ...ord,
+              distanceToStore: payload.distanceToStore ? Number(payload.distanceToStore) : ord.distanceToStore,
+              distanceToCustomer: payload.distanceToCustomer ? Number(payload.distanceToCustomer) : (payload.distanceKm ? Number(payload.distanceKm) : ord.distanceToCustomer),
+              distanceKm: payload.distanceToCustomer ? Number(payload.distanceToCustomer) : (payload.distanceKm ? Number(payload.distanceKm) : ord.distanceKm),
+              etaToStore: payload.etaToStore,
+              etaToCustomer: payload.etaToCustomer || payload.eta || payload.etaMinutes,
+            };
+          }
+          return ord;
+        });
+
+      setIncomingOrders((prev) => updateOrderProximity(prev));
+      setPickingOrders((prev) => updateOrderProximity(prev));
+      setReadyOrders((prev) => updateOrderProximity(prev));
+      setCompletedOrders((prev) => updateOrderProximity(prev));
     });
 
     // 4. Shift status update
     storeSocket.on('store_shift_update', (payload: any) => {
-      console.log('[StoreContext] 🔄 WS store_shift_update:', payload);
       if (typeof payload?.isOnShift === 'boolean') {
         setStaff((prev) => (prev ? { ...prev, isOnShift: payload.isOnShift } : prev));
       }
@@ -231,7 +286,6 @@ const enrichStore = (rawStore: any): StoreHub | null => {
 
     // 5. Order status updates (GOING_TO_STORE, ARRIVED_AT_STORE, PACKED, OUT_FOR_DELIVERY, DELIVERED, CANCELLED)
     storeSocket.on('order_status', (payload: any) => {
-      console.log('[StoreContext] 📦 WS order_status update:', payload);
       const updatedOrderId = (payload?.orderId || '').toString();
       const updatedOrderNum = payload?.orderNumber?.toString();
       const updatedStatus = payload?.status;
@@ -295,7 +349,6 @@ const enrichStore = (rawStore: any): StoreHub | null => {
             (updatedOrderId && currentId === updatedOrderId) ||
             (updatedOrderNum && currentNum === updatedOrderNum)
           ) {
-            console.log(`[StoreContext] Clearing activeOrder ${currentNum || currentId} (dispatched/delivered: ${updatedStatus})`);
             setActivePickList(null);
             setSubScreen(null);
             return null;
@@ -332,18 +385,49 @@ const enrichStore = (rawStore: any): StoreHub | null => {
         });
       }
 
-      // Refresh queues to guarantee real-time parity
-      refreshIncoming();
-      refreshPicking();
-      refreshReady();
-      refreshCompletedOrders();
+      // Selective queue refresh — maps each status transition to only the affected queues
+      // Stage 1 — Order accepted by store: moves from incoming → picking
+      const incomingToPickingStatuses = ['PLACED', 'ASSIGNED', 'PACKING'];
+      // Stage 2 — Picking complete / item issue: moves within picking or picking → ready
+      const pickingToReadyStatuses = ['PACKED', 'READY_FOR_PICKUP', 'ITEM_OUT_OF_STOCK'];
+      // Stage 3 — Rider approaching: ready queue needs updated rider info
+      const riderApproachStatuses = ['GOING_TO_STORE', 'ARRIVED_AT_STORE'];
+      // Stage 4 — Terminal: order leaves all active queues
+      const terminalStatuses = ['HANDED_OVER', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'];
+
+      if (updatedStatus && incomingToPickingStatuses.includes(updatedStatus)) {
+        refreshIncoming();
+        refreshPicking();
+      } else if (updatedStatus && pickingToReadyStatuses.includes(updatedStatus)) {
+        refreshPicking();
+        refreshReady();
+      } else if (updatedStatus && riderApproachStatuses.includes(updatedStatus)) {
+        // Rider info updated on ready queue cards; picking still active
+        refreshPicking();
+        refreshReady();
+      } else if (updatedStatus && terminalStatuses.includes(updatedStatus)) {
+        refreshPicking();
+        refreshReady();
+        refreshCompletedOrders();
+      } else {
+        // Unknown/future status: safe fallback — refresh all active queues but not history
+        refreshIncoming();
+        refreshPicking();
+        refreshReady();
+      }
+
     });
 
     return () => {
       storeSocket.off('new_order');
+      storeSocket.off('notification:new');
       storeSocket.off('rider_at_store');
       storeSocket.off('inventory_update');
+      storeSocket.off('catalog:updated');
+      storeSocket.off('catalog:price-updated');
+      storeSocket.off('stores:updated');
       storeSocket.off('store_shift_update');
+      storeSocket.off('location_updated');
       storeSocket.off('order_status');
     };
   }, [authStep, store?.id]);
@@ -354,7 +438,7 @@ const enrichStore = (rawStore: any): StoreHub | null => {
       const orders = await StoreApiService.getIncomingOrders();
       setIncomingOrders(orders || []);
     } catch (e) {
-      console.log('[StoreContext] Failed fetching incoming orders:', e);
+      // non-fatal: incoming orders unavailable
     }
   }, []);
 
@@ -363,7 +447,7 @@ const enrichStore = (rawStore: any): StoreHub | null => {
       const orders = await StoreApiService.getPickingOrders();
       setPickingOrders(orders || []);
     } catch (e) {
-      console.log('[StoreContext] Failed fetching picking orders:', e);
+      // non-fatal: picking orders unavailable
     }
   }, []);
 
@@ -372,7 +456,7 @@ const enrichStore = (rawStore: any): StoreHub | null => {
       const orders = await StoreApiService.getReadyOrders();
       setReadyOrders(orders || []);
     } catch (e) {
-      console.log('[StoreContext] Failed fetching ready orders:', e);
+      // non-fatal: ready orders unavailable
     }
   }, []);
 
@@ -417,7 +501,7 @@ const enrichStore = (rawStore: any): StoreHub | null => {
       const orders = await StoreApiService.getCompletedOrders();
       setCompletedOrders(orders || []);
     } catch (e) {
-      console.log('[StoreContext] Failed fetching completed orders:', e);
+      // non-fatal: completed orders unavailable
     }
   }, []);
 
@@ -426,7 +510,7 @@ const enrichStore = (rawStore: any): StoreHub | null => {
       const items = await StoreApiService.getInventory(inventorySearch, inventoryFilter);
       setInventory(items || []);
     } catch (e) {
-      console.log('[StoreContext] Failed fetching inventory:', e);
+      // non-fatal: inventory unavailable
     }
   }, [inventorySearch, inventoryFilter]);
 
@@ -807,6 +891,15 @@ const enrichStore = (rawStore: any): StoreHub | null => {
         isSidebarOpen,
         setSidebarOpen,
         toggleSidebar,
+        storeUnreadCount,
+        setStoreUnreadCount,
+        refreshUnreadCount: async () => {
+          const sId = store?.id || (store as any)?._id;
+          if (sId) {
+            const count = await StoreApiService.getUnreadCount(sId);
+            setStoreUnreadCount(count);
+          }
+        },
         loginWithStoreCredentials,
         sendOtp,
         verifyOtp,

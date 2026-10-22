@@ -22,9 +22,12 @@ import { Store, StoreDocument } from '../../stores/schemas/store.schema';
 import { OrderStatus } from '../../common/enums/order-status.enum';
 import { TrackingGateway } from '../../tracking/tracking.gateway';
 
+import { DeliveryPartnerCacheService } from '../common/partner-cache.service';
+
 @Injectable()
 export class DeliveryOrderService implements OnModuleInit {
   private readonly logger = new Logger(DeliveryOrderService.name);
+  private storeCache = new Map<string, { store: StoreDocument; expiresAt: number }>();
 
   onModuleInit() {
     this.autoExpireStaleOrders();
@@ -48,50 +51,15 @@ export class DeliveryOrderService implements OnModuleInit {
     private storeModel: Model<StoreDocument>,
     @InjectConnection() private readonly connection: Connection,
     private trackingGateway: TrackingGateway,
+    private readonly partnerCacheService: DeliveryPartnerCacheService,
   ) {}
 
+  public clearPartnerCache(userId?: string) {
+    this.partnerCacheService.invalidate(userId);
+  }
+
   private async getPartner(userId: string): Promise<DeliveryPartnerDocument> {
-    const userObjId = Types.ObjectId.isValid(userId) ? new Types.ObjectId(userId) : null;
-    let partner = await this.partnerModel.findOne({
-      $or: [
-        ...(userObjId ? [{ userId: userObjId }, { _id: userObjId }] : []),
-        { partnerCode: userId },
-        { riderCode: userId },
-      ],
-    });
-    if (!partner && userObjId) {
-      const user = await this.partnerModel.db.collection('users').findOne({ _id: userObjId });
-      const phone = user?.phone?.replace(/\s+/g, '').replace('+', '') || '9876543210';
-      partner = await this.partnerModel.findOne({
-        $or: [{ phoneNumber: phone }, { phoneNumber: `+91${phone}` }],
-      });
-      if (partner) {
-        partner.userId = userObjId as any;
-        await partner.save();
-      } else {
-        partner = await this.partnerModel.create({
-          userId: userObjId,
-          partnerCode: `RDR-${Math.floor(1000 + Math.random() * 9000)}`,
-          fullName: user?.name || 'Delivery Partner',
-          phoneNumber: phone,
-          email: user?.email || `rider.${phone}@wormup.com`,
-          city: 'Ahmedabad (Satellite Hub)',
-          hubName: 'Satellite Hub Dark Store',
-          status: 'APPROVED',
-          verificationStatus: 'VERIFIED',
-          isOnline: true,
-          vehicleType: 'EV_SCOOTER',
-          vehicleNumber: 'GJ-01-ET-4829',
-          rating: 4.88,
-          totalDeliveries: 428,
-          completedDeliveries: 428,
-        });
-      }
-    }
-    if (!partner) {
-      throw new NotFoundException('Delivery partner not found');
-    }
-    return partner;
+    return this.partnerCacheService.getPartner(userId);
   }
 
   async getActiveOrder(userId: string) {
@@ -283,9 +251,6 @@ export class DeliveryOrderService implements OnModuleInit {
       return [];
     }
 
-    // Clean up stale orders
-    await this.autoExpireStaleOrders();
-
     // Orders active within the last 2 hours remain visible for delivery partners
     const maxOrderAge = new Date(Date.now() - 120 * 60 * 1000);
 
@@ -343,23 +308,26 @@ export class DeliveryOrderService implements OnModuleInit {
       } catch (err) {}
     }
 
-    // Discover nearby active dark stores within 6.0 km
-    try {
-      const allActiveStores = await this.storeModel.find({ isActive: { $ne: false } });
-      for (const st of allActiveStores) {
-        if (st.location?.coordinates && st.location.coordinates.length === 2) {
-          const sLng = st.location.coordinates[0];
-          const sLat = st.location.coordinates[1];
-          const dist = this.calculateHaversineDistanceKm(riderLat, riderLng, sLat, sLng);
-          const maxRadius = Math.max(6.0, (st.serviceRadiusKm || 4.0) + 2.0);
-          if (dist <= maxRadius) {
-            const isOwn = partner.hubId ? partner.hubId.toString() === st._id.toString() : false;
-            allowedHubMap.set(st._id.toString(), { store: st, distanceKm: dist, isOwnHub: isOwn });
+    // Hyperlocal Rider Geofencing:
+    // If the rider is assigned to a fixed Dark Store Hub (partner.hubId), strictly limit orders to their home hub.
+    // Only search nearby active dark stores within 4.5 km if the rider has no assigned fixed hub.
+    if (!partner.hubId || allowedHubMap.size === 0) {
+      try {
+        const allActiveStores = await this.storeModel.find({ isActive: { $ne: false } });
+        for (const st of allActiveStores) {
+          if (st.location?.coordinates && st.location.coordinates.length === 2) {
+            const sLng = st.location.coordinates[0];
+            const sLat = st.location.coordinates[1];
+            const dist = this.calculateHaversineDistanceKm(riderLat, riderLng, sLat, sLng);
+            const maxRadius = Math.min(4.5, st.serviceRadiusKm || 4.0);
+            if (dist <= maxRadius) {
+              allowedHubMap.set(st._id.toString(), { store: st, distanceKm: dist, isOwnHub: false });
+            }
           }
         }
+      } catch (stErr: any) {
+        this.logger.warn(`Failed finding nearby stores for rider ${partner._id}: ${stErr?.message}`);
       }
-    } catch (stErr: any) {
-      this.logger.warn(`Failed finding nearby stores for rider ${partner._id}: ${stErr?.message}`);
     }
 
     const allowedHubIds = Array.from(allowedHubMap.keys())
@@ -544,6 +512,7 @@ export class DeliveryOrderService implements OnModuleInit {
       partnerPhone: partner.phoneNumber,
       vehicleNumber: partner.vehicleNumber,
       orderNumber: order?.orderNumber,
+      storeId: order?.storeId?.toString?.() || order?.storeId,
     });
 
     return this.formatOrderDeliveryPayload(assignment, order, partner);
@@ -684,6 +653,7 @@ export class DeliveryOrderService implements OnModuleInit {
       partnerPhone: partner.phoneNumber,
       vehicleNumber: partner.vehicleNumber,
       orderNumber: order?.orderNumber,
+      storeId: order?.storeId?.toString?.() || order?.storeId,
     });
 
     if (order?.storeId) {
@@ -774,6 +744,7 @@ export class DeliveryOrderService implements OnModuleInit {
       pickupConfirmedAt: assignment.pickedUpAt,
       orderNumber: order.orderNumber,
       bagBarcode: expectedBagBarcode,
+      storeId: order?.storeId?.toString?.() || order?.storeId,
     });
 
     return this.formatOrderDeliveryPayload(assignment, order, partner);
@@ -811,6 +782,7 @@ export class DeliveryOrderService implements OnModuleInit {
       partnerPhone: partner.phoneNumber,
       vehicleNumber: partner.vehicleNumber,
       orderNumber: order?.orderNumber,
+      storeId: order?.storeId?.toString?.() || order?.storeId,
     });
 
     return this.formatOrderDeliveryPayload(assignment, order, partner);
@@ -870,6 +842,7 @@ export class DeliveryOrderService implements OnModuleInit {
         orderNumber: (order as any)?.orderNumber,
         cashCollectedAmount: cashAmt,
         paymentStatus: 'PAID',
+        storeId: (order as any)?.storeId?.toString?.() || (order as any)?.storeId,
       });
     }
 
@@ -1285,6 +1258,7 @@ export class DeliveryOrderService implements OnModuleInit {
         completedAt: assignment.completedAt,
         orderId: assignment.orderId.toString(),
         orderNumber: order?.orderNumber,
+        storeId: order?.storeId?.toString?.() || order?.storeId,
       });
 
       return {
@@ -1330,37 +1304,41 @@ export class DeliveryOrderService implements OnModuleInit {
     const orderNumber = order?.orderNumber || (assignment ? `#WUP-${assignment._id.toString().slice(-5)}` : '#ORDER');
     let store: StoreDocument | null = hubInfo?.store || null;
     if (!store && order?.storeId && Types.ObjectId.isValid(order.storeId.toString())) {
-      try {
-        store = await this.storeModel.findById(order.storeId);
-      } catch {
-        store = null;
-      }
-    }
-
-    // Customer details from users collection via order.userId
-    let customerUser: any = null;
-    if (order?.userId && Types.ObjectId.isValid(order.userId.toString())) {
-      try {
-        customerUser = await this.connection
-          .collection('users')
-          .findOne({ _id: new Types.ObjectId(order.userId.toString()) });
-      } catch (err: any) {
-        this.logger.warn(`Could not fetch customer user for order: ${err?.message}`);
+      const storeIdStr = order.storeId.toString();
+      const cached = this.storeCache.get(storeIdStr);
+      if (cached && cached.expiresAt > Date.now()) {
+        store = cached.store;
+      } else {
+        try {
+          store = await this.storeModel.findById(order.storeId);
+          if (store) {
+            this.storeCache.set(storeIdStr, { store, expiresAt: Date.now() + 60000 });
+          }
+        } catch {
+          store = null;
+        }
       }
     }
 
     const deliveryAddress: any = order?.deliveryAddress || {};
-    const customerName =
-      customerUser?.name ||
-      customerUser?.fullName ||
-      deliveryAddress.name ||
-      deliveryAddress.fullName ||
-      'Customer';
-    const customerPhone =
-      customerUser?.phone ||
-      customerUser?.phoneNumber ||
-      deliveryAddress.phone ||
-      '+91 98980 12345';
+    let customerName = deliveryAddress.name || deliveryAddress.fullName;
+    let customerPhone = deliveryAddress.phone || deliveryAddress.phoneNumber;
+
+    // Only query users collection if name or phone is missing in deliveryAddress
+    if ((!customerName || !customerPhone) && order?.userId && Types.ObjectId.isValid(order.userId.toString())) {
+      try {
+        const customerUser = await this.connection
+          .collection('users')
+          .findOne({ _id: new Types.ObjectId(order.userId.toString()) });
+        customerName = customerName || customerUser?.name || customerUser?.fullName || 'Customer';
+        customerPhone = customerPhone || customerUser?.phone || customerUser?.phoneNumber || '+91 98980 12345';
+      } catch (err: any) {
+        this.logger.warn(`Could not fetch customer user for order: ${err?.message}`);
+      }
+    } else {
+      customerName = customerName || 'Customer';
+      customerPhone = customerPhone || '+91 98980 12345';
+    }
 
     const addressParts = [
       deliveryAddress.houseFlat || deliveryAddress.houseNumber || deliveryAddress.addressLine1,
@@ -1377,9 +1355,9 @@ export class DeliveryOrderService implements OnModuleInit {
     const paymentMethod = order?.paymentMethod || 'COD';
     const paymentStatus = order?.paymentStatus || (paymentMethod === 'COD' ? 'PENDING' : 'COMPLETED');
 
-    // Fetch order status histories from collection
+    // Fetch order status histories from collection only for active/completed delivery steps
     let histories: any[] = [];
-    if (assignment?.orderId) {
+    if (assignment?.orderId && assignment?.status !== RiderAssignmentStatus.OFFERED) {
       try {
         histories = await this.connection
           .collection('order_status_history')

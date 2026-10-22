@@ -10,6 +10,7 @@ import { AdminApprovalsService } from './admin-approvals.service';
 import { AdminApprovalsController } from './admin-approvals.controller';
 import { AdminRealtimeController } from './admin-realtime.controller';
 import { TrackingModule } from '../tracking/tracking.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { TrackingModule } from '../tracking/tracking.module';
       { name: AdminAuditLog.name, schema: AdminAuditLogSchema },
     ]),
     TrackingModule,
+    NotificationsModule,
   ],
   controllers: [AdminApprovalsController, AdminRealtimeController],
   providers: [AdminApprovalsService],

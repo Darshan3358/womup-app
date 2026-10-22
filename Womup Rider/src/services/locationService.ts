@@ -149,10 +149,16 @@ export class LocationTrackerService {
     return { hub: nearest, distanceKm: minDistance };
   }
 
+  private static addressCache = new Map<string, string>();
+
   static async getAddressForCoords(
     lat: number = LocationTrackerService.currentLatitude ?? 23.115,
     lng: number = LocationTrackerService.currentLongitude ?? 72.545
   ): Promise<string> {
+    const key = `${lat.toFixed(3)},${lng.toFixed(3)}`;
+    if (this.addressCache.has(key)) {
+      return this.addressCache.get(key)!;
+    }
     try {
       const geo = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
       if (geo && geo.length > 0) {
@@ -164,13 +170,16 @@ export class LocationTrackerService {
           item.postalCode,
         ].filter(Boolean);
         if (parts.length > 0) {
-          return parts.join(', ');
+          const addr = parts.join(', ');
+          this.addressCache.set(key, addr);
+          return addr;
         }
       }
     } catch {
       // fallback
     }
     const nearest = this.getNearestHub(lat, lng);
+    this.addressCache.set(key, nearest.hub.address);
     return nearest.hub.address;
   }
 

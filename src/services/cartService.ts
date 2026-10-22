@@ -78,13 +78,13 @@ export const CartService = {
     return res.success ? res.data : null;
   },
 
-  async addItemToServer(productId: string, quantity: number = 1, variantId?: string): Promise<any> {
-    const res = await api.post<any>('/cart/items', { productId, quantity, variantId });
+  async addItemToServer(productId: string, quantity: number = 1, variantId?: string, areaId?: string, storeId?: string): Promise<any> {
+    const res = await api.post<any>('/cart/items', { productId, quantity, variantId, areaId, storeId });
     return res.success ? res.data : null;
   },
 
-  async updateQuantityOnServer(productId: string, delta: number, variantId?: string): Promise<any> {
-    const res = await api.patch<any>(`/cart/items/${productId}`, { delta, variantId });
+  async updateQuantityOnServer(productId: string, delta: number, variantId?: string, areaId?: string, storeId?: string): Promise<any> {
+    const res = await api.patch<any>(`/cart/items/${productId}`, { delta, variantId, areaId, storeId });
     return res.success ? res.data : null;
   },
 
@@ -131,6 +131,7 @@ export const CartService = {
     areaName?: string;
     distanceKm?: number;
     tip?: number;
+    forceRefresh?: boolean;
   }): Promise<{
     deliveryFee: number;
     handlingFee: number;
@@ -140,6 +141,8 @@ export const CartService = {
     total: number;
     areaName?: string;
     cityName?: string;
+    storeName?: string;
+    storeId?: string;
     breakdown?: {
       baseFee: number;
       minimumPayout: number;
@@ -151,39 +154,34 @@ export const CartService = {
       explanation?: string;
     };
   }> {
-    const cacheKey = `${params.areaName || ''}_${params.cityName || ''}_${params.distanceKm || 3.26}_${params.items?.length || 0}`;
+    const lat = params.deliveryAddress?.latitude ?? params.deliveryAddress?.lat ?? '';
+    const lng = params.deliveryAddress?.longitude ?? params.deliveryAddress?.lng ?? '';
+    const cacheKey = `${params.storeId || ''}_${params.areaName || ''}_${lat}_${lng}_${params.items?.length || 0}`;
 
-    // 1. Check completed cache first (60s TTL)
-    const cached = _feeCache.get(cacheKey);
-    if (cached && Date.now() - cached.ts < 60000) {
-      return cached.data;
+    // 1. Check completed cache first (60s TTL) - skipped if forceRefresh is true
+    if (!params.forceRefresh) {
+      const cached = _feeCache.get(cacheKey);
+      if (cached && Date.now() - cached.ts < 60000) {
+        return cached.data;
+      }
     }
 
     // 2. Check if identical request is already in-flight (deduplication)
     const inFlight = _inFlightRequests.get(cacheKey);
-    if (inFlight) {
+    if (inFlight && !params.forceRefresh) {
       return inFlight;
     }
 
-    // 3. Create single shared promise
+    // 3. Create single shared promise — uses centralized api client (correct URL + auth header)
     const promise = (async () => {
       try {
-        const host = typeof window !== 'undefined' && window.location?.hostname
-          ? window.location.hostname
-          : 'localhost';
-
-        const res = await fetch(`http://${host}:5050/api/v1/cart/calculate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(params),
-        });
-        const json = await res.json();
-        if (json.success && json.data) {
-          _feeCache.set(cacheKey, { data: json.data, ts: Date.now() });
-          return json.data;
+        const res = await api.post<any>('/cart/calculate', params);
+        if (res.success && res.data) {
+          _feeCache.set(cacheKey, { data: res.data, ts: Date.now() });
+          return res.data;
         }
       } catch (err) {
-        console.warn('[CartService] /api/v1/cart/calculate fetch failed, using fallback:', err);
+        console.warn('[CartService] /api/v1/cart/calculate failed, using fallback:', err);
       } finally {
         _inFlightRequests.delete(cacheKey);
       }
@@ -242,5 +240,22 @@ export const CartService = {
 
     _inFlightRequests.set(cacheKey, promise);
     return promise;
+  },
+
+  getCachedDeliveryFee(params?: {
+    storeId?: string;
+    cityName?: string;
+    areaName?: string;
+    distanceKm?: number;
+    items?: Array<{ name?: string; price?: number; mrp?: number; quantity?: number }>;
+  }): any | null {
+    if (params) {
+      const cacheKey = `${params.storeId || ''}_${params.areaName || ''}_${params.cityName || ''}_${params.distanceKm || 3.26}_${params.items?.length || 0}`;
+      const cached = _feeCache.get(cacheKey);
+      if (cached && Date.now() - cached.ts < 60000) {
+        return cached.data;
+      }
+    }
+    return null;
   },
 };

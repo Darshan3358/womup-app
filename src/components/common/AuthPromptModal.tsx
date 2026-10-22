@@ -57,7 +57,11 @@ export const AuthPromptModal: React.FC = () => {
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                 >
-                  <Feather name="shopping-bag" size={28} color="#FFFFFF" />
+                  {authPromptActionName === 'Local Store App' ? (
+                    <Ionicons name="storefront" size={28} color="#FFFFFF" />
+                  ) : (
+                    <Feather name="shopping-bag" size={28} color="#FFFFFF" />
+                  )}
                 </LinearGradient>
               </View>
 

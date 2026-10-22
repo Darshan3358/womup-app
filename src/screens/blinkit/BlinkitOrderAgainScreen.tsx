@@ -17,10 +17,9 @@ import { FloatingCartPill } from '../../components/common/FloatingCartPill';
 import { useApp, mapProductToBlinkit } from '../../context/AppContext';
 import { ProductService } from '../../services/productService';
 import { BlinkitProduct, Order, Address } from '../../types';
-import { AppIcon } from '../../components/common/AppIcon';
-import { DEALS_OF_THE_DAY_PRODUCTS, ORDER_AGAIN_PRODUCTS } from '../../data/blinkitData';
 import { PrintingService, PrintOrderItem } from '../../services/printingService';
 import { OrderCard } from '../../components/OrderCard';
+import { resolveImageThumbnail } from '../../utils/imageUrl';
 
 const defaultAddress: Address = {
   id: 'addr_default',
@@ -75,9 +74,8 @@ export const BlinkitOrderAgainScreen: React.FC = () => {
   const displayOrders = orders && orders.length > 0 ? orders : DEFAULT_PAST_ORDERS;
   const hasPrintOrders = printOrders && printOrders.length > 0;
 
-  // Curated bestsellers matching SRS Section 40 (Tomatoes, Sunflower Oil, Oats, Paneer)
-  const bestsellersList: BlinkitProduct[] =
-    popularProducts.length >= 4 ? popularProducts : DEALS_OF_THE_DAY_PRODUCTS;
+  // Curated bestsellers from live products catalog
+  const bestsellersList: BlinkitProduct[] = popularProducts;
 
   const getProductImageSource = (item?: any, orderIdx?: number, isCancelled?: boolean): ImageSourcePropType => {
     if (item?.image) {
@@ -97,16 +95,8 @@ export const BlinkitOrderAgainScreen: React.FC = () => {
       if (match?.imageUrl) return { uri: match.imageUrl };
     }
 
-    // Search in known catalog
-    const catalog = [...DEALS_OF_THE_DAY_PRODUCTS, ...ORDER_AGAIN_PRODUCTS];
-    if (itemId) {
-      const match: any = catalog.find((p) => p.id === itemId);
-      if (match?.image) return match.image;
-      if (match?.imageUrl) return { uri: match.imageUrl };
-    }
-
     if (itemName) {
-      const nameMatch: any = catalog.find(
+      const nameMatch: any = popularProducts.find(
         (p) =>
           itemName.includes(p.name.toLowerCase()) ||
           p.name.toLowerCase().includes(itemName)
@@ -353,7 +343,7 @@ export const BlinkitOrderAgainScreen: React.FC = () => {
                     style={styles.bsImageWrapper}
                   >
                     <Image
-                      source={{ uri: prod.imageUrl }}
+                      source={{ uri: resolveImageThumbnail(prod.imageUrl) }}
                       style={styles.bsImage}
                       resizeMode="cover"
                     />

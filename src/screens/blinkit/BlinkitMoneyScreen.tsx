@@ -11,6 +11,7 @@ import {
   Alert,
   ActivityIndicator,
   Image,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, GRADIENTS } from '../../theme/colors';
 import { TYPOGRAPHY } from '../../theme/typography';
 import { useApp } from '../../context/AppContext';
+import { useToast } from '../../context/ToastContext';
 import { AuthService } from '../../services/authService';
 import { StorageService } from '../../services/storageService';
 import { KycService } from '../../services/kycService';
@@ -37,6 +39,57 @@ export const BlinkitMoneyScreen: React.FC = () => {
 
   const [isAddMoneyModalVisible, setAddMoneyModalVisible] = useState(false);
   const [amountInput, setAmountInput] = useState('500');
+  const [isReferralCopied, setIsReferralCopied] = useState(false);
+  const toast = useToast();
+
+  const handleCopyReferralCode = async () => {
+    const code = user.referralCode || (user as any).sponsorCode || 'WORM3405';
+    let copiedSuccess = false;
+
+    // 1. Try modern navigator.clipboard (Standard Web API)
+    if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      try {
+        await navigator.clipboard.writeText(code);
+        copiedSuccess = true;
+      } catch (err) {
+        console.warn('navigator.clipboard.writeText failed:', err);
+      }
+    }
+
+    // 2. Fallback using invisible textarea (works across all browsers / iframe contexts)
+    if (!copiedSuccess && typeof document !== 'undefined') {
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = code;
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        textarea.style.top = '-9999px';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        copiedSuccess = document.execCommand('copy');
+        document.body.removeChild(textarea);
+      } catch (err) {
+        console.warn('document.execCommand copy fallback failed:', err);
+      }
+    }
+
+    // 3. Tactile Visual State Change (Button turns Green "Copied!" for 2.5s)
+    setIsReferralCopied(true);
+    setTimeout(() => {
+      setIsReferralCopied(false);
+    }, 2500);
+
+    // 4. In-App Notification Toast
+    try {
+      toast.showSuccess(`Referral code ${code} copied to clipboard!`, 'Copied!');
+    } catch {
+      if (Platform.OS !== 'web') {
+        Alert.alert('Referral Code Copied!', `Your code ${code} is ready to paste.`);
+      }
+    }
+  };
 
   // Aadhaar & Bank KYC State
   const [isAadhaarModalVisible, setAadhaarModalVisible] = useState(false);
@@ -95,6 +148,28 @@ export const BlinkitMoneyScreen: React.FC = () => {
       console.warn('Failed to load income history:', e);
     } finally {
       setIsLoadingIncomeHistory(false);
+    }
+  };
+
+  // ── Token / Shopping Coin History Modal State ──
+  const [isCoinHistoryVisible, setIsCoinHistoryVisible] = useState(false);
+  const [coinHistoryData, setCoinHistoryData] = useState<any[]>([]);
+  const [isLoadingCoinHistory, setIsLoadingCoinHistory] = useState(false);
+  const [coinFilter, setCoinFilter] = useState<'ALL' | 'LEVEL' | 'MONTHLY' | 'BONUS' | 'ORDER' | 'REDEEM'>('ALL');
+
+  const handleOpenCoinHistory = async () => {
+    setIsCoinHistoryVisible(true);
+    setIsLoadingCoinHistory(true);
+    try {
+      const res = await AuthService.getCoinTransactions(1, 100);
+      if (res.success && res.data) {
+        const txs = res.data.transactions || res.data || [];
+        setCoinHistoryData(txs);
+      }
+    } catch (e) {
+      console.warn('Failed to load coin transactions history:', e);
+    } finally {
+      setIsLoadingCoinHistory(false);
     }
   };
 
@@ -422,12 +497,29 @@ export const BlinkitMoneyScreen: React.FC = () => {
                     <Text style={styles.bonusTagText}>WELCOME BONUS</Text>
                   </View>
                 </View>
-                <Text style={styles.balanceIcon}>🪙</Text>
+                <TouchableOpacity
+                  style={styles.coinHistoryBadgeBtn}
+                  onPress={handleOpenCoinHistory}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="time-outline" size={13} color="#FCD34D" />
+                  <Text style={styles.coinHistoryBadgeText}>View History</Text>
+                  <Ionicons name="chevron-forward" size={11} color="#FCD34D" />
+                </TouchableOpacity>
               </View>
               <Text style={styles.balanceValueDark}>{user.shoppingCoins ?? 2000}</Text>
-              <Text style={styles.balanceSubDark}>
-                Worth ₹{user.shoppingCoins ?? 2000} • 1 Coin = ₹1 Discount on grocery orders
-              </Text>
+              <View style={styles.coinBottomRow}>
+                <Text style={styles.balanceSubDark}>
+                  Worth ₹{user.shoppingCoins ?? 2000} • 1 Coin = ₹1 Discount on grocery orders
+                </Text>
+                <TouchableOpacity
+                  style={styles.tokenHistoryLinkBtn}
+                  onPress={handleOpenCoinHistory}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.tokenHistoryLinkText}>Token Ledger →</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* Row of 2 Cards: Today's Income & Available Income */}
@@ -622,23 +714,28 @@ export const BlinkitMoneyScreen: React.FC = () => {
             <View style={styles.referralCodeCard}>
               <View style={styles.referralLeftCol}>
                 <Text style={styles.referralHeaderLabel}>MY REFERRAL CODE</Text>
-                <Text style={styles.referralCodeBig}>{user.referralCode || 'WORM5871'}</Text>
+                <Text style={styles.referralCodeBig}>{user.referralCode || (user as any).sponsorCode || 'WORM3405'}</Text>
                 <Text style={styles.referralHelpText}>
                   Share with friends to earn ₹20 Direct App Download Income
                 </Text>
               </View>
               <TouchableOpacity
-                style={styles.referralCopyBtn}
-                onPress={() => {
-                  Alert.alert(
-                    'Referral Code Copied!',
-                    `Your referral code ${user.referralCode || 'WORM5871'} has been copied!`
-                  );
-                }}
+                style={[
+                  styles.referralCopyBtn,
+                  isReferralCopied && styles.referralCopyBtnSuccess,
+                ]}
+                onPress={handleCopyReferralCode}
                 activeOpacity={0.8}
+                accessibilityLabel="Copy referral code"
               >
-                <Ionicons name="copy-outline" size={16} color="#FFFFFF" />
-                <Text style={styles.referralCopyBtnText}>Copy</Text>
+                <Ionicons
+                  name={isReferralCopied ? 'checkmark-circle' : 'copy-outline'}
+                  size={16}
+                  color="#FFFFFF"
+                />
+                <Text style={styles.referralCopyBtnText}>
+                  {isReferralCopied ? 'Copied!' : 'Copy'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1637,6 +1734,227 @@ export const BlinkitMoneyScreen: React.FC = () => {
         </View>
       </Modal>
 
+      {/* ── Shopping Coin / Token Transaction History Modal ── */}
+      <Modal
+        visible={isCoinHistoryVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsCoinHistoryVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setIsCoinHistoryVisible(false)} />
+          <View style={[styles.modalCard, styles.teamPerformanceModalCard]}>
+            {/* Header */}
+            <View style={styles.modalHeaderRow}>
+              <View>
+                <Text style={[TYPOGRAPHY.headingMd, styles.modalHeading]}>Shopping Coins History</Text>
+                <Text style={styles.withdrawSub}>
+                  Token Ledger • Level Tokens, Monthly Tokens & Orders
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setIsCoinHistoryVisible(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Ionicons name="close-circle" size={24} color="#94A3B8" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={{ flex: 1, marginTop: 8 }}
+              showsVerticalScrollIndicator={true}
+              nestedScrollEnabled={true}
+              contentContainerStyle={{ paddingBottom: 30 }}
+            >
+              {/* Total Coins Card */}
+              <View style={[styles.historyBalanceCard, { backgroundColor: '#071B52' }]}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={[styles.historyBalanceLabel, { color: '#93C5FD' }]}>TOTAL SHOPPING COINS</Text>
+                  <View style={[styles.historyBalanceBadge, { backgroundColor: '#1E3A8A' }]}>
+                    <Text style={[styles.historyBalanceBadgeText, { color: '#FCD34D' }]}>1 COIN = ₹1</Text>
+                  </View>
+                </View>
+                <Text style={[styles.historyBalanceValue, { color: '#FFFFFF' }]}>🪙 {user.shoppingCoins ?? 2000}</Text>
+                <Text style={[styles.historyBalanceSub, { color: '#CBD5E1' }]}>
+                  Worth ₹{user.shoppingCoins ?? 2000} instant discount on groceries & local shop orders
+                </Text>
+              </View>
+
+              {/* Filter Tabs */}
+              <View style={styles.coinFilterRow}>
+                {[
+                  { key: 'ALL', label: 'All' },
+                  { key: 'LEVEL', label: '🎖️ Level Token' },
+                  { key: 'MONTHLY', label: '📅 Monthly Token' },
+                  { key: 'BONUS', label: '🎁 Welcome' },
+                  { key: 'ORDER', label: '🛒 Orders' },
+                  { key: 'REDEEM', label: '⚡ Redeemed' },
+                ].map((f) => (
+                  <TouchableOpacity
+                    key={f.key}
+                    style={[
+                      styles.coinFilterChip,
+                      coinFilter === f.key && styles.coinFilterChipActive,
+                    ]}
+                    onPress={() => setCoinFilter(f.key as any)}
+                    activeOpacity={0.75}
+                  >
+                    <Text
+                      style={[
+                        styles.coinFilterChipText,
+                        coinFilter === f.key && styles.coinFilterChipTextActive,
+                      ]}
+                    >
+                      {f.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Transaction Ledger List */}
+              <Text style={[styles.historySectionHeading, { marginTop: 14 }]}>TOKEN TRANSACTIONS</Text>
+
+              {isLoadingCoinHistory ? (
+                <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                  <ActivityIndicator size="large" color="#4F46E5" />
+                  <Text style={{ marginTop: 10, color: '#64748B', fontSize: 13 }}>Loading token history...</Text>
+                </View>
+              ) : (() => {
+                const filtered = coinHistoryData.filter((tx) => {
+                  if (coinFilter === 'ALL') return true;
+                  const ref = (tx.referenceType || '').toUpperCase();
+                  const desc = (tx.description || '').toLowerCase();
+                  const isDebitItem = tx.type === 'SPEND' || tx.type === 'DEBIT' || ref === 'VENDOR_REDEEM' || desc.includes('redeem') || desc.includes('checkout') || desc.includes('used');
+                  if (coinFilter === 'LEVEL') return ref === 'TIER_COIN_INCOME' || desc.includes('level');
+                  if (coinFilter === 'MONTHLY') return ref === 'MONTHLY_ALLOCATION' || desc.includes('monthly');
+                  if (coinFilter === 'BONUS') return ref === 'SIGNUP_BONUS' || desc.includes('welcome') || desc.includes('signup');
+                  if (coinFilter === 'ORDER') return ref === 'ORDER' || ref === 'VENDOR_REDEEM' || desc.includes('order') || desc.includes('cashback') || desc.includes('redeem');
+                  if (coinFilter === 'REDEEM') return isDebitItem;
+                  return true;
+                });
+
+                if (filtered.length === 0) {
+                  return (
+                    <View style={styles.emptyMembersBox}>
+                      <Ionicons name="receipt-outline" size={32} color="#94A3B8" />
+                      <Text style={[styles.emptyMembersText, { marginTop: 4 }]}>
+                        {coinFilter === 'ALL'
+                          ? 'No coin transactions recorded yet.'
+                          : `No transactions found in ${coinFilter} category.`}
+                      </Text>
+                    </View>
+                  );
+                }
+
+                return filtered.map((tx: any, idx: number) => {
+                  const ref = (tx.referenceType || '').toUpperCase();
+                  const desc = tx.description || 'Shopping Coin Transaction';
+                  const lowerDesc = desc.toLowerCase();
+                  const isDebit = tx.type === 'SPEND' || tx.type === 'DEBIT' || ref === 'VENDOR_REDEEM' || lowerDesc.includes('redeem') || lowerDesc.includes('checkout') || lowerDesc.includes('used');
+                  
+                  let badge = {
+                    label: 'Order Reward',
+                    icon: 'cart-outline',
+                    bg: '#ECFDF5',
+                    color: '#059669',
+                    border: '#A7F3D0',
+                  };
+
+                  if (ref === 'VENDOR_REDEEM' || (isDebit && (lowerDesc.includes('store') || lowerDesc.includes('merchant')))) {
+                    badge = {
+                      label: 'Store Redeemed',
+                      icon: 'storefront-outline',
+                      bg: '#FEF2F2',
+                      color: '#DC2626',
+                      border: '#FECACA',
+                    };
+                  } else if (ref === 'TIER_COIN_INCOME' || lowerDesc.includes('level')) {
+                    badge = {
+                      label: 'Level Token',
+                      icon: 'trophy-outline',
+                      bg: '#F5F3FF',
+                      color: '#7C3AED',
+                      border: '#DDD6FE',
+                    };
+                  } else if (ref === 'MONTHLY_ALLOCATION' || lowerDesc.includes('monthly')) {
+                    badge = {
+                      label: 'Monthly Token',
+                      icon: 'calendar-outline',
+                      bg: '#EFF6FF',
+                      color: '#2563EB',
+                      border: '#BFDBFE',
+                    };
+                  } else if (ref === 'SIGNUP_BONUS' || lowerDesc.includes('welcome') || lowerDesc.includes('signup')) {
+                    badge = {
+                      label: 'Welcome Bonus',
+                      icon: 'gift-outline',
+                      bg: '#FEF3C7',
+                      color: '#D97706',
+                      border: '#FDE68A',
+                    };
+                  } else if (isDebit) {
+                    badge = {
+                      label: 'Coins Redeemed',
+                      icon: 'pricetag-outline',
+                      bg: '#FEF2F2',
+                      color: '#DC2626',
+                      border: '#FECACA',
+                    };
+                  }
+
+                  const dateObj = tx.createdAt ? new Date(tx.createdAt) : new Date();
+                  const dateStr = dateObj.toLocaleDateString('en-IN', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  });
+
+                  return (
+                    <View key={tx._id || tx.id || idx} style={styles.txItemCard}>
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', flex: 1, marginRight: 12 }}>
+                        <View style={[styles.txIconBubble, { backgroundColor: badge.bg }]}>
+                          <Ionicons name={badge.icon as any} size={16} color={badge.color} />
+                        </View>
+                        <View style={{ flex: 1, marginLeft: 10 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <View style={[styles.txStatusBadge, { backgroundColor: badge.bg, borderColor: badge.border, borderWidth: 1 }]}>
+                              <Text style={[styles.txStatusText, { color: badge.color }]}>
+                                {badge.label}
+                              </Text>
+                            </View>
+                          </View>
+                          <Text style={styles.txDesc} numberOfLines={2}>
+                            {desc}
+                          </Text>
+                          <Text style={styles.txDate}>{dateStr}</Text>
+                          {typeof tx.balanceAfter === 'number' && (
+                            <Text style={styles.txBalanceAfter}>
+                              Balance after: 🪙 {tx.balanceAfter}
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text
+                          style={[
+                            styles.txAmount,
+                            isDebit ? { color: '#DC2626' } : { color: '#059669' },
+                          ]}
+                        >
+                          {isDebit ? '−' : '+'}
+                          {tx.coins || tx.amount || 0}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '600' }}>Coins</Text>
+                      </View>
+                    </View>
+                  );
+                });
+              })()}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       {/* ── 7-Level Team Performance Dashboard Modal ── */}
       <Modal
         visible={isTeamModalVisible}
@@ -2334,6 +2652,75 @@ const styles = StyleSheet.create({
     color: '#FCD34D',
     fontWeight: '600',
     marginTop: 4,
+    flex: 1,
+  },
+  coinHistoryBadgeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(252, 211, 77, 0.15)',
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+    borderRadius: 8,
+    paddingVertical: 3.5,
+    paddingHorizontal: 8,
+  },
+  coinHistoryBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FCD34D',
+  },
+  coinBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+    gap: 8,
+  },
+  tokenHistoryLinkBtn: {
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  tokenHistoryLinkText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#93C5FD',
+  },
+  coinFilterRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  coinFilterChip: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  coinFilterChipActive: {
+    backgroundColor: '#071B52',
+    borderColor: '#071B52',
+  },
+  coinFilterChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  coinFilterChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+  txBalanceAfter: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#6366F1',
+    marginTop: 3,
   },
   twoCardsRow: {
     flexDirection: 'row',
@@ -2886,6 +3273,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+  },
+  referralCopyBtnSuccess: {
+    backgroundColor: '#059669',
   },
   referralCopyBtnText: {
     fontSize: 13,

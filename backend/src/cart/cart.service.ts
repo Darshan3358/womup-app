@@ -60,6 +60,25 @@ export class CartService {
         if (sDoc?.areaId) targetAreaId = sDoc.areaId.toString();
       }
     }
+    if (!targetAreaId && user) {
+      const defaultAddr = await this.connection.collection('addresses').findOne({
+        userId: user._id,
+        isDefault: true,
+      });
+      if (defaultAddr?.areaId) {
+        targetAreaId = defaultAddr.areaId.toString();
+      } else if (defaultAddr?.area) {
+        const escaped = defaultAddr.area.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+        const aDoc = await this.connection.collection('areas').findOne({
+          name: new RegExp(escaped, 'i'),
+        });
+        if (aDoc?._id) targetAreaId = aDoc._id.toString();
+      }
+    }
+    if (targetAreaId && !cart.areaId && Types.ObjectId.isValid(targetAreaId)) {
+      cart.areaId = new Types.ObjectId(targetAreaId);
+      await cart.save();
+    }
 
     const detailedItems: any[] = [];
     let itemSubtotal = 0;
@@ -319,7 +338,7 @@ export class CartService {
     };
   }
 
-  async addItem(userId: string, productId: string, quantity: number, variantId?: string) {
+  async addItem(userId: string, productId: string, quantity: number, variantId?: string, areaId?: string, storeId?: string) {
     if (quantity <= 0) {
       throw new BadRequestException('Quantity must be greater than zero');
     }
@@ -337,6 +356,13 @@ export class CartService {
     const resolvedProductId = product._id;
     const resolvedVariantId = variantId && Types.ObjectId.isValid(variantId) ? new Types.ObjectId(variantId) : undefined;
     const cart = await this.getOrCreateCart(userId);
+    if (areaId && Types.ObjectId.isValid(areaId)) {
+      cart.areaId = new Types.ObjectId(areaId);
+    }
+    if (storeId && Types.ObjectId.isValid(storeId)) {
+      cart.storeId = new Types.ObjectId(storeId);
+    }
+
     const existingIndex = cart.items.findIndex((i) => {
       const pMatch = i.productId.toString() === resolvedProductId.toString();
       if (!pMatch) return false;
@@ -357,12 +383,12 @@ export class CartService {
     }
 
     await cart.save();
-    const summary = await this.getCartSummary(userId);
+    const summary = await this.getCartSummary(userId, areaId, storeId);
     this.trackingGateway.emitCartUpdated(userId, summary);
     return summary;
   }
 
-  async updateQuantity(userId: string, productId: string, delta: number, variantId?: string) {
+  async updateQuantity(userId: string, productId: string, delta: number, variantId?: string, areaId?: string, storeId?: string) {
     const product = Types.ObjectId.isValid(productId)
       ? await this.productModel.findById(productId).exec()
       : await this.productModel.findOne({
@@ -372,6 +398,13 @@ export class CartService {
     const targetIdStr = product ? product._id.toString() : productId;
     const resolvedVariantId = variantId && Types.ObjectId.isValid(variantId) ? new Types.ObjectId(variantId) : undefined;
     const cart = await this.getOrCreateCart(userId);
+    if (areaId && Types.ObjectId.isValid(areaId)) {
+      cart.areaId = new Types.ObjectId(areaId);
+    }
+    if (storeId && Types.ObjectId.isValid(storeId)) {
+      cart.storeId = new Types.ObjectId(storeId);
+    }
+
     const existingIndex = cart.items.findIndex((i) => {
       const pMatch = i.productId.toString() === targetIdStr || i.productId.toString() === productId;
       if (!pMatch) return false;
@@ -396,12 +429,12 @@ export class CartService {
       await cart.save();
     }
 
-    const summary = await this.getCartSummary(userId);
+    const summary = await this.getCartSummary(userId, areaId, storeId);
     this.trackingGateway.emitCartUpdated(userId, summary);
     return summary;
   }
 
-  async setExactQuantity(userId: string, productId: string, quantity: number, variantId?: string) {
+  async setExactQuantity(userId: string, productId: string, quantity: number, variantId?: string, areaId?: string, storeId?: string) {
     const product = Types.ObjectId.isValid(productId)
       ? await this.productModel.findById(productId).exec()
       : await this.productModel.findOne({
@@ -411,6 +444,13 @@ export class CartService {
     const targetIdStr = product ? product._id.toString() : productId;
     const resolvedVariantId = variantId && Types.ObjectId.isValid(variantId) ? new Types.ObjectId(variantId) : undefined;
     const cart = await this.getOrCreateCart(userId);
+    if (areaId && Types.ObjectId.isValid(areaId)) {
+      cart.areaId = new Types.ObjectId(areaId);
+    }
+    if (storeId && Types.ObjectId.isValid(storeId)) {
+      cart.storeId = new Types.ObjectId(storeId);
+    }
+
     const existingIndex = cart.items.findIndex((i) => {
       const pMatch = i.productId.toString() === targetIdStr || i.productId.toString() === productId;
       if (!pMatch) return false;
@@ -439,7 +479,7 @@ export class CartService {
       }
     }
 
-    const summary = await this.getCartSummary(userId);
+    const summary = await this.getCartSummary(userId, areaId, storeId);
     this.trackingGateway.emitCartUpdated(userId, summary);
     return summary;
   }
@@ -585,13 +625,29 @@ export class CartService {
     const custLat = Number(latValue);
     const custLng = Number(lngValue);
 
+    // Guard: If resolvedStore was explicitly passed but is out of service range (>6.0 km) from customer coordinates,
+    // re-anchor to the hyperlocal store matching the customer's actual coordinates/area
+    if (resolvedStore && Number.isFinite(custLat) && Number.isFinite(custLng) && custLat !== 0 && custLng !== 0) {
+      const sLat = Number(resolvedStore.location?.coordinates?.[1] ?? resolvedStore.latitude);
+      const sLng = Number(resolvedStore.location?.coordinates?.[0] ?? resolvedStore.longitude);
+      if (Number.isFinite(sLat) && Number.isFinite(sLng) && (sLat !== 0 || sLng !== 0)) {
+        const dLat = (sLat - custLat) * 111;
+        const dLng = (sLng - custLng) * 111 * Math.cos((custLat * Math.PI) / 180);
+        const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+        const maxLimit = Number(resolvedStore.serviceRadiusKm) || 6.0;
+        if (dist > maxLimit) {
+          resolvedStore = null;
+        }
+      }
+    }
+
     // Priority 1: Match by areaName or store name (case-insensitive substring)
     if (!resolvedStore && effectiveArea) {
       const escaped = effectiveArea.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
       const areaTerms = effectiveArea.split(/[-–—,]/).map((t: string) => t.trim()).filter(Boolean);
       const termRegexes = areaTerms.map((t: string) => new RegExp(t.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&'), 'i'));
 
-      resolvedStore = await db.collection('stores').findOne({
+      const matchedStore = await db.collection('stores').findOne({
         isActive: true,
         $or: [
           { areaName: new RegExp(`^${escaped}$`, 'i') },
@@ -601,9 +657,29 @@ export class CartService {
           ...termRegexes.map((r: RegExp) => ({ name: r })),
         ],
       });
+
+      if (matchedStore) {
+        if (Number.isFinite(custLat) && Number.isFinite(custLng) && custLat !== 0 && custLng !== 0) {
+          const sLat = Number(matchedStore.location?.coordinates?.[1] ?? matchedStore.latitude);
+          const sLng = Number(matchedStore.location?.coordinates?.[0] ?? matchedStore.longitude);
+          if (Number.isFinite(sLat) && Number.isFinite(sLng) && (sLat !== 0 || sLng !== 0)) {
+            const dLat = (sLat - custLat) * 111;
+            const dLng = (sLng - custLng) * 111 * Math.cos((custLat * Math.PI) / 180);
+            const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+            const maxLimit = Number(matchedStore.serviceRadiusKm) || 6.0;
+            if (dist <= maxLimit) {
+              resolvedStore = matchedStore;
+            }
+          } else {
+            resolvedStore = matchedStore;
+          }
+        } else {
+          resolvedStore = matchedStore;
+        }
+      }
     }
 
-    // Priority 2: Geospatial nearest active store to customer coordinates
+    // Priority 2: Geospatial nearest active store strictly within configured range
     if (!resolvedStore && Number.isFinite(custLat) && Number.isFinite(custLng) && custLat !== 0 && custLng !== 0) {
       const allStores = await db.collection('stores').find({ isActive: true }).toArray();
       let closestStore: any = null;
@@ -616,7 +692,8 @@ export class CartService {
           const dLat = (sLat - custLat) * 111;
           const dLng = (sLng - custLng) * 111 * Math.cos((custLat * Math.PI) / 180);
           const dist = Math.sqrt(dLat * dLat + dLng * dLng);
-          if (dist < minDistance) {
+          const maxLimit = Number(s.serviceRadiusKm) || 6.0;
+          if (dist <= maxLimit && dist < minDistance) {
             minDistance = dist;
             closestStore = s;
           }
@@ -625,14 +702,6 @@ export class CartService {
       if (closestStore) {
         resolvedStore = closestStore;
       }
-    }
-
-    // Priority 3: Fallback to city store
-    if (!resolvedStore) {
-      resolvedStore = await db.collection('stores').findOne({
-        city: new RegExp(`^${effectiveCity}$`, 'i'),
-        isActive: true,
-      });
     }
 
     // 3. Compute Distance using Real OSRM Road Route (Customer Coordinates to Store Coordinates)
@@ -777,9 +846,9 @@ export class CartService {
     let mrpTotal = 0;
     if (Array.isArray(items) && items.length > 0) {
       items.forEach((it: any) => {
-        const qty = it.quantity || 1;
-        const price = it.price || it.sellingPrice || 60;
-        const mrp = it.mrp || it.price || price;
+        const qty = Math.max(1, Number(it.quantity) || 1);
+        const price = typeof it.sellingPrice === 'number' ? it.sellingPrice : (typeof it.price === 'number' ? it.price : 60);
+        const mrp = typeof it.mrp === 'number' ? it.mrp : price;
         itemSubtotal += price * qty;
         mrpTotal += mrp * qty;
       });
@@ -833,8 +902,8 @@ export class CartService {
         ratePerKm,
         minimumFee: minPayout,
         maximumFee: maxPayout,
-        rawFee: Number(rawFee.toFixed(2)),
         storeName: resolvedStore?.name || 'Wom Up Dark Store',
+        storeId: resolvedStore?._id?.toString() || resolvedStore?.storeId || '',
         areaName: rateRecord?.areaName || effectiveArea,
         cityName: rateRecord?.cityName || effectiveCity,
         breakdown: {

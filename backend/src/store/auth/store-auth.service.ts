@@ -31,6 +31,7 @@ import { Role } from '../../common/enums/role.enum';
 import { MailService } from '../../common/services/mail.service';
 import { RegisterStoreDto } from './dto/store-auth.dto';
 import { TrackingGateway } from '../../tracking/tracking.gateway';
+import { NotificationService } from '../../notifications/notification.service';
 import { Optional } from '@nestjs/common';
 
 @Injectable()
@@ -52,6 +53,7 @@ export class StoreAuthService {
     private configService: ConfigService,
     private mailService: MailService,
     @Optional() private readonly trackingGateway?: TrackingGateway,
+    @Optional() private readonly notificationService?: NotificationService,
   ) {}
 
   async registerStore(dto: RegisterStoreDto) {
@@ -201,6 +203,22 @@ export class StoreAuthService {
 
     this.logger.log(`[Store Register] New store registered: ${store.code} (${store.name}) for Area: ${area.name}`);
 
+    if (this.notificationService) {
+      this.notificationService.create({
+        recipientType: 'ADMIN',
+        recipientId: 'admin',
+        role: 'ADMIN',
+        type: 'STORE_KYC_REQUEST',
+        title: '🏬 New Dark Store Registered',
+        message: `Store ${store.name} (${store.code}) registered in ${city.name} by ${store.ownerName}.`,
+        entityType: 'STORE_KYC',
+        entityId: store._id.toString(),
+        actionType: 'STORE_APPROVAL',
+        dedupeKey: `STORE_REGISTERED:${store._id.toString()}`,
+        metadata: { storeId: store._id.toString(), storeName: store.name, city: city.name },
+      }).catch(err => console.warn(`Failed creating store registration notification: ${err.message}`));
+    }
+
     return {
       success: true,
       message: `Store registered successfully! Your Store Login ID is: ${loginId}`,
@@ -236,8 +254,28 @@ export class StoreAuthService {
       throw new UnauthorizedException('Invalid Store ID or password');
     }
 
-    // Verify bcrypt password
-    const isValid = await bcrypt.compare(password, store.loginPasswordHash || '');
+    // Verify bcrypt password or plain text match (with self-healing hash synchronization)
+    let isValid = false;
+    if (store.loginPasswordHash) {
+      try {
+        isValid = await bcrypt.compare(password, store.loginPasswordHash);
+      } catch (_) {
+        isValid = false;
+      }
+    }
+
+    if (!isValid && ((store as any).loginPassword === password || (store as any).password === password)) {
+      isValid = true;
+      // Auto-heal hash in background
+      try {
+        const newHash = await bcrypt.hash(password, 10);
+        await this.storeModel.updateOne(
+          { _id: store._id },
+          { $set: { loginPasswordHash: newHash, loginPassword: password } },
+        );
+      } catch (_) {}
+    }
+
     if (!isValid) {
       this.logger.warn(`[Store Login] Invalid password for ${cleanId}`);
       throw new UnauthorizedException('Invalid Store ID or password');

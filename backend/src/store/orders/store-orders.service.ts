@@ -489,6 +489,7 @@ export class StoreOrdersService {
     this.trackingGateway.notifyOrderStatus(order._id.toString(), 'PACKING', {
       orderNumber: order.orderNumber,
       pickerName: staff.fullName,
+      storeId: order.storeId?.toString?.() || order.storeId,
     });
 
     if (this.trackingGateway.server) {
@@ -743,6 +744,7 @@ export class StoreOrdersService {
       itemName: item.name,
       refundAmount,
       reason: dto.reason,
+      storeId: order.storeId?.toString?.() || order.storeId,
     });
 
     return {
@@ -781,6 +783,7 @@ export class StoreOrdersService {
     this.trackingGateway.notifyOrderStatus(order._id.toString(), 'PACKED', {
       orderNumber: order.orderNumber,
       bagBarcode,
+      storeId: order.storeId?.toString?.() || order.storeId,
     });
 
     if (this.trackingGateway.server) {
@@ -826,6 +829,7 @@ export class StoreOrdersService {
       orderNumber: order.orderNumber,
       shelfSlot: slot,
       bagBarcode: pickList?.bagBarcode || order.bagBarcode,
+      storeId: order.storeId?.toString?.() || order.storeId,
     });
 
     return {
@@ -904,6 +908,7 @@ export class StoreOrdersService {
       orderNumber: order.orderNumber,
       bagBarcode: dto.bagBarcode,
       handedOverAt: new Date().toISOString(),
+      storeId: order.storeId?.toString?.() || order.storeId,
     });
 
     return {

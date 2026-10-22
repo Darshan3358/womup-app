@@ -80,6 +80,7 @@ export interface CartItem {
 
 export interface Address {
   id: string;
+  _id?: string;
   type: 'Home' | 'Work' | 'Other' | 'Current';
   fullName: string;
   phoneNumber: string;

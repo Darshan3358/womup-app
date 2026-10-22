@@ -14,6 +14,8 @@ import { COLORS } from '../../theme/colors';
 import { TYPOGRAPHY } from '../../theme/typography';
 import { AppIcon } from './AppIcon';
 import { useApp } from '../../context/AppContext';
+import { useNotifications } from '../../context/NotificationContext';
+import { NotificationCenterModal } from './NotificationCenterModal';
 
 interface BlinkitHeaderProps {
   variant?: 'gradient' | 'plain';
@@ -66,7 +68,12 @@ export const BlinkitHeader: React.FC<BlinkitHeaderProps> = ({
     user,
     isAuthenticated,
     openAuthPrompt,
+    selectedAddress,
+    selectedAddressSource,
   } = useApp();
+
+  const { unreadCount } = useNotifications();
+  const [isNotificationCenterVisible, setNotificationCenterVisible] = useState(false);
 
   const totalCartCount = blinkitCartCount;
 
@@ -121,8 +128,11 @@ export const BlinkitHeader: React.FC<BlinkitHeaderProps> = ({
   }
 
   const displayEta = deliveryEtaMinutes ? `${deliveryEtaMinutes} minutes` : etaTime;
-  const areaName = currentAreaName || 'Ahmedabad';
-  const cityName = currentCityName || user?.preferredCityName || 'Ahmedabad';
+  const isSavedAddress = selectedAddressSource === 'SAVED' && selectedAddress && selectedAddress.type !== 'Current';
+  const areaName = isSavedAddress
+    ? (selectedAddress.areaLandmark || selectedAddress.street || selectedAddress.houseFlat || currentAreaName || 'Ahmedabad')
+    : (currentAreaName || selectedAddress?.areaLandmark || 'Ahmedabad');
+  const cityName = (isSavedAddress ? selectedAddress.city : null) || currentCityName || user?.preferredCityName || 'Ahmedabad';
   const cleanStoreName = (
     currentStoreName || (isServiceable !== false ? 'Wom Up Dark Store' : 'Delivery Unavailable')
   )
@@ -200,6 +210,21 @@ export const BlinkitHeader: React.FC<BlinkitHeaderProps> = ({
               {wishlist.length > 0 && (
                 <View style={styles.badgePill}>
                   <Text style={styles.badgeText}>{wishlist.length}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {/* Notification Bell */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setNotificationCenterVisible(true)}
+              style={styles.actionIconButton}
+              accessibilityLabel="Notifications"
+            >
+              <Feather name="bell" size={17} color="#FFFFFF" />
+              {unreadCount > 0 && (
+                <View style={[styles.badgePill, { backgroundColor: '#EF4444' }]}>
+                  <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -286,6 +311,11 @@ export const BlinkitHeader: React.FC<BlinkitHeaderProps> = ({
 
         {children}
       </View>
+
+      <NotificationCenterModal
+        visible={isNotificationCenterVisible}
+        onClose={() => setNotificationCenterVisible(false)}
+      />
     </View>
   );
 };

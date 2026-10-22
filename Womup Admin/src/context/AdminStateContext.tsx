@@ -79,6 +79,8 @@ interface AdminStateContextType {
   isSidebarOpen: boolean;
   setIsSidebarOpen: (open: boolean) => void;
   toggleSidebar: () => void;
+  locationSubTab: 'Cities' | 'Areas' | 'Pincodes';
+  setLocationSubTab: (tab: 'Cities' | 'Areas' | 'Pincodes') => void;
 
   // Admin Auth & Master Sponsor ID
   isAdminAuthenticated: boolean;
@@ -238,6 +240,7 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const [activeModal, setActiveModal] = useState<ActiveModal>('none');
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
+  const [locationSubTab, setLocationSubTab] = useState<'Cities' | 'Areas' | 'Pincodes'>('Cities');
 
   const toggleSidebar = () => setIsSidebarOpen((prev) => !prev);
 
@@ -439,10 +442,12 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     socket.on('connect', () => {
       setSyncStatus('Live WebSocket & DB Active (Cluster0)');
+      socket.emit('join_admin');
     });
 
     socket.on('reconnect', () => {
       setSyncStatus('Live WebSocket Reconnected (Cluster0)');
+      socket.emit('join_admin');
       refreshFromDb();
     });
 
@@ -551,6 +556,35 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
     });
 
+    // Authoritative real-time location & road distance stream from Backend
+    socket.on('location_updated', (data: any) => {
+      if (!data?.orderId) return;
+      const targetId = data.orderId.toString();
+      const cleanId = targetId.replace(/^#/, '');
+
+      setOrders(prev =>
+        prev.map(o => {
+          const ordId = (o.id || o.orderNumber || '').toString();
+          if (
+            ordId === targetId ||
+            ordId === cleanId ||
+            ordId === `#${cleanId}` ||
+            ordId.includes(cleanId.slice(-6).toUpperCase())
+          ) {
+            return {
+              ...o,
+              distanceKm: data.distanceToCustomer ? Number(data.distanceToCustomer) : (data.distanceKm ? Number(data.distanceKm) : o.distanceKm),
+              distanceToCustomer: data.distanceToCustomer ? Number(data.distanceToCustomer) : o.distanceToCustomer,
+              distanceToStore: data.distanceToStore ? Number(data.distanceToStore) : o.distanceToStore,
+              deliveryDistanceKm: data.distanceToCustomer ? Number(data.distanceToCustomer) : (data.distanceKm ? Number(data.distanceKm) : o.deliveryDistanceKm),
+              eta: data.eta ? `${data.eta} mins` : (data.etaMinutes ? `${data.etaMinutes} mins` : o.eta),
+            };
+          }
+          return o;
+        })
+      );
+    });
+
     socket.on('inventory_alert', () => {
       // socket handled
     });
@@ -628,6 +662,148 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             return store;
           })
         );
+      }
+    });
+
+    // Real-time Master Catalog & Area Price updates
+    socket.on('catalog:updated', (data: any) => {
+      if (data?.productId) {
+        setProducts((prev) =>
+          prev.map((p) => {
+            if (p.id === data.productId || (p as any)._id === data.productId || p.name === data.productName) {
+              const updated = { ...p };
+              if (data.sellingPrice !== undefined) updated.sellingPrice = Number(data.sellingPrice);
+              if (data.mrp !== undefined) updated.mrp = Number(data.mrp);
+              if (data.newAvailableStock !== undefined) updated.stockKg = Number(data.newAvailableStock);
+              if (data.isActive !== undefined) updated.isActive = Boolean(data.isActive);
+              return updated;
+            }
+            return p;
+          })
+        );
+      }
+      if (data?.type === 'PRICE_UPDATE' && data?.variantId && data?.areaId && data?.price !== undefined) {
+        setAreaPricingRecords((prev) => {
+          const exists = prev.some((r) => r.variantId === data.variantId && r.areaId === data.areaId);
+          if (exists) {
+            return prev.map((r) =>
+              r.variantId === data.variantId && r.areaId === data.areaId
+                ? { ...r, price: Number(data.price) }
+                : r
+            );
+          }
+          return [
+            ...prev,
+            {
+              id: 'apr_' + Date.now(),
+              productId: (data.productId || '').toString(),
+              variantId: data.variantId,
+              areaId: data.areaId,
+              price: Number(data.price),
+            },
+          ];
+        });
+      }
+    });
+
+    socket.on('catalog:price-updated', (data: any) => {
+      if (data?.productId && data?.price !== undefined) {
+        setProducts((prev) =>
+          prev.map((p) =>
+            p.id === data.productId || (p as any)._id === data.productId || p.name === data.productName
+              ? { ...p, sellingPrice: Number(data.price) }
+              : p
+          )
+        );
+      }
+    });
+
+    // Real-time Delivery Partner (Rider) updates
+    socket.on('rider_updated', (data: any) => {
+      if (data?.id) {
+        setRiders((prev) =>
+          prev.map((r) =>
+            r.id === data.id || (r as any)._id === data.id || r.partnerCode === data.partnerCode
+              ? {
+                  ...r,
+                  status: data.status || r.status,
+                  verificationStatus: data.verificationStatus || r.verificationStatus,
+                  isOnline: data.isOnline !== undefined ? Boolean(data.isOnline) : r.isOnline,
+                  name: data.fullName || r.name,
+                  phone: data.phoneNumber || r.phone,
+                  vehicleNumber: data.vehicleNumber || r.vehicleNumber,
+                  hubName: data.hubName || r.hubName,
+                }
+              : r
+          )
+        );
+      }
+    });
+
+    socket.on('rider_deleted', (data: any) => {
+      if (data?.id) {
+        setRiders((prev) => prev.filter((r) => r.id !== data.id && (r as any)._id !== data.id && r.partnerCode !== data.partnerCode));
+      }
+    });
+
+    // Real-time Coins / Customer balance updates
+    socket.on('coins_updated', (data: any) => {
+      if (data?.userId && data?.coins !== undefined) {
+        setCustomers((prev) =>
+          prev.map((c) =>
+            c.id === data.userId || (c as any)._id === data.userId
+              ? { ...c, shoppingCoins: Number(data.coins) }
+              : c
+          )
+        );
+      }
+    });
+
+    // Real-time Areas / Operational Zones updates
+    socket.on('areas:updated', (data: any) => {
+      if (data?.deleted && data?.id) {
+        setZones((prev) => prev.filter((z) => z.id !== data.id && (z as any)._id !== data.id));
+      } else if (data?.id || data?._id) {
+        const id = (data.id || data._id).toString();
+        setZones((prev) => {
+          const exists = prev.some((z) => z.id === id || (z as any)._id === id);
+          if (exists) {
+            return prev.map((z) => (z.id === id || (z as any)._id === id ? { ...z, ...data, id } : z));
+          }
+          return [...prev, { ...data, id, name: data.name || 'New Zone' }];
+        });
+      }
+    });
+
+    // Real-time Cities updates
+    socket.on('cities:updated', (data: any) => {
+      if (data?.deleted && data?.id) {
+        setCities((prev) => prev.filter((c) => c.id !== data.id && (c as any)._id !== data.id));
+      } else if (data?.id || data?._id) {
+        const id = (data.id || data._id).toString();
+        setCities((prev) => {
+          const exists = prev.some((c) => c.id === id || (c as any)._id === id);
+          if (exists) {
+            return prev.map((c) => (c.id === id || (c as any)._id === id ? { ...c, ...data, id } : c));
+          }
+          return [...prev, { ...data, id, name: data.name || 'New City', code: data.code || 'CTY' }];
+        });
+      }
+    });
+
+    // Real-time Dark Stores updates
+    socket.on('stores:updated', (data: any) => {
+      if (data?.deleted && data?.id) {
+        setDarkStores((prev) => prev.filter((s) => s.id !== data.id && (s as any)._id !== data.id));
+      } else if (data?.id || data?._id) {
+        const id = (data.id || data._id).toString();
+        setDarkStores((prev) => {
+          const exists = prev.some((s) => s.id === id || (s as any)._id === id);
+          if (exists) {
+            return prev.map((s) => (s.id === id || (s as any)._id === id ? { ...s, ...data, id } : s));
+          }
+          return [...prev, { ...data, id, name: data.name || 'New Dark Store', code: data.code || 'STR' }];
+        });
       }
     });
 
@@ -1495,6 +1671,8 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         isSidebarOpen,
         setIsSidebarOpen,
         toggleSidebar,
+        locationSubTab,
+        setLocationSubTab,
         zones,
         customers,
         selectedCustomer,

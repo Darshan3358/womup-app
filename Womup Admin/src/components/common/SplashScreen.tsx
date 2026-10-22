@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Image, Animated, Dimensions } from 'react-native';
-import { COLORS, SPACING } from '../../theme';
+import { View, StyleSheet, Image, Animated, Dimensions, ActivityIndicator, StatusBar } from 'react-native';
+
+const { width, height } = Dimensions.get('window');
 
 interface SplashScreenProps {
   onFinish?: () => void;
@@ -8,22 +9,13 @@ interface SplashScreenProps {
 
 export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.85)).current;
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 6,
-        tension: 40,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 500,
+      useNativeDriver: true,
+    }).start();
 
     const timer = setTimeout(() => {
       Animated.timing(fadeAnim, {
@@ -33,30 +25,21 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
       }).start(() => {
         if (onFinish) onFinish();
       });
-    }, 1800);
+    }, 2000);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [onFinish]);
 
   return (
     <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
-      <Animated.View style={[styles.logoContainer, { transform: [{ scale: scaleAnim }] }]}>
-        <Image
-          source={require('../../../assets/womup_logo.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-        <Text style={styles.title}>Womup Admin</Text>
-        <Text style={styles.subtitle}>Dark Store & Quick Commerce Operations</Text>
-      </Animated.View>
-
-      <View style={styles.footer}>
-        <View style={styles.dotRow}>
-          <View style={[styles.dot, styles.activeDot]} />
-          <View style={styles.dot} />
-          <View style={styles.dot} />
-        </View>
-        <Text style={styles.version}>v1.0.0 Enterprise</Text>
+      <StatusBar barStyle="light-content" backgroundColor="#05062A" translucent />
+      <Image
+        source={require('../../../assets/admin_splash.png')}
+        style={styles.splashImage}
+        resizeMode="cover"
+      />
+      <View style={styles.loaderArea}>
+        <ActivityIndicator size="small" color="#FF3B98" />
       </View>
     </Animated.View>
   );
@@ -65,56 +48,26 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
 const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: COLORS.navy,
+    backgroundColor: '#05062A',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 9999,
   },
-  logoContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+  splashImage: {
+    width: width,
+    height: height,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
-  logo: {
-    width: 140,
-    height: 140,
-    marginBottom: SPACING.md,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: COLORS.white,
-    letterSpacing: 0.8,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: COLORS.lightPink,
-    marginTop: 6,
-    fontWeight: '500',
-  },
-  footer: {
+  loaderArea: {
     position: 'absolute',
     bottom: 40,
-    alignItems: 'center',
-  },
-  dotRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    marginHorizontal: 3,
-  },
-  activeDot: {
-    backgroundColor: COLORS.hotPink,
-    width: 18,
-  },
-  version: {
-    fontSize: 11,
-    color: COLORS.textMuted,
-    fontWeight: '600',
+    alignSelf: 'center',
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(5, 6, 42, 0.4)',
   },
 });

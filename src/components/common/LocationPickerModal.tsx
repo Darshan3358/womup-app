@@ -92,37 +92,22 @@ export const LocationPickerModal: React.FC = () => {
     }
 
     setLocationModalVisible(false);
+    // GPS location is used strictly as the active delivery location for this session/order.
+    // It is NEVER auto-saved into permanent Saved Addresses unless explicitly saved by user.
     await setActiveGpsLocation(loc);
-
-    // Save to Database (MongoDB Atlas) in background
-    try {
-      await AddressService.saveAddress({
-        type: 'Current',
-        fullName: user.fullName || 'Customer',
-        phoneNumber: user.phoneNumber || '',
-        houseFlat: loc.street || 'Current GPS Location',
-        areaLandmark: loc.areaLandmark || loc.shortAddress,
-        city: loc.city || 'Ahmedabad',
-        pincode: loc.pincode || '380015',
-        latitude: loc.latitude,
-        longitude: loc.longitude,
-        isDefault: true,
-      });
-
-      // Refresh user saved addresses
-      const liveAddresses = await AddressService.getAddresses();
-      if (liveAddresses && liveAddresses.length > 0) {
-        const updatedProfile = { ...user, savedAddresses: liveAddresses };
-        setUser(updatedProfile);
-        StorageService.saveItem(StorageService.KEYS.USER, updatedProfile);
-      }
-    } catch (e) {
-      console.warn('[LocationPickerModal] Background save current address notice:', e);
-    }
   };
 
-  // Real database saved addresses for the user
-  const savedAddrs = user.savedAddresses || [];
+  // Real database saved addresses for the user (exclude temporary GPS markers and deduplicate)
+  const savedAddrs = (user.savedAddresses || [])
+    .filter((a) => a.type !== 'Current' && !a.id?.startsWith('current_'))
+    .filter((a, idx, arr) => 
+      arr.findIndex((other) => 
+        (a.id && other.id && (a.id === other.id || (a as any)._id === (other as any)._id)) ||
+        (a.houseFlat?.trim().toLowerCase() === other.houseFlat?.trim().toLowerCase() && 
+         a.areaLandmark?.trim().toLowerCase() === other.areaLandmark?.trim().toLowerCase() &&
+         a.city?.trim().toLowerCase() === other.city?.trim().toLowerCase())
+      ) === idx
+    );
 
   const handleDeleteAddress = (addrId: string, label: string, targetAddr?: any) => {
     const performDelete = async () => {

@@ -14,9 +14,8 @@ import {
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Rect, Path } from 'react-native-svg';
-import { LocalCartItem, LocalVendor } from '../types/localShop.types';
+import { LocalCartItem, LocalVendor, LocalTransaction } from '../types/localShop.types';
 import { LocalShopApi } from '../api/localShopApi';
-import { MOCK_LOCAL_TRANSACTIONS } from '../data/mockLocalShops';
 
 interface ShopDetailScreenProps {
   vendorId?: string;
@@ -152,10 +151,8 @@ export const ShopDetailScreen: React.FC<ShopDetailScreenProps> = ({
     );
   }
 
-  // Filter transactions for this specific vendor
-  const vendorTransactions = MOCK_LOCAL_TRANSACTIONS.filter(
-    (t) => t.vendorId === vendor.id
-  );
+  // Filter transactions for this specific vendor (starts empty until genuine live payments occur)
+  const vendorTransactions: LocalTransaction[] = [];
 
   // Generate standardized counter QR payload & code string
   const cleanId = (vendor.id || 'SHOP').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();

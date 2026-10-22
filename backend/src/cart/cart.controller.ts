@@ -50,9 +50,13 @@ export class CartController {
   @ApiOperation({ summary: 'Add product item to cart (SRS standardized)' })
   async addCartItem(
     @CurrentUser() user: any,
-    @Body() body: { productId: string; variantId?: string; quantity?: number },
+    @Body() body: { productId: string; variantId?: string; quantity?: number; areaId?: string; storeId?: string },
+    @Query('areaId') qAreaId?: string,
+    @Query('storeId') qStoreId?: string,
   ) {
-    return this.cartService.addItem(user.id, body.productId, body.quantity || 1, body.variantId);
+    const areaId = body.areaId || qAreaId;
+    const storeId = body.storeId || qStoreId;
+    return this.cartService.addItem(user.id, body.productId, body.quantity || 1, body.variantId, areaId, storeId);
   }
 
   // Legacy Cart Add API
@@ -62,9 +66,13 @@ export class CartController {
   @ApiOperation({ summary: 'Add product item to cart' })
   async addItem(
     @CurrentUser() user: any,
-    @Body() body: { productId: string; variantId?: string; quantity: number },
+    @Body() body: { productId: string; variantId?: string; quantity: number; areaId?: string; storeId?: string },
+    @Query('areaId') qAreaId?: string,
+    @Query('storeId') qStoreId?: string,
   ) {
-    return this.cartService.addItem(user.id, body.productId, body.quantity || 1, body.variantId);
+    const areaId = body.areaId || qAreaId;
+    const storeId = body.storeId || qStoreId;
+    return this.cartService.addItem(user.id, body.productId, body.quantity || 1, body.variantId, areaId, storeId);
   }
 
   // Standard SRS Cart Update API
@@ -74,12 +82,16 @@ export class CartController {
   @ApiOperation({ summary: 'Update cart quantity (SRS standardized)' })
   async updateCartItem(
     @CurrentUser() user: any,
-    @Body() body: { productId: string; variantId?: string; quantity?: number; delta?: number },
+    @Body() body: { productId: string; variantId?: string; quantity?: number; delta?: number; areaId?: string; storeId?: string },
+    @Query('areaId') qAreaId?: string,
+    @Query('storeId') qStoreId?: string,
   ) {
+    const areaId = body.areaId || qAreaId;
+    const storeId = body.storeId || qStoreId;
     if (typeof body.quantity === 'number') {
-      return this.cartService.setExactQuantity(user.id, body.productId, body.quantity, body.variantId);
+      return this.cartService.setExactQuantity(user.id, body.productId, body.quantity, body.variantId, areaId, storeId);
     }
-    return this.cartService.updateQuantity(user.id, body.productId, body.delta ?? 1, body.variantId);
+    return this.cartService.updateQuantity(user.id, body.productId, body.delta ?? 1, body.variantId, areaId, storeId);
   }
 
   @Patch('items/:productId')
@@ -91,8 +103,14 @@ export class CartController {
     @Param('productId') productId: string,
     @Body('delta') delta: number,
     @Body('variantId') variantId?: string,
+    @Body('areaId') bodyAreaId?: string,
+    @Body('storeId') bodyStoreId?: string,
+    @Query('areaId') qAreaId?: string,
+    @Query('storeId') qStoreId?: string,
   ) {
-    return this.cartService.updateQuantity(user.id, productId, delta, variantId);
+    const areaId = bodyAreaId || qAreaId;
+    const storeId = bodyStoreId || qStoreId;
+    return this.cartService.updateQuantity(user.id, productId, delta, variantId, areaId, storeId);
   }
 
   // Standard SRS Cart Remove API

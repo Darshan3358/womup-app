@@ -10,8 +10,10 @@ import { VendorCollectionRequest, VendorCollectionRequestDocument } from './sche
 import { VendorSettlement, VendorSettlementDocument } from './schemas/vendor-settlement.schema';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { IncomeTransaction, IncomeTransactionDocument } from '../users/schemas/income-transaction.schema';
+import { CoinTransaction, CoinTransactionDocument } from '../coins/schemas/coin-transaction.schema';
 import { TrackingGateway } from '../tracking/tracking.gateway';
 import { EmailService } from '../auth/email.service';
+import { NotificationService } from '../notifications/notification.service';
 import {
   CreateVendorDto,
   UpdateVendorDto,
@@ -37,8 +39,10 @@ export class LocalShopsService implements OnModuleInit {
     @InjectModel(VendorSettlement.name) private settlementModel: Model<VendorSettlementDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(IncomeTransaction.name) private incomeTxModel: Model<IncomeTransactionDocument>,
+    @InjectModel(CoinTransaction.name) private coinTxModel: Model<CoinTransactionDocument>,
     @Optional() private trackingGateway?: TrackingGateway,
     @Optional() private emailService?: EmailService,
+    @Optional() private notificationService?: NotificationService,
   ) {}
 
   async onModuleInit() {
@@ -410,6 +414,7 @@ export class LocalShopsService implements OnModuleInit {
     const payableAmount = Math.max(0, billAmount - coinBenefit);
 
     const method = dto.paymentMethod ? dto.paymentMethod.toUpperCase() : 'COIN';
+    const coinsBalanceBefore = customer?.shoppingCoins || 0;
 
     // 1. SHOPPING COINS: Admin % applied (max coinBenefit), customer uses min(coinBenefit, available coins)
     if (method === 'COIN' || method === 'COINS') {
@@ -417,8 +422,8 @@ export class LocalShopsService implements OnModuleInit {
       coinsUsed = Math.min(coinBenefit, Math.max(0, requestedCoins));
       cashPaid = Math.max(0, billAmount - coinsUsed);
       coinsEarned = 0;
-      if (customer) {
-        customer.shoppingCoins = Math.max(0, (customer.shoppingCoins || 0) - coinsUsed);
+      if (customer && coinsUsed > 0) {
+        customer.shoppingCoins = Math.max(0, coinsBalanceBefore - coinsUsed);
         await customer.save();
       }
     }
@@ -504,6 +509,32 @@ export class LocalShopsService implements OnModuleInit {
       qrScanned: true,
       verifiedAt: new Date(),
     });
+
+    // Record CoinTransaction in user's coin ledger if coins were deducted
+    if (customer && coinsUsed > 0) {
+      try {
+        await this.coinTxModel.create({
+          userId: customer._id,
+          type: 'SPEND',
+          coins: coinsUsed,
+          balanceBefore: coinsBalanceBefore,
+          balanceAfter: customer.shoppingCoins,
+          referenceType: 'VENDOR_REDEEM',
+          referenceId: orderNumber,
+          description: `Shopping Coins used at ${vendor.storeName} for order ${orderNumber}`,
+        });
+      } catch (coinErr) {
+        console.warn('Failed recording CoinTransaction:', coinErr);
+      }
+    }
+
+    if (customer && this.trackingGateway) {
+      this.trackingGateway.emitWalletUpdated(customer._id.toString(), {
+        shoppingCoins: customer.shoppingCoins,
+        availableIncome: customer.availableIncome,
+        appDownloadIncome: customer.appDownloadIncome,
+      });
+    }
 
     // Update vendor metrics
     vendor.totalTransactions = (vendor.totalTransactions || 0) + 1;
@@ -1583,6 +1614,31 @@ export class LocalShopsService implements OnModuleInit {
       this.trackingGateway.emitCollectionRequestToVendor(vendor.vendorCode, wsPayload);
     }
 
+    if (this.notificationService) {
+      this.notificationService.create({
+        recipientType: 'STORE',
+        recipientId: vendor._id.toString(),
+        role: 'STORE',
+        storeId: vendor._id.toString(),
+        type: 'NEW_COLLECTION_REQUEST',
+        title: '🛒 Counter Payment Request',
+        message: `${newRequest.customerName || 'Customer'} requested ₹${billAmount} counter payment (${newRequest.paymentMethod})`,
+        entityType: 'COLLECTION_REQUEST',
+        entityId: newRequest._id.toString(),
+        actionType: 'COLLECTION_VERIFY',
+        dedupeKey: `COLLECTION_REQ:${newRequest._id.toString()}`,
+        metadata: {
+          requestId: newRequest._id.toString(),
+          customerName: newRequest.customerName,
+          customerPhone: newRequest.customerPhone,
+          billAmount: newRequest.billAmount,
+          coinsUsed: newRequest.coinsUsed,
+          cashToCollect: newRequest.cashToCollect,
+          paymentMethod: newRequest.paymentMethod,
+        },
+      }).catch((err) => console.warn('Failed creating store collection request notification:', err.message));
+    }
+
     return wsPayload;
   }
 
@@ -1653,19 +1709,60 @@ export class LocalShopsService implements OnModuleInit {
     }
 
     let customerNewCoins: number | undefined;
+    let customer: any = null;
     if (request.customerId) {
-      const customer = await this.userModel.findById(request.customerId);
-      if (customer) {
-        if (request.coinsUsed > 0) {
-          customer.shoppingCoins = Math.max(0, (customer.shoppingCoins || 0) - request.coinsUsed);
+      customer = await this.userModel.findById(request.customerId);
+    }
+    if (!customer && request.customerPhone) {
+      const cleanPhone = String(request.customerPhone).replace(/\D/g, '').slice(-10);
+      customer = await this.userModel.findOne({
+        phone: { $in: [cleanPhone, `+91${cleanPhone}`, `91${cleanPhone}`, request.customerPhone] },
+      });
+    }
+
+    if (customer) {
+      const orderNumberForRef = `WM-TXN-${request._id.toString().slice(-4).toUpperCase()}`;
+      const coinsBefore = customer.shoppingCoins || 0;
+
+      if (request.coinsUsed > 0) {
+        customer.shoppingCoins = Math.max(0, coinsBefore - request.coinsUsed);
+        try {
+          await this.coinTxModel.create({
+            userId: customer._id,
+            type: 'SPEND',
+            coins: request.coinsUsed,
+            balanceBefore: coinsBefore,
+            balanceAfter: customer.shoppingCoins,
+            referenceType: 'VENDOR_REDEEM',
+            referenceId: orderNumberForRef,
+            description: `Used ${request.coinsUsed} coins at Local Store (${vendor?.storeName || 'Merchant'}) for Order #${orderNumberForRef}`,
+          });
+        } catch (coinErr) {
+          console.warn('Failed recording CoinTransaction:', coinErr);
         }
+      }
         if (request.walletUsed > 0) {
           customer.appDownloadIncome = Math.max(0, (customer.appDownloadIncome || 0) - request.walletUsed);
           customer.availableIncome = Math.max(0, (customer.availableIncome || 0) - request.walletUsed);
           customer.walletBalance = Math.max(0, (customer.walletBalance || 0) - request.walletUsed);
         }
         if (request.coinsEarned > 0) {
-          customer.shoppingCoins = (customer.shoppingCoins || 0) + request.coinsEarned;
+          const preEarnBalance = customer.shoppingCoins || 0;
+          customer.shoppingCoins = preEarnBalance + request.coinsEarned;
+          try {
+            await this.coinTxModel.create({
+              userId: customer._id,
+              type: 'EARN',
+              coins: request.coinsEarned,
+              balanceBefore: preEarnBalance,
+              balanceAfter: customer.shoppingCoins,
+              referenceType: 'VENDOR_REDEEM',
+              referenceId: orderNumberForRef,
+              description: `Shopping Coins earned from ${vendor?.storeName || 'Merchant'} for counter order ${orderNumberForRef}`,
+            });
+          } catch (coinErr) {
+            console.warn('Failed recording CoinTransaction:', coinErr);
+          }
         }
 
         // Record Monthly GMV Activity (only on real purchases, NOT wallet balance spend)
@@ -1732,13 +1829,16 @@ export class LocalShopsService implements OnModuleInit {
           }
         }
       }
-    }
 
     const orderNumber = `WM-TXN-${request._id.toString().slice(-4).toUpperCase()}`;
     const transaction = await this.transactionModel.create({
       vendorId: request.vendorId,
       vendorName: vendor?.storeName || 'Vendor Store',
       customerId: request.customerId,
+      customerName:
+        request.customerName ||
+        (customer ? (customer.name || customer.fullNameAsPerAadhaar) : null) ||
+        'Local Shopper',
       customerPhone: request.customerPhone,
       orderNumber,
       billAmount: request.billAmount,
@@ -1752,6 +1852,29 @@ export class LocalShopsService implements OnModuleInit {
       qrScanned: true,
       verifiedAt: new Date(),
     });
+
+    if (this.notificationService && request.customerId) {
+      this.notificationService.create({
+        recipientType: 'CUSTOMER',
+        recipientId: request.customerId.toString(),
+        role: 'CUSTOMER',
+        customerId: request.customerId.toString(),
+        type: 'COLLECTION_VERIFIED',
+        title: '✅ Payment Verified',
+        message: `Your payment of ₹${request.billAmount} at ${vendor?.storeName || 'Merchant'} was verified successfully.`,
+        entityType: 'ORDER',
+        entityId: orderNumber,
+        actionType: 'ORDER_DETAILS',
+        dedupeKey: `COLLECTION_VERIFIED:${request._id.toString()}`,
+        metadata: {
+          orderNumber,
+          billAmount: request.billAmount,
+          coinsUsed: request.coinsUsed,
+          cashPaid: request.cashToCollect,
+          vendorName: vendor?.storeName || 'Merchant',
+        },
+      }).catch((err) => console.warn('Failed creating customer collection verified notification:', err.message));
+    }
 
     if (this.trackingGateway) {
       this.trackingGateway.emitCollectionVerifiedToCustomer(request.customerId?.toString() || '', {
@@ -2107,26 +2230,58 @@ export class LocalShopsService implements OnModuleInit {
 
     const txs = await this.transactionModel
       .find(query)
+      .populate('customerId', 'name fullNameAsPerAadhaar phone email')
       .sort({ createdAt: -1 })
       .limit(50)
       .lean();
 
-    return txs.map((t) => ({
-      id: t._id.toString(),
-      orderNumber: t.orderNumber || `WM-TXN-${t._id.toString().slice(-4).toUpperCase()}`,
-      customerName: t.customerPhone ? `Customer (${t.customerPhone.slice(-4)})` : 'Local Shopper',
-      customerPhone: t.customerPhone,
-      billAmount: t.billAmount,
-      coinsUsed: t.coinsUsed || 0,
-      cashPaid: t.cashPaid || 0,
-      coinsEarned: t.coinsEarned || 0,
-      vendorPayout: t.vendorPayout || t.billAmount,
-      platformCommission: t.platformCommission || 0,
-      paymentMethod: t.paymentMethod,
-      status: t.status,
-      date: new Date((t as any).createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
-      time: new Date((t as any).createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    }));
+    const phonesToResolve = txs
+      .filter((t: any) => !t.customerName && t.customerPhone)
+      .map((t: any) => t.customerPhone.replace(/\D/g, '').slice(-10));
+
+    const userMap = new Map<string, string>();
+    if (phonesToResolve.length > 0) {
+      try {
+        const matchedUsers = await this.userModel
+          .find({
+            phone: { $in: phonesToResolve.map((p: string) => new RegExp(p + '$')) },
+          })
+          .select('name phone fullNameAsPerAadhaar')
+          .lean();
+        for (const u of matchedUsers) {
+          const uDigits = (u.phone || '').replace(/\D/g, '').slice(-10);
+          if (uDigits) userMap.set(uDigits, u.name || u.fullNameAsPerAadhaar || '');
+        }
+      } catch {}
+    }
+
+    return txs.map((t: any) => {
+      const populatedUser = t.customerId && typeof t.customerId === 'object' ? t.customerId : null;
+      const cleanPhone = (t.customerPhone || '').replace(/\D/g, '').slice(-10);
+      const resolvedName =
+        t.customerName ||
+        populatedUser?.name ||
+        populatedUser?.fullNameAsPerAadhaar ||
+        (cleanPhone ? userMap.get(cleanPhone) : null) ||
+        (t.customerPhone ? `Customer (${t.customerPhone.slice(-4)})` : 'Local Shopper');
+
+      return {
+        id: t._id.toString(),
+        orderNumber: t.orderNumber || `WM-TXN-${t._id.toString().slice(-4).toUpperCase()}`,
+        customerName: resolvedName,
+        customerPhone: t.customerPhone || populatedUser?.phone || '',
+        billAmount: t.billAmount,
+        coinsUsed: t.coinsUsed || 0,
+        cashPaid: t.cashPaid || 0,
+        coinsEarned: t.coinsEarned || 0,
+        vendorPayout: t.vendorPayout || t.billAmount,
+        platformCommission: t.platformCommission || 0,
+        paymentMethod: t.paymentMethod,
+        status: t.status,
+        date: new Date((t as any).createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+        time: new Date((t as any).createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+    });
   }
 
   async getVendorAnalytics(vendorIdOrCode: string) {
@@ -2249,17 +2404,154 @@ export class LocalShopsService implements OnModuleInit {
       growthPercent,
       orderCount: currentMonthGmv[0]?.count || 0,
       paymentSplit,
-      topCustomers: topCustomersData.map((c) => ({
-        name: c._id ? `Customer (${c._id.slice(-4)})` : 'Local Shopper',
-        phone: c._id,
-        totalSpent: c.totalSpent,
-        visitCount: c.visitCount,
-      })),
+      topCustomers: await Promise.all(
+        topCustomersData.map(async (c) => {
+          let name = 'Local Shopper';
+          if (c._id) {
+            const rawDigits = String(c._id).replace(/\D/g, '').slice(-10);
+            try {
+              const u = await this.userModel
+                .findOne({ phone: new RegExp(rawDigits + '$') })
+                .select('name fullNameAsPerAadhaar')
+                .lean();
+              name = u?.name || u?.fullNameAsPerAadhaar || `Customer (${String(c._id).slice(-4)})`;
+            } catch {
+              name = `Customer (${String(c._id).slice(-4)})`;
+            }
+          }
+          return {
+            name,
+            phone: c._id,
+            totalSpent: c.totalSpent,
+            visitCount: c.visitCount,
+          };
+        })
+      ),
       peakHours: peakHoursData.map((h) => ({
         hour: h._id,
         count: h.count,
       })),
     };
+  }
+
+  async getCustomerOfflineOrders(customerId?: string, customerPhone?: string) {
+    let resolvedCustomerId = customerId;
+    let cleanPhone = customerPhone ? customerPhone.replace(/\D/g, '').slice(-10) : '';
+
+    // If customerId is provided, look up user to obtain phone if missing
+    if (resolvedCustomerId && Types.ObjectId.isValid(resolvedCustomerId)) {
+      try {
+        const u = await this.userModel.findById(resolvedCustomerId).select('_id phone').lean();
+        if (u) {
+          if (!cleanPhone && u.phone) {
+            cleanPhone = u.phone.replace(/\D/g, '').slice(-10);
+          }
+        }
+      } catch {}
+    } else if (cleanPhone && !resolvedCustomerId) {
+      try {
+        const u = await this.userModel.findOne({ phone: new RegExp(cleanPhone + '$') }).select('_id phone').lean();
+        if (u) {
+          resolvedCustomerId = u._id.toString();
+        }
+      } catch {}
+    }
+
+    const filterConditions: any[] = [];
+    if (resolvedCustomerId && Types.ObjectId.isValid(resolvedCustomerId)) {
+      filterConditions.push({ customerId: new Types.ObjectId(resolvedCustomerId) });
+      filterConditions.push({ customerId: resolvedCustomerId.toString() });
+    }
+    if (cleanPhone) {
+      filterConditions.push({ customerPhone: cleanPhone });
+      filterConditions.push({ customerPhone: `+91${cleanPhone}` });
+      filterConditions.push({ customerPhone: `+91 ${cleanPhone}` });
+      filterConditions.push({ customerPhone: new RegExp(cleanPhone + '$') });
+    }
+
+    if (filterConditions.length === 0) {
+      return [];
+    }
+
+    // 1. Fetch completed and verified offline transactions
+    const transactions = await this.transactionModel
+      .find({ $or: filterConditions })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // 2. Fetch pending collection requests (ongoing offline counter transactions)
+    const pendingRequests = await this.collectionRequestModel
+      .find({
+        $or: filterConditions,
+        status: 'PENDING',
+      })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // 3. Also fetch verified collection requests that may not have a duplicate in transactions
+    const existingOrderNumbers = new Set(transactions.map((t) => t.orderNumber));
+    const verifiedRequests = await this.collectionRequestModel
+      .find({
+        $or: filterConditions,
+        status: 'VERIFIED',
+      })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const ongoingList = pendingRequests.map((req: any) => ({
+      id: req._id.toString(),
+      orderNumber: `WM-REQ-${req._id.toString().slice(-4).toUpperCase()}`,
+      vendorId: req.vendorId.toString(),
+      vendorName: req.vendorName || req.storeName || 'Local Merchant',
+      vendorCategory: 'Local Shop',
+      billAmount: req.billAmount,
+      coinsUsed: req.coinsUsed || 0,
+      cashPaid: req.cashToCollect || 0,
+      coinsEarned: req.coinsEarned || 0,
+      paymentMethod: req.paymentMethod,
+      status: 'PENDING',
+      date: req.createdAt || req.requestedAt ? new Date(req.createdAt || req.requestedAt).toISOString() : new Date().toISOString(),
+      createdAt: req.createdAt || req.requestedAt,
+    }));
+
+    const verifiedListFromRequests = verifiedRequests
+      .filter((req: any) => {
+        const orderNum = `WM-TXN-${req._id.toString().slice(-4).toUpperCase()}`;
+        return !existingOrderNumbers.has(orderNum);
+      })
+      .map((req: any) => ({
+        id: req._id.toString(),
+        orderNumber: `WM-TXN-${req._id.toString().slice(-4).toUpperCase()}`,
+        vendorId: req.vendorId.toString(),
+        vendorName: req.vendorName || req.storeName || 'Local Merchant',
+        vendorCategory: 'Local Shop',
+        billAmount: req.billAmount,
+        coinsUsed: req.coinsUsed || 0,
+        cashPaid: req.cashToCollect || 0,
+        coinsEarned: req.coinsEarned || 0,
+        paymentMethod: req.paymentMethod,
+        status: 'SUCCESS',
+        date: req.verifiedAt || req.createdAt ? new Date(req.verifiedAt || req.createdAt).toISOString() : new Date().toISOString(),
+        createdAt: req.verifiedAt || req.createdAt,
+      }));
+
+    const completedList = transactions.map((tx: any) => ({
+      id: tx._id.toString(),
+      orderNumber: tx.orderNumber,
+      vendorId: tx.vendorId.toString(),
+      vendorName: tx.vendorName,
+      vendorCategory: tx.vendorCategory || 'Local Vendor',
+      billAmount: tx.billAmount,
+      coinsUsed: tx.coinsUsed || 0,
+      cashPaid: tx.cashPaid || 0,
+      coinsEarned: tx.coinsEarned || 0,
+      paymentMethod: tx.paymentMethod,
+      status: tx.status || 'SUCCESS',
+      date: tx.createdAt ? new Date(tx.createdAt).toISOString() : new Date().toISOString(),
+      createdAt: tx.createdAt,
+    }));
+
+    return [...ongoingList, ...completedList, ...verifiedListFromRequests];
   }
 }
 

@@ -54,7 +54,7 @@ export const LocalShopHomeScreen: React.FC = () => {
   const [isCityModalVisible, setIsCityModalVisible] = useState(false);
 
   // Navigation State
-  const [activeTab, setActiveTab] = useState<LocalTabKey>('Home');
+  const [activeTab, setActiveTab] = useState<LocalTabKey>('Shops');
   const [currentSubScreen, setCurrentSubScreen] = useState<
     'none' | 'shop_detail' | 'cart' | 'qr_scanner'
   >('none');
@@ -141,8 +141,8 @@ export const LocalShopHomeScreen: React.FC = () => {
         setCurrentSubScreen('none');
         return true;
       }
-      if (activeTab !== 'Home') {
-        setActiveTab('Home');
+      if (activeTab !== 'Shops') {
+        setActiveTab('Shops');
         return true;
       }
       handleBackToMainApp();
@@ -240,6 +240,13 @@ export const LocalShopHomeScreen: React.FC = () => {
           setCurrentSubScreen('none');
           setActiveTab('My Coin');
         }}
+        onViewOrders={() => {
+          LocalShopApi.getCoinBalance().then((latest) => {
+            if (typeof latest === 'number') setCoinBalance(latest);
+          });
+          setCurrentSubScreen('none');
+          setActiveTab('My Orders');
+        }}
       />
     );
   }
@@ -248,7 +255,7 @@ export const LocalShopHomeScreen: React.FC = () => {
   if (activeTab === 'My Coin') {
     return (
       <View style={{ flex: 1 }}>
-        <MyCoinWalletScreen onGoBack={() => setActiveTab('Home')} />
+        <MyCoinWalletScreen onGoBack={() => setActiveTab('Shops')} />
         <LocalBottomNav
           currentTab={activeTab}
           onSelectTab={handleSelectTab}
@@ -263,7 +270,7 @@ export const LocalShopHomeScreen: React.FC = () => {
     return (
       <View style={{ flex: 1 }}>
         <MyOrdersScreen
-          onGoBack={() => setActiveTab('Home')}
+          onGoBack={() => setActiveTab('Shops')}
           onShopAgain={(vId) => {
             const v = vendors.find((item) => item.id === vId) || vendors[0];
             setSelectedVendor(v);
@@ -285,7 +292,7 @@ export const LocalShopHomeScreen: React.FC = () => {
       <View style={{ flex: 1 }}>
         <MyProfileScreen
           coinBalance={coinBalance}
-          onGoBack={() => setActiveTab('Home')}
+          onGoBack={() => setActiveTab('Shops')}
           onOpenWallet={() => setActiveTab('My Coin')}
         />
         <LocalBottomNav

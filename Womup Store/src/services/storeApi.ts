@@ -394,4 +394,90 @@ export class StoreApiService {
     }
     throw lastError || new Error('Failed to upload image to server');
   }
+
+  // ─── UNIFIED STORE NOTIFICATIONS API ──────────────────────────────
+  static async getNotifications(storeId: string, page = 1, limit = 20): Promise<{ notifications: any[]; unreadCount: number }> {
+    try {
+      const headers = await this.getHeaders();
+      const notifBase = API_BASE_URL.replace(/\/store\/?$/, '');
+      const res = await fetch(`${notifBase}/notifications?page=${page}&limit=${limit}&storeId=${encodeURIComponent(storeId)}&role=STORE`, {
+        headers: {
+          ...headers,
+          'x-store-id': storeId,
+          'x-role': 'STORE',
+        },
+      });
+      if (!res.ok) return { notifications: [], unreadCount: 0 };
+      const json = await res.json();
+      const payload = json?.data || json;
+      return {
+        notifications: payload?.notifications || [],
+        unreadCount: payload?.unreadCount || 0,
+      };
+    } catch (e) {
+      console.warn('[StoreApiService] getNotifications error:', e);
+      return { notifications: [], unreadCount: 0 };
+    }
+  }
+
+  static async getUnreadCount(storeId: string): Promise<number> {
+    try {
+      const headers = await this.getHeaders();
+      const notifBase = API_BASE_URL.replace(/\/store\/?$/, '');
+      const res = await fetch(`${notifBase}/notifications/unread-count?storeId=${encodeURIComponent(storeId)}&role=STORE`, {
+        headers: {
+          ...headers,
+          'x-store-id': storeId,
+          'x-role': 'STORE',
+        },
+      });
+      if (!res.ok) return 0;
+      const json = await res.json();
+      return json?.data?.count ?? json?.count ?? 0;
+    } catch (e) {
+      console.warn('[StoreApiService] getUnreadCount error:', e);
+      return 0;
+    }
+  }
+
+  static async markNotificationRead(id: string, storeId: string): Promise<boolean> {
+    try {
+      const headers = await this.getHeaders();
+      const notifBase = API_BASE_URL.replace(/\/store\/?$/, '');
+      const res = await fetch(`${notifBase}/notifications/${id}/read`, {
+        method: 'PATCH',
+        headers: {
+          ...headers,
+          'x-store-id': storeId,
+          'x-role': 'STORE',
+        },
+      });
+      const data = await res.json();
+      return data?.success !== false;
+    } catch (e) {
+      console.warn('[StoreApiService] markNotificationRead error:', e);
+      return false;
+    }
+  }
+
+  static async markAllNotificationsRead(storeId: string): Promise<boolean> {
+    try {
+      const headers = await this.getHeaders();
+      const notifBase = API_BASE_URL.replace(/\/store\/?$/, '');
+      const res = await fetch(`${notifBase}/notifications/read-all`, {
+        method: 'PATCH',
+        headers: {
+          ...headers,
+          'x-store-id': storeId,
+          'x-role': 'STORE',
+        },
+      });
+      const data = await res.json();
+      return data?.success !== false;
+    } catch (e) {
+      console.warn('[StoreApiService] markAllNotificationsRead error:', e);
+      return false;
+    }
+  }
 }
+

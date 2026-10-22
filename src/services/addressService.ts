@@ -18,11 +18,19 @@ export const AddressService = {
     houseFlat: string;
     areaLandmark: string;
     city: string;
+    areaId?: string;
+    areaName?: string;
+    storeId?: string;
     pincode?: string;
     isDefault?: boolean;
     latitude?: number;
     longitude?: number;
   }): Promise<{ success: boolean; data?: any; message?: string }> {
+    // Ephemeral Current GPS location should NEVER be persisted to MongoDB Saved Addresses
+    if (address.type === 'Current') {
+      return { success: true, message: 'Current location is transient and not saved to DB' };
+    }
+
     const parts = address.houseFlat.split(',');
     const houseNumber = parts[0]?.trim() || address.houseFlat || 'B-402';
     const street = parts.length > 1 ? parts.slice(1).join(',').trim() : address.areaLandmark || 'Shivalik Heights';
@@ -34,6 +42,9 @@ export const AddressService = {
       landmark: address.areaLandmark || '',
       city: address.city.split(',')[0].trim() || 'Ahmedabad',
       state: 'Gujarat',
+      areaId: address.areaId,
+      areaName: address.areaName,
+      storeId: address.storeId,
       pincode: address.pincode || '',
       coordinates: address.longitude !== undefined && address.latitude !== undefined
         ? [address.longitude, address.latitude]
@@ -83,6 +94,7 @@ export const AddressService = {
         street: item.street || '',
         areaLandmark: item.landmark || '',
         city: item.city || 'Ahmedabad',
+        areaId: item.areaId ? item.areaId.toString() : undefined,
         pincode: item.pincode || '',
         isDefault: item.isDefault,
         latitude: item.location?.coordinates?.[1] !== undefined ? Number(item.location.coordinates[1]) : undefined,

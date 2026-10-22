@@ -98,22 +98,74 @@ export const EditProductModal: React.FC = () => {
       setImagePreview(img);
       setErrorMsg(null);
 
+      // Resolve store & inventory if available
+      const targetStore = darkStores.find(
+        (s) =>
+          (selectedProduct as any).selectedStoreId === String(s.id || (s as any)._id) ||
+          (selectedProduct as any).selectedStoreName === s.name ||
+          s.name === selectedDarkStore ||
+          String(s.id || (s as any)._id) === selectedDarkStore
+      );
+      const invRecord = inventory.find(
+        (i) =>
+          i.productId === selectedProduct.id &&
+          targetStore &&
+          (i.darkStoreId === String(targetStore.id || (targetStore as any)._id) || i.darkStoreName === targetStore.name)
+      );
+
+      // Resolve area pricing if available
+      const targetAreaId = (selectedProduct as any).selectedAreaId;
+
       // Load variants
       const prodVariants = selectedProduct.variants || [];
       if (prodVariants.length > 0) {
         setVariants(
-          prodVariants.map((v, idx) => ({
-            id: v.id || `v_${idx}`,
-            sku: v.sku || '',
-            weightOrVolume: v.weightOrVolume || '1 unit',
-            mrp: String(v.mrp || v.sellingPrice || 0),
-            sellingPrice: String(v.sellingPrice || 0),
-            stock: String(v.stock !== undefined ? v.stock : 50),
-            isDefault: v.isDefault !== undefined ? !!v.isDefault : idx === 0,
-            isActive: v.isActive !== false,
-          }))
+          prodVariants.map((v, idx) => {
+            const vId = String(v.id || (v as any)._id || '');
+            const areaRecord =
+              targetAreaId && targetAreaId !== 'ALL'
+                ? areaPricingRecords.find(
+                    (ap) =>
+                      (ap.variantId === vId || ap.variantId === v.sku) &&
+                      (ap.areaId === targetAreaId || (ap as any).areaName === (selectedProduct as any).selectedAreaName)
+                  )
+                : null;
+
+            const effectivePrice =
+              v.sellingPrice !== undefined && v.sellingPrice > 0
+                ? v.sellingPrice
+                : areaRecord?.price !== undefined && areaRecord.price > 0
+                ? areaRecord.price
+                : 0;
+
+            const effectiveMrp =
+              v.mrp !== undefined && v.mrp > 0
+                ? v.mrp
+                : areaRecord?.mrp !== undefined && areaRecord.mrp > 0
+                ? areaRecord.mrp
+                : effectivePrice;
+
+            const effectiveStock =
+              v.stock !== undefined
+                ? v.stock
+                : invRecord?.availableKg !== undefined
+                ? invRecord.availableKg
+                : 50;
+
+            return {
+              id: v.id || `v_${idx}`,
+              sku: v.sku || '',
+              weightOrVolume: v.weightOrVolume || '1 unit',
+              mrp: String(effectiveMrp),
+              sellingPrice: String(effectivePrice),
+              stock: String(effectiveStock),
+              isDefault: v.isDefault !== undefined ? !!v.isDefault : idx === 0,
+              isActive: v.isActive !== false,
+            };
+          })
         );
       } else {
+        const storeStock = invRecord?.availableKg !== undefined ? invRecord.availableKg : (selectedProduct.stockKg || 50);
         setVariants([
           {
             id: `v_${Date.now()}`,
@@ -121,14 +173,14 @@ export const EditProductModal: React.FC = () => {
             weightOrVolume: '1 unit',
             mrp: String(selectedProduct.mrp || 50),
             sellingPrice: String(selectedProduct.sellingPrice || 40),
-            stock: String(selectedProduct.stockKg || 50),
+            stock: String(storeStock),
             isDefault: true,
             isActive: true,
           },
         ]);
       }
     }
-  }, [selectedProduct, categories]);
+  }, [selectedProduct, categories, inventory, areaPricingRecords, darkStores, selectedDarkStore]);
 
   if (activeModal !== 'EditProduct' || !selectedProduct) {
     return null;
@@ -304,23 +356,31 @@ export const EditProductModal: React.FC = () => {
       } as any);
 
       if (success) {
-        // Sync store-specific inventory if store context exists (productId, storeId, inventoryId)
-        const targetStore = darkStores.find((s) => s.name === selectedDarkStore || s.id === selectedDarkStore);
+        // 1. Sync store-specific inventory if store context exists
+        const targetStore = darkStores.find(
+          (s) =>
+            (selectedProduct as any).selectedStoreId === String(s.id || (s as any)._id) ||
+            (selectedProduct as any).selectedStoreName === s.name ||
+            s.name === selectedDarkStore ||
+            String(s.id || (s as any)._id) === selectedDarkStore
+        );
         if (targetStore) {
           const storeId = String(targetStore.id || (targetStore as any)._id);
           const invRecord = inventory.find(
             (i) => i.productId === selectedProduct.id && (i.darkStoreId === storeId || i.darkStoreName === targetStore.name)
           );
-          const newStock = defaultVar.stock || 50;
+          const newStock = defaultVar.stock !== undefined ? defaultVar.stock : 50;
           const oldStock = invRecord ? invRecord.availableKg : (selectedProduct.stockKg || 50);
           const delta = newStock - oldStock;
-          await ApiService.adjustStock(
-            storeId,
-            selectedProduct.id,
-            delta,
-            'Product edit modal stock sync',
-            invRecord?.id
-          );
+          if (delta !== 0) {
+            await ApiService.adjustStock(
+              storeId,
+              selectedProduct.id,
+              delta,
+              'Product edit modal stock sync',
+              invRecord?.id
+            );
+          }
           if (shelfLocation.trim()) {
             await ApiService.updateShelfLocation({
               inventoryId: invRecord?.id,
@@ -329,9 +389,27 @@ export const EditProductModal: React.FC = () => {
               shelfLocation: shelfLocation.trim(),
             });
           }
-          if (refreshFromDb) {
-            await refreshFromDb();
+        }
+
+        // 2. Sync Area Pricing if area context exists
+        const targetAreaId = (selectedProduct as any).selectedAreaId;
+        if (targetAreaId && targetAreaId !== 'ALL' && updateVariantAreaPrice) {
+          for (const v of formattedVariants) {
+            if (v.id) {
+              await updateVariantAreaPrice(
+                selectedProduct.id,
+                v.id,
+                targetAreaId,
+                v.sellingPrice,
+                v.mrp,
+                v.stock
+              );
+            }
           }
+        }
+
+        if (refreshFromDb) {
+          await refreshFromDb();
         }
         handleClose();
       } else {
@@ -370,9 +448,16 @@ export const EditProductModal: React.FC = () => {
         <View style={styles.modalCard}>
           {/* Header */}
           <View style={styles.modalHeader}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Edit2 size={18} color="#4F46E5" />
-              <Text style={styles.modalTitle}>Edit Product & Variants</Text>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Edit2 size={18} color="#4F46E5" />
+                <Text style={styles.modalTitle}>Edit Product & Variants</Text>
+              </View>
+              {Boolean((selectedProduct as any)?.selectedStoreName || (selectedProduct as any)?.selectedAreaName) && (
+                <Text style={{ fontSize: 11, color: '#6366F1', fontWeight: '700', marginTop: 3 }}>
+                  🏬 {(selectedProduct as any).selectedStoreName || selectedDarkStore || 'Selected Store'}{Boolean((selectedProduct as any)?.selectedAreaName) && ` • 📍 ${(selectedProduct as any).selectedAreaName}`}
+                </Text>
+              )}
             </View>
             <TouchableOpacity onPress={handleClose} style={styles.closeBtn} activeOpacity={0.7}>
               <X size={18} color="#94A3B8" />

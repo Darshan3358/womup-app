@@ -15,6 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../context/StoreContext';
 import { COLORS } from '../../theme/colors';
+import { StoreNotificationModal } from './StoreNotificationModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DRAWER_WIDTH = Math.min(320, SCREEN_WIDTH * 0.85);
@@ -318,28 +319,7 @@ export const SidebarDrawer: React.FC = () => {
 
       {/* Sub-Modal: Notifications */}
       {activeModal === 'notifications' && (
-        <Modal transparent animationType="fade" visible={true} onRequestClose={() => setActiveModal(null)}>
-          <View style={styles.dialogOverlay}>
-            <View style={styles.dialogCard}>
-              <View style={styles.dialogHeader}>
-                <Ionicons name="notifications" size={22} color="#8B5CF6" />
-                <Text style={styles.dialogTitle}>Dark Store Notifications</Text>
-                <TouchableOpacity onPress={() => setActiveModal(null)}>
-                  <Ionicons name="close" size={22} color="#94A3B8" />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.dialogBody}>
-                <View style={styles.emptyNoticeBox}>
-                  <Ionicons name="checkmark-circle-outline" size={36} color="#10B981" />
-                  <Text style={styles.emptyNoticeTitle}>All Caught Up!</Text>
-                  <Text style={styles.emptyNoticeDesc}>
-                    There are no unread broadcast alerts. Incoming orders and rider handovers trigger real-time sound and banner alerts automatically.
-                  </Text>
-                </View>
-              </View>
-            </View>
-          </View>
-        </Modal>
+        <StoreNotificationModal visible={true} onClose={() => setActiveModal(null)} />
       )}
 
       {/* Sub-Modal: Settings */}

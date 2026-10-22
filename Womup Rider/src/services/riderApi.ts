@@ -37,8 +37,18 @@ const DEFAULT_API_URL = isLocalWeb
   ? 'http://localhost:5050/api/v1'
   : 'https://womup-app-uquz.onrender.com/api/v1';
 
+interface BufferedHttpResponse {
+  status: number;
+  statusText: string;
+  headers: [string, string][];
+  ok: boolean;
+  bodyText: string;
+}
+
 export class RiderApiService {
   private static token: string | null = null;
+  private static isLocationTelemetryInFlight = false;
+  private static lastLocationTelemetrySent = 0;
 
   private static getApiBaseUrl(): string {
     const envUrl = process.env.EXPO_PUBLIC_API_URL;
@@ -87,6 +97,73 @@ export class RiderApiService {
       return raw.data as T;
     }
     return raw as T;
+  }
+
+  // In-flight GET request deduplication map to prevent simultaneous duplicate requests
+  private static inFlightGetRequests = new Map<string, Promise<BufferedHttpResponse>>();
+
+  // Native-safe resilient fetch with in-flight GET deduplication & Promise.race timeout
+  private static async resilientFetch(url: string, options: RequestInit = {}, timeoutMs = 15000): Promise<Response> {
+    const method = (options.method || 'GET').toUpperCase();
+
+    // Deduplicate concurrent safe GET requests to protect connection pool
+    if (method === 'GET') {
+      const authHeader = (options.headers as any)?.Authorization || (options.headers as any)?.authorization || '';
+      const dedupeKey = `${url}::${authHeader}`;
+      let p = this.inFlightGetRequests.get(dedupeKey);
+
+      if (!p) {
+        p = (async () => {
+          try {
+            const raw = await this.executeResilientFetch(url, options, timeoutMs);
+            const bodyText = await raw.text();
+            const headersInit: [string, string][] = [];
+            if (raw.headers && typeof (raw.headers as any).forEach === 'function') {
+              (raw.headers as any).forEach((val: string, key: string) => headersInit.push([key, val]));
+            }
+            return {
+              status: raw.status,
+              statusText: raw.statusText,
+              headers: headersInit,
+              ok: raw.ok,
+              bodyText,
+            };
+          } finally {
+            this.inFlightGetRequests.delete(dedupeKey);
+          }
+        })();
+        this.inFlightGetRequests.set(dedupeKey, p);
+      }
+
+      const buffered = await p;
+      return new Response(buffered.bodyText, {
+        status: buffered.status,
+        statusText: buffered.statusText,
+        headers: buffered.headers,
+      });
+    }
+
+    return this.executeResilientFetch(url, options, timeoutMs);
+  }
+
+  private static async executeResilientFetch(url: string, options: RequestInit = {}, timeoutMs = 15000): Promise<Response> {
+    const controller = new AbortController();
+    let timer: any = null;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        try { controller.abort(); } catch (_) {}
+        reject(new Error('REQUEST_TIMEOUT'));
+      }, timeoutMs);
+    });
+
+    const fetchPromise = fetch(url, {
+      ...options,
+      signal: controller.signal,
+    }).finally(() => {
+      if (timer) clearTimeout(timer);
+    });
+
+    return Promise.race([fetchPromise, timeoutPromise]);
   }
 
 
@@ -525,6 +602,11 @@ export class RiderApiService {
       const isApproved = profile.status === 'APPROVED' || profile.status === 'ACTIVE';
       return { status: profile.status, isApproved };
     } catch {
+      const cached = await this.getStorage<RiderProfile>(STORAGE_KEYS.PROFILE);
+      if (cached && cached.status) {
+        const isApproved = cached.status === 'APPROVED' || cached.status === 'ACTIVE';
+        return { status: cached.status, isApproved };
+      }
       return { status: 'PENDING' as any, isApproved: false };
     }
   }
@@ -537,17 +619,13 @@ export class RiderApiService {
     }
 
     const headers = await this.getAuthHeader();
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
-      try { controller.abort(); } catch (e) {}
-    }, 6000);
 
     try {
-      const res = await fetch(`${this.getApiBaseUrl()}/delivery/me`, {
-        headers,
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
+      const res = await this.resilientFetch(
+        `${this.getApiBaseUrl()}/delivery/me`,
+        { headers },
+        12000
+      );
       if (res.status === 401) {
         await this.clearAuth();
         throw new Error('SESSION_EXPIRED');
@@ -580,13 +658,12 @@ export class RiderApiService {
       await this.setStorage(STORAGE_KEYS.PROFILE, mapped);
       return mapped;
     } catch (err: any) {
-      clearTimeout(timeoutId);
       if (err.message === 'NOT_AUTHENTICATED' || err.message === 'SESSION_EXPIRED') {
         throw err;
       }
       // Offline fallback: only return cached genuine profile if present
       const cached = await this.getStorage<RiderProfile>(STORAGE_KEYS.PROFILE);
-      if (cached && cached.id && cached.email) {
+      if (cached && (cached.id || cached.email)) {
         return cached;
       }
       throw new Error('NETWORK_ERROR');
@@ -604,11 +681,11 @@ export class RiderApiService {
   static async updateDutyStatus(isOnline: boolean): Promise<boolean> {
     const headers = await this.getAuthHeader();
     try {
-      await fetch(`${this.getApiBaseUrl()}/delivery/status`, {
+      await this.resilientFetch(`${this.getApiBaseUrl()}/delivery/status`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ isOnline }),
-      });
+      }, 8000);
     } catch {
       // ignore
     }
@@ -638,17 +715,13 @@ export class RiderApiService {
     }
 
     const headers = await this.getAuthHeader();
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
-      try { controller.abort(); } catch (e) {}
-    }, 6000);
 
     try {
-      const res = await fetch(`${this.getApiBaseUrl()}/delivery/active-order`, {
-        headers,
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
+      const res = await this.resilientFetch(
+        `${this.getApiBaseUrl()}/delivery/active-order`,
+        { headers },
+        10000
+      );
       if (res.status === 401) {
         await this.clearAuth();
         return null;
@@ -662,8 +735,7 @@ export class RiderApiService {
         }
       }
     } catch {
-      clearTimeout(timeoutId);
-      // network/auth error
+      // network/auth/timeout error
     }
 
     // Check cached delivery only if genuine
@@ -672,7 +744,6 @@ export class RiderApiService {
       return cached;
     }
 
-    await this.setStorage(STORAGE_KEYS.ACTIVE_DELIVERY, null);
     return null;
   }
 
@@ -908,7 +979,7 @@ export class RiderApiService {
     const headers = await this.getAuthHeader();
     try {
       // 1. Try to get real unassigned order waiting for dispatch
-      const res = await fetch(`${this.getApiBaseUrl()}/delivery/orders/available`, { headers });
+      const res = await this.resilientFetch(`${this.getApiBaseUrl()}/delivery/orders/available`, { headers }, 15000);
       if (res.status === 401) {
         await this.clearAuth();
         return null;
@@ -927,7 +998,7 @@ export class RiderApiService {
 
     // 2. Check active-order endpoint
     try {
-      const activeRes = await fetch(`${this.getApiBaseUrl()}/delivery/active-order`, { headers });
+      const activeRes = await this.resilientFetch(`${this.getApiBaseUrl()}/delivery/active-order`, { headers }, 15000);
       if (activeRes.status === 401) {
         await this.clearAuth();
         return null;
@@ -955,7 +1026,7 @@ export class RiderApiService {
     }
     const headers = await this.getAuthHeader();
     try {
-      const res = await fetch(`${this.getApiBaseUrl()}/delivery/orders/available-list`, { headers });
+      const res = await this.resilientFetch(`${this.getApiBaseUrl()}/delivery/orders/available-list`, { headers }, 15000);
       if (res.status === 401) {
         await this.clearAuth();
         return [];
@@ -976,6 +1047,13 @@ export class RiderApiService {
 
   // --- LOCATION TELEMETRY ---
   static async sendLocationTelemetry(coords: LocationCoordinates): Promise<boolean> {
+    if (this.isLocationTelemetryInFlight) {
+      return false; // Prevent concurrent calls from saturating browser connection pool
+    }
+    const now = Date.now();
+    if (now - this.lastLocationTelemetrySent < 8000) {
+      return true; // Throttle to maximum once every 8 seconds
+    }
     if (!(await this.hasValidToken())) {
       return false;
     }
@@ -991,7 +1069,8 @@ export class RiderApiService {
 
     const headers = await this.getAuthHeader();
     try {
-      const res = await fetch(`${this.getApiBaseUrl()}/delivery/location`, {
+      this.isLocationTelemetryInFlight = true;
+      const res = await this.resilientFetch(`${this.getApiBaseUrl()}/delivery/location`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -1000,13 +1079,16 @@ export class RiderApiService {
           speed: Math.max(0, Number(coords.speed) || 0),
           heading: Math.max(0, Math.min(360, Number(coords.heading) || 0)),
         }),
-      });
+      }, 6000);
+      this.lastLocationTelemetrySent = Date.now();
       if (res.status === 401) {
         return false;
       }
       return res.ok;
     } catch {
       return false;
+    } finally {
+      this.isLocationTelemetryInFlight = false;
     }
   }
 
@@ -1037,7 +1119,7 @@ export class RiderApiService {
     }
     const headers = await this.getAuthHeader();
     try {
-      const res = await fetch(`${this.getApiBaseUrl()}/delivery/wallet`, { headers });
+      const res = await this.resilientFetch(`${this.getApiBaseUrl()}/delivery/wallet`, { headers }, 15000);
       if (res.status === 401) {
         await this.clearAuth();
         return defaultData;
@@ -1078,7 +1160,7 @@ export class RiderApiService {
     const headers = await this.getAuthHeader();
     try {
       // 1. Prioritize real daily settlement endpoint
-      const res = await fetch(`${this.getApiBaseUrl()}/delivery/settlements/today`, { headers });
+      const res = await this.resilientFetch(`${this.getApiBaseUrl()}/delivery/settlements/today`, { headers }, 15000);
       if (res.status === 401) {
         await this.clearAuth();
         return {
@@ -1102,7 +1184,7 @@ export class RiderApiService {
       }
 
       // 2. Fallback to balance endpoint
-      const balRes = await fetch(`${this.getApiBaseUrl()}/delivery/settlements/balance`, { headers });
+      const balRes = await this.resilientFetch(`${this.getApiBaseUrl()}/delivery/settlements/balance`, { headers }, 15000);
       if (balRes.status === 401) {
         await this.clearAuth();
         return {
@@ -1258,7 +1340,7 @@ export class RiderApiService {
   static async getMySettlementRequests(): Promise<any[]> {
     const headers = await this.getAuthHeader();
     try {
-      const res = await fetch(`${this.getApiBaseUrl()}/delivery/settlements/my-requests`, { headers });
+      const res = await this.resilientFetch(`${this.getApiBaseUrl()}/delivery/settlements/my-requests`, { headers }, 15000);
       if (res.ok) {
         const raw = await res.json();
         const data = this.unwrapData<any[]>(raw);
@@ -1313,7 +1395,7 @@ export class RiderApiService {
 
     const headers = await this.getAuthHeader();
     try {
-      const res = await fetch(`${this.getApiBaseUrl()}/delivery/bank-account`, { headers });
+      const res = await this.resilientFetch(`${this.getApiBaseUrl()}/delivery/bank-account`, { headers }, 15000);
       if (res.status === 401) {
         await this.clearAuth();
         return null;
@@ -1382,7 +1464,7 @@ export class RiderApiService {
 
     const headers = await this.getAuthHeader();
     try {
-      const res = await fetch(`${this.getApiBaseUrl()}/delivery/vehicle`, { headers });
+      const res = await this.resilientFetch(`${this.getApiBaseUrl()}/delivery/vehicle`, { headers }, 15000);
       if (res.status === 401) {
         await this.clearAuth();
         return null;
@@ -1424,7 +1506,7 @@ export class RiderApiService {
   static async getPerformance(): Promise<PerformanceMetrics> {
     const headers = await this.getAuthHeader();
     try {
-      const res = await fetch(`${this.getApiBaseUrl()}/delivery/performance`, { headers });
+      const res = await this.resilientFetch(`${this.getApiBaseUrl()}/delivery/performance`, { headers }, 15000);
       if (res.ok) {
         const raw = await res.json();
         const data = this.unwrapData<PerformanceMetrics>(raw);
@@ -1449,7 +1531,7 @@ export class RiderApiService {
   static async getDutyHistory(): Promise<DutyShift[]> {
     const headers = await this.getAuthHeader();
     try {
-      const res = await fetch(`${this.getApiBaseUrl()}/delivery/duty-history`, { headers });
+      const res = await this.resilientFetch(`${this.getApiBaseUrl()}/delivery/duty-history`, { headers }, 15000);
       if (res.ok) {
         const raw = await res.json();
         const data = this.unwrapData<DutyShift[]>(raw);
@@ -1466,7 +1548,7 @@ export class RiderApiService {
   static async getDocuments(): Promise<RiderDocument[]> {
     const headers = await this.getAuthHeader();
     try {
-      const res = await fetch(`${this.getApiBaseUrl()}/delivery/documents`, { headers });
+      const res = await this.resilientFetch(`${this.getApiBaseUrl()}/delivery/documents`, { headers }, 15000);
       if (res.ok) {
         const raw = await res.json();
         const data = this.unwrapData<any[]>(raw);
@@ -1522,14 +1604,34 @@ export class RiderApiService {
   static async getNotifications(): Promise<RiderNotification[]> {
     if (await this.hasValidToken()) {
       const headers = await this.getAuthHeader();
+      const profile = await this.getProfile().catch(() => null);
+      const riderId = profile?.id || (profile as any)?._id || '';
       try {
-        const res = await fetch(`${this.getApiBaseUrl()}/delivery/notifications`, { headers });
+        const notifUrl = `${this.getApiBaseUrl()}/notifications?role=RIDER${riderId ? `&riderId=${riderId}` : ''}`;
+        const res = await this.resilientFetch(notifUrl, {
+          headers: {
+            ...headers,
+            'x-role': 'RIDER',
+            ...(riderId ? { 'x-rider-id': riderId } : {}),
+          },
+        }, 15000);
         if (res.status === 401) {
           await this.clearAuth();
         } else if (res.ok) {
           const raw = await res.json();
-          const data = this.unwrapData<RiderNotification[]>(raw);
-          if (Array.isArray(data)) return data;
+          const payload = raw?.data || raw;
+          const list = payload?.notifications || (Array.isArray(payload) ? payload : []);
+          return list.map((n: any) => ({
+            id: n.id || n._id,
+            _id: n._id || n.id,
+            title: n.title,
+            message: n.message || n.body || '',
+            type: n.type || 'ORDER',
+            isRead: n.isRead,
+            orderId: n.orderId,
+            timestamp: n.createdAt ? new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent',
+            rawDate: n.createdAt,
+          }));
         }
       } catch {
         // ignore
@@ -1539,15 +1641,54 @@ export class RiderApiService {
     return [];
   }
 
+  static async getUnreadNotificationCount(): Promise<number> {
+    if (await this.hasValidToken()) {
+      const headers = await this.getAuthHeader();
+      const profile = await this.getProfile().catch(() => null);
+      const riderId = profile?.id || (profile as any)?._id || '';
+      try {
+        const notifUrl = `${this.getApiBaseUrl()}/notifications/unread-count?role=RIDER${riderId ? `&riderId=${riderId}` : ''}`;
+        const res = await fetch(notifUrl, {
+          headers: {
+            ...headers,
+            'x-role': 'RIDER',
+            ...(riderId ? { 'x-rider-id': riderId } : {}),
+          },
+        });
+        if (res.ok) {
+          const json = await res.json();
+          return json?.data?.count ?? json?.count ?? 0;
+        }
+      } catch {}
+    }
+    return 0;
+  }
+
   static async markNotificationRead(id: string): Promise<RiderNotification[]> {
-    const notifs = await this.getNotifications();
-    const updated = notifs.map((n) => (n.id === id ? { ...n, isRead: true } : n));
-    await this.setStorage(STORAGE_KEYS.NOTIFICATIONS, updated);
-    return updated;
+    try {
+      const headers = await this.getAuthHeader();
+      await fetch(`${this.getApiBaseUrl()}/notifications/${id}/read`, {
+        method: 'PATCH',
+        headers: {
+          ...headers,
+          'x-role': 'RIDER',
+        },
+      });
+    } catch {}
+    return this.getNotifications();
   }
 
   static async clearAllNotifications(): Promise<void> {
-    await this.setStorage(STORAGE_KEYS.NOTIFICATIONS, []);
+    try {
+      const headers = await this.getAuthHeader();
+      await fetch(`${this.getApiBaseUrl()}/notifications/read-all`, {
+        method: 'PATCH',
+        headers: {
+          ...headers,
+          'x-role': 'RIDER',
+        },
+      });
+    } catch {}
   }
 
   // --- SUPPORT TICKET ---

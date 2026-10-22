@@ -2,7 +2,7 @@ import { Controller, Get, Query, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 
 const routeCache = new Map<string, { data: any; ts: number }>();
-const CACHE_TTL_MS = 30000; // 30s cache
+const CACHE_TTL_MS = 600000; // 10 minutes cache
 
 @ApiTags('tracking')
 @Controller('api/v1/tracking')
@@ -26,7 +26,7 @@ export class TrackingController {
       throw new BadRequestException('Invalid coordinates format. Use "lat,lng"');
     }
 
-    const cacheKey = `${fromLat.toFixed(4)},${fromLng.toFixed(4)}_${toLat.toFixed(4)},${toLng.toFixed(4)}`;
+    const cacheKey = `${fromLat.toFixed(3)},${fromLng.toFixed(3)}_${toLat.toFixed(3)},${toLng.toFixed(3)}`;
     const cached = routeCache.get(cacheKey);
     if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
       return { success: true, cached: true, data: cached.data };
@@ -37,7 +37,7 @@ export class TrackingController {
       const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${fromLng},${fromLat};${toLng},${toLat}?overview=full&geometries=geojson&steps=true`;
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const timeoutId = setTimeout(() => controller.abort(), 1500);
 
       const res = await fetch(osrmUrl, { signal: controller.signal });
       clearTimeout(timeoutId);

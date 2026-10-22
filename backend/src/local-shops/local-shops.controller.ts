@@ -9,6 +9,8 @@ import {
   Body,
   HttpCode,
   HttpStatus,
+  Req,
+  Headers,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { LocalShopsService } from './local-shops.service';
@@ -67,6 +69,38 @@ export class LocalShopsController {
       query,
     );
     return { success: true, data: { vendors }, count: vendors.length };
+  }
+
+  @Get(['local-shops/my-orders', 'local/my-orders'])
+  @ApiOperation({ summary: 'Customer offline vendor orders & transaction history' })
+  async getMyOrders(
+    @Req() req: any,
+    @Headers('x-user-id') userIdHeader?: string,
+    @Query('customerId') customerIdQuery?: string,
+    @Query('phone') phoneQuery?: string,
+  ) {
+    let customerId = req.user?.id || req.user?._id || userIdHeader || customerIdQuery;
+    let phone = req.user?.phone || req.user?.phoneNumber || phoneQuery;
+
+    // Decode JWT from Authorization Bearer header if customerId not yet resolved
+    if (!customerId && req.headers?.authorization) {
+      try {
+        const token = req.headers.authorization.replace(/^Bearer\s+/i, '').trim();
+        if (token) {
+          const jwt = require('jsonwebtoken');
+          const decoded: any = jwt.decode(token);
+          if (decoded) {
+            customerId = decoded.sub || decoded.id || decoded.userId || decoded._id;
+            if (!phone && decoded.phone) {
+              phone = decoded.phone;
+            }
+          }
+        }
+      } catch {}
+    }
+
+    const orders = await this.localShopsService.getCustomerOfflineOrders(customerId, phone);
+    return { success: true, data: orders };
   }
 
   @Get(['local-shops/:vendorId', 'local/shops/:vendorId'])

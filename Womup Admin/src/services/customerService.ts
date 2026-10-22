@@ -132,7 +132,7 @@ export const CustomerService = {
   async getAreas(): Promise<Array<{ id: string; name: string }>> {
     try {
       const adminBase = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-        ? 'http://localhost:5001'
+        ? 'http://localhost:5050'
         : 'https://womup-app-uquz.onrender.com';
 
       let res = await fetch(`${adminBase}/api/admin/areas`).catch(() => null);

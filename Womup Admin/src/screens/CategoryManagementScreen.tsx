@@ -32,20 +32,20 @@ import { COLORS, GRADIENTS, RADIUS, SPACING } from '../theme';
 import { useAdminState } from '../context/AdminStateContext';
 import { CategoryItem, SubCategoryItem } from '../types/admin';
 
-// 100% Website Parity Image Presets (Matching localhost:5175)
+// Category Presets (Emoji & Color styles)
 const IMAGE_PRESETS = [
-  { label: 'Vegetables', url: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=500&q=80', emoji: '🥦', color: '#E8F5E9' },
-  { label: 'Fruits', url: 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=500&q=80', emoji: '🍎', color: '#FFF3E0' },
-  { label: 'Dairy & Milk', url: 'https://images.unsplash.com/photo-1628088062854-d1870b4553da?w=500&q=80', emoji: '🥛', color: '#E3F2FD' },
-  { label: 'Cooking Essentials', url: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=500&q=80', emoji: '🧄', color: '#F3E5F5' },
-  { label: 'Bakery & Bread', url: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=500&q=80', emoji: '🍞', color: '#FFF8E1' },
-  { label: 'Cold Beverages', url: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=500&q=80', emoji: '🥤', color: '#FCE4EC' },
-  { label: 'Snacks & Munchies', url: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=500&q=80', emoji: '🍿', color: '#FBE9E7' },
-  { label: 'Organic Wellness', url: 'https://images.unsplash.com/photo-1512069772995-ec65ed45afd6?w=500&q=80', emoji: '🌿', color: '#EEF9F3' },
-  { label: 'Personal Care', url: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=500&q=80', emoji: '🧴', color: '#EDE9FE' },
-  { label: 'Cleaning & Household', url: 'https://images.unsplash.com/photo-1585421514738-01798e348b17?w=500&q=80', emoji: '🧼', color: '#F1F5F9' },
-  { label: 'Paan Corner', url: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=500&q=80', emoji: '🍃', color: '#DCFCE7' },
-  { label: 'Baby Care', url: 'https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=500&q=80', emoji: '🍼', color: '#FCE7F3' },
+  { label: 'Vegetables', url: '', emoji: '🥦', color: '#E8F5E9' },
+  { label: 'Fruits', url: '', emoji: '🍎', color: '#FFF3E0' },
+  { label: 'Dairy & Milk', url: '', emoji: '🥛', color: '#E3F2FD' },
+  { label: 'Cooking Essentials', url: '', emoji: '🧄', color: '#F3E5F5' },
+  { label: 'Bakery & Bread', url: '', emoji: '🍞', color: '#FFF8E1' },
+  { label: 'Cold Beverages', url: '', emoji: '🥤', color: '#FCE4EC' },
+  { label: 'Snacks & Munchies', url: '', emoji: '🍿', color: '#FBE9E7' },
+  { label: 'Organic Wellness', url: '', emoji: '🌿', color: '#EEF9F3' },
+  { label: 'Personal Care', url: '', emoji: '🧴', color: '#EDE9FE' },
+  { label: 'Cleaning & Household', url: '', emoji: '🧼', color: '#F1F5F9' },
+  { label: 'Paan Corner', url: '', emoji: '🍃', color: '#DCFCE7' },
+  { label: 'Baby Care', url: '', emoji: '🍼', color: '#FCE7F3' },
 ];
 
 const COLOR_PRESETS = [
@@ -130,19 +130,11 @@ export const CategoryManagementScreen: React.FC = () => {
     setRefreshing(false);
   };
 
-  // Helper to resolve preset image if category has no custom image
+  // Helper to resolve image if category has an image URL
   const getCategoryImage = (cat: CategoryItem): string => {
     if (cat.image && cat.image.startsWith('http')) return cat.image;
     if (cat.imageUrl && cat.imageUrl.startsWith('http')) return cat.imageUrl;
-
-    const lowerName = cat.name.toLowerCase();
-    const preset = IMAGE_PRESETS.find(
-      (p) =>
-        lowerName.includes(p.label.toLowerCase()) ||
-        p.label.toLowerCase().includes(lowerName) ||
-        (cat.slug && p.label.toLowerCase().includes(cat.slug.toLowerCase()))
-    );
-    return preset?.url || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=500&q=80';
+    return '';
   };
 
   // Filtered categories
@@ -424,15 +416,19 @@ export const CategoryManagementScreen: React.FC = () => {
                 <View
                   style={[
                     styles.thumbnailBox,
-                    { backgroundColor: c.bgColor || '#F3F0FF' },
+                    { backgroundColor: c.bgColor || '#F3F0FF', alignItems: 'center', justifyContent: 'center' },
                   ]}
                 >
-                  <Image
-                    source={{ uri: catImg }}
-                    style={styles.thumbnailImage}
-                    resizeMode="cover"
-                  />
-                  {c.icon && c.icon.length <= 4 && (
+                  {catImg ? (
+                    <Image
+                      source={{ uri: catImg }}
+                      style={styles.thumbnailImage}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <Text style={{ fontSize: 24 }}>{c.icon || '🏷️'}</Text>
+                  )}
+                  {Boolean(catImg && c.icon && c.icon.length <= 4) && (
                     <View style={styles.emojiOverlayBadge}>
                       <Text style={styles.emojiOverlayText}>{c.icon}</Text>
                     </View>

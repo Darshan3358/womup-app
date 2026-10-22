@@ -19,6 +19,7 @@ import { COLORS } from '../../theme/colors';
 import { RiderChatModal } from '../../components/modals/RiderChatModal';
 import { RiderNavigationMap } from '../../components/RiderNavigationMap';
 import { NavigationScreen } from './NavigationScreen';
+import { DeliveryRequest } from '../../types/rider.types';
 
 const RIDER_STAGES = [
   { id: 'ACCEPTED', label: 'Order Accepted', desc: 'Job confirmed & active delivery' },
@@ -88,6 +89,7 @@ export const CurrentDeliveryScreen: React.FC = () => {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [selectedPastOrder, setSelectedPastOrder] = useState<any | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [previewJob, setPreviewJob] = useState<DeliveryRequest | null>(null);
 
   const loadHistory = useCallback(async () => {
     setIsLoadingHistory(true);
@@ -1009,21 +1011,10 @@ export const CurrentDeliveryScreen: React.FC = () => {
                       <Ionicons name="notifications-outline" size={13} color={COLORS.navy} />
                       <Text style={styles.jobOrderNumber}>Order {job.orderNumber}</Text>
                     </View>
-                    {job.isFromOwnHub === false ? (
-                      <View style={{ backgroundColor: '#FFF3E0', borderColor: '#FF9800', borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                        <Ionicons name="navigate" size={10} color="#E65100" />
-                        <Text style={{ color: '#E65100', fontWeight: '800', fontSize: 10 }}>
-                          NEARBY ({job.distanceToStoreKm ?? '0'} km)
-                        </Text>
-                      </View>
-                    ) : (
-                      <View style={{ backgroundColor: '#E8F5E9', borderColor: '#4CAF50', borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                        <Ionicons name="storefront" size={10} color="#2E7D32" />
-                        <Text style={{ color: '#2E7D32', fontWeight: '800', fontSize: 10 }}>
-                          HOME HUB
-                        </Text>
-                      </View>
-                    )}
+                    <View style={{ backgroundColor: '#ECFDF5', borderColor: '#A7F3D0', borderWidth: 1, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                      <Ionicons name="bicycle" size={10} color="#059669" />
+                      <Text style={{ color: '#047857', fontWeight: '800', fontSize: 10 }}>DELIVERY ORDER</Text>
+                    </View>
                   </View>
                   <View style={styles.freshBadge}>
                     <Ionicons name="time-outline" size={11} color="#4F46E5" style={{ marginRight: 3 }} />
@@ -1049,19 +1040,31 @@ export const CurrentDeliveryScreen: React.FC = () => {
                   </View>
                 </View>
 
-                {/* 3. Pickup & Drop Locations */}
-                <View style={styles.jobRouteBox}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Ionicons name="storefront-outline" size={13} color={COLORS.primary} />
-                    <Text style={styles.routeRowText} numberOfLines={1}>
-                      <Text style={styles.routeRowLabel}>Pickup: </Text>{job.storeName || 'Wom Up Ahmedabad Central Hub'}
-                    </Text>
+                {/* 3. Complete Pickup & Drop Locations */}
+                <View style={[styles.jobRouteBox, { flexDirection: 'column', gap: 8 }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
+                    <Ionicons name="storefront" size={14} color={COLORS.primary} style={{ marginTop: 2 }} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 10, fontWeight: '800', color: COLORS.textMuted, letterSpacing: 0.5 }}>PICKUP FROM DARK STORE / VENDOR</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: COLORS.textPrimary, marginTop: 1 }}>
+                        {job.storeName || 'Dark Store / Vendor'}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: '#334155', marginTop: 2, lineHeight: 16 }}>
+                        {job.storeAddress || 'Address details available upon dispatch'}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }}>
-                    <Ionicons name="location-outline" size={13} color={COLORS.hotPink} />
-                    <Text style={styles.routeRowText} numberOfLines={1}>
-                      <Text style={styles.routeRowLabel}>Drop: </Text>{job.customerName || 'Customer'} ({job.customerAddress?.split(',')?.[0] || 'Satellite'})
-                    </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 6 }}>
+                    <Ionicons name="location" size={14} color={COLORS.hotPink} style={{ marginTop: 2 }} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 10, fontWeight: '800', color: COLORS.textMuted, letterSpacing: 0.5 }}>DELIVER TO CUSTOMER</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: COLORS.textPrimary, marginTop: 1 }}>
+                        {job.customerName || 'Customer'}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: '#334155', marginTop: 2, lineHeight: 16 }}>
+                        {job.customerAddress || 'Customer Address'}
+                      </Text>
+                    </View>
                   </View>
                 </View>
 
@@ -1080,54 +1083,74 @@ export const CurrentDeliveryScreen: React.FC = () => {
                   </View>
                 </View>
 
-                {/* 5. Full Width Action Button */}
-                <TouchableOpacity
-                  style={[
-                    styles.jobAcceptBtnFull,
-                    isPendingApproval
-                      ? { backgroundColor: '#94A3B8' }
-                      : isCashBlocked
-                      ? { backgroundColor: '#DC2626' }
-                      : undefined,
-                  ]}
-                  onPress={() => {
-                    if (isPendingApproval) {
-                      Alert.alert(
-                        'Account Pending Approval',
-                        'Your documents are under review by Admin. You cannot accept orders until approved.'
-                      );
-                      return;
-                    }
-                    if (isCashBlocked) {
-                      Alert.alert(
-                        'Order Acceptance Locked',
-                        `You have reached the ₹${cashLimit} cash limit (Dues: ₹${netDueToAdmin}). Please settle with Admin to accept orders.`,
-                        [
-                          { text: 'Cancel', style: 'cancel' },
-                          { text: 'View Khata', onPress: () => setCurrentTab('Earnings') },
-                        ]
-                      );
-                      return;
-                    }
-                    acceptDelivery(job);
-                  }}
-                  activeOpacity={0.85}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                    <Ionicons
-                      name={isPendingApproval ? 'lock-closed' : isCashBlocked ? 'lock-closed' : 'checkmark-circle-outline'}
-                      size={16}
-                      color={COLORS.white}
-                    />
-                    <Text style={styles.jobAcceptBtnFullText}>
-                      {isPendingApproval
-                        ? 'LOCKED (PENDING ADMIN APPROVAL)'
+                {/* 5. Action Buttons: View Details & Accept Delivery */}
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                  <TouchableOpacity
+                    style={{
+                      flex: 1,
+                      backgroundColor: '#F1F5F9',
+                      paddingVertical: 11,
+                      borderRadius: 10,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: 1,
+                      borderColor: '#CBD5E1',
+                    }}
+                    onPress={() => setPreviewJob(job)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E293B' }}>View Details</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.jobAcceptBtnFull,
+                      { flex: 2, marginTop: 0 },
+                      isPendingApproval
+                        ? { backgroundColor: '#94A3B8' }
                         : isCashBlocked
-                        ? 'LOCKED (CASH LIMIT REACHED)'
-                        : 'ACCEPT DELIVERY'}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
+                        ? { backgroundColor: '#DC2626' }
+                        : undefined,
+                    ]}
+                    onPress={() => {
+                      if (isPendingApproval) {
+                        Alert.alert(
+                          'Account Pending Approval',
+                          'Your documents are under review by Admin. You cannot accept orders until approved.'
+                        );
+                        return;
+                      }
+                      if (isCashBlocked) {
+                        Alert.alert(
+                          'Order Acceptance Locked',
+                          `You have reached the ₹${cashLimit} cash limit (Dues: ₹${netDueToAdmin}). Please settle with Admin to accept orders.`,
+                          [
+                            { text: 'Cancel', style: 'cancel' },
+                            { text: 'View Khata', onPress: () => setCurrentTab('Earnings') },
+                          ]
+                        );
+                        return;
+                      }
+                      acceptDelivery(job);
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                      <Ionicons
+                        name={isPendingApproval ? 'lock-closed' : isCashBlocked ? 'lock-closed' : 'checkmark-circle-outline'}
+                        size={16}
+                        color={COLORS.white}
+                      />
+                      <Text style={styles.jobAcceptBtnFullText}>
+                        {isPendingApproval
+                          ? 'LOCKED'
+                          : isCashBlocked
+                          ? 'LOCKED'
+                          : 'ACCEPT DELIVERY'}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
 
                 {/* Optional Subtle Dismiss */}
                 <TouchableOpacity
@@ -1377,6 +1400,167 @@ export const CurrentDeliveryScreen: React.FC = () => {
                   activeOpacity={0.85}
                 >
                   <Text style={styles.modalActionBtnText}>Close Details</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================== */}
+      {/* AVAILABLE ORDER PREVIEW DETAIL MODAL (BEFORE ACCEPTANCE)             */}
+      {/* ===================================================================== */}
+      <Modal
+        visible={Boolean(previewJob)}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setPreviewJob(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="receipt-outline" size={20} color="#2563EB" style={{ marginRight: 8 }} />
+                <View>
+                  <Text style={styles.modalHeaderTitle}>Delivery Order Details</Text>
+                  <Text style={styles.modalHeaderSubtitle}>{previewJob?.orderNumber}</Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => setPreviewJob(null)}
+                style={styles.modalCloseBtn}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="close" size={20} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            {previewJob ? (
+              <ScrollView style={styles.modalScroll} contentContainerStyle={{ padding: 16 }}>
+                {/* Payout & Distance Banner */}
+                <View style={[styles.modalStatusBanner, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Ionicons name="wallet-outline" size={22} color="#16A34A" style={{ marginRight: 8 }} />
+                    <View>
+                      <Text style={[styles.bannerStatusTitle, { color: '#15803D' }]}>Guaranteed Earning: ₹{previewJob.payoutAmount ?? 35}</Text>
+                      <Text style={[styles.bannerDateSubtitle, { color: '#166534' }]}>
+                        {previewJob.distanceKm || '2.1'} km • ~{previewJob.etaMinutes || '12'} mins delivery time
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Complete Pickup & Drop Route Section */}
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionHeader}>Route & Address Verification</Text>
+
+                  <View style={styles.routeDetailBox}>
+                    {/* Dark Store / Vendor Pickup Location */}
+                    <View style={styles.routeDetailRow}>
+                      <View style={[styles.routeDot, { backgroundColor: '#2563EB', marginTop: 4 }]} />
+                      <View style={{ flex: 1, marginLeft: 10 }}>
+                        <Text style={[styles.routeDetailLabel, { color: '#2563EB' }]}>PICKUP FROM DARK STORE / VENDOR</Text>
+                        <Text style={[styles.routeDetailValue, { fontSize: 14, fontWeight: '800' }]}>
+                          {previewJob.storeName || 'Dark Store / Vendor'}
+                        </Text>
+                        <Text style={[styles.routeDetailSub, { color: '#1E293B', fontSize: 13, lineHeight: 18, marginTop: 4, fontWeight: '600' }]}>
+                          {previewJob.storeAddress || 'Address details available upon dispatch'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={[styles.routeConnectorLine, { marginLeft: 5, height: 20 }]} />
+
+                    {/* Customer Drop Location */}
+                    <View style={styles.routeDetailRow}>
+                      <View style={[styles.routeDot, { backgroundColor: '#10B981', marginTop: 4 }]} />
+                      <View style={{ flex: 1, marginLeft: 10 }}>
+                        <Text style={[styles.routeDetailLabel, { color: '#059669' }]}>DELIVER TO CUSTOMER</Text>
+                        <Text style={[styles.routeDetailValue, { fontSize: 14, fontWeight: '800' }]}>
+                          {previewJob.customerName || 'Customer'}
+                        </Text>
+                        <Text style={[styles.routeDetailSub, { color: '#1E293B', fontSize: 13, lineHeight: 18, marginTop: 4, fontWeight: '600' }]}>
+                          {previewJob.customerAddress || 'Customer Address'}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Package & Payment Summary */}
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionHeader}>Package & Payment</Text>
+                  <View style={{ backgroundColor: '#F8FAFC', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#E2E8F0', gap: 6 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={{ fontSize: 13, color: '#64748B' }}>Package Size</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#1E293B' }}>{previewJob.itemCount || 1} items</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text style={{ fontSize: 13, color: '#64748B' }}>Payment Mode</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: previewJob.paymentMethod === 'COD' ? '#D97706' : '#16A34A' }}>
+                        {previewJob.paymentMethod === 'COD' ? 'Cash on Delivery (Collect Cash)' : 'Prepaid Online'}
+                      </Text>
+                    </View>
+                    {previewJob.hasPrintJob && (
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        <Text style={{ fontSize: 13, color: '#64748B' }}>Special Handling</Text>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#DB2777' }}>Contains Print Job</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                {/* Items in Order (if available) */}
+                {previewJob.items && previewJob.items.length > 0 && (
+                  <View style={styles.modalSection}>
+                    <Text style={styles.modalSectionHeader}>Package Items ({previewJob.items.length})</Text>
+                    <View style={styles.modalItemsList}>
+                      {previewJob.items.map((it: any, i: number) => (
+                        <View key={i} style={styles.modalItemRow}>
+                          <Text style={styles.modalItemQty}>{it.quantity || 1}x</Text>
+                          <Text style={styles.modalItemName}>{it.name}</Text>
+                          <Text style={[styles.modalItemPrice, { color: COLORS.textMuted }]}>Packed</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {/* Accept Button & Close */}
+                <TouchableOpacity
+                  style={[
+                    styles.modalActionBtn,
+                    { backgroundColor: '#059669', marginBottom: 8 },
+                    (isPendingApproval || isCashBlocked) && { backgroundColor: '#94A3B8' },
+                  ]}
+                  onPress={() => {
+                    if (isPendingApproval) {
+                      Alert.alert('Account Pending Approval', 'Your documents are under review by Admin.');
+                      return;
+                    }
+                    if (isCashBlocked) {
+                      Alert.alert('Order Acceptance Locked', `You have reached the ₹${cashLimit} cash limit.`);
+                      return;
+                    }
+                    const target = previewJob;
+                    setPreviewJob(null);
+                    acceptDelivery(target);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.modalActionBtnText}>
+                    {isPendingApproval ? 'Locked (Pending Approval)' : isCashBlocked ? 'Locked (Cash Limit)' : 'Accept This Delivery'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.modalActionBtn, { backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#CBD5E1' }]}
+                  onPress={() => setPreviewJob(null)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[styles.modalActionBtnText, { color: '#475569' }]}>Close Preview</Text>
                 </TouchableOpacity>
               </ScrollView>
             ) : null}

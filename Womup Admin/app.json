@@ -7,8 +7,8 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/womup_logo.png",
-      "resizeMode": "contain",
+      "image": "./assets/admin_splash.png",
+      "resizeMode": "cover",
       "backgroundColor": "#05062A"
     },
     "web": {

@@ -51,4 +51,19 @@ export class CreateAddressDto {
   @IsString()
   @IsOptional()
   deliveryInstructions?: string;
+
+  @ApiProperty({ example: 'area_ahm_1', required: false })
+  @IsString()
+  @IsOptional()
+  areaId?: string;
+
+  @ApiProperty({ example: 'Chandlodiya - Tragad', required: false })
+  @IsString()
+  @IsOptional()
+  areaName?: string;
+
+  @ApiProperty({ required: false })
+  @IsString()
+  @IsOptional()
+  storeId?: string;
 }

@@ -99,45 +99,69 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         socket.on('connect', () => {
           console.log('[NotificationSocket] 🟢 Connected:', socket.id);
           if (userId) {
+            socket.emit('join_user', { userId });
             socket.emit('join_order', { orderId: `user_${userId}` });
           }
         });
 
-        // 1. Generic in-app notification event
-        socket.on('in_app_notification', (data: any) => {
+        // Handler for unified notification event
+        const handleIncomingNotification = (data: any) => {
           if (!active) return;
-          console.log('[NotificationSocket] 🔔 In-App Event:', data);
+          console.log('[NotificationSocket] 🔔 Notification Received:', data);
+
+          const notifId = data.id || data._id || `notif_${Date.now()}`;
+          const title = data.title || 'WormUp Alert';
+          const body = data.message || data.body || '';
+          const type = data.type || 'ORDER_STATUS';
 
           const bannerData: BannerNotificationData = {
-            id: data.id || `notif_${Date.now()}`,
-            title: data.title || 'WormUp Alert',
-            body: data.body || '',
-            type: data.type || 'ORDER_STATUS',
+            id: notifId,
+            title,
+            body,
+            type,
             role: data.role || 'CUSTOMER',
             deepLink: data.deepLink,
-            data: data.data,
+            data: data.data || data.metadata,
           };
 
           setActiveBanner(bannerData);
           setUnreadCount((prev) => prev + 1);
 
-          // Add to local state list
-          setNotifications((prev) => [
-            {
-              _id: bannerData.id,
-              title: bannerData.title,
-              body: bannerData.body,
-              type: bannerData.type || 'ORDER_STATUS',
-              isRead: false,
-              createdAt: new Date().toISOString(),
-              data: bannerData.data,
-            },
-            ...prev,
-          ]);
+          // Prepend to local notification history without duplicate
+          setNotifications((prev) => {
+            if (prev.some((n) => n._id === notifId || n.id === notifId)) {
+              return prev;
+            }
+            return [
+              {
+                _id: notifId,
+                id: notifId,
+                title,
+                message: body,
+                body,
+                type,
+                orderId: data.orderId,
+                entityType: data.entityType,
+                entityId: data.entityId,
+                actionType: data.actionType,
+                isRead: false,
+                createdAt: data.createdAt || new Date().toISOString(),
+                metadata: data.metadata,
+                data: data.data || data.metadata,
+              },
+              ...prev,
+            ];
+          });
 
-          // Also trigger subtle toast feedback
-          toast.showInfo(bannerData.body, bannerData.title);
-        });
+          // Trigger subtle toast feedback
+          toast.showInfo(body, title);
+        };
+
+        // 1. Unified scoped notification:new event
+        socket.on('notification:new', handleIncomingNotification);
+
+        // 2. Generic in-app notification event (backward compat)
+        socket.on('in_app_notification', handleIncomingNotification);
 
         // 2. Order status updated event
         socket.on('order_status_updated', (data: any) => {

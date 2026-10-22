@@ -17,6 +17,7 @@ import {
 import { Order, OrderDocument } from '../../orders/schemas/order.schema';
 import { Store, StoreDocument } from '../../stores/schemas/store.schema';
 import { TrackingGateway } from '../../tracking/tracking.gateway';
+import { DeliveryPartnerCacheService } from '../common/partner-cache.service';
 
 @Injectable()
 export class RiderService {
@@ -38,39 +39,15 @@ export class RiderService {
     @InjectModel(Store.name)
     private storeModel: Model<StoreDocument>,
     private trackingGateway: TrackingGateway,
+    private readonly partnerCacheService: DeliveryPartnerCacheService,
   ) {}
 
+  public clearPartnerCache(userId?: string) {
+    this.partnerCacheService.invalidate(userId);
+  }
+
   async getPartnerByUserId(userId: string): Promise<DeliveryPartnerDocument> {
-    const userObjId = Types.ObjectId.isValid(userId) ? new Types.ObjectId(userId) : null;
-    let partner = await this.partnerModel.findOne({
-      $or: [
-        ...(userObjId ? [{ userId: userObjId }, { _id: userObjId }] : []),
-        { partnerCode: userId },
-        { riderCode: userId },
-      ],
-    });
-    if (!partner && userObjId) {
-      // Find or create registered delivery partner document for this user in DB
-      const user = await this.partnerModel.db.collection('users').findOne({ _id: userObjId });
-      partner = await this.partnerModel.create({
-        userId: userObjId,
-        partnerCode: `RDR-${Math.floor(1000 + Math.random() * 9000)}`,
-        fullName: user?.name || 'Delivery Partner',
-        phoneNumber: user?.phone || '9876543210',
-        city: 'Ahmedabad (Satellite Hub)',
-        hubName: 'Satellite Hub Dark Store',
-        status: 'PENDING',
-        verificationStatus: 'PENDING',
-        isOnline: false,
-        isActive: false,
-        vehicleType: 'EV_SCOOTER',
-        vehicleNumber: 'GJ-01-ET-4829',
-        rating: 4.88,
-        totalDeliveries: 428,
-        completedDeliveries: 428,
-      });
-    }
-    return partner;
+    return this.partnerCacheService.getPartner(userId);
   }
 
   async getProfile(userId: string) {
@@ -275,6 +252,10 @@ export class RiderService {
 
     partner.isOnline = isOnline;
     await partner.save();
+    this.clearPartnerCache(userId);
+    if (partner._id) {
+      this.clearPartnerCache(partner._id.toString());
+    }
 
     return {
       isOnline: partner.isOnline,
@@ -619,6 +600,26 @@ export class RiderService {
     if (updates.profilePhotoUrl) partner.profilePhotoUrl = updates.profilePhotoUrl;
 
     await partner.save();
+    if (partner.userId) {
+      this.clearPartnerCache(partner.userId.toString());
+    }
+    if (partner._id) {
+      this.clearPartnerCache(partner._id.toString());
+    }
+
+    try {
+      this.trackingGateway?.server?.emit('rider_updated', {
+        riderId: partner._id.toString(),
+        userId: partner.userId ? partner.userId.toString() : null,
+        status: partner.status,
+        verificationStatus: partner.verificationStatus,
+        isActive: partner.isActive,
+        isOnline: partner.isOnline,
+      });
+      this.trackingGateway?.server?.emit('rider:updated', {
+        riderId: partner._id.toString(),
+      });
+    } catch (_) {}
 
     return {
       success: true,

@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Modal,
   Platform,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -33,6 +34,7 @@ export const S10_LocationPermissionScreen: React.FC = () => {
   } = useApp();
 
   const [loading, setLoading] = useState(false);
+  const [permissionDenied, setPermissionDenied] = useState(false);
   const [cityMismatchModal, setCityMismatchModal] = useState<{
     visible: boolean;
     detectedCity: string;
@@ -80,6 +82,7 @@ export const S10_LocationPermissionScreen: React.FC = () => {
     try {
       const loc = await LocationService.getCurrentLocation();
       if (loc) {
+        setPermissionDenied(false);
         const area = await LocationService.resolveArea(loc.latitude, loc.longitude, true);
         const detectedCity = area?.city || loc.city;
         const preferredCity = user.preferredCityName || 'Ahmedabad';
@@ -102,17 +105,18 @@ export const S10_LocationPermissionScreen: React.FC = () => {
 
         applyLocation(loc, area, detectedCity || preferredCity);
       } else {
-        fallbackToPreferredCity();
+        setPermissionDenied(true);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.warn('Location permission detection error:', e);
-      fallbackToPreferredCity();
+      setPermissionDenied(true);
     } finally {
       setLoading(false);
     }
   };
 
   const fallbackToPreferredCity = async () => {
+    // Check serviceability directly with preferred city coordinates
     const preferredCity = user.preferredCityName || 'Ahmedabad';
     setCurrentCityName(preferredCity);
     setDeliveryLocation(`📍 ${preferredCity}`);
@@ -158,6 +162,60 @@ export const S10_LocationPermissionScreen: React.FC = () => {
     setCityMismatchModal((prev) => ({ ...prev, visible: false }));
     applyLocation(loc, resolvedArea, preferredCity);
   };
+
+  // Phase A.3: Blocking screen if user denies location permission
+  if (permissionDenied) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top + 30, paddingBottom: insets.bottom + 20 }]}>
+        <View style={styles.content}>
+          <View style={styles.deniedIconWrap}>
+            <Ionicons name="location-outline" size={48} color={COLORS.error} />
+          </View>
+          <Text style={styles.title}>Location Permission Required</Text>
+          <Text style={styles.subtitle}>
+            Location permission is required to use WormUp. We need your location to check delivery availability and find dark stores in your area.
+          </Text>
+
+          <View style={styles.deniedInfoBox}>
+            <View style={styles.deniedInfoRow}>
+              <Ionicons name="shield-checkmark" size={17} color={COLORS.navy} />
+              <Text style={styles.deniedInfoText}>Auto-detects your serviceable City & PIN code</Text>
+            </View>
+            <View style={styles.deniedInfoRow}>
+              <Ionicons name="flash" size={17} color="#D97706" />
+              <Text style={styles.deniedInfoText}>Enables guaranteed 9-minute dark store delivery</Text>
+            </View>
+            <View style={styles.deniedInfoRow}>
+              <Ionicons name="lock-closed" size={17} color="#DC2626" />
+              <Text style={styles.deniedInfoText}>Prevents orders to unsupported addresses</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.buttonContainer}>
+          <GradientButton
+            title="Open Settings"
+            onPress={() => {
+              if (Platform.OS === 'web') {
+                alert('Please allow location permission in your browser URL bar / site settings and refresh the page.');
+              } else {
+                Linking.openSettings();
+              }
+            }}
+            style={styles.button}
+          />
+
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={handleAllowLocation}
+            style={styles.tryAgainButton}
+          >
+            <Text style={styles.tryAgainText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 20 }]}>
@@ -358,5 +416,44 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.textMuted,
     fontWeight: '600',
+  },
+  deniedIconWrap: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#FEE2E2',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  deniedInfoBox: {
+    width: '100%',
+    backgroundColor: '#F8FAFC',
+    borderRadius: RADIUS.card,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: SPACING.md,
+    marginTop: SPACING.lg,
+    gap: 12,
+  },
+  deniedInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  deniedInfoText: {
+    fontSize: 13,
+    color: COLORS.textPrimary,
+    fontWeight: '600',
+    flex: 1,
+  },
+  tryAgainButton: {
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+  },
+  tryAgainText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.primary,
   },
 });

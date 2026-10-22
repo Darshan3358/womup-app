@@ -111,6 +111,9 @@ export interface StoreOrder {
   customerPhone?: string;
   deliveryAddress?: any;
   deliveredAt?: string;
+  distanceKm?: number;
+  distanceToStore?: number;
+  distanceToCustomer?: number;
   progress?: {
     pickedCount: number;
     totalCount: number;

@@ -8,12 +8,14 @@ import {
   ActivityIndicator,
   ViewStyle,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { COLORS } from '../../theme/colors';
 import { TYPOGRAPHY } from '../../theme/typography';
 import { AppIcon } from './AppIcon';
 import { BlinkitProduct } from '../../types';
 import { useApp } from '../../context/AppContext';
+import { resolveImageThumbnail } from '../../utils/imageUrl';
 
 interface BlinkitProductCardProps {
   product: BlinkitProduct;
@@ -27,7 +29,7 @@ const formatRating = (val?: number): string => {
   return Number(val).toFixed(1);
 };
 
-export const BlinkitProductCard: React.FC<BlinkitProductCardProps> = ({
+const BlinkitProductCardComponent: React.FC<BlinkitProductCardProps> = ({
   product,
   variant = 'grid',
   onPress,
@@ -40,6 +42,7 @@ export const BlinkitProductCard: React.FC<BlinkitProductCardProps> = ({
     setActiveScreen,
     isInWishlist,
     toggleWishlist,
+    isServiceable,
   } = useApp();
   const isWishlisted = isInWishlist(product.id);
   const [isLoading, setIsLoading] = useState(false);
@@ -48,11 +51,12 @@ export const BlinkitProductCard: React.FC<BlinkitProductCardProps> = ({
   const defaultVariant = variants.find((v) => v.isDefault) || variants[0];
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(defaultVariant?.id || null);
 
+  // F-09 / B-10: Stable dependency to prevent effect firing on every parent render
   React.useEffect(() => {
     const vList = product.variants || [];
     const defV = vList.find((v) => v.isDefault) || vList[0];
     setSelectedVariantId(defV?.id || null);
-  }, [product.id, product.variants]);
+  }, [product.id]);
 
   const activeVariant = variants.find((v) => v.id === selectedVariantId) || defaultVariant;
   const currentSellingPrice = activeVariant ? activeVariant.price : product.sellingPrice;
@@ -62,18 +66,21 @@ export const BlinkitProductCard: React.FC<BlinkitProductCardProps> = ({
   const quantity = getBlinkitQty(product.id, activeVariant?.id);
 
   const handleAdd = () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      const enrichedProd: BlinkitProduct = {
-        ...product,
-        sellingPrice: currentSellingPrice,
-        mrp: currentMrp,
-        packSize: currentPackSize,
-        selectedVariantId: activeVariant?.id,
-      };
-      updateBlinkitQty(enrichedProd, 1, activeVariant?.id);
-      setIsLoading(false);
-    }, 150);
+    if (!isServiceable) {
+      Alert.alert(
+        'Delivery Unavailable',
+        'Sorry, WormUp is not serviceable in your area. We are expanding soon!'
+      );
+      return;
+    }
+    const enrichedProd: BlinkitProduct = {
+      ...product,
+      sellingPrice: currentSellingPrice,
+      mrp: currentMrp,
+      packSize: currentPackSize,
+      selectedVariantId: activeVariant?.id,
+    };
+    updateBlinkitQty(enrichedProd, 1, activeVariant?.id);
   };
 
   const handleIncrement = () => {
@@ -128,7 +135,7 @@ export const BlinkitProductCard: React.FC<BlinkitProductCardProps> = ({
         {/* Left: Product Image Box */}
         <View style={styles.wishlistImageWrapper}>
           <Image
-            source={{ uri: product.imageUrl }}
+            source={{ uri: resolveImageThumbnail(product.imageUrl) }}
             style={styles.wishlistProductImage}
             resizeMode="cover"
           />
@@ -206,10 +213,10 @@ export const BlinkitProductCard: React.FC<BlinkitProductCardProps> = ({
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={handleAdd}
-                disabled={isLoading || product.stock === 0}
+                disabled={isLoading || product.stock === 0 || !isServiceable}
                 style={[
                   styles.wishlistAddBtn,
-                  product.stock === 0 && styles.disabledButton,
+                  (product.stock === 0 || !isServiceable) && styles.disabledButton,
                 ]}
                 accessibilityLabel={`Add ${product.name} to cart`}
               >
@@ -219,10 +226,10 @@ export const BlinkitProductCard: React.FC<BlinkitProductCardProps> = ({
                   <Text
                     style={[
                       styles.wishlistAddBtnText,
-                      product.stock === 0 && styles.disabledButtonText,
+                      (product.stock === 0 || !isServiceable) && styles.disabledButtonText,
                     ]}
                   >
-                    {product.stock === 0 ? 'Out of Stock' : 'ADD'}
+                    {product.stock === 0 ? 'Out of Stock' : !isServiceable ? 'Not Serviceable' : 'ADD'}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -275,7 +282,7 @@ export const BlinkitProductCard: React.FC<BlinkitProductCardProps> = ({
       {/* Product Image Box with Real Online Photo */}
       <View style={[styles.imageContainer, isHorizontal && styles.horizontalImageContainer]}>
         <Image
-          source={{ uri: product.imageUrl }}
+          source={{ uri: resolveImageThumbnail(product.imageUrl) }}
           style={styles.productImage}
           resizeMode="cover"
         />
@@ -387,10 +394,10 @@ export const BlinkitProductCard: React.FC<BlinkitProductCardProps> = ({
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={handleAdd}
-              disabled={isLoading || product.stock === 0}
+              disabled={isLoading || product.stock === 0 || !isServiceable}
               style={[
                 styles.addButton,
-                product.stock === 0 && styles.disabledButton,
+                (product.stock === 0 || !isServiceable) && styles.disabledButton,
               ]}
               accessibilityLabel={`Add ${product.name} to cart`}
             >
@@ -400,10 +407,10 @@ export const BlinkitProductCard: React.FC<BlinkitProductCardProps> = ({
                 <Text
                   style={[
                     styles.addButtonText,
-                    product.stock === 0 && styles.disabledButtonText,
+                    (product.stock === 0 || !isServiceable) && styles.disabledButtonText,
                   ]}
                 >
-                  {product.stock === 0 ? 'Out of Stock' : 'ADD'}
+                  {product.stock === 0 ? 'Out of Stock' : !isServiceable ? 'Not Serviceable' : 'ADD'}
                 </Text>
               )}
             </TouchableOpacity>
@@ -883,3 +890,5 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
 });
+
+export const BlinkitProductCard = React.memo(BlinkitProductCardComponent);

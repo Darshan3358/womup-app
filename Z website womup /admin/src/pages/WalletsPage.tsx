@@ -49,10 +49,10 @@ export const WalletsPage: React.FC = () => {
   const platformRevenueTotal = Math.round(totalGMV * 0.18);
   const platformNetProfit = Math.round(platformRevenueTotal * 0.75);
 
-  // Mock / Calculated Store Wallets
-  const storeWallets = stores.map((s, idx) => {
+  // Live Calculated Store Wallets
+  const storeWallets = stores.map((s) => {
     const sOrders = orders.filter((o) => o.storeId === s.id || o.storeId === s._id);
-    const gross = sOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0) || (idx + 1) * 3200;
+    const gross = sOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
     const balance = Math.round(gross * 0.82);
     return {
       storeId: s.id || s._id,
@@ -70,9 +70,9 @@ export const WalletsPage: React.FC = () => {
     };
   });
 
-  // Mock / Calculated Rider Wallets
-  const riderWallets = riders.map((r, idx) => {
-    const deliveries = r.completedDeliveries || r.totalDeliveries || (idx + 1) * 14;
+  // Live Calculated Rider Wallets
+  const riderWallets = riders.map((r) => {
+    const deliveries = r.completedDeliveries || r.totalDeliveries || 0;
     const balance = deliveries * 42;
     return {
       riderId: r.id || r._id,
@@ -89,53 +89,37 @@ export const WalletsPage: React.FC = () => {
     };
   });
 
-  // Financial Ledger Transactions
-  const ledgerTransactions = [
-    {
-      id: 'TXN-90412',
-      type: 'STORE',
-      title: 'Store Settlement Payout',
-      party: 'Wom Up Chandlodiya Dark Store',
-      amount: 4820,
-      direction: 'DEBIT',
-      method: 'Bank NEFT',
-      status: 'SETTLED',
-      time: '10 mins ago',
-    },
-    {
-      id: 'TXN-90411',
-      type: 'PLATFORM',
-      title: 'Order Commission (18%)',
-      party: 'Platform Revenue Collection',
-      amount: 142,
-      direction: 'CREDIT',
-      method: 'Order Auto-Split',
-      status: 'SETTLED',
-      time: '25 mins ago',
-    },
-    {
-      id: 'TXN-90410',
-      type: 'RIDER',
-      title: 'Instant Rider Earnings IMPS',
-      party: 'Rahul Parmar (RDR-0012)',
-      amount: 480,
-      direction: 'DEBIT',
-      method: 'Instant IMPS',
-      status: 'SETTLED',
-      time: '1 hour ago',
-    },
-    {
-      id: 'TXN-90409',
-      type: 'STORE',
-      title: 'Gross Cart Order Credit',
-      party: 'Wom Up Satellite Hub Store',
-      amount: 790,
-      direction: 'CREDIT',
-      method: 'Customer Online Pay',
-      status: 'SETTLED',
-      time: '2 hours ago',
-    },
-  ];
+  // Real Financial Ledger Transactions derived from live completed orders
+  const ledgerTransactions = orders.slice(0, 20).flatMap((order) => {
+    const orderTotal = order.totalAmount || 0;
+    if (orderTotal <= 0) return [];
+    const storeCut = Math.round(orderTotal * 0.82);
+    const platformCut = Math.round(orderTotal * 0.18);
+    return [
+      {
+        id: `TXN-ST-${order.orderNumber || order.id || order._id}`,
+        type: 'STORE' as const,
+        title: 'Store Gross Credit',
+        party: order.storeName || 'Dark Store Hub',
+        amount: storeCut,
+        direction: 'CREDIT' as const,
+        method: order.paymentMethod || 'Online Pay',
+        status: 'SETTLED' as const,
+        time: order.createdAt ? new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recently',
+      },
+      {
+        id: `TXN-PF-${order.orderNumber || order.id || order._id}`,
+        type: 'PLATFORM' as const,
+        title: 'Platform Fee (18%)',
+        party: 'Platform Treasury',
+        amount: platformCut,
+        direction: 'CREDIT' as const,
+        method: 'Order Auto-Split',
+        status: 'SETTLED' as const,
+        time: order.createdAt ? new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recently',
+      },
+    ];
+  });
 
   const filteredLedger = ledgerTransactions.filter((tx) => {
     if (ledgerFilter !== 'ALL' && tx.type !== ledgerFilter) return false;

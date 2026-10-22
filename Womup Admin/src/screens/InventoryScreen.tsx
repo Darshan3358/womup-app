@@ -618,15 +618,7 @@ export const InventoryScreen: React.FC = () => {
 
   const getProductThumbnail = (name: string, defaultUrl?: string) => {
     if (defaultUrl && defaultUrl.startsWith('http')) return defaultUrl;
-    const n = (name || '').toLowerCase();
-    if (n.includes('tomato')) return 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=200&auto=format&fit=crop&q=80';
-    if (n.includes('potato')) return 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=200&auto=format&fit=crop&q=80';
-    if (n.includes('onion')) return 'https://images.unsplash.com/photo-1618512496248-a07fe83aa8cb?w=200&auto=format&fit=crop&q=80';
-    if (n.includes('banana')) return 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=200&auto=format&fit=crop&q=80';
-    if (n.includes('capsicum') || n.includes('pepper')) return 'https://images.unsplash.com/photo-1563565375-f3fdfdbefa83?w=200&auto=format&fit=crop&q=80';
-    if (n.includes('apple')) return 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=200&auto=format&fit=crop&q=80';
-    if (n.includes('milk')) return 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=200&auto=format&fit=crop&q=80';
-    return defaultUrl || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=200&auto=format&fit=crop&q=80';
+    return '';
   };
 
   const cycleVariant = (prod: ProductItem) => {
@@ -917,11 +909,17 @@ export const InventoryScreen: React.FC = () => {
                 {/* TOP SECTION: THUMBNAIL, INFO, PRICE, STOCK */}
                 <View style={styles.inventoryCardTopRow}>
                   {/* Thumbnail */}
-                  <Image
-                    source={{ uri: thumbUrl }}
-                    style={styles.inventoryCardThumb}
-                    resizeMode="cover"
-                  />
+                  {thumbUrl ? (
+                    <Image
+                      source={{ uri: thumbUrl }}
+                      style={styles.inventoryCardThumb}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={[styles.inventoryCardThumb, { backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }]}>
+                      <Package size={20} color="#94A3B8" />
+                    </View>
+                  )}
 
                   {/* Middle Info Column */}
                   <View style={styles.inventoryCardInfoCol}>
@@ -1004,7 +1002,23 @@ export const InventoryScreen: React.FC = () => {
                   <TouchableOpacity
                     style={styles.inventoryActionBtn}
                     onPress={() => {
-                      if (setSelectedProduct) setSelectedProduct(p);
+                      const storeAwareProduct = {
+                        ...p,
+                        selectedStoreId: selectedStoreId || (selectedStore ? String(selectedStore.id || (selectedStore as any)._id) : ''),
+                        selectedStoreName: selectedStore?.name || currentArea?.assignedStore?.name || selectedDarkStore,
+                        selectedAreaId: selectedAreaId !== 'ALL' && currentArea ? String(currentArea.id || (currentArea as any)._id) : '',
+                        selectedAreaName: currentArea?.name || '',
+                        variants: (p.variants || []).map((v) => {
+                          const eff = getEffectiveVariantData(v, p.id);
+                          return {
+                            ...v,
+                            sellingPrice: eff.price !== undefined && eff.price > 0 ? eff.price : (v.sellingPrice || 0),
+                            mrp: eff.mrp !== undefined && eff.mrp > 0 ? eff.mrp : (v.mrp || 0),
+                            stock: eff.stock !== undefined ? eff.stock : (v.stock !== undefined ? v.stock : 50),
+                          };
+                        }),
+                      };
+                      if (setSelectedProduct) setSelectedProduct(storeAwareProduct);
                       if (setActiveModal) setActiveModal('EditProduct');
                     }}
                     activeOpacity={0.8}

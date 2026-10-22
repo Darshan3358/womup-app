@@ -15,17 +15,18 @@ import {
   TextInput,
   Alert,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../theme/colors';
 import { TYPOGRAPHY } from '../../theme/typography';
 import { AppIcon } from '../../components/common/AppIcon';
-import { Ionicons } from '@expo/vector-icons';
-import { ShieldCheck, CheckCircle2, MapPin, Compass, Home as HomeIcon, Check, Plus } from 'lucide-react-native';
-import { useApp } from '../../context/AppContext';
+import { ShieldCheck, CheckCircle2, MapPin, Compass, Home as HomeIcon, Check, Plus, X, ArrowRight } from 'lucide-react-native';
 import { CartService } from '../../services/cartService';
 import { LocationService } from '../../services/locationService';
 import { matchAreaByName, AHMEDABAD_AREAS } from '../../data/areas';
 import { LocalShopApi } from '../../local-shop-module/api/localShopApi';
+import { resolveImageThumbnail } from '../../utils/imageUrl';
+import { useApp } from '../../context/AppContext';
 
 // Resolve full-screen order celebration video asset
 const orderVideoAsset = require('../../../assets/gemini_generated_video_2981966f.mp4');
@@ -96,9 +97,11 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     setAppliedCoins,
     setActiveScreen,
     goBack,
-    setLocationModalVisible,
+    selectedAddressSource,
+    selectedAddressId,
     liveCheckoutState,
     emitCheckoutChange,
+    setLocationModalVisible,
   } = useApp();
 
   const [couponCodeInput, setCouponCodeInput] = useState('');
@@ -122,9 +125,6 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     emitCheckoutChange({ couponCode: '' });
   };
 
-  // Address Selection & Store Routing State (identical to website)
-  const [selectedAddressType, setSelectedAddressType] = useState<'CURRENT_GPS' | 'SAVED'>('CURRENT_GPS');
-
   // Sanitizer to eliminate stale corrupted strings from MongoDB / user profile
   const cleanHouseFlat = (raw?: string): string => {
     if (!raw) return '';
@@ -139,18 +139,83 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     return raw;
   };
 
+  // Saved addresses from user profile with sanitization (no demo fallbacks, deduplicated, excluding temporary GPS markers)
+  const rawSaved = user.savedAddresses && user.savedAddresses.length > 0
+    ? user.savedAddresses
+        .filter((a: any) => a.type !== 'Current' && !a.id?.startsWith('current_'))
+        .filter((a: any) => !JSON.stringify(a).includes('Shivalik Shilp'))
+        .filter((a: any, idx: number, arr: any[]) =>
+          arr.findIndex((other: any) =>
+            (a.id && other.id && (a.id === other.id || a._id === other._id)) ||
+            (a.houseFlat?.trim().toLowerCase() === other.houseFlat?.trim().toLowerCase() &&
+             a.areaLandmark?.trim().toLowerCase() === other.areaLandmark?.trim().toLowerCase() &&
+             a.city?.trim().toLowerCase() === other.city?.trim().toLowerCase())
+          ) === idx
+        )
+    : [];
+  const savedAddrs = rawSaved.map((a: any) => ({
+    ...a,
+    houseFlat: cleanHouseFlat(a.houseFlat),
+  }));
+
+  // Ensure active selected address is included in the list ONLY if it is a real saved address
+  if (
+    selectedAddress &&
+    selectedAddress.id &&
+    !selectedAddress.id.startsWith('current_') &&
+    selectedAddress.type !== 'Current' &&
+    !savedAddrs.some((a: any) => a.id === selectedAddress.id || a._id === selectedAddress.id)
+  ) {
+    savedAddrs.unshift({
+      ...selectedAddress,
+      houseFlat: cleanHouseFlat(selectedAddress.houseFlat),
+    });
+  }
+
+  const isSavedInitially = Boolean(
+    selectedAddressSource === 'SAVED' &&
+    selectedAddress &&
+    selectedAddress.type !== 'Current' &&
+    !selectedAddress.id?.startsWith('current_')
+  );
+
+  const activeSavedAddr = savedAddrs.find((a: any) =>
+    (selectedAddress?.id && (a.id === selectedAddress.id || a._id === selectedAddress.id)) ||
+    (selectedAddress?.houseFlat && a.houseFlat === selectedAddress.houseFlat)
+  ) || savedAddrs[0];
+
+  const activeAddr = isSavedInitially ? (selectedAddress || activeSavedAddr) : null;
+  const matchedInitialArea = isSavedInitially && activeAddr
+    ? matchAreaByName(activeAddr.areaLandmark || activeAddr.street || activeAddr.houseFlat || '')
+    : null;
+
+  // Address Selection & Store Routing State (defaults to user-selected address, not forced GPS)
+  const [selectedAddressType, setSelectedAddressType] = useState<'CURRENT_GPS' | 'SAVED'>(
+    isSavedInitially ? 'SAVED' : 'CURRENT_GPS'
+  );
+
   const [customerName, setCustomerName] = useState(user.fullName || 'DARSHAN THANKI');
   const [customerPhone, setCustomerPhone] = useState(user.phoneNumber || '+919656565656');
   const [houseFlat, setHouseFlat] = useState(
-    cleanHouseFlat(selectedAddress?.houseFlat) || 'GPS Location'
+    isSavedInitially
+      ? cleanHouseFlat(activeAddr?.houseFlat) || ''
+      : 'GPS Location'
   );
   const [street, setStreet] = useState(
-    selectedAddress?.street || 'Chandlodiya - Tragad Area'
+    isSavedInitially
+      ? activeAddr?.street || ''
+      : 'Chandlodiya - Tragad Area'
   );
   const [areaLandmark, setAreaLandmark] = useState(
-    currentAreaName || selectedAddress?.areaLandmark || 'Chandlodiya - Tragad'
+    isSavedInitially
+      ? (activeAddr?.areaLandmark || matchedInitialArea?.name || 'Prahlad Nagar')
+      : 'Chandlodiya - Tragad'
   );
-  const [pincode, setPincode] = useState(selectedAddress?.pincode || '382481');
+  const [pincode, setPincode] = useState(
+    isSavedInitially
+      ? (activeAddr?.pincode || matchedInitialArea?.pincode || '380015')
+      : '382481'
+  );
 
   // Visual confirmation state for area auto-detection
   const [areaDetectionStatus, setAreaDetectionStatus] = useState<{
@@ -159,24 +224,19 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     storeName: string;
   } | null>({
     isServiceable: true,
-    areaName: currentAreaName || 'Chandlodiya - Tragad',
-    storeName: currentStoreName || 'Wom Up Chandlodiya - Tragad Dark Store',
+    areaName: isSavedInitially
+      ? (matchedInitialArea?.name || activeAddr?.areaLandmark || 'Prahlad Nagar')
+      : (currentAreaName || 'Chandlodiya - Tragad'),
+    storeName: isSavedInitially
+      ? (matchedInitialArea?.storeName || 'Wom Up Prahlad Nagar Dark Store')
+      : (currentStoreName || 'Wom Up Chandlodiya - Tragad Dark Store'),
   });
-
-  // Saved addresses from user profile with sanitization (no demo fallbacks)
-  const rawSaved = user.savedAddresses && user.savedAddresses.length > 0
-    ? user.savedAddresses.filter((a: any) => !JSON.stringify(a).includes('Shivalik Shilp'))
-    : [];
-  const savedAddrs = rawSaved.map((a: any) => ({
-    ...a,
-    houseFlat: cleanHouseFlat(a.houseFlat),
-  }));
 
   // Explicit selection mode flag: 'saved' ignores background GPS updates to prevent auto-changing
   const [addressSource, setAddressSource] = useState<'gps' | 'saved'>(
-    selectedAddressType === 'SAVED' ? 'saved' : 'gps'
+    isSavedInitially ? 'saved' : 'gps'
   );
-  const isManualSelectionRef = useRef(false);
+  const isManualSelectionRef = useRef(isSavedInitially);
   const lastResolvedCoordsRef = useRef<string>('');
 
   const handleSelectGpsMode = () => {
@@ -238,7 +298,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
           storeName: loc.storeName || loc.areaName,
         });
 
-        // Trigger server cart location update so backend recalculates area prices (₹7 in Chandlodiya)
+        // Trigger server cart location update so backend recalculates area prices
         try {
           await CartService.setCartLocation(loc.areaId, loc.storeId);
         } catch (err) {
@@ -254,28 +314,45 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     setAddressSource('saved');
     isManualSelectionRef.current = true;
 
-    const targetAddr = addr || savedAddrs[0];
-    const rawCombined = `${targetAddr?.houseFlat || ''} ${targetAddr?.street || ''} ${targetAddr?.landmark || ''} ${targetAddr?.areaLandmark || ''}`.toLowerCase();
-    const isThaltej = rawCombined.includes('thaltej');
+    const targetAddr = addr || activeSavedAddr || savedAddrs[0];
+    const matchedAddrArea = matchAreaByName(
+      targetAddr?.areaLandmark || targetAddr?.landmark || targetAddr?.street || targetAddr?.houseFlat || ''
+    );
 
-    const lat = isThaltej ? 23.0500 : (targetAddr?.latitude || 23.0500);
-    const lng = isThaltej ? 72.5160 : (targetAddr?.longitude || 72.5160);
+    let lat = typeof targetAddr?.latitude === 'number' && !isNaN(targetAddr.latitude)
+      ? targetAddr.latitude
+      : (matchedAddrArea?.lat || 23.0125);
+    let lng = typeof targetAddr?.longitude === 'number' && !isNaN(targetAddr.longitude)
+      ? targetAddr.longitude
+      : (matchedAddrArea?.lng || 72.5082);
+
+    if (matchedAddrArea) {
+      const distFromMatched = Math.sqrt(
+        Math.pow((lat - matchedAddrArea.lat) * 111, 2) +
+        Math.pow((lng - matchedAddrArea.lng) * 111 * Math.cos((lat * Math.PI) / 180), 2)
+      );
+      if (distFromMatched > 5) {
+        lat = matchedAddrArea.lat;
+        lng = matchedAddrArea.lng;
+      }
+    }
     lastResolvedCoordsRef.current = `${lat.toFixed(4)}_${lng.toFixed(4)}`;
 
-    const areaName = isThaltej ? 'Thaltej' : (targetAddr?.areaLandmark || 'Ahmedabad');
-    const pin = isThaltej ? '380054' : (targetAddr?.pincode || '382481');
+    const areaName = matchedAddrArea?.name || targetAddr?.areaLandmark || targetAddr?.landmark || 'Prahlad Nagar';
+    const storeName = matchedAddrArea?.storeName || 'Wom Up Prahlad Nagar Dark Store';
+    const pin = targetAddr?.pincode || matchedAddrArea?.pincode || '380015';
 
     setSelectedAddressType('SAVED');
     setHouseFlat(cleanHouseFlat(targetAddr?.houseFlat) || '');
-    setStreet(targetAddr?.street || (isThaltej ? 'Near Thaltej Cross Road' : ''));
+    setStreet(targetAddr?.street || '');
     setAreaLandmark(areaName);
     setPincode(pin);
-    setDeliveryLocation(targetAddr ? `Home — ${cleanHouseFlat(targetAddr?.houseFlat)}, ${targetAddr?.street || ''}` : 'Current Location');
+    setDeliveryLocation(targetAddr ? `Home — ${cleanHouseFlat(targetAddr?.houseFlat)}, ${targetAddr?.street || areaName}` : 'Current Location');
     setDeliveryEtaMinutes(8);
     setAreaDetectionStatus({
       isServiceable: true,
       areaName: areaName,
-      storeName: isThaltej ? 'Wom Up Thaltej Dark Store' : (currentStoreName || 'Wom Up Dark Store'),
+      storeName: storeName,
     });
 
     const fullAddr = {
@@ -294,16 +371,11 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     };
     setSelectedAddress(fullAddr as any);
 
-    if (isThaltej) {
-      setCurrentArea('6aa11866c6c3e5984e2ef5e5', 'Thaltej');
-      setCurrentStore('6aa277a8fc02997cbe281ac7', 'Wom Up Thaltej Dark Store');
-    }
-
     emitCheckoutChange({
       selectedAddressType: 'SAVED',
-      addressId: targetAddr?.id || 'addr_thaltej',
+      addressId: targetAddr?.id || targetAddr?._id || 'addr_saved',
       houseFlat: cleanHouseFlat(targetAddr?.houseFlat),
-      street: targetAddr?.street || (isThaltej ? 'Near Thaltej Cross Road' : ''),
+      street: targetAddr?.street || '',
       areaLandmark: areaName,
       pincode: pin,
       recipientName: customerName,
@@ -326,7 +398,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
           storeName: loc.storeName || loc.areaName,
         });
 
-        // Trigger server cart location update so backend recalculates area prices (₹12 in Thaltej)
+        // Trigger server cart location update so backend recalculates area prices
         try {
           await CartService.setCartLocation(loc.areaId, loc.storeId);
         } catch (err) {
@@ -382,25 +454,27 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     return () => clearTimeout(timer);
   }, [areaLandmark]);
 
-  // Auto-sync form and selector cards when currentAreaName / currentStoreName updates (e.g. from Website live sync)
+  // Auto-sync form and selector cards when addressSource or context updates
   useEffect(() => {
-    // GATE GPS UPDATES: If user has explicitly selected a saved address, DO NOT let background GPS updates overwrite it!
-    if (isManualSelectionRef.current && addressSource === 'saved') {
+    // If user has selected a saved address, DO NOT let background GPS updates overwrite it!
+    if (addressSource === 'saved') {
+      const target = activeSavedAddr || (selectedAddress?.type !== 'Current' ? selectedAddress : null);
+      if (target) {
+        const matched = matchAreaByName(target.areaLandmark || target.street || target.houseFlat || '');
+        setSelectedAddressType('SAVED');
+        setHouseFlat(cleanHouseFlat(target.houseFlat));
+        setStreet(target.street || '');
+        setAreaLandmark(target.areaLandmark || matched?.name || 'Prahlad Nagar');
+        setPincode(target.pincode || matched?.pincode || '380015');
+        setAreaDetectionStatus({
+          isServiceable: true,
+          areaName: matched?.name || target.areaLandmark || 'Prahlad Nagar',
+          storeName: matched?.storeName || 'Wom Up Prahlad Nagar Dark Store',
+        });
+      }
       return;
     }
-    if (!currentAreaName) return;
-    if (savedAddrs.length > 0 && addressSource === 'saved') {
-      setSelectedAddressType('SAVED');
-      setHouseFlat(cleanHouseFlat(savedAddrs[0].houseFlat));
-      setStreet(savedAddrs[0].street || '');
-      setAreaLandmark(savedAddrs[0].areaLandmark || currentAreaName);
-      setPincode(savedAddrs[0].pincode || '382481');
-      setAreaDetectionStatus({
-        isServiceable: true,
-        areaName: currentAreaName,
-        storeName: currentStoreName || 'Wom Up Dark Store',
-      });
-    } else {
+    if (addressSource === 'gps') {
       setSelectedAddressType('CURRENT_GPS');
       setHouseFlat('GPS Location');
       setStreet('Chandlodiya - Tragad Area');
@@ -419,6 +493,8 @@ export const BlinkitCheckoutScreen: React.FC = () => {
   const [isRazorpayModalOpen, setIsRazorpayModalOpen] = useState(false);
   const [selectedTestUpi, setSelectedTestUpi] = useState<'success@razorpay' | 'failure@razorpay' | 'card'>('success@razorpay');
   const [isRazorpayVerifying, setIsRazorpayVerifying] = useState(false);
+  const [showAddressConfirmModal, setShowAddressConfirmModal] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   // Preload Razorpay Web SDK if on web
   useEffect(() => {
@@ -480,7 +556,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
         setAddressSource('saved');
         isManualSelectionRef.current = true;
         setSelectedAddressType('SAVED');
-        const targetAddr = savedAddrs.find((a) => a.id === liveCheckoutState.addressId) || savedAddrs[0];
+        const targetAddr = savedAddrs.find((a: any) => a.id === liveCheckoutState.addressId) || savedAddrs[0];
         if (targetAddr) {
           const lat = targetAddr?.latitude || 23.0500;
           const lng = targetAddr?.longitude || 72.5160;
@@ -555,97 +631,123 @@ export const BlinkitCheckoutScreen: React.FC = () => {
 
   const TIP_OPTIONS = [0, 10, 20, 30, 50];
 
-  const isSavedThaltej =
-    selectedAddressType === 'SAVED' ||
-    (currentAreaName || '').toLowerCase().includes('thaltej') ||
-    areaLandmark.toLowerCase().includes('thaltej');
-  // Dynamic distance based on active selected address:
-  // Thaltej Dark Store to Thaltej Home address: 1.15 km
-  // Chandlodiya Dark Store to GPS address: 1.64 km
-  const currentDistanceKm = isSavedThaltej ? 1.15 : 1.64;
+  const isSavedAddress = selectedAddressSource === 'SAVED' || selectedAddressType === 'SAVED';
 
-  const [dynamicDeliveryFee, setDynamicDeliveryFee] = useState<number>(30);
-  const [feeBreakdown, setFeeBreakdown] = useState<any>({
-    distanceKm: isSavedThaltej ? 1.15 : 1.64,
-    rateUsed: 12,
-    baseFee: isSavedThaltej ? 13.80 : 19.68,
-    minimumPayout: 30,
-    floorApplied: true,
-    areaName: isSavedThaltej ? 'Thaltej' : 'Chandlodiya - Tragad',
-  });
+  const matchedArea = matchAreaByName(
+    (isSavedAddress ? (selectedAddress?.areaLandmark || areaLandmark || (selectedAddress as any)?.area || selectedAddress?.street || selectedAddress?.houseFlat) : null) ||
+    currentAreaName ||
+    areaLandmark ||
+    selectedAddress?.areaLandmark ||
+    (selectedAddress as any)?.area ||
+    deliveryLocation
+  );
+  const activeLat = isSavedAddress
+    ? (matchedArea?.lat || Number(selectedAddress?.latitude) || 23.0125)
+    : (Number(selectedAddress?.latitude) || matchedArea?.lat || 23.0125);
+  const activeLng = isSavedAddress
+    ? (matchedArea?.lng || Number(selectedAddress?.longitude) || 72.5082)
+    : (Number(selectedAddress?.longitude) || matchedArea?.lng || 72.5082);
+  const currentDistanceKm = 1.2;
 
   const cartItemCount = blinkitCartList.length;
-  const cityKey = currentCityName || selectedAddress?.city || 'Ahmedabad';
-  const areaKey = isSavedThaltej ? 'Thaltej' : (currentAreaName || selectedAddress?.areaLandmark || 'Chandlodiya - Tragad');
-  const addressIdKey = selectedAddress?.id || (isSavedThaltej ? 'addr_thaltej' : 'current_gps');
+  const cityKey = (isSavedAddress ? selectedAddress?.city : null) || currentCityName || 'Ahmedabad';
+  const areaKey = (isSavedAddress ? (selectedAddress?.areaLandmark || matchedArea?.name) : null) ||
+    matchedArea?.name || currentAreaName || selectedAddress?.areaLandmark || 'Prahlad Nagar';
+  const addressIdKey = selectedAddress?.id || 'current_selected_address';
+
+  const cachedFeeData = CartService.getCachedDeliveryFee({
+    cityName: cityKey,
+    areaName: areaKey,
+    distanceKm: currentDistanceKm,
+    items: blinkitCartList.map((item: any) => ({
+      name: item.product.name,
+      price: item.product.sellingPrice,
+      mrp: item.product.mrp,
+      quantity: item.quantity,
+    })),
+  });
+
+  const [dynamicDeliveryFee, setDynamicDeliveryFee] = useState<number | null>(
+    cachedFeeData ? cachedFeeData.deliveryFee : null
+  );
+  const [feeBreakdown, setFeeBreakdown] = useState<any>(
+    cachedFeeData ? cachedFeeData.breakdown : null
+  );
+  const [isCalculatingFee, setIsCalculatingFee] = useState<boolean>(!cachedFeeData);
 
   useEffect(() => {
     let isMounted = true;
     let timer: any = null;
 
     const fetchFee = async () => {
-      const res = await CartService.calculateDynamicDeliveryFee({
-        items: blinkitCartList.map((item) => {
-          const isTomato250g =
-            item.product.name.toLowerCase().includes('tomato') &&
-            (!item.product.packSize || item.product.packSize === '250 g');
-          const unitPrice = isTomato250g ? (isSavedThaltej ? 12 : 7) : item.product.sellingPrice;
-          return {
+      setIsCalculatingFee(true);
+      try {
+        const res = await CartService.calculateDynamicDeliveryFee({
+          items: blinkitCartList.map((item: any) => ({
             name: item.product.name,
-            price: unitPrice,
+            price: item.product.sellingPrice,
             mrp: item.product.mrp,
             quantity: item.quantity,
-          };
-        }),
-        cityName: cityKey,
-        areaName: areaKey,
-        distanceKm: currentDistanceKm,
-        deliveryAddress: {
-          latitude: isSavedThaltej ? 23.0500 : 23.1288,
-          longitude: isSavedThaltej ? 72.5160 : 72.5507,
-          area: areaKey,
-          city: cityKey,
-        },
-      });
-      if (isMounted && res) {
-        setDynamicDeliveryFee(res.deliveryFee);
-        if (res.breakdown) {
-          setFeeBreakdown({
-            ...res.breakdown,
-            distanceKm: res.distanceKm || currentDistanceKm,
-            rateUsed: res.rateUsed || 12,
-            areaName: res.areaName || areaKey,
-          });
+          })),
+          cityName: cityKey,
+          areaName: areaKey,
+          storeId: currentStoreId || undefined,
+          deliveryAddress: {
+            latitude: activeLat,
+            longitude: activeLng,
+            area: areaKey,
+            city: cityKey,
+          },
+          forceRefresh: true,
+        });
+
+        if (isMounted && res) {
+          setDynamicDeliveryFee(res.deliveryFee);
+          if (res.breakdown) {
+            setFeeBreakdown({
+              ...res.breakdown,
+              distanceKm: res.distanceKm || (res as any).routeDistanceKm || currentDistanceKm,
+              rateUsed: res.rateUsed || 12,
+              areaName: res.areaName || areaKey,
+            });
+          }
+          if (res.storeName) {
+            setAreaDetectionStatus({
+              isServiceable: true,
+              areaName: res.areaName || areaKey,
+              storeName: res.storeName,
+            });
+            if (res.storeId && res.storeId !== currentStoreId) {
+              setCurrentStore(res.storeId, res.storeName);
+            }
+          }
         }
+      } catch (err) {
+        console.warn('[BlinkitCheckout] Live calculate fee error:', err);
+      } finally {
+        if (isMounted) setIsCalculatingFee(false);
       }
     };
 
-    // Debounce 500ms to batch rapid address or cart changes into a single request
-    timer = setTimeout(fetchFee, 500);
+    timer = setTimeout(fetchFee, 120);
 
     return () => {
       isMounted = false;
       if (timer) clearTimeout(timer);
     };
-  }, [cartItemCount, cityKey, areaKey, addressIdKey, currentDistanceKm]);
+  }, [cartItemCount, cityKey, areaKey, addressIdKey, selectedAddressType, activeLat, activeLng, currentStoreId]);
 
   // Dynamic Delivery Fee matching distance & floor guarantee (Min ₹30)
-  const deliveryFee = dynamicDeliveryFee || 30;
+  const deliveryFee = dynamicDeliveryFee ?? 0;
   const handlingFee = 5;
 
-  const effectiveCartTotal = blinkitCartList.reduce((sum, item) => {
-    let unitPrice = item.product.sellingPrice;
-    if (item.product.name.toLowerCase().includes('tomato')) {
-      unitPrice = isSavedThaltej ? 12 : 7;
-    }
+  const effectiveCartTotal = blinkitCartList.reduce((sum: number, item: any) => {
+    const unitPrice = typeof item.product.sellingPrice === 'number' ? item.product.sellingPrice : 0;
     return sum + unitPrice * item.quantity;
   }, 0);
 
-  const effectiveMrpTotal = blinkitCartList.reduce((sum, item) => {
-    let unitMrp = item.product.mrp;
-    if (item.product.name.toLowerCase().includes('tomato')) {
-      unitMrp = 15;
-    }
+  const effectiveMrpTotal = blinkitCartList.reduce((sum: number, item: any) => {
+    const unitMrp = typeof item.product.mrp === 'number' ? item.product.mrp : (typeof item.product.sellingPrice === 'number' ? item.product.sellingPrice : 0);
     return sum + unitMrp * item.quantity;
   }, 0);
 
@@ -745,13 +847,20 @@ export const BlinkitCheckoutScreen: React.FC = () => {
         if (useCoins) {
           setAppliedCoins(coinsDeduction);
         }
-        await placeOrder(selectedPayment.toUpperCase(), {
-          tip: tipAmount,
-          deliveryFee: deliveryFee,
-          deliveryInstructions: deliveryInstruction,
-          walletDeduction: useWalletBalance ? walletDeduction : 0,
-        });
-        startCelebrationVideo();
+        try {
+          await placeOrder(selectedPayment.toUpperCase(), {
+            tip: tipAmount,
+            deliveryFee: deliveryFee,
+            deliveryInstructions: deliveryInstruction,
+            walletDeduction: useWalletBalance ? walletDeduction : 0,
+          });
+          startCelebrationVideo();
+        } catch (orderErr: any) {
+          Alert.alert(
+            'Order Placement Failed',
+            orderErr?.message || 'Delivery is currently not available for your address. If amount was deducted, auto-refund will be initiated.'
+          );
+        }
       } else {
         Alert.alert('Payment Verification Failed', verifyRes.message || 'Signature check failed. Please try again.');
       }
@@ -780,7 +889,18 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     );
   };
 
-  const handlePlaceOrder = async () => {
+  const handlePlaceOrderClick = () => {
+    if (isSubmitting || isRazorpayVerifying || isCalculatingFee) return;
+    // Show Pre-Order Address Confirmation Popup first as requested by user
+    setShowAddressConfirmModal(true);
+  };
+
+  const handleConfirmAddressAndPlaceOrder = () => {
+    setShowAddressConfirmModal(false);
+    executePlaceOrder();
+  };
+
+  const executePlaceOrder = async () => {
     if (isSubmitting || isRazorpayVerifying) return;
     const paymentMethod = useWalletBalance && finalPayable === 0 ? 'WOMUP_WALLET' : selectedPayment.toUpperCase();
 
@@ -798,8 +918,12 @@ export const BlinkitCheckoutScreen: React.FC = () => {
           walletDeduction: useWalletBalance ? walletDeduction : 0,
         });
         startCelebrationVideo();
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to place order:', error);
+        Alert.alert(
+          'Order Placement Failed',
+          error?.message || 'Could not place order. Delivery is currently not available for your area.'
+        );
       } finally {
         setIsSubmitting(false);
       }
@@ -901,6 +1025,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
       </View>
 
       <ScrollView
+        ref={scrollViewRef}
         style={{ flex: 1, width: '100%' }}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -971,7 +1096,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
             {savedAddrs.length > 0 ? (
               <TouchableOpacity
                 activeOpacity={0.8}
-                onPress={() => handleSelectSavedAddr(savedAddrs[0])}
+                onPress={() => handleSelectSavedAddr(activeSavedAddr || savedAddrs[0])}
                 style={[
                   styles.choiceCard,
                   selectedAddressType === 'SAVED' && styles.choiceCardActiveSaved,
@@ -991,7 +1116,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
                         selectedAddressType === 'SAVED' && { color: '#6D28D9' },
                       ]}
                     >
-                      {savedAddrs[0]?.type || 'Home'}
+                      {activeSavedAddr?.type || 'Home'}
                     </Text>
                   </View>
                   {selectedAddressType === 'SAVED' && (
@@ -1001,10 +1126,10 @@ export const BlinkitCheckoutScreen: React.FC = () => {
                   )}
                 </View>
                 <Text style={styles.choiceTitle} numberOfLines={1}>
-                  {cleanHouseFlat(savedAddrs[0]?.houseFlat) || 'Saved Address'}
+                  {cleanHouseFlat(activeSavedAddr?.houseFlat) || 'Saved Address'}
                 </Text>
                 <Text style={styles.choiceCoords} numberOfLines={1}>
-                  {savedAddrs[0]?.street ? `${savedAddrs[0]?.street}, ` : ''}{savedAddrs[0]?.city || 'Ahmedabad'}
+                  {activeSavedAddr?.areaLandmark || activeSavedAddr?.street || activeSavedAddr?.city || 'Ahmedabad'}
                 </Text>
                 <Text style={[styles.choiceSub, { color: COLORS.primary }]}>
                   🏠 Doorstep verified address
@@ -1149,16 +1274,13 @@ export const BlinkitCheckoutScreen: React.FC = () => {
           <Text style={[TYPOGRAPHY.bodyMdMedium, styles.subSectionTitle]}>
             Items in Cart ({blinkitCartList.length})
           </Text>
-          {blinkitCartList.map((item) => {
-            const isTomato250g =
-              item.product.name.toLowerCase().includes('tomato') &&
-              (!item.product.packSize || item.product.packSize === '250 g');
-            const unitPrice = isTomato250g ? (isSavedThaltej ? 12 : 7) : item.product.sellingPrice;
+          {blinkitCartList.map((item: any) => {
+            const unitPrice = item.product.sellingPrice;
             const itemVariantId = (item.product as any).selectedVariantId;
             const itemKey = itemVariantId ? `${item.product.id}_${itemVariantId}` : item.product.id;
             return (
               <View key={itemKey} style={styles.cartItemRow}>
-                <Image source={{ uri: item.product.imageUrl }} style={styles.cartItemImg} />
+                <Image source={{ uri: resolveImageThumbnail(item.product.imageUrl) }} style={styles.cartItemImg} />
                 <View style={styles.cartItemInfo}>
                   <Text style={styles.cartItemName} numberOfLines={1}>
                     {item.product.name}
@@ -1536,27 +1658,41 @@ export const BlinkitCheckoutScreen: React.FC = () => {
             <View style={{ flex: 1, paddingRight: 8 }}>
               <Text style={styles.summaryLabel}>Delivery Partner Fee</Text>
               <Text style={{ fontSize: 11, color: '#62677A', marginTop: 1 }}>
-                {feeBreakdown?.distanceKm || (isSavedThaltej ? 1.15 : 1.64)} km · ₹{feeBreakdown?.rateUsed || 12}/km
-                {feeBreakdown?.floorApplied ? ` (Base: ₹${feeBreakdown?.baseFee || (isSavedThaltej ? 13.80 : 19.68)})` : ''}
+                {isCalculatingFee
+                  ? 'Calculating live route fee...'
+                  : `${feeBreakdown?.distanceKm || currentDistanceKm} km · ₹${feeBreakdown?.rateUsed || 12}/km${
+                      feeBreakdown?.floorApplied ? ` (Base: ₹${feeBreakdown?.baseFee || 14.40})` : ''
+                    }`}
               </Text>
-              {feeBreakdown?.floorApplied && (
+              {!isCalculatingFee && feeBreakdown?.floorApplied && (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
                   <ShieldCheck size={12} color="#4338CA" />
                   <Text style={{ fontSize: 10, color: '#4338CA', fontWeight: '600' }}>
-                    +₹{(Number(feeBreakdown?.minimumPayout || 30) - Number(feeBreakdown?.baseFee || (isSavedThaltej ? 13.80 : 19.68))).toFixed(2)} Floor Guarantee (Min ₹{feeBreakdown?.minimumPayout || 30})
+                    +₹{(Number(feeBreakdown?.minimumPayout || 30) - Number(feeBreakdown?.baseFee || 14.40)).toFixed(2)} Floor Guarantee (Min ₹{feeBreakdown?.minimumPayout || 30})
                   </Text>
                 </View>
               )}
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                <CheckCircle2 size={10} color="#059669" />
-                <Text style={{ fontSize: 10, color: '#059669', fontWeight: '600' }}>
-                  100% passed to delivery partner
+              {!isCalculatingFee && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                  <CheckCircle2 size={10} color="#059669" />
+                  <Text style={{ fontSize: 10, color: '#059669', fontWeight: '600' }}>
+                    100% passed to delivery partner
+                  </Text>
+                </View>
+              )}
+            </View>
+            {isCalculatingFee ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <ActivityIndicator size="small" color="#0C831F" />
+                <Text style={[styles.summaryValue, { color: COLORS.textMuted, fontSize: 12 }]}>
+                  Calculating...
                 </Text>
               </View>
-            </View>
-            <Text style={[styles.summaryValue, { fontWeight: '700' }]}>
-              ₹{deliveryFee}
-            </Text>
+            ) : (
+              <Text style={[styles.summaryValue, { fontWeight: '700' }]}>
+                ₹{deliveryFee}
+              </Text>
+            )}
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Handling & Convenience</Text>
@@ -1599,9 +1735,16 @@ export const BlinkitCheckoutScreen: React.FC = () => {
             <Text style={[TYPOGRAPHY.bodyMdMedium, styles.finalPayableLabel]}>
               Amount to Pay
             </Text>
-            <Text style={[TYPOGRAPHY.priceLg, styles.finalPayableValue]}>
-              ₹{finalPayable}
-            </Text>
+            {isCalculatingFee ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <ActivityIndicator size="small" color="#0C831F" />
+                <Text style={[TYPOGRAPHY.priceLg, { color: COLORS.textMuted, fontSize: 16 }]}>Calculating...</Text>
+              </View>
+            ) : (
+              <Text style={[TYPOGRAPHY.priceLg, styles.finalPayableValue]}>
+                ₹{finalPayable}
+              </Text>
+            )}
           </View>
 
           {/* Serving Dark Store Info Banner matching website */}
@@ -1624,19 +1767,28 @@ export const BlinkitCheckoutScreen: React.FC = () => {
       {/* Sticky Place Order CTA */}
       <View style={[styles.stickyBottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <View style={styles.bottomPriceCol}>
-          <Text style={styles.bottomPriceText}>₹{finalPayable}</Text>
+          {isCalculatingFee ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <ActivityIndicator size="small" color="#0C831F" />
+              <Text style={[styles.bottomPriceText, { fontSize: 14, color: COLORS.textMuted }]}>Calculating...</Text>
+            </View>
+          ) : (
+            <Text style={styles.bottomPriceText}>₹{finalPayable}</Text>
+          )}
           <Text style={styles.bottomPriceSub}>AMOUNT PAYABLE</Text>
         </View>
 
         <TouchableOpacity
           activeOpacity={0.85}
-          onPress={handlePlaceOrder}
-          style={[styles.placeOrderBtn, isSubmitting && { opacity: 0.8 }]}
-          disabled={isSubmitting}
+          onPress={handlePlaceOrderClick}
+          style={[styles.placeOrderBtn, (isSubmitting || isCalculatingFee) && { opacity: 0.8 }]}
+          disabled={isSubmitting || isCalculatingFee}
           accessibilityLabel="Place Order"
         >
           {isSubmitting ? (
             <ActivityIndicator color={COLORS.white} size="small" />
+          ) : isCalculatingFee ? (
+            <Text style={styles.placeOrderBtnText}>Calculating Total...</Text>
           ) : (
             <Text style={styles.placeOrderBtnText}>Place Order • ₹{finalPayable} ➔</Text>
           )}
@@ -1932,6 +2084,120 @@ export const BlinkitCheckoutScreen: React.FC = () => {
               <Text style={styles.rzpFooterSecurityText}>
                 Secured by Razorpay Payments • 256-bit SSL Encryption
               </Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 3. Pre-Order Address Confirmation Popup */}
+      <Modal
+        visible={showAddressConfirmModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowAddressConfirmModal(false)}
+      >
+        <View style={styles.confirmModalBackdrop}>
+          <View style={[styles.confirmModalSheet, { paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
+            <View style={styles.confirmModalHandle} />
+
+            {/* Header */}
+            <View style={styles.confirmModalHeader}>
+              <View style={styles.confirmIconCircle}>
+                <MapPin size={22} color={COLORS.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.confirmModalTitle}>Please Confirm Delivery Address</Text>
+                <Text style={styles.confirmModalSubtitle}>
+                  Ensure your delivery location and store are accurate
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowAddressConfirmModal(false)}
+                style={styles.confirmCloseBtn}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <X size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Selected Address Summary Card */}
+            <View style={styles.confirmAddressBox}>
+              <View style={styles.confirmAddressBadgeRow}>
+                <View style={[
+                  styles.confirmTypeBadge,
+                  selectedAddressType === 'CURRENT_GPS' ? styles.confirmTypeBadgeGps : styles.confirmTypeBadgeSaved
+                ]}>
+                  {selectedAddressType === 'CURRENT_GPS' ? (
+                    <Compass size={12} color="#0284C7" />
+                  ) : (
+                    <HomeIcon size={12} color="#6D28D9" />
+                  )}
+                  <Text style={[
+                    styles.confirmTypeBadgeText,
+                    selectedAddressType === 'CURRENT_GPS' ? { color: '#0284C7' } : { color: '#6D28D9' }
+                  ]}>
+                    {selectedAddressType === 'CURRENT_GPS' ? 'CURRENT GPS' : (selectedAddress?.type || 'HOME')}
+                  </Text>
+                </View>
+
+                <View style={styles.confirmDeliveryTimeBadge}>
+                  <Text style={styles.confirmDeliveryTimeText}>⚡ {deliveryEtaMinutes || 9} mins</Text>
+                </View>
+              </View>
+
+              <Text style={styles.confirmAddressMainText}>
+                {selectedAddressType === 'CURRENT_GPS'
+                  ? 'Chandlodiya - Tragad Area'
+                  : (houseFlat ? `${houseFlat}, ${street ? street + ', ' : ''}${areaLandmark}` : areaLandmark)}
+              </Text>
+
+              <View style={styles.confirmMetaRow}>
+                <Text style={styles.confirmMetaLabel}>Recipient:</Text>
+                <Text style={styles.confirmMetaVal}>{customerName || 'Customer'} • {customerPhone || ''}</Text>
+              </View>
+
+              <View style={styles.confirmMetaRow}>
+                <Text style={styles.confirmMetaLabel}>Pincode & City:</Text>
+                <Text style={styles.confirmMetaVal}>{pincode || '380015'}, Ahmedabad</Text>
+              </View>
+
+              <View style={styles.confirmStoreRow}>
+                <CheckCircle2 size={13} color="#16A34A" />
+                <Text style={styles.confirmStoreText}>
+                  Serving from <Text style={{ fontWeight: '700', color: '#166534' }}>{areaDetectionStatus?.storeName || currentStoreName || 'Dark Store'}</Text>
+                </Text>
+              </View>
+            </View>
+
+            {/* Delivery fee info note */}
+            <View style={styles.confirmFeeNotice}>
+              <ShieldCheck size={14} color="#059669" />
+              <Text style={styles.confirmFeeNoticeText}>
+                Delivery fee is calculated for this address.
+              </Text>
+            </View>
+
+            {/* Action Buttons */}
+            <View style={styles.confirmActionsRow}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={styles.confirmChangeBtn}
+                onPress={() => {
+                  setShowAddressConfirmModal(false);
+                  scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+                }}
+              >
+                <Text style={styles.confirmChangeBtnText}>Change Address</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={styles.confirmProceedBtn}
+                onPress={handleConfirmAddressAndPlaceOrder}
+              >
+                <Text style={styles.confirmProceedBtnText}>Confirm & Place Order</Text>
+                <ArrowRight size={16} color="#FFFFFF" strokeWidth={2.5} />
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -2855,5 +3121,208 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#94A3B8',
     fontWeight: '500',
+  },
+
+  /* Address Confirmation Modal Styles */
+  confirmModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'flex-end',
+  },
+  confirmModalSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    maxHeight: '85%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  confirmModalHandle: {
+    width: 44,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#CBD5E1',
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  confirmModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  confirmIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FDF2F8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#FCE7F3',
+  },
+  confirmModalTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  confirmModalSubtitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#64748B',
+    marginTop: 2,
+  },
+  confirmCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmAddressBox: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    padding: 16,
+    marginBottom: 14,
+  },
+  confirmAddressBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  confirmTypeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  confirmTypeBadgeGps: {
+    backgroundColor: '#E0F2FE',
+  },
+  confirmTypeBadgeSaved: {
+    backgroundColor: '#F3E8FF',
+  },
+  confirmTypeBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  confirmDeliveryTimeBadge: {
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  confirmDeliveryTimeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  confirmAddressMainText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1E293B',
+    lineHeight: 22,
+    marginBottom: 10,
+  },
+  confirmMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 3,
+  },
+  confirmMetaLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  confirmMetaVal: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  confirmStoreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F0FDF4',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    marginTop: 10,
+  },
+  confirmStoreText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#15803D',
+    flex: 1,
+  },
+  confirmFeeNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    marginBottom: 18,
+  },
+  confirmFeeNoticeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#047857',
+    flex: 1,
+  },
+  confirmActionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  confirmChangeBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  confirmChangeBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  confirmProceedBtn: {
+    flex: 1.6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: COLORS.primary,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  confirmProceedBtnText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
 });

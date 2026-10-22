@@ -6,6 +6,11 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splashfinal.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#FED2EB"
+    },
     "plugins": [
       "expo-font",
       "expo-speech-recognition",

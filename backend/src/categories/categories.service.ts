@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import { ModuleRef } from '@nestjs/core';
 import { Model, Types } from 'mongoose';
 import {
   Category,
@@ -7,6 +8,8 @@ import {
   SubCategory,
   SubCategoryDocument,
 } from './schemas/category.schema';
+import { TrackingGateway } from '../tracking/tracking.gateway';
+import { clearHomeCache } from '../home/home-cache';
 
 @Injectable()
 export class CategoriesService {
@@ -14,7 +17,25 @@ export class CategoriesService {
     @InjectModel(Category.name) private categoryModel: Model<CategoryDocument>,
     @InjectModel(SubCategory.name)
     private subCategoryModel: Model<SubCategoryDocument>,
+    private readonly moduleRef: ModuleRef,
   ) {}
+
+  private notifyCategoryChange(type: string, details?: any) {
+    try {
+      clearHomeCache();
+      const gateway = this.moduleRef.get(TrackingGateway, { strict: false });
+      gateway?.server?.emit('catalog:updated', {
+        type,
+        ...details,
+        timestamp: new Date().toISOString(),
+      });
+      gateway?.server?.emit('categories:updated', {
+        type,
+        ...details,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (_) {}
+  }
 
   async findAll(includeInactive = false) {
     const filter = includeInactive ? {} : { isActive: true };
@@ -118,7 +139,9 @@ export class CategoriesService {
       itemCount: 0,
     });
 
-    return newCat.save();
+    const saved = await newCat.save();
+    this.notifyCategoryChange('CATEGORY_CREATED', { categoryId: saved._id.toString(), name: saved.name });
+    return saved;
   }
 
   async update(id: string, dto: Partial<Category>) {
@@ -134,7 +157,9 @@ export class CategoriesService {
     if (dto.sortOrder !== undefined) category.sortOrder = Number(dto.sortOrder);
     if (dto.isActive !== undefined) category.isActive = Boolean(dto.isActive);
 
-    return category.save();
+    const saved = await category.save();
+    this.notifyCategoryChange('CATEGORY_UPDATED', { categoryId: saved._id.toString(), name: saved.name });
+    return saved;
   }
 
   async toggleStatus(id: string, isActive?: boolean) {
@@ -144,7 +169,9 @@ export class CategoriesService {
     }
 
     category.isActive = isActive !== undefined ? Boolean(isActive) : !category.isActive;
-    return category.save();
+    const saved = await category.save();
+    this.notifyCategoryChange('CATEGORY_STATUS_TOGGLED', { categoryId: saved._id.toString(), isActive: saved.isActive });
+    return saved;
   }
 
   async delete(id: string) {
@@ -175,6 +202,7 @@ export class CategoriesService {
     await this.subCategoryModel.deleteMany({ categoryId: category._id }).exec();
     await this.categoryModel.deleteOne({ _id: category._id }).exec();
 
+    this.notifyCategoryChange('CATEGORY_DELETED', { categoryId: id });
     return { success: true, message: `Category "${category.name}" permanently deleted.` };
   }
 
@@ -231,7 +259,9 @@ export class CategoriesService {
       itemCount: 0,
     });
 
-    return newSub.save();
+    const saved = await newSub.save();
+    this.notifyCategoryChange('SUBCATEGORY_CREATED', { subCategoryId: saved._id.toString(), parentCategoryId: parent._id.toString() });
+    return saved;
   }
 
   async updateSubcategory(subId: string, dto: Partial<SubCategory>) {
@@ -247,7 +277,9 @@ export class CategoriesService {
     if (dto.sortOrder !== undefined) sub.sortOrder = Number(dto.sortOrder);
     if (dto.isActive !== undefined) sub.isActive = Boolean(dto.isActive);
 
-    return sub.save();
+    const saved = await sub.save();
+    this.notifyCategoryChange('SUBCATEGORY_UPDATED', { subCategoryId: saved._id.toString() });
+    return saved;
   }
 
   async deleteSubcategory(subId: string) {
@@ -274,6 +306,7 @@ export class CategoriesService {
     }
 
     await this.subCategoryModel.deleteOne({ _id: sub._id }).exec();
+    this.notifyCategoryChange('SUBCATEGORY_DELETED', { subCategoryId: subId });
     return { success: true, message: `Sub-category "${sub.name}" deleted.` };
   }
 }

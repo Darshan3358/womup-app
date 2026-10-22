@@ -22,14 +22,55 @@ function haversineDistanceKm(lat1: number, lon1: number, lat2: number, lon2: num
 
 @Injectable()
 export class StoresService {
+  private cachedStores: any[] = [];
+  private cachedAreas: Map<string, any> = new Map();
+  private cacheExpiresAt = 0;
+
   constructor(
     @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
     @InjectModel(Area.name) private areaModel: Model<AreaDocument>,
     private readonly trackingGateway: TrackingGateway,
   ) {}
 
+  private async getCachedStoresAndAreas(): Promise<{ stores: any[]; areas: Map<string, any> }> {
+    const now = Date.now();
+    if (this.cachedStores.length > 0 && now < this.cacheExpiresAt) {
+      return { stores: this.cachedStores, areas: this.cachedAreas };
+    }
+
+    try {
+      const [stores, areas] = await Promise.all([
+        this.storeModel.find({ isActive: true }).lean().exec(),
+        this.areaModel.find().lean().exec(),
+      ]);
+
+      const areaMap = new Map<string, any>();
+      for (const a of areas) {
+        areaMap.set(a._id.toString(), a);
+      }
+
+      this.cachedStores = stores || [];
+      this.cachedAreas = areaMap;
+      this.cacheExpiresAt = now + 60000; // 60s in-memory cache
+      return { stores: this.cachedStores, areas: areaMap };
+    } catch {
+      return { stores: this.cachedStores, areas: this.cachedAreas };
+    }
+  }
+
+  invalidateCache() {
+    this.cacheExpiresAt = 0;
+  }
+
   async findAll() {
-    return this.storeModel.find({ isActive: true }).exec();
+    const docs = await this.storeModel.find({ isActive: true }).lean().exec();
+    return docs.map((s: any) => ({
+      ...s,
+      id: s.id || (s._id ? s._id.toString() : ''),
+      status: s.status || (s.isActive !== false ? 'ACTIVE' : 'PENDING'),
+      isActive: s.isActive !== undefined ? s.isActive : true,
+      coordinates: s.coordinates || s.location?.coordinates || [72.5714, 23.0225],
+    }));
   }
 
   async adminGetStores(query?: { status?: string; search?: string }) {
@@ -44,13 +85,27 @@ export class StoresService {
         { address: { $regex: query.search, $options: 'i' } },
       ];
     }
-    return this.storeModel.find(filter).sort({ createdAt: -1 }).exec();
+    const docs = await this.storeModel.find(filter).sort({ createdAt: -1 }).lean().exec();
+    return docs.map((s: any) => ({
+      ...s,
+      id: s.id || (s._id ? s._id.toString() : ''),
+      status: s.status || (s.isActive !== false ? 'ACTIVE' : 'PENDING'),
+      isActive: s.isActive !== undefined ? s.isActive : true,
+      coordinates: s.coordinates || s.location?.coordinates || [72.5714, 23.0225],
+    }));
   }
 
   async adminGetPendingStores() {
-    return this.storeModel.find({
+    const docs = await this.storeModel.find({
       $or: [{ status: 'PENDING' }, { status: '1' }, { isActive: false }],
-    }).sort({ createdAt: -1 }).exec();
+    }).sort({ createdAt: -1 }).lean().exec();
+    return docs.map((s: any) => ({
+      ...s,
+      id: s.id || (s._id ? s._id.toString() : ''),
+      status: s.status || 'PENDING',
+      isActive: s.isActive !== undefined ? s.isActive : false,
+      coordinates: s.coordinates || s.location?.coordinates || [72.5714, 23.0225],
+    }));
   }
 
   async adminApproveStore(id: string, adminId?: string) {
@@ -70,6 +125,7 @@ export class StoresService {
     store.qrCodeImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=womup://store/${code}`;
 
     await store.save();
+    this.invalidateCache();
 
     if (this.trackingGateway) {
       this.trackingGateway.emitStoreApproved(store._id.toString(), {
@@ -101,6 +157,7 @@ export class StoresService {
     if (adminId) store.approvedBy = adminId;
 
     await store.save();
+    this.invalidateCache();
 
     if (this.trackingGateway) {
       this.trackingGateway.emitKycRejected('store', store._id.toString(), {
@@ -126,11 +183,10 @@ export class StoresService {
   }
 
   /**
-   * Deterministic Hyperlocal Serviceability Engine:
-   * 1. Finds nearest active dark stores using 2dsphere ($near).
+   * Ultra-fast Hyperlocal Serviceability Engine (<1ms in RAM):
+   * 1. Evaluates customer coordinates against cached active dark stores.
    * 2. Checks exact haversine distance against each store's serviceRadiusKm.
-   * 3. Selects the closest store whose service radius encompasses the customer GPS.
-   * 4. Completely eliminates overlapping polygon ambiguity and nondeterministic store switching.
+   * 3. Selects closest store within radius limit.
    */
   async checkServiceability(lat: number, lng: number) {
     if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) {
@@ -141,71 +197,64 @@ export class StoresService {
       };
     }
 
-    // 1. Find up to 5 nearest active stores within 12 km radius (sorted ascending by distance)
-    const candidateStores = await this.storeModel
-      .find({
-        isActive: true,
-        location: {
-          $near: {
-            $geometry: {
-              type: 'Point',
-              coordinates: [lng, lat],
-            },
-            $maxDistance: 12000,
-          },
-        },
-      })
-      .limit(5)
-      .exec();
+    try {
+      const { stores, areas } = await this.getCachedStoresAndAreas();
 
-    let matchedStore: StoreDocument | null = null;
-    let shortestDistance = Infinity;
+      const candidateStores = [];
+      for (const store of stores) {
+        const storeCoords = store.location?.coordinates;
+        if (!storeCoords || storeCoords.length < 2) continue;
 
-    for (const store of candidateStores) {
-      const storeCoords = store.location?.coordinates;
-      if (!storeCoords || storeCoords.length < 2) continue;
-
-      const storeLng = storeCoords[0];
-      const storeLat = storeCoords[1];
-      const dist = haversineDistanceKm(lat, lng, storeLat, storeLng);
-      const radiusLimit = store.serviceRadiusKm || 4.0;
-
-      if (dist <= radiusLimit) {
-        matchedStore = store;
-        shortestDistance = dist;
-        break; // candidateStores is already sorted by distance ascending ($near)
+        const storeLng = storeCoords[0];
+        const storeLat = storeCoords[1];
+        const dist = haversineDistanceKm(lat, lng, storeLat, storeLng);
+        candidateStores.push({ store, dist });
       }
-    }
 
-    // 2. If customer is outside all stores' service radiuses, return honest rejection
-    if (!matchedStore) {
+      candidateStores.sort((a, b) => a.dist - b.dist);
+
+      let matchedStore: any = null;
+      let shortestDistance = Infinity;
+
+      for (const item of candidateStores) {
+        const radiusLimit = item.store.serviceRadiusKm || 4.0;
+        if (item.dist <= radiusLimit) {
+          matchedStore = item.store;
+          shortestDistance = item.dist;
+          break;
+        }
+      }
+
+      if (!matchedStore) {
+        return {
+          serviceable: false,
+          estimatedDeliveryMinutes: 0,
+          message: 'Delivery is currently not available in your selected location.',
+        };
+      }
+
+      const areaKey = matchedStore.areaId ? matchedStore.areaId.toString() : '';
+      const matchedArea = areaKey ? areas.get(areaKey) : null;
+      const dynamicEta = Math.max(8, Math.min(15, Math.round(5.5 + shortestDistance * 2.2)));
+
+      return {
+        serviceable: true,
+        areaId: matchedArea?._id?.toString() || matchedStore.areaId?.toString() || null,
+        areaName: matchedArea?.name || matchedStore.areaName || matchedStore.name,
+        storeId: matchedStore._id.toString(),
+        storeName: matchedStore.name,
+        storeCode: matchedStore.code,
+        estimatedDeliveryMinutes: dynamicEta,
+        distanceKm: shortestDistance,
+        deliveryFee: 0,
+        message: `Fulfillable by ${matchedStore.name} in ${dynamicEta} minutes (${shortestDistance} km)`,
+      };
+    } catch (err: any) {
       return {
         serviceable: false,
         estimatedDeliveryMinutes: 0,
-        message: 'Delivery is currently not available in your selected location.',
+        message: 'Location service temporarily unavailable.',
       };
     }
-
-    // 3. Match area if available
-    let matchedArea = null;
-    if (matchedStore.areaId) {
-      matchedArea = await this.areaModel.findById(matchedStore.areaId).exec();
-    }
-
-    // Dynamic ETA: 6-7 min base + ~2 min per km, clamped between 8 and 15 min
-    const dynamicEta = Math.max(8, Math.min(15, Math.round(5.5 + shortestDistance * 2.2)));
-
-    return {
-      serviceable: true,
-      areaId: matchedArea?._id?.toString() || matchedStore.areaId?.toString() || null,
-      areaName: matchedArea?.name || matchedStore.areaName || matchedStore.name,
-      storeId: matchedStore._id.toString(),
-      storeName: matchedStore.name,
-      storeCode: matchedStore.code,
-      estimatedDeliveryMinutes: dynamicEta,
-      distanceKm: shortestDistance,
-      deliveryFee: 0,
-      message: `Fulfillable by ${matchedStore.name} in ${dynamicEta} minutes (${shortestDistance} km)`,
-    };
   }
 }

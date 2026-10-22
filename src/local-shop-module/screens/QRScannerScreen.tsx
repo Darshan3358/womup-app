@@ -30,12 +30,14 @@ interface QRScannerScreenProps {
   initialVendor?: LocalVendor | null;
   onGoBack: () => void;
   onPaymentSuccess: (earnedCoins: number, amount: number, vendorName: string, coinsUsed?: number, newBalance?: number) => void;
+  onViewOrders?: () => void;
 }
 
 export const QRScannerScreen: React.FC<QRScannerScreenProps> = ({
   initialVendor,
   onGoBack,
   onPaymentSuccess,
+  onViewOrders,
 }) => {
   const insets = useSafeAreaInsets();
   const { user } = useApp();
@@ -422,6 +424,14 @@ export const QRScannerScreen: React.FC<QRScannerScreenProps> = ({
             newBalance
           );
           onGoBack();
+        }}
+        onViewOrders={() => {
+          setPendingCollectionRequest(null);
+          if (onViewOrders) {
+            onViewOrders();
+          } else {
+            onGoBack();
+          }
         }}
         onCancelledOrRejected={() => {
           setPendingCollectionRequest(null);

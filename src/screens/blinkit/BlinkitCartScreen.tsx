@@ -8,6 +8,7 @@ import {
   Image,
   StyleSheet,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Info, ShieldCheck, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,6 +17,8 @@ import { TYPOGRAPHY } from '../../theme/typography';
 import { AppIcon } from '../../components/common/AppIcon';
 import { useApp } from '../../context/AppContext';
 import { CartService } from '../../services/cartService';
+import { resolveImageThumbnail } from '../../utils/imageUrl';
+import { matchAreaByName } from '../../data/areas';
 
 export const BlinkitCartScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -32,36 +35,86 @@ export const BlinkitCartScreen: React.FC = () => {
     deliveryLocation,
     currentCityName,
     currentAreaName,
+    currentStoreId,
     selectedAddress,
+    selectedAddressSource,
     setActiveScreen,
     goBack,
     setLocationModalVisible,
   } = useApp();
 
-  const isSavedThaltej =
-    (selectedAddress as any)?.type === 'SAVED' ||
-    (currentAreaName || '').toLowerCase().includes('thaltej') ||
-    ((selectedAddress as any)?.areaLandmark || '').toLowerCase().includes('thaltej');
+  const isSavedAddress = selectedAddressSource === 'SAVED' && selectedAddress && selectedAddress.type !== 'Current';
 
-  const currentDistanceKm = isSavedThaltej ? 1.15 : 1.64;
-  const areaKey = isSavedThaltej ? 'Thaltej' : (currentAreaName || selectedAddress?.areaLandmark || 'Chandlodiya - Tragad');
-  const cityKey = currentCityName || selectedAddress?.city || 'Ahmedabad';
+  const matchedArea = matchAreaByName(
+    (isSavedAddress ? (selectedAddress?.areaLandmark || (selectedAddress as any)?.area || selectedAddress?.street || selectedAddress?.houseFlat) : null) ||
+    currentAreaName ||
+    selectedAddress?.areaLandmark ||
+    (selectedAddress as any)?.area ||
+    deliveryLocation
+  );
+  const activeLat = isSavedAddress
+    ? (matchedArea?.lat || Number(selectedAddress?.latitude) || 23.0125)
+    : (Number(selectedAddress?.latitude) || matchedArea?.lat || 23.0125);
+  const activeLng = isSavedAddress
+    ? (matchedArea?.lng || Number(selectedAddress?.longitude) || 72.5082)
+    : (Number(selectedAddress?.longitude) || matchedArea?.lng || 72.5082);
+  const areaKey = (isSavedAddress ? (selectedAddress?.areaLandmark || matchedArea?.name) : null) ||
+    matchedArea?.name || currentAreaName || selectedAddress?.areaLandmark || 'Prahlad Nagar';
+  const cityKey = (isSavedAddress ? selectedAddress?.city : null) || currentCityName || 'Ahmedabad';
+  const currentDistanceKm = 1.2;
 
   const [couponInput, setCouponInput] = useState('');
   const [showFeeDetails, setShowFeeDetails] = useState(false);
-  const [dynamicDeliveryFee, setDynamicDeliveryFee] = useState<number>(30);
-  const [feeBreakdown, setFeeBreakdown] = useState<any>({
-    distanceKm: currentDistanceKm,
-    rateUsed: 12,
-    baseFee: isSavedThaltej ? 13.80 : 19.68,
-    minimumPayout: 30,
-    floorApplied: true,
+
+  // Check cached delivery fee synchronously to avoid any 1-frame price flicker
+  const initialCachedFee = CartService.getCachedDeliveryFee({
+    cityName: cityKey,
     areaName: areaKey,
+    distanceKm: currentDistanceKm,
+    items: blinkitCartList.map((item) => ({
+      name: item.product.name,
+      price: item.product.sellingPrice,
+      mrp: item.product.mrp,
+      quantity: item.quantity,
+    })),
   });
+
+  const [dynamicDeliveryFee, setDynamicDeliveryFee] = useState<number | null>(
+    initialCachedFee ? initialCachedFee.deliveryFee : null
+  );
+  const [feeBreakdown, setFeeBreakdown] = useState<any>(
+    initialCachedFee ? initialCachedFee.breakdown : null
+  );
+  const [isCalculatingFee, setIsCalculatingFee] = useState<boolean>(!initialCachedFee);
 
   useEffect(() => {
     let isMounted = true;
     const fetchFee = async () => {
+      // Check cache first
+      const cached = CartService.getCachedDeliveryFee({
+        cityName: cityKey,
+        areaName: areaKey,
+        distanceKm: currentDistanceKm,
+        items: blinkitCartList.map((item) => ({
+          name: item.product.name,
+          price: item.product.sellingPrice,
+          mrp: item.product.mrp,
+          quantity: item.quantity,
+        })),
+      });
+
+      if (cached) {
+        if (isMounted) {
+          setDynamicDeliveryFee(cached.deliveryFee);
+          if (cached.breakdown) {
+            setFeeBreakdown(cached.breakdown);
+          }
+          setIsCalculatingFee(false);
+        }
+      } else if (dynamicDeliveryFee === null) {
+        setIsCalculatingFee(true);
+      }
+
       const res = await CartService.calculateDynamicDeliveryFee({
         items: blinkitCartList.map((item) => ({
           name: item.product.name,
@@ -71,10 +124,11 @@ export const BlinkitCartScreen: React.FC = () => {
         })),
         cityName: cityKey,
         areaName: areaKey,
+        storeId: currentStoreId || undefined,
         distanceKm: currentDistanceKm,
         deliveryAddress: {
-          latitude: isSavedThaltej ? 23.0500 : 23.1288,
-          longitude: isSavedThaltej ? 72.5160 : 72.5507,
+          latitude: activeLat,
+          longitude: activeLng,
           area: areaKey,
           city: cityKey,
         },
@@ -89,15 +143,16 @@ export const BlinkitCartScreen: React.FC = () => {
             areaName: res.areaName || areaKey,
           });
         }
+        setIsCalculatingFee(false);
       }
     };
     fetchFee();
     return () => {
       isMounted = false;
     };
-  }, [blinkitCartList, deliveryLocation, currentAreaName, currentCityName, selectedAddress]);
+  }, [blinkitCartList, deliveryLocation, currentAreaName, currentCityName, selectedAddress, selectedAddressSource, currentStoreId]);
 
-  const deliveryFee = dynamicDeliveryFee;
+  const deliveryFee = dynamicDeliveryFee ?? 0;
   const handlingFee = 5;
   const grandTotal = Math.max(0, blinkitCartTotal + deliveryFee + handlingFee - couponDiscount);
   const totalSavings = (blinkitMrpTotal - blinkitCartTotal) + couponDiscount;
@@ -205,7 +260,7 @@ export const BlinkitCartScreen: React.FC = () => {
               >
                 <View style={styles.itemEmojiContainer}>
                   <Image
-                    source={{ uri: entry.product.imageUrl }}
+                    source={{ uri: resolveImageThumbnail(entry.product.imageUrl) }}
                     style={styles.itemRealImage}
                     resizeMode="cover"
                   />
@@ -328,34 +383,48 @@ export const BlinkitCartScreen: React.FC = () => {
               <View style={{ flex: 1, paddingRight: 8 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                   <Text style={styles.billLabel}>Delivery Partner Fee</Text>
-                  <TouchableOpacity
-                    onPress={() => setShowFeeDetails(!showFeeDetails)}
-                    activeOpacity={0.7}
-                    style={styles.infoTouchBtn}
-                  >
-                    <Info size={12} color="#4F46E5" />
-                    <Text style={styles.infoTouchText}>
-                      {showFeeDetails ? 'Hide math' : 'Why this fee?'}
-                    </Text>
-                    {showFeeDetails ? (
-                      <ChevronUp size={11} color="#4F46E5" />
-                    ) : (
-                      <ChevronDown size={11} color="#4F46E5" />
-                    )}
-                  </TouchableOpacity>
+                  {!isCalculatingFee && (
+                    <TouchableOpacity
+                      onPress={() => setShowFeeDetails(!showFeeDetails)}
+                      activeOpacity={0.7}
+                      style={styles.infoTouchBtn}
+                    >
+                      <Info size={12} color="#4F46E5" />
+                      <Text style={styles.infoTouchText}>
+                        {showFeeDetails ? 'Hide math' : 'Why this fee?'}
+                      </Text>
+                      {showFeeDetails ? (
+                        <ChevronUp size={11} color="#4F46E5" />
+                      ) : (
+                        <ChevronDown size={11} color="#4F46E5" />
+                      )}
+                    </TouchableOpacity>
+                  )}
                 </View>
                 <Text style={styles.feeSubText}>
-                  {feeBreakdown?.distanceKm || currentDistanceKm} km · ₹{feeBreakdown?.rateUsed || 12}/km
-                  {feeBreakdown?.floorApplied ? ` (Base: ₹${feeBreakdown?.baseFee || (isSavedThaltej ? 13.80 : 19.68)})` : ''}
+                  {isCalculatingFee
+                    ? 'Calculating live route fee...'
+                    : `${feeBreakdown?.distanceKm || currentDistanceKm} km · ₹${feeBreakdown?.rateUsed || 12}/km${
+                        feeBreakdown?.floorApplied ? ` (Base: ₹${feeBreakdown?.baseFee || 14.40})` : ''
+                      }`}
                 </Text>
               </View>
-              <Text style={[styles.billValue, { fontWeight: '700', fontSize: 14 }]}>
-                ₹{deliveryFee}
-              </Text>
+              {isCalculatingFee ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <ActivityIndicator size="small" color="#0C831F" />
+                  <Text style={[styles.billValue, { color: COLORS.textMuted, fontSize: 13 }]}>
+                    Calculating...
+                  </Text>
+                </View>
+              ) : (
+                <Text style={[styles.billValue, { fontWeight: '700', fontSize: 14 }]}>
+                  ₹{deliveryFee}
+                </Text>
+              )}
             </View>
 
             {/* Rider Minimum Guarantee Callout */}
-            {feeBreakdown?.floorApplied && (
+            {!isCalculatingFee && feeBreakdown?.floorApplied && (
               <View style={styles.floorNoticeBox}>
                 <ShieldCheck size={14} color="#4338CA" style={{ marginTop: 1 }} />
                 <View style={{ flex: 1, marginLeft: 6 }}>
@@ -363,14 +432,14 @@ export const BlinkitCartScreen: React.FC = () => {
                     Fair Rider Floor Guarantee Applied
                   </Text>
                   <Text style={styles.floorNoticeDesc}>
-                    Base distance fee is ₹{feeBreakdown?.baseFee || (isSavedThaltej ? 13.80 : 19.68)}. A +₹{(Number(feeBreakdown?.minimumPayout || 30) - Number(feeBreakdown?.baseFee || (isSavedThaltej ? 13.80 : 19.68))).toFixed(2)} top-up is included to guarantee a minimum ₹{feeBreakdown?.minimumPayout || 30} payout for your delivery partner.
+                    Base distance fee is ₹{feeBreakdown?.baseFee || 14.40}. A +₹{(Number(feeBreakdown?.minimumPayout || 30) - Number(feeBreakdown?.baseFee || 14.40)).toFixed(2)} top-up is included to guarantee a minimum ₹{feeBreakdown?.minimumPayout || 30} payout for your delivery partner.
                   </Text>
                 </View>
               </View>
             )}
 
             {/* Expandable Explanation Details */}
-            {showFeeDetails && (
+            {!isCalculatingFee && showFeeDetails && (
               <View style={styles.feeDetailsDrawer}>
                 <Text style={styles.drawerTitle}>Fee Calculation Breakdown</Text>
                 <View style={styles.drawerItem}>
@@ -382,7 +451,7 @@ export const BlinkitCartScreen: React.FC = () => {
                 <View style={styles.drawerItem}>
                   <Text style={styles.drawerDot}>•</Text>
                   <Text style={styles.drawerText}>
-                    <Text style={{ fontWeight: '700' }}>Base Math:</Text> {feeBreakdown?.distanceKm || currentDistanceKm} km × ₹{feeBreakdown?.rateUsed || 12}/km = ₹{feeBreakdown?.baseFee || (isSavedThaltej ? 13.80 : 19.68)}.
+                    <Text style={{ fontWeight: '700' }}>Base Math:</Text> {feeBreakdown?.distanceKm || currentDistanceKm} km × ₹{feeBreakdown?.rateUsed || 12}/km = ₹{feeBreakdown?.baseFee || 14.40}.
                   </Text>
                 </View>
                 <View style={styles.drawerItem}>
@@ -400,7 +469,7 @@ export const BlinkitCartScreen: React.FC = () => {
               </View>
             )}
 
-            {!showFeeDetails && (
+            {!isCalculatingFee && !showFeeDetails && (
               <View style={styles.directPassRow}>
                 <CheckCircle2 size={11} color="#059669" />
                 <Text style={styles.directPassText}>
@@ -419,7 +488,14 @@ export const BlinkitCartScreen: React.FC = () => {
 
           <View style={styles.grandTotalRow}>
             <Text style={[TYPOGRAPHY.headingMd, styles.grandTotalLabel]}>To Pay</Text>
-            <Text style={[TYPOGRAPHY.priceLg, styles.grandTotalValue]}>₹{grandTotal}</Text>
+            {isCalculatingFee ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <ActivityIndicator size="small" color="#0C831F" />
+                <Text style={[TYPOGRAPHY.priceLg, { color: COLORS.textMuted, fontSize: 16 }]}>Calculating...</Text>
+              </View>
+            ) : (
+              <Text style={[TYPOGRAPHY.priceLg, styles.grandTotalValue]}>₹{grandTotal}</Text>
+            )}
           </View>
 
           {totalSavings > 0 && (
@@ -443,17 +519,30 @@ export const BlinkitCartScreen: React.FC = () => {
       {/* Sticky Bottom "Proceed to Checkout" CTA */}
       <View style={[styles.stickyBottomCheckoutBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <View style={styles.bottomPriceCol}>
-          <Text style={styles.bottomTotalText}>₹{grandTotal}</Text>
+          {isCalculatingFee ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <ActivityIndicator size="small" color="#0C831F" />
+              <Text style={[styles.bottomTotalText, { fontSize: 14, color: COLORS.textMuted }]}>Calculating...</Text>
+            </View>
+          ) : (
+            <Text style={styles.bottomTotalText}>₹{grandTotal}</Text>
+          )}
           <Text style={styles.bottomTotalSub}>TOTAL</Text>
         </View>
 
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={() => setActiveScreen('Blinkit_Checkout')}
-          style={styles.proceedCheckoutBtn}
+          style={[
+            styles.proceedCheckoutBtn,
+            isCalculatingFee && { opacity: 0.6 }
+          ]}
+          disabled={isCalculatingFee}
           accessibilityLabel="Proceed to Checkout"
         >
-          <Text style={styles.proceedCheckoutText}>Proceed to Checkout ▸</Text>
+          <Text style={styles.proceedCheckoutText}>
+            {isCalculatingFee ? 'Calculating Total...' : 'Proceed to Checkout ▸'}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>

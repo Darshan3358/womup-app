@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Model, Types, Connection } from 'mongoose';
@@ -37,6 +38,7 @@ import {
 } from '../delivery/schemas/delivery-partner.schema';
 import { CreateOrderDto } from './dto/order.dto';
 import { TrackingGateway } from '../tracking/tracking.gateway';
+import { NotificationService } from '../notifications/notification.service';
 
 @Injectable()
 export class OrdersService {
@@ -61,6 +63,7 @@ export class OrdersService {
     private cartService: CartService,
     private inventoryService: InventoryService,
     private trackingGateway: TrackingGateway,
+    @Optional() private readonly notificationService?: NotificationService,
   ) { }
 
   async createOrder(userId: string | undefined, dto: CreateOrderDto) {
@@ -124,11 +127,37 @@ export class OrdersService {
         );
       }
 
-      // If no existing address matched, persist or provision this address so it is saved in user account
+      // Check if an existing address already matches these coordinates or street/houseNumber
+      if (!address) {
+        address = await this.addressModel.findOne({
+          userId: uId,
+          $or: [
+            {
+              'location.coordinates.0': { $gte: reqLng - 0.0005, $lte: reqLng + 0.0005 },
+              'location.coordinates.1': { $gte: reqLat - 0.0005, $lte: reqLat + 0.0005 },
+            },
+            {
+              houseNumber,
+              street,
+            },
+          ],
+        });
+        if (address) {
+          address.houseNumber = houseNumber;
+          address.street = street;
+          address.landmark = landmark;
+          address.city = city;
+          address.pincode = pincode;
+          address.location = { type: 'Point', coordinates: [reqLng, reqLat] };
+          await address.save();
+        }
+      }
+
+      // If still no address matched, persist new address
       if (!address) {
         address = await this.addressModel.create({
           userId: uId,
-          label,
+          label: label === 'Current' ? 'Home' : label,
           houseNumber,
           street,
           landmark,
@@ -407,7 +436,7 @@ export class OrdersService {
       isActive: true,
     }).exec();
 
-    // Filter stores with valid coordinates and within strict 6 km delivery radius
+    // Filter stores with valid coordinates and strictly enforce admin-configured delivery radius
     const R_EARTH = 6371;
     const eligibleStores: Array<{ store: StoreDocument; distKm: number }> = [];
 
@@ -419,10 +448,33 @@ export class OrdersService {
           const dLat = ((lat - sLat) * Math.PI) / 180;
           const dLng = ((lng - sLng) * Math.PI) / 180;
           const a = Math.sin(dLat / 2) ** 2 + Math.cos((sLat * Math.PI) / 180) * Math.cos((lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
-          const distKm = R_EARTH * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          const distKm = Number((R_EARTH * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))).toFixed(2));
+          const maxRadiusKm = Number(cand.serviceRadiusKm) || 6.0;
 
-          if (distKm <= 6.0) {
+          if (distKm <= maxRadiusKm) {
             eligibleStores.push({ store: cand, distKm });
+          }
+        }
+      }
+    }
+
+    // Dynamic Geofence Fallback: If no store matched strictly by areaId, check any active dark store whose serviceRadiusKm covers customer coordinates
+    if (eligibleStores.length === 0) {
+      const allActiveStores = await this.storeModel.find({ isActive: true }).exec();
+      for (const cand of allActiveStores) {
+        const sCoords = cand.location?.coordinates || ((cand as any).longitude && (cand as any).latitude ? [(cand as any).longitude, (cand as any).latitude] : null);
+        if (sCoords && Array.isArray(sCoords) && sCoords.length >= 2) {
+          const [sLng, sLat] = sCoords;
+          if (!isNaN(sLat) && !isNaN(sLng) && sLat !== 0 && sLng !== 0) {
+            const dLat = ((lat - sLat) * Math.PI) / 180;
+            const dLng = ((lng - sLng) * Math.PI) / 180;
+            const a = Math.sin(dLat / 2) ** 2 + Math.cos((sLat * Math.PI) / 180) * Math.cos((lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+            const distKm = Number((R_EARTH * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))).toFixed(2));
+            const maxRadiusKm = Number(cand.serviceRadiusKm) || 6.0;
+
+            if (distKm <= maxRadiusKm) {
+              eligibleStores.push({ store: cand, distKm });
+            }
           }
         }
       }
@@ -463,7 +515,7 @@ export class OrdersService {
 
     // STRICT REJECTION: Never silently route cross-area to an unrelated distant store
     if (!store) {
-      throw new BadRequestException(`Delivery not available in your area. No active Dark Store found for ${matchedArea.name}.`);
+      throw new BadRequestException(`Delivery is not available in your area. No active Dark Store is within its configured delivery range for ${matchedArea.name}.`);
     }
 
     // 2b. Authoritative Price & Area-Specific Integrity Check
@@ -489,13 +541,19 @@ export class OrdersService {
 
       // 1. Check if area pricing override exists for this store's area
       if (store.areaId) {
+        const areaIdStr = store.areaId.toString();
+        const areaIdObj = Types.ObjectId.isValid(areaIdStr) ? new Types.ObjectId(areaIdStr) : null;
         const areaPricingQuery: any = {
-          areaId: Types.ObjectId.isValid(store.areaId.toString()) ? new Types.ObjectId(store.areaId.toString()) : store.areaId,
+          $or: areaIdObj ? [{ areaId: areaIdObj }, { areaId: areaIdStr }] : [{ areaId: areaIdStr }],
         };
         if (vId) {
-          areaPricingQuery.variantId = Types.ObjectId.isValid(vId.toString()) ? new Types.ObjectId(vId.toString()) : vId;
+          const vIdStr = vId.toString();
+          const vIdObj = Types.ObjectId.isValid(vIdStr) ? new Types.ObjectId(vIdStr) : null;
+          areaPricingQuery.variantId = { $in: vIdObj ? [vIdObj, vIdStr] : [vIdStr] };
         } else if (prodId) {
-          areaPricingQuery.productId = Types.ObjectId.isValid(prodId.toString()) ? new Types.ObjectId(prodId.toString()) : prodId;
+          const prodIdStr = prodId.toString();
+          const prodIdObj = Types.ObjectId.isValid(prodIdStr) ? new Types.ObjectId(prodIdStr) : null;
+          areaPricingQuery.productId = { $in: prodIdObj ? [prodIdObj, prodIdStr] : [prodIdStr] };
         }
 
         const areaPricingDoc = await this.connection.collection('area_pricing').findOne(areaPricingQuery);
@@ -926,6 +984,7 @@ export class OrdersService {
       deliveryOtp: order.deliveryOtp,
       status: OrderStatus.PLACED,
       userId: resolvedUserIdStr,
+      storeId: order.storeId?.toString?.() || order.storeId,
       order,
     });
     this.trackingGateway.emitOrderCreated(resolvedUserIdStr, order);
@@ -943,6 +1002,70 @@ export class OrdersService {
         newTotal: totalAmount,
         storeName: store.name || 'Serving Dark Store',
       });
+    }
+
+    // Unified scoped notifications: Customer, Store, Admin
+    if (this.notificationService) {
+      const orderIdStr = order._id.toString();
+      const storeIdStr = order.storeId?.toString?.() || (order.storeId as any) || '';
+
+      // 1. Scoped Customer Notification
+      if (resolvedUserIdStr) {
+        this.notificationService.create({
+          recipientType: 'CUSTOMER',
+          recipientId: resolvedUserIdStr,
+          role: 'CUSTOMER',
+          customerId: resolvedUserIdStr,
+          storeId: storeIdStr,
+          orderId: orderIdStr,
+          type: 'ORDER_PLACED',
+          title: '🛒 Order placed successfully',
+          message: `Your WormUp order #${order.orderNumber} has been placed successfully.`,
+          entityType: 'ORDER',
+          entityId: orderIdStr,
+          actionType: 'ORDER_DETAILS',
+          dedupeKey: `ORDER_PLACED:${orderIdStr}:${resolvedUserIdStr}`,
+          metadata: { orderNumber: order.orderNumber, totalAmount: order.totalAmount },
+        }).catch(err => this.logger.warn(`Failed creating ORDER_PLACED notification: ${err.message}`));
+      }
+
+      // 2. Scoped Store Notification (Strictly for this store only)
+      if (storeIdStr) {
+        this.notificationService.create({
+          recipientType: 'STORE',
+          recipientId: storeIdStr,
+          role: 'STORE',
+          storeId: storeIdStr,
+          orderId: orderIdStr,
+          type: 'NEW_ORDER',
+          title: '🛒 New order received',
+          message: `Order #${order.orderNumber} • ₹${order.totalAmount} • ${order.items?.length || 0} items`,
+          entityType: 'ORDER',
+          entityId: orderIdStr,
+          actionType: 'ORDER_DETAILS',
+          dedupeKey: `NEW_ORDER:${orderIdStr}:${storeIdStr}`,
+          metadata: { orderNumber: order.orderNumber, totalAmount: order.totalAmount, itemCount: order.items?.length || 0 },
+        }).catch(err => this.logger.warn(`Failed creating NEW_ORDER notification: ${err.message}`));
+      }
+
+      // 3. Admin Notification for large orders
+      if (order.totalAmount >= 2000) {
+        this.notificationService.create({
+          recipientType: 'ADMIN',
+          recipientId: 'admin',
+          role: 'ADMIN',
+          orderId: orderIdStr,
+          storeId: storeIdStr,
+          type: 'LARGE_ORDER',
+          title: 'High-value order received',
+          message: `High-value order #${order.orderNumber} received for ₹${order.totalAmount}.`,
+          entityType: 'ORDER',
+          entityId: orderIdStr,
+          actionType: 'ORDER_DETAILS',
+          dedupeKey: `LARGE_ORDER:${orderIdStr}`,
+          metadata: { orderNumber: order.orderNumber, totalAmount: order.totalAmount },
+        }).catch(err => this.logger.warn(`Failed creating LARGE_ORDER notification: ${err.message}`));
+      }
     }
 
     this.logger.log(`Order #${orderNumber} placed. Delivery PIN: ${deliveryOtp}. Total: ₹${order.totalAmount}`);
@@ -1014,6 +1137,171 @@ export class OrdersService {
         targetStatus,
         { orderNumber: order.orderNumber, order },
       );
+    }
+
+    // Unified persistent scoped notifications
+    if (this.notificationService) {
+      const orderIdStr = order._id.toString();
+      const custId = order.userId?.toString();
+      const storeIdStr = order.storeId?.toString?.() || (order.storeId as any) || '';
+      const riderIdStr = (order.deliveryPartnerId as any)?._id?.toString() || order.deliveryPartnerId?.toString() || '';
+
+      // 1. Customer notification by status
+      if (custId) {
+        let notifType = '';
+        let notifTitle = '';
+        let notifMsg = '';
+
+        switch (targetStatus) {
+          case OrderStatus.PACKING:
+            notifType = 'ORDER_PACKING';
+            notifTitle = '📦 Your order is being packed';
+            notifMsg = `The dark store is currently packing your order #${order.orderNumber}.`;
+            break;
+          case OrderStatus.PACKED:
+            notifType = 'ORDER_PACKED';
+            notifTitle = '📦 Your order is packed';
+            notifMsg = `Your order #${order.orderNumber} is packed and ready for pickup.`;
+            break;
+          case OrderStatus.ASSIGNED:
+            notifType = 'RIDER_ASSIGNED';
+            notifTitle = '🛵 Rider has been assigned';
+            notifMsg = `A delivery partner has been assigned to your order #${order.orderNumber}.`;
+            break;
+          case OrderStatus.OUT_FOR_DELIVERY:
+            notifType = 'OUT_FOR_DELIVERY';
+            notifTitle = '🛵 Your order is out for delivery';
+            notifMsg = `Your WormUp order #${order.orderNumber} is on the way!`;
+            break;
+          case OrderStatus.ARRIVED_AT_CUSTOMER:
+            notifType = 'RIDER_NEARBY';
+            notifTitle = '📍 Your rider is nearby';
+            notifMsg = `Your delivery partner has arrived with order #${order.orderNumber}.`;
+            break;
+          case OrderStatus.DELIVERED:
+            notifType = 'ORDER_DELIVERED';
+            notifTitle = '✅ Your order has been delivered';
+            notifMsg = `Your order #${order.orderNumber} has been delivered. Enjoy!`;
+            break;
+          case OrderStatus.CANCELLED:
+            notifType = 'ORDER_CANCELLED';
+            notifTitle = '❌ Your order was cancelled';
+            notifMsg = `Your order #${order.orderNumber} was cancelled. ${notes || ''}`;
+            break;
+        }
+
+        if (notifType) {
+          this.notificationService.create({
+            recipientType: 'CUSTOMER',
+            recipientId: custId,
+            role: 'CUSTOMER',
+            customerId: custId,
+            storeId: storeIdStr,
+            orderId: orderIdStr,
+            type: notifType,
+            title: notifTitle,
+            message: notifMsg,
+            entityType: 'ORDER',
+            entityId: orderIdStr,
+            actionType: 'ORDER_DETAILS',
+            dedupeKey: `STATUS_${notifType}:${orderIdStr}:${custId}`,
+            metadata: { orderNumber: order.orderNumber, status: targetStatus },
+          }).catch(err => this.logger.warn(`Failed creating customer status notification: ${err.message}`));
+        }
+      }
+
+      // 2. Store notification (Store isolation: strictly to this store only)
+      if (storeIdStr) {
+        if (targetStatus === OrderStatus.PACKED) {
+          this.notificationService.create({
+            recipientType: 'STORE',
+            recipientId: storeIdStr,
+            role: 'STORE',
+            storeId: storeIdStr,
+            orderId: orderIdStr,
+            type: 'ORDER_READY',
+            title: '✓ Order ready for pickup',
+            message: `Order #${order.orderNumber} is packed and ready for delivery pickup.`,
+            entityType: 'ORDER',
+            entityId: orderIdStr,
+            actionType: 'ORDER_DETAILS',
+            dedupeKey: `STORE_READY:${orderIdStr}:${storeIdStr}`,
+            metadata: { orderNumber: order.orderNumber },
+          }).catch(err => this.logger.warn(`Failed creating store ready notification: ${err.message}`));
+        } else if (targetStatus === OrderStatus.CANCELLED) {
+          this.notificationService.create({
+            recipientType: 'STORE',
+            recipientId: storeIdStr,
+            role: 'STORE',
+            storeId: storeIdStr,
+            orderId: orderIdStr,
+            type: 'ORDER_CANCELLED',
+            title: '❌ Order cancelled',
+            message: `Order #${order.orderNumber} was cancelled.`,
+            entityType: 'ORDER',
+            entityId: orderIdStr,
+            actionType: 'ORDER_DETAILS',
+            dedupeKey: `STORE_CANCELLED:${orderIdStr}:${storeIdStr}`,
+            metadata: { orderNumber: order.orderNumber },
+          }).catch(err => this.logger.warn(`Failed creating store cancelled notification: ${err.message}`));
+        }
+      }
+
+      // 3. Rider notification when delivery is completed or cancelled
+      if (riderIdStr) {
+        if (targetStatus === OrderStatus.DELIVERED) {
+          this.notificationService.create({
+            recipientType: 'RIDER',
+            recipientId: riderIdStr,
+            role: 'RIDER',
+            riderId: riderIdStr,
+            orderId: orderIdStr,
+            type: 'DELIVERY_COMPLETED',
+            title: '✓ Delivery completed',
+            message: `Order #${order.orderNumber} delivered successfully. Earnings updated!`,
+            entityType: 'ORDER',
+            entityId: orderIdStr,
+            actionType: 'DELIVERY_DETAILS',
+            dedupeKey: `RIDER_DELIVERED:${orderIdStr}:${riderIdStr}`,
+            metadata: { orderNumber: order.orderNumber },
+          }).catch(err => this.logger.warn(`Failed creating rider delivered notification: ${err.message}`));
+        } else if (targetStatus === OrderStatus.CANCELLED) {
+          this.notificationService.create({
+            recipientType: 'RIDER',
+            recipientId: riderIdStr,
+            role: 'RIDER',
+            riderId: riderIdStr,
+            orderId: orderIdStr,
+            type: 'DELIVERY_CANCELLED',
+            title: '⚠️ Delivery cancelled',
+            message: `Delivery for order #${order.orderNumber} has been cancelled.`,
+            entityType: 'ORDER',
+            entityId: orderIdStr,
+            actionType: 'DELIVERY_DETAILS',
+            dedupeKey: `RIDER_CANCELLED:${orderIdStr}:${riderIdStr}`,
+            metadata: { orderNumber: order.orderNumber },
+          }).catch(err => this.logger.warn(`Failed creating rider cancelled notification: ${err.message}`));
+        }
+      }
+
+      // 4. Admin notification for critical events (cancellation)
+      if (targetStatus === OrderStatus.CANCELLED) {
+        this.notificationService.create({
+          recipientType: 'ADMIN',
+          recipientId: 'admin',
+          role: 'ADMIN',
+          orderId: orderIdStr,
+          storeId: storeIdStr,
+          type: 'ORDER_CANCELLED',
+          title: 'Order cancellation',
+          message: `Order #${order.orderNumber} was cancelled. ${notes || ''}`,
+          entityType: 'ORDER',
+          entityId: orderIdStr,
+          actionType: 'ORDER_DETAILS',
+          dedupeKey: `ADMIN_CANCELLED:${orderIdStr}`,
+          metadata: { orderNumber: order.orderNumber, notes },
+        }).catch(err => this.logger.warn(`Failed creating admin cancellation notification: ${err.message}`));
+      }
     }
 
     // Auto-trigger Rider Review Prompt when delivered

@@ -1,9 +1,18 @@
 import { Product, FilterSortState, Category, SubCategory, ProductVariantPriced } from '../types';
 import { api } from './api';
 
-// In-memory dynamic cache loaded from MongoDB Atlas backend
+// ---------------------------------------------------------------------------
+// Simple TTL caches (in-memory, process-lifetime)
+// ---------------------------------------------------------------------------
+// Flat in-memory cache (backward-compat, used by synchronous getters)
 let cachedProducts: Product[] = [];
 let cachedCategories: Category[] = [];
+
+let _categoryCacheEntry: { data: Category[]; ts: number } | null = null;
+const CATEGORY_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+const _homeSectionCache = new Map<string, { data: any; ts: number }>();
+const HOME_SECTION_TTL_MS = 30 * 1000; // 30 seconds per store+area combo
 
 export function mapRawItemToProduct(item: any): Product {
   const variants: ProductVariantPriced[] = Array.isArray(item.variants)
@@ -58,7 +67,10 @@ export function mapRawItemToProduct(item: any): Product {
 
 export const ProductService = {
   // --- Live API Methods (Fetching directly from MongoDB Atlas) ---
-  async fetchHomeSections(params: { storeId?: string; areaId?: string } = {}): Promise<{
+  async fetchHomeSections(
+    params: { storeId?: string; areaId?: string } = {},
+    signal?: AbortSignal,
+  ): Promise<{
     hero: any[];
     categories: any[];
     sections: {
@@ -76,10 +88,17 @@ export const ProductService = {
     if (params.storeId) queryParts.push(`storeId=${encodeURIComponent(params.storeId)}`);
     if (params.areaId) queryParts.push(`areaId=${encodeURIComponent(params.areaId)}`);
     const qs = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+    const cacheKey = `home${qs}`;
 
-    const res = await api.get<any>(`/home/sections${qs}`);
+    // Return cached result if still fresh (TTL: 30 seconds per store+area)
+    const cached = _homeSectionCache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < HOME_SECTION_TTL_MS) {
+      return cached.data;
+    }
+
+    const res = await api.request<any>(`/home/sections${qs}`, { method: 'GET', signal });
     if (res.success && res.data?.sections) {
-      return {
+      const result = {
         hero: res.data.hero || [],
         categories: res.data.categories || [],
         sections: res.data.sections.map((sec: any) => ({
@@ -87,8 +106,14 @@ export const ProductService = {
           products: (sec.products || []).map(mapRawItemToProduct),
         })),
       };
+      _homeSectionCache.set(cacheKey, { data: result, ts: Date.now() });
+      return result;
     }
     return null;
+  },
+
+  clearHomeCache() {
+    _homeSectionCache.clear();
   },
 
   async fetchProducts(params: {
@@ -136,6 +161,11 @@ export const ProductService = {
   },
 
   async fetchCategories(): Promise<Category[]> {
+    // Return from TTL cache if still fresh (5 minutes)
+    if (_categoryCacheEntry && Date.now() - _categoryCacheEntry.ts < CATEGORY_TTL_MS) {
+      return _categoryCacheEntry.data;
+    }
+
     const res = await api.get<any[]>('/categories');
     if (res.success && Array.isArray(res.data)) {
       const mapped: Category[] = res.data.map((cat: any) => ({
@@ -146,10 +176,11 @@ export const ProductService = {
         bgColor: cat.bgColor || '#FCE1F5',
         itemCount: cat.itemCount || 0,
       }));
+      _categoryCacheEntry = { data: mapped, ts: Date.now() };
       cachedCategories = mapped;
       return mapped;
     }
-    return cachedCategories;
+    return _categoryCacheEntry?.data || cachedCategories;
   },
 
   async fetchBanners(): Promise<any[]> {

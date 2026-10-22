@@ -127,6 +127,10 @@ interface RiderContextType {
   requestPayout: (amount: number) => Promise<{ success: boolean; message: string }>;
   logout: () => Promise<void>;
 
+  riderUnreadCount: number;
+  setRiderUnreadCount: React.Dispatch<React.SetStateAction<number>>;
+  refreshRiderUnreadCount: () => Promise<void>;
+
   // Modal Setters
   setShowNewRequestModal: (show: boolean) => void;
   setShowRejectModal: (show: boolean) => void;
@@ -163,6 +167,7 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [settlementSummary, setSettlementSummary] = useState<SettlementSummary | null>(null);
   const [bankAccount, setBankAccount] = useState<RiderBankAccount | null>(null);
   const [vehicle, setVehicle] = useState<RiderVehicle | null>(null);
+  const [riderUnreadCount, setRiderUnreadCount] = useState<number>(0);
   const [unreadCount, setUnreadCount] = useState<number>(2);
 
   // Modal Visibility
@@ -210,11 +215,13 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setDetectedAddress(addr);
         await AsyncStorage.setItem('@womup_rider_selected_hub', JSON.stringify(nearest.hub));
       }
-      await refreshAvailableJobs();
+      // B-04 fix: removed refreshAvailableJobs() call here.
+      // Job list is now refreshed independently by the dashboard's duty-aware polling
+      // so that every GPS tick does NOT trigger a backend API request.
     } catch {
       // non-fatal
     }
-  }, [refreshAvailableJobs]);
+  }, []);
 
   const setSimulatedHub = useCallback(async (hub: HubLocation) => {
     try {
@@ -223,6 +230,7 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setDetectedHubName(`${hub.name} (0.1 km away)`);
       setDetectedAddress(hub.address);
       await AsyncStorage.setItem('@womup_rider_selected_hub', JSON.stringify(hub));
+      // Refresh jobs once when the rider manually selects a hub
       await refreshAvailableJobs();
     } catch {
       // non-fatal
@@ -236,19 +244,33 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setCurrentLocation(null);
       setDetectedHubName(null);
       setDetectedAddress(null);
+      // Refresh jobs once when rider clears hub selection
       await refreshAvailableJobs();
     } catch {
       // non-fatal
     }
   }, [refreshAvailableJobs]);
 
-  const refreshDashboard = useCallback(async () => {
+  const isDashboardRefreshingRef = React.useRef(false);
+  const lastDashboardRefreshTimeRef = React.useRef(0);
+
+  const refreshDashboard = useCallback(async (force = false) => {
+    const now = Date.now();
+    // Concurrency & debounce guard: ignore duplicate calls while refresh is already in-flight or called within 2 seconds
+    if (!force && (isDashboardRefreshingRef.current || now - lastDashboardRefreshTimeRef.current < 2000)) return;
+    isDashboardRefreshingRef.current = true;
+    lastDashboardRefreshTimeRef.current = now;
+
     try {
-      const userProfile = await RiderApiService.getProfile();
+      // ── Stage 1: Critical UI Data (Profile + Active Order) ──
+      const [userProfile, currentOrder] = await Promise.all([
+        RiderApiService.getProfile(),
+        RiderApiService.getActiveDelivery().catch(() => null),
+      ]);
+
       setProfile(userProfile);
       setIsOnline(userProfile.isOnline);
 
-      const currentOrder = await RiderApiService.getActiveDelivery();
       if (currentOrder && (currentOrder.orderNumber || currentOrder.id)) {
         setActiveDelivery(currentOrder);
       } else {
@@ -256,51 +278,62 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setActiveDelivery(null);
       }
 
+      // GPS resolution (cached/simulated fallback)
       let coords = LocationTrackerService.getCurrentCoordinates();
       if (!coords) {
-        // Automatically detect GPS or assign nearest dark store hub on launch
-        coords = await LocationTrackerService.detectRealGps();
-        if (!coords) {
-          const savedHubRaw = await AsyncStorage.getItem('@womup_rider_selected_hub');
-          let hub = AHMEDABAD_HUBS[0];
-          if (savedHubRaw) {
-            try {
-              hub = JSON.parse(savedHubRaw);
-            } catch {}
-          }
-          coords = await LocationTrackerService.setSimulatedLocation(hub.latitude, hub.longitude);
+        const savedHubRaw = await AsyncStorage.getItem('@womup_rider_selected_hub');
+        let hub = AHMEDABAD_HUBS[0];
+        if (savedHubRaw) {
+          try { hub = JSON.parse(savedHubRaw); } catch {}
         }
+        coords = await LocationTrackerService.setSimulatedLocation(hub.latitude, hub.longitude);
       }
 
       if (coords) {
         setCurrentLocation(coords);
         const nearest = LocationTrackerService.getNearestHub(coords.latitude, coords.longitude);
         setDetectedHubName(`${nearest.hub.name} (${nearest.distanceKm} km away)`);
-        const addr = await LocationTrackerService.getAddressForCoords(coords.latitude, coords.longitude);
-        setDetectedAddress(addr);
+        LocationTrackerService.getAddressForCoords(coords.latitude, coords.longitude)
+          .then(setDetectedAddress)
+          .catch(() => {});
       }
 
-      await refreshAvailableJobs();
+      // ── Stage 2: Operational Data (Settlement + Jobs only if online) ──
+      const settlementPromise = RiderApiService.getSettlementSummary()
+        .then((sum) => setSettlementSummary(sum))
+        .catch(() => {});
 
-      const sum = await RiderApiService.getSettlementSummary();
-      setSettlementSummary(sum);
+      const jobsPromise = userProfile.isOnline
+        ? refreshAvailableJobs().catch(() => {})
+        : Promise.resolve();
 
-      const bank = await RiderApiService.getBankAccount();
-      setBankAccount(bank);
+      await Promise.all([settlementPromise, jobsPromise]);
 
-      const veh = await RiderApiService.getVehicle();
-      setVehicle(veh);
-
-      const notifs = await RiderApiService.getNotifications();
-      setUnreadCount(notifs.filter((n) => !n.isRead).length);
+      // ── Stage 3: Deferred Non-Critical Data (Bank, Vehicle, Notifications) ──
+      // Staggered by 350ms to keep connection pool free
+      setTimeout(() => {
+        Promise.allSettled([
+          RiderApiService.getBankAccount(),
+          RiderApiService.getVehicle(),
+          RiderApiService.getNotifications(),
+        ]).then(([bank, veh, notifs]) => {
+          if (bank.status === 'fulfilled') setBankAccount(bank.value);
+          if (veh.status === 'fulfilled') setVehicle(veh.value);
+          if (notifs.status === 'fulfilled') {
+            setUnreadCount((notifs.value as any[]).filter((n) => !n.isRead).length);
+          }
+        }).catch(() => {});
+      }, 350);
     } catch (e: any) {
       if (e?.message === 'NOT_AUTHENTICATED' || e?.message === 'SESSION_EXPIRED') {
         await logout();
       } else {
         console.warn('Failed to refresh dashboard data', e);
       }
+    } finally {
+      isDashboardRefreshingRef.current = false;
     }
-  }, []);
+  }, [refreshAvailableJobs]);
 
   const checkSession = useCallback(async () => {
     // Always reset navigation to Home tab and close any modals on app boot/reload
@@ -498,22 +531,6 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setAuthStep('AUTHENTICATED');
   };
 
-  useEffect(() => {
-    // Only check active delivery if authenticated with a real token
-    (async () => {
-      if (await RiderApiService.hasValidToken()) {
-        const active = await RiderApiService.getActiveDelivery();
-        if (!active) {
-          await RiderApiService.clearActiveDelivery();
-          setActiveDelivery(null);
-        }
-      } else {
-        await RiderApiService.clearActiveDelivery();
-        setActiveDelivery(null);
-      }
-    })();
-  }, []);
-
   // AppState Lifecycle: Pause location telemetry in background; resume when active
   useEffect(() => {
     const sub = AppState.addEventListener('change', (nextState: AppStateStatus) => {
@@ -566,19 +583,52 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       reconnectionDelay: 2000,
     });
 
+    const joinAssignedHub = async () => {
+      let targetHubId = profile?.hubId || (profile as any)?.storeId;
+      if (!targetHubId) {
+        try {
+          const savedHubRaw = await AsyncStorage.getItem('@womup_rider_selected_hub');
+          if (savedHubRaw) {
+            const parsed = JSON.parse(savedHubRaw);
+            targetHubId = parsed?.id || parsed?._id;
+          }
+        } catch {}
+      }
+      if (targetHubId) {
+        socket.emit('join_hub', { hubId: targetHubId, partnerId: profile?.id });
+      }
+    };
+
     socket.on('connect', () => {
+      if (profile?.id) {
+        socket.emit('join_rider', { riderId: profile.id });
+      }
+      joinAssignedHub();
       refreshDashboard();
+      RiderApiService.getUnreadNotificationCount().then(setRiderUnreadCount).catch(() => {});
     });
 
     socket.on('reconnect', async () => {
+      if (profile?.id) {
+        socket.emit('join_rider', { riderId: profile.id });
+      }
+      joinAssignedHub();
       try {
         await refreshDashboard();
         const activeJob = await RiderApiService.getActiveDelivery();
         if (activeJob) {
           setActiveDelivery(activeJob);
         }
+        RiderApiService.getUnreadNotificationCount().then(setRiderUnreadCount).catch(() => {});
       } catch {
         // non-fatal
+      }
+    });
+
+    socket.on('notification:new', (notif: any) => {
+      setRiderUnreadCount((prev) => prev + 1);
+      if (notif.type === 'NEW_DELIVERY_REQUEST' || notif.type === 'DELIVERY_ASSIGNED') {
+        refreshAvailableJobs();
       }
     });
 
@@ -594,7 +644,7 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     socket.on('order_status', async (data: any) => {
       const current = activeDeliveryRef.current;
       if (current && data?.orderId && (data.orderId === current.id || data.orderId === (current as any).orderId)) {
-        if (data.status === 'DELIVERED') {
+        if (data.status === 'DELIVERED' || data.status === 'CANCELLED') {
           setActiveDelivery(null);
           setIncomingJobOffer(null);
           await refreshDashboard();
@@ -602,7 +652,72 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     });
 
-    // Stream live rider GPS updates to backend every 1 second during active delivery
+    socket.on('rider_updated', async (data: any) => {
+      try {
+        await refreshDashboard();
+      } catch (_) {}
+    });
+
+    socket.on('rider:updated', async () => {
+      try {
+        await refreshDashboard();
+      } catch (_) {}
+    });
+
+    // Centralized authoritative distance updates from Backend Tracking Gateway
+    socket.on('location_updated', (data: any) => {
+      if (!data) return;
+      const current = activeDeliveryRef.current;
+      const eventOrderId = data.orderId?.toString();
+      const currentOrderId = current ? (current.id || (current as any).orderId || (current as any)._id)?.toString() : null;
+
+      if (
+        current &&
+        eventOrderId &&
+        (eventOrderId === currentOrderId ||
+          eventOrderId.replace(/^#/, '') === currentOrderId?.replace(/^#/, '') ||
+          eventOrderId === current.orderNumber ||
+          eventOrderId.replace(/^#/, '') === current.orderNumber?.replace(/^#/, ''))
+      ) {
+        setActiveDelivery((prev: any) => {
+          if (!prev) return null;
+          const distToStore = data.distanceToStore !== undefined ? Number(data.distanceToStore) : prev.distanceToStoreKm;
+          const distToCustomer = data.distanceToCustomer !== undefined ? Number(data.distanceToCustomer) : (data.distanceKm !== undefined ? Number(data.distanceKm) : prev.distanceKm);
+          const eta = data.eta !== undefined ? Number(data.eta) : (data.etaMinutes !== undefined ? Number(data.etaMinutes) : prev.etaMinutes);
+          return {
+            ...prev,
+            distanceKm: distToCustomer,
+            distanceToStoreKm: distToStore,
+            etaMinutes: eta,
+          };
+        });
+      }
+
+      // Sync incoming job offer if matches
+      setIncomingJobOffer((prevOffer: any) => {
+        if (!prevOffer) return null;
+        const offerId = (prevOffer.id || prevOffer.orderId)?.toString();
+        if (
+          offerId &&
+          eventOrderId &&
+          (eventOrderId === offerId ||
+            eventOrderId.replace(/^#/, '') === offerId.replace(/^#/, '') ||
+            eventOrderId === prevOffer.orderNumber ||
+            eventOrderId.replace(/^#/, '') === prevOffer.orderNumber?.replace(/^#/, ''))
+        ) {
+          const distToStore = data.distanceToStore !== undefined ? Number(data.distanceToStore) : prevOffer.distanceToStoreKm;
+          const distToCustomer = data.distanceToCustomer !== undefined ? Number(data.distanceToCustomer) : (data.distanceKm !== undefined ? Number(data.distanceKm) : prevOffer.distanceKm);
+          return {
+            ...prevOffer,
+            distanceKm: distToCustomer,
+            distanceToStoreKm: distToStore,
+          };
+        }
+        return prevOffer;
+      });
+    });
+
+    // Stream live rider GPS updates to backend every 10 seconds during active delivery
     const locationInterval = setInterval(() => {
       const current = activeDeliveryRef.current;
       if (!current || !socket.connected) return;
@@ -627,14 +742,16 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           heading: coords.heading ?? 0,
         };
 
-        // Emit via both standard event names for maximum cross-gateway compatibility
+        // Emit via all standard event names for maximum cross-gateway compatibility
         socket.emit('update_rider_location', payload);
         socket.emit('rider_location_update', payload);
+        socket.emit('update_delivery_location', payload);
 
         const cleanOrderId = typeof orderId === 'string' ? orderId.replace(/^#/, '') : orderId;
         if (cleanOrderId !== orderId) {
           socket.emit('update_rider_location', { ...payload, orderId: cleanOrderId });
           socket.emit('rider_location_update', { ...payload, orderId: cleanOrderId });
+          socket.emit('update_delivery_location', { ...payload, orderId: cleanOrderId });
         }
       }
     }, 10000); // Efficient 10s WebSocket cadence - minimizes battery & server load
@@ -851,6 +968,12 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         clearSelectedHub,
         settlementSummary,
         bankAccount,
+        riderUnreadCount,
+        setRiderUnreadCount,
+        refreshRiderUnreadCount: async () => {
+          const count = await RiderApiService.getUnreadNotificationCount();
+          setRiderUnreadCount(count);
+        },
         vehicle,
         unreadCount,
         showNewRequestModal,

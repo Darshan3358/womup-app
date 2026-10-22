@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   ViewStyle,
   TextStyle,
+  StyleProp,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GRADIENTS, COLORS } from '../../theme/colors';
@@ -17,8 +18,8 @@ interface GradientButtonProps {
   gradient?: readonly [string, string, ...string[]];
   disabled?: boolean;
   loading?: boolean;
-  style?: ViewStyle;
-  textStyle?: TextStyle;
+  style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
   icon?: React.ReactNode;
 }
 

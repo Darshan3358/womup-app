@@ -397,6 +397,16 @@ export const OrdersScreen: React.FC = () => {
                   </View>
                 </View>
 
+                {Boolean(order.distanceToCustomer || order.distanceKm || order.distanceToStore) && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0FDF4', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, marginHorizontal: 12, marginTop: 6, alignSelf: 'flex-start' }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#15803D' }}>
+                      🛵 {order.status === 'Ready for Dispatch' && order.distanceToStore
+                        ? `Rider is ${order.distanceToStore} km from store`
+                        : `Rider is ${order.distanceToCustomer || order.distanceKm} km from customer${order.eta ? ` · ETA ${order.eta}` : ''}`}
+                    </Text>
+                  </View>
+                )}
+
                 {/* Amount & Items Row */}
                 <View style={styles.orderBody}>
                   <View style={{ flex: 1 }}>

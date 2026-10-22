@@ -106,10 +106,10 @@ export const NewDeliveryModal: React.FC = () => {
               <View style={styles.routeStep}>
                 <View style={[styles.stepDot, styles.pickupDot]} />
                 <View style={styles.stepInfo}>
-                  <Text style={styles.stepLabel}>PICKUP FROM DARK STORE</Text>
-                  <Text style={styles.stepName}>{offer.storeName}</Text>
-                  <Text style={styles.stepAddress} numberOfLines={2}>
-                    {offer.storeAddress}
+                  <Text style={styles.stepLabel}>PICKUP FROM DARK STORE / VENDOR</Text>
+                  <Text style={styles.stepName}>{offer.storeName || 'Dark Store'}</Text>
+                  <Text style={[styles.stepAddress, { color: COLORS.textPrimary, lineHeight: 18, marginTop: 4 }]}>
+                    {offer.storeAddress || 'Store address details'}
                   </Text>
                 </View>
               </View>
@@ -121,9 +121,9 @@ export const NewDeliveryModal: React.FC = () => {
                 <View style={[styles.stepDot, styles.dropDot]} />
                 <View style={styles.stepInfo}>
                   <Text style={styles.stepLabel}>DELIVER TO CUSTOMER</Text>
-                  <Text style={styles.stepName}>{offer.customerName}</Text>
-                  <Text style={styles.stepAddress} numberOfLines={2}>
-                    {offer.customerAddress}
+                  <Text style={styles.stepName}>{offer.customerName || 'Customer'}</Text>
+                  <Text style={[styles.stepAddress, { color: COLORS.textPrimary, lineHeight: 18, marginTop: 4 }]}>
+                    {offer.customerAddress || 'Customer address details'}
                   </Text>
                 </View>
               </View>

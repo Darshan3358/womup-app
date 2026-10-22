@@ -15,6 +15,9 @@ export class VendorTransaction {
   customerId?: Types.ObjectId;
 
   @Prop({ required: false })
+  customerName?: string;
+
+  @Prop({ required: false })
   customerPhone?: string;
 
   @Prop({ required: true, unique: true })

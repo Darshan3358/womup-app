@@ -11,7 +11,7 @@ export interface RouteData {
 
 class RouteService {
   private cache = new Map<string, { data: RouteData; ts: number }>();
-  private readonly CACHE_TTL_MS = 30000; // 30 seconds
+  private readonly CACHE_TTL_MS = 300000; // 5 minutes
 
   async getRoute(
     fromLat: number,
@@ -19,7 +19,7 @@ class RouteService {
     toLat: number,
     toLng: number,
   ): Promise<RouteData> {
-    const cacheKey = `${fromLat.toFixed(4)},${fromLng.toFixed(4)}_${toLat.toFixed(4)},${toLng.toFixed(4)}`;
+    const cacheKey = `${fromLat.toFixed(3)},${fromLng.toFixed(3)}_${toLat.toFixed(3)},${toLng.toFixed(3)}`;
     const cached = this.cache.get(cacheKey);
     if (cached && Date.now() - cached.ts < this.CACHE_TTL_MS) {
       return cached.data;
@@ -30,10 +30,13 @@ class RouteService {
         ? window.location.hostname
         : 'localhost';
 
-    // 1. Try Backend Route Proxy
+    // 1. Try Backend Route Proxy with bounded 2500ms timeout
     try {
       const url = `http://${host}:5050/api/v1/tracking/route?from=${fromLat},${fromLng}&to=${toLat},${toLng}`;
-      const res = await fetch(url);
+      const controller = new AbortController();
+      const tId = setTimeout(() => controller.abort(), 2500);
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(tId);
       if (res.ok) {
         const json = await res.json();
         if (json.success && json.data && json.data.coordinates?.length) {

@@ -27,6 +27,7 @@ export interface AwaitingVerificationProps {
   paymentMethod: string;
   onVerified: (newBalance?: number, coinsUsed?: number, cashPaid?: number) => void;
   onCancelledOrRejected: () => void;
+  onViewOrders?: () => void;
 }
 
 export const AwaitingVendorVerificationScreen: React.FC<AwaitingVerificationProps> = ({
@@ -39,6 +40,7 @@ export const AwaitingVendorVerificationScreen: React.FC<AwaitingVerificationProp
   paymentMethod,
   onVerified,
   onCancelledOrRejected,
+  onViewOrders,
 }) => {
   const insets = useSafeAreaInsets();
   const { user, setUser } = useApp();
@@ -270,12 +272,25 @@ export const AwaitingVendorVerificationScreen: React.FC<AwaitingVerificationProp
               </View>
             </View>
 
+            {onViewOrders && (
+              <TouchableOpacity
+                style={[styles.doneBtn, { backgroundColor: '#10B981', marginBottom: 10 }]}
+                activeOpacity={0.85}
+                onPress={() => {
+                  onVerified(finalNewCoins, coinsUsed, cashToCollect);
+                  onViewOrders();
+                }}
+              >
+                <Text style={styles.doneBtnText}>View in Orders 🧾</Text>
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity
-              style={styles.doneBtn}
+              style={[styles.doneBtn, onViewOrders ? { backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#CBD5E1' } : {}]}
               activeOpacity={0.85}
               onPress={() => onVerified(finalNewCoins, coinsUsed, cashToCollect)}
             >
-              <Text style={styles.doneBtnText}>Done</Text>
+              <Text style={[styles.doneBtnText, onViewOrders ? { color: '#334155' } : {}]}>Done</Text>
             </TouchableOpacity>
           </View>
         </View>

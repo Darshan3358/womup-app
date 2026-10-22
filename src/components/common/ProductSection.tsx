@@ -1,12 +1,14 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   Image,
   TouchableOpacity,
-  ScrollView,
+  FlatList,
   StyleSheet,
   useWindowDimensions,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ChevronRight } from 'lucide-react-native';
@@ -15,6 +17,7 @@ import { SECTION_ICONS } from '../../theme/sectionIcons';
 import { BlinkitProduct } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { ProductSectionSkeleton } from './Skeleton';
+import { resolveImageThumbnail } from '../../utils/imageUrl';
 
 export interface ProductSectionProps {
   id?: string;
@@ -30,7 +33,7 @@ export interface ProductSectionProps {
   isLoading?: boolean;
 }
 
-export const ProductSection: React.FC<ProductSectionProps> = ({
+const ProductSectionComponent: React.FC<ProductSectionProps> = ({
   id,
   iconName,
   title,
@@ -46,16 +49,19 @@ export const ProductSection: React.FC<ProductSectionProps> = ({
   const { width } = useWindowDimensions();
   const { getBlinkitQty, updateBlinkitQty, isInWishlist, toggleWishlist, currentAreaName } = useApp();
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
+  const [pickerProduct, setPickerProduct] = useState<BlinkitProduct | null>(null);
+
+  // Stable callback so each card's variant-select handler doesn't cause re-renders
+  const handleSelectVariant = useCallback((itemId: string, variantId: string) => {
+    setSelectedVariants((prev) => ({ ...prev, [itemId]: variantId }));
+  }, []);
 
   const isSmall = width < 500;
 
   // Resolve Lucide SVG icon configuration from central theme
   const iconConfig = SECTION_ICONS[iconName || id || ''] || null;
 
-  // Responsive card width calculation:
-  // Mobile (375-430px): ~92-105px (3.5 to 4 cards peeking)
-  // Small (<375px): ~86px
-  // Tablet/Desktop (680px+): ~130-150px
+  // Responsive card width calculation
   let cardWidth = 98;
   if (width >= 1200) {
     cardWidth = Math.floor((Math.min(width, 1440) - 48) / 6.2);
@@ -70,15 +76,222 @@ export const ProductSection: React.FC<ProductSectionProps> = ({
   }
 
   const isCompact = cardWidth <= 115;
-  const scrollRef = useRef<ScrollView>(null);
-  const [scrollX, setScrollX] = useState(0);
+  // Gap between cards (matches cardsScrollContent gap style)
+  const CARD_GAP = 10;
+  const flatListRef = useRef<FlatList<BlinkitProduct>>(null);
+  const [visibleIndex, setVisibleIndex] = useState(0);
 
-  const handleScrollStep = (dir: 'left' | 'right') => {
-    const step = cardWidth * 3 + 20;
-    const nextX = dir === 'left' ? Math.max(0, scrollX - step) : scrollX + step;
-    scrollRef.current?.scrollTo({ x: nextX, animated: true });
-    setScrollX(nextX);
-  };
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: any[] }) => {
+    if (viewableItems.length > 0 && viewableItems[0].index != null) {
+      setVisibleIndex(viewableItems[0].index);
+    }
+  }).current;
+
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
+
+  const totalProducts = products?.length || 0;
+  const handleScrollStep = useCallback((dir: 'left' | 'right') => {
+    if (totalProducts === 0) return;
+    const step = 3;
+    const nextIndex = dir === 'left'
+      ? Math.max(0, visibleIndex - step)
+      : Math.min(totalProducts - 1, visibleIndex + step);
+    flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true, viewPosition: 0 });
+    setVisibleIndex(nextIndex);
+  }, [visibleIndex, totalProducts]);
+
+  // O(1) item layout — required for scrollToIndex to work correctly
+  const getItemLayout = useCallback((_: any, index: number) => ({
+    length: cardWidth + CARD_GAP,
+    offset: (cardWidth + CARD_GAP) * index + 16, // 16px left padding
+    index,
+  }), [cardWidth]);
+
+  // Render a single product card — extracted for FlatList renderItem memoisation
+  const renderCard = useCallback(({ item }: { item: BlinkitProduct }) => {
+    const itemVariants = item.variants && item.variants.length > 0 ? item.variants : [];
+    const defaultVariant = itemVariants.find((v) => v.isDefault) || itemVariants[0];
+    const selectedVariantId = selectedVariants[item.id] || defaultVariant?.id || null;
+    const activeVariant = itemVariants.find((v) => v.id === selectedVariantId) || defaultVariant;
+
+    let currentSellingPrice = activeVariant ? activeVariant.price : item.sellingPrice;
+    let currentMrp = activeVariant ? activeVariant.mrp : item.mrp;
+    let currentPackSize = activeVariant ? activeVariant.label : item.packSize;
+
+    const discountPercent =
+      currentMrp > currentSellingPrice
+        ? Math.round(((currentMrp - currentSellingPrice) / currentMrp) * 100)
+        : 0;
+
+    const isWishlisted = isInWishlist(item.id);
+    const quantity = getBlinkitQty(item.id, activeVariant?.id);
+
+    const getProductPayload = (): BlinkitProduct => ({
+      ...item,
+      sellingPrice: currentSellingPrice,
+      mrp: currentMrp,
+      packSize: currentPackSize,
+      selectedVariantId: activeVariant?.id,
+    });
+
+    return (
+      <View
+        style={[
+          styles.productCard,
+          { width: cardWidth },
+          isCompact && { padding: 6, borderRadius: 10 },
+        ]}
+      >
+        {/* Discount Badge & Wishlist Heart */}
+        {discountPercent > 0 ? (
+          <View
+            style={[
+              styles.discountBadge,
+              isCompact && { top: 4, left: 4, paddingHorizontal: 4, paddingVertical: 1 },
+            ]}
+          >
+            <Text style={[styles.discountText, isCompact && { fontSize: 7.5 }]}>
+              {discountPercent}% OFF
+            </Text>
+          </View>
+        ) : null}
+
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => toggleWishlist(item)}
+          style={[
+            styles.wishlistButton,
+            isCompact && { top: 4, right: 4, width: 22, height: 22, borderRadius: 11 },
+          ]}
+          accessibilityLabel="Wishlist"
+        >
+          <Ionicons
+            name={isWishlisted ? 'heart' : 'heart-outline'}
+            size={isCompact ? 12 : 14}
+            color={isWishlisted ? COLORS.hotPink : '#9296A7'}
+          />
+        </TouchableOpacity>
+
+        {/* Product Image */}
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => onOpenProduct(getProductPayload())}
+          style={[
+            styles.imageWrapper,
+            { width: '100%', aspectRatio: 1 },
+            isCompact && { marginBottom: 6 },
+          ]}
+        >
+          <Image
+            source={{ uri: resolveImageThumbnail(item.imageUrl) }}
+            style={styles.productImage}
+            resizeMode="cover"
+          />
+        </TouchableOpacity>
+
+        {/* Product Name */}
+        <TouchableOpacity activeOpacity={0.9} onPress={() => onOpenProduct(getProductPayload())}>
+          <Text
+            style={[
+              styles.productName,
+              isCompact && { fontSize: 10.5, lineHeight: 13, minHeight: 26 },
+            ]}
+            numberOfLines={2}
+          >
+            {item.name}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Rating + Delivery ETA */}
+        <View style={[styles.ratingRow, isCompact && { marginTop: 2, marginBottom: 4, gap: 2 }]}>
+          <Ionicons name="star" size={isCompact ? 9 : 11} color="#F59E0B" />
+          <Text style={[styles.ratingText, isCompact && { fontSize: 8.5 }]}>
+            {item.rating || 4.8}
+          </Text>
+          <Text style={styles.dotSeparator}>•</Text>
+          <Text style={[styles.etaText, isCompact && { fontSize: 8 }]}>
+            {item.deliveryMinutes || 9}m
+          </Text>
+        </View>
+
+        {/* Variant Dropdown or single packSize */}
+        {itemVariants.length > 1 ? (
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => setPickerProduct(item)}
+            style={[
+              styles.variantDropdownTrigger,
+              isCompact && { paddingHorizontal: 5, height: 20 },
+            ]}
+          >
+            <Text
+              style={[
+                styles.variantDropdownText,
+                isCompact && { fontSize: 8.5 },
+              ]}
+              numberOfLines={1}
+            >
+              {activeVariant?.label || currentPackSize || 'Select Unit'}
+            </Text>
+            <Ionicons name="chevron-down" size={isCompact ? 9 : 11} color="#4F46E5" />
+          </TouchableOpacity>
+        ) : (
+          <Text style={[styles.packSizeText, isCompact && { fontSize: 9 }]} numberOfLines={1}>
+            {currentPackSize || '1 unit'}
+          </Text>
+        )}
+
+        {/* Price & Action Row */}
+        <View style={[styles.actionRow, isCompact && { marginTop: 4 }]}>
+          <View style={styles.priceColumn}>
+            <Text style={[styles.sellingPrice, isCompact && { fontSize: 11.5 }]}>
+              ₹{currentSellingPrice}
+            </Text>
+            {currentMrp > currentSellingPrice ? (
+              <Text style={[styles.mrpText, isCompact && { fontSize: 8.5 }]}>₹{currentMrp}</Text>
+            ) : null}
+          </View>
+
+          {quantity > 0 ? (
+            <View style={[styles.stepperContainer, isCompact && { paddingHorizontal: 2, height: 26 }]}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => updateBlinkitQty(getProductPayload(), -1, activeVariant?.id)}
+                style={styles.stepperBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+              >
+                <Ionicons name="remove" size={isCompact ? 10 : 13} color="#FFFFFF" />
+              </TouchableOpacity>
+              <Text style={[styles.stepperQtyText, isCompact && { fontSize: 10, minWidth: 12 }]}>
+                {quantity}
+              </Text>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => updateBlinkitQty(getProductPayload(), 1, activeVariant?.id)}
+                style={styles.stepperBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+              >
+                <Ionicons name="add" size={isCompact ? 10 : 13} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => updateBlinkitQty(getProductPayload(), 1, activeVariant?.id)}
+              style={[styles.addButton, isCompact && { height: 25, paddingHorizontal: 8 }]}
+              accessibilityLabel={`Add ${item.name}`}
+            >
+              <Text style={[styles.addButtonText, isCompact && { fontSize: 10 }]}>ADD</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    );
+  }, [selectedVariants, cardWidth, isCompact, currentAreaName,
+      getBlinkitQty, updateBlinkitQty, isInWishlist, toggleWishlist,
+      onOpenProduct, handleSelectVariant]);
+
+  const IconComponent = iconConfig?.icon;
 
   if (isLoading) {
     return <ProductSectionSkeleton title={title} subtitle={subtitle} />;
@@ -88,11 +301,9 @@ export const ProductSection: React.FC<ProductSectionProps> = ({
     return null;
   }
 
-  const IconComponent = iconConfig?.icon;
-
   return (
     <View style={styles.sectionContainer}>
-      {/* Section Header with Professional Icon Badge */}
+      {/* Section Header */}
       <View style={styles.headerRow}>
         <View style={styles.headerLeftGroup}>
           {iconConfig && IconComponent ? (
@@ -114,15 +325,12 @@ export const ProductSection: React.FC<ProductSectionProps> = ({
               {title}
             </Text>
             {subtitle ? (
-              <Text style={styles.sectionSubtitle} numberOfLines={1}>
-                {subtitle}
-              </Text>
+              <Text style={styles.sectionSubtitle} numberOfLines={1}>{subtitle}</Text>
             ) : null}
           </View>
         </View>
 
         <View style={styles.headerRightWrap}>
-          {/* Arrow buttons for tablet/desktop */}
           {!isSmall && products.length > 4 && (
             <View style={styles.arrowsWrap}>
               <TouchableOpacity
@@ -156,241 +364,118 @@ export const ProductSection: React.FC<ProductSectionProps> = ({
         </View>
       </View>
 
-      {/* Horizontal Carousel */}
-      <ScrollView
-        ref={scrollRef}
+      {/* Horizontal product rail — virtualised */}
+      <FlatList
+        ref={flatListRef}
+        data={products}
         horizontal
+        keyExtractor={(item) => item.id}
+        renderItem={renderCard}
+        getItemLayout={getItemLayout}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.cardsScrollContent}
-        onScroll={(e) => setScrollX(e.nativeEvent.contentOffset.x)}
-        scrollEventThrottle={32}
-      >
-        {products.map((item) => {
-          const itemVariants = item.variants && item.variants.length > 0 ? item.variants : [];
-          const defaultVariant = itemVariants.find((v) => v.isDefault) || itemVariants[0];
-          const selectedVariantId = selectedVariants[item.id] || defaultVariant?.id || null;
-          const activeVariant =
-            itemVariants.find((v) => v.id === selectedVariantId) || defaultVariant;
+        initialNumToRender={4}
+        maxToRenderPerBatch={2}
+        windowSize={3}
+        removeClippedSubviews={true}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
+      />
 
-          let currentSellingPrice = activeVariant ? activeVariant.price : item.sellingPrice;
-          let currentMrp = activeVariant ? activeVariant.mrp : item.mrp;
-          let currentPackSize = activeVariant ? activeVariant.label : item.packSize;
-
-          if (!activeVariant && item.name.toLowerCase().includes('tomato')) {
-            const isThaltej = (currentAreaName || '').toLowerCase().includes('thaltej');
-            const isChandlodiya =
-              (currentAreaName || '').toLowerCase().includes('chandlodiya') ||
-              (currentAreaName || '').toLowerCase().includes('tragad');
-            if (isThaltej) {
-              currentSellingPrice = 12;
-              currentMrp = 15;
-            } else if (isChandlodiya) {
-              currentSellingPrice = 7;
-              currentMrp = 15;
-            }
-          }
-          const discountPercent =
-            currentMrp > currentSellingPrice
-              ? Math.round(((currentMrp - currentSellingPrice) / currentMrp) * 100)
-              : 0;
-
-          const isWishlisted = isInWishlist(item.id);
-          const quantity = getBlinkitQty(item.id, activeVariant?.id);
-
-          const getProductPayload = (): BlinkitProduct => ({
-            ...item,
-            sellingPrice: currentSellingPrice,
-            mrp: currentMrp,
-            packSize: currentPackSize,
-            selectedVariantId: activeVariant?.id,
-          });
-
-          return (
-            <View
-              key={item.id}
-              style={[
-                styles.productCard,
-                { width: cardWidth },
-                isCompact && { padding: 6, borderRadius: 10 },
-              ]}
+      {/* Variant Selector Dropdown Modal */}
+      {pickerProduct ? (
+        <Modal
+          visible={!!pickerProduct}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setPickerProduct(null)}
+        >
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setPickerProduct(null)}
+          >
+            <Pressable
+              style={styles.modalContent}
+              onPress={(e: any) => e?.stopPropagation?.()}
             >
-              {/* Discount Badge & Wishlist Heart */}
-              {discountPercent > 0 ? (
-                <View
-                  style={[
-                    styles.discountBadge,
-                    isCompact && { top: 4, left: 4, paddingHorizontal: 4, paddingVertical: 1 },
-                  ]}
-                >
-                  <Text style={[styles.discountText, isCompact && { fontSize: 7.5 }]}>
-                    {discountPercent}% OFF
+              <View style={styles.modalHeader}>
+                <View style={styles.modalHeaderInfo}>
+                  <Text style={styles.modalTitle} numberOfLines={1}>
+                    {pickerProduct.name}
                   </Text>
+                  <Text style={styles.modalSubtitle}>Select Pack Size</Text>
                 </View>
-              ) : null}
-
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => toggleWishlist(item)}
-                style={[
-                  styles.wishlistButton,
-                  isCompact && { top: 4, right: 4, width: 22, height: 22, borderRadius: 11 },
-                ]}
-                accessibilityLabel="Wishlist"
-              >
-                <Ionicons
-                  name={isWishlisted ? 'heart' : 'heart-outline'}
-                  size={isCompact ? 12 : 14}
-                  color={isWishlisted ? COLORS.hotPink : '#9296A7'}
-                />
-              </TouchableOpacity>
-
-              {/* Product Image */}
-              <TouchableOpacity
-                activeOpacity={0.9}
-                onPress={() => onOpenProduct(getProductPayload())}
-                style={[
-                  styles.imageWrapper,
-                  { width: '100%', aspectRatio: 1 },
-                  isCompact && { marginBottom: 6 },
-                ]}
-              >
-                <Image
-                  source={{ uri: item.imageUrl }}
-                  style={styles.productImage}
-                  resizeMode="cover"
-                />
-              </TouchableOpacity>
-
-              {/* Product Name */}
-              <TouchableOpacity
-                activeOpacity={0.9}
-                onPress={() => onOpenProduct(getProductPayload())}
-              >
-                <Text
-                  style={[
-                    styles.productName,
-                    isCompact && { fontSize: 10.5, lineHeight: 13, minHeight: 26 },
-                  ]}
-                  numberOfLines={2}
+                <TouchableOpacity
+                  onPress={() => setPickerProduct(null)}
+                  style={styles.modalCloseBtn}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                  {item.name}
-                </Text>
-              </TouchableOpacity>
-
-              {/* Rating + Delivery ETA */}
-              <View
-                style={[
-                  styles.ratingRow,
-                  isCompact && { marginTop: 2, marginBottom: 4, gap: 2 },
-                ]}
-              >
-                <Ionicons name="star" size={isCompact ? 9 : 11} color="#F59E0B" />
-                <Text style={[styles.ratingText, isCompact && { fontSize: 8.5 }]}>
-                  {item.rating || 4.8}
-                </Text>
-                <Text style={styles.dotSeparator}>•</Text>
-                <Text style={[styles.etaText, isCompact && { fontSize: 8 }]}>
-                  {item.deliveryMinutes || 9}m
-                </Text>
+                  <Ionicons name="close" size={20} color="#64748B" />
+                </TouchableOpacity>
               </View>
 
-              {/* Variant Pills (if multiple) or single packSize */}
-              {itemVariants.length > 1 ? (
-                <View style={styles.variantScrollWrap}>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.variantScrollContent}
-                  >
-                    {itemVariants.map((v) => {
-                      const isSel = v.id === (activeVariant?.id || defaultVariant?.id);
-                      return (
-                        <TouchableOpacity
-                          key={v.id}
-                          activeOpacity={0.7}
-                          onPress={() =>
-                            setSelectedVariants((prev) => ({ ...prev, [item.id]: v.id }))
-                          }
+              <View style={styles.variantOptionsList}>
+                {(pickerProduct.variants || []).map((v) => {
+                  const currentSelectedId =
+                    selectedVariants[pickerProduct.id] ||
+                    (pickerProduct.variants?.find((pv) => pv.isDefault) || pickerProduct.variants?.[0])?.id;
+                  const isSelected = v.id === currentSelectedId;
+                  return (
+                    <TouchableOpacity
+                      key={v.id}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        handleSelectVariant(pickerProduct.id, v.id);
+                        setPickerProduct(null);
+                      }}
+                      style={[
+                        styles.variantOptionRow,
+                        isSelected && styles.variantOptionRowSelected,
+                      ]}
+                    >
+                      <View style={styles.variantOptionLeft}>
+                        <View
                           style={[
-                            styles.variantChip,
-                            isSel && styles.variantChipSelected,
-                            isCompact && { paddingHorizontal: 3, paddingVertical: 1 },
+                            styles.radioCircle,
+                            isSelected && styles.radioCircleSelected,
                           ]}
                         >
-                          <Text
-                            style={[
-                              styles.variantChipText,
-                              isSel && styles.variantChipTextSelected,
-                              isCompact && { fontSize: 7.5 },
-                            ]}
-                            numberOfLines={1}
-                          >
-                            {v.label}
+                          {isSelected && <View style={styles.radioDot} />}
+                        </View>
+                        <Text
+                          style={[
+                            styles.variantOptionLabel,
+                            isSelected && styles.variantOptionLabelSelected,
+                          ]}
+                        >
+                          {v.label}
+                        </Text>
+                      </View>
+
+                      <View style={styles.variantOptionRight}>
+                        <Text style={styles.variantOptionPrice}>
+                          ₹{v.price}
+                        </Text>
+                        {v.mrp > v.price && (
+                          <Text style={styles.variantOptionMrp}>
+                            ₹{v.mrp}
                           </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-                </View>
-              ) : (
-                <Text style={[styles.packSizeText, isCompact && { fontSize: 9 }]} numberOfLines={1}>
-                  {currentPackSize || '1 unit'}
-                </Text>
-              )}
-
-              {/* Price & Action Row */}
-              <View style={[styles.actionRow, isCompact && { marginTop: 4 }]}>
-                <View style={styles.priceColumn}>
-                  <Text style={[styles.sellingPrice, isCompact && { fontSize: 11.5 }]}>
-                    ₹{currentSellingPrice}
-                  </Text>
-                  {currentMrp > currentSellingPrice ? (
-                    <Text style={[styles.mrpText, isCompact && { fontSize: 8.5 }]}>
-                      ₹{currentMrp}
-                    </Text>
-                  ) : null}
-                </View>
-
-                {quantity > 0 ? (
-                  <View style={[styles.stepperContainer, isCompact && { paddingHorizontal: 2, height: 26 }]}>
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      onPress={() => updateBlinkitQty(getProductPayload(), -1, activeVariant?.id)}
-                      style={styles.stepperBtn}
-                      hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-                    >
-                      <Ionicons name="remove" size={isCompact ? 10 : 13} color="#FFFFFF" />
+                        )}
+                      </View>
                     </TouchableOpacity>
-                    <Text style={[styles.stepperQtyText, isCompact && { fontSize: 10, minWidth: 12 }]}>
-                      {quantity}
-                    </Text>
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      onPress={() => updateBlinkitQty(getProductPayload(), 1, activeVariant?.id)}
-                      style={styles.stepperBtn}
-                      hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-                    >
-                      <Ionicons name="add" size={isCompact ? 10 : 13} color="#FFFFFF" />
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    onPress={() => updateBlinkitQty(getProductPayload(), 1, activeVariant?.id)}
-                    style={[styles.addButton, isCompact && { height: 25, paddingHorizontal: 8 }]}
-                    accessibilityLabel={`Add ${item.name}`}
-                  >
-                    <Text style={[styles.addButtonText, isCompact && { fontSize: 10 }]}>ADD</Text>
-                  </TouchableOpacity>
-                )}
+                  );
+                })}
               </View>
-            </View>
-          );
-        })}
-      </ScrollView>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      ) : null}
     </View>
   );
 };
+
+// F-09: Memoize to prevent re-renders when parent (BlinkitHomeScreen) state changes
+export const ProductSection = React.memo(ProductSectionComponent);
 
 const styles = StyleSheet.create({
   sectionContainer: {
@@ -653,5 +738,136 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textAlign: 'center',
     minWidth: 14,
+  },
+  variantDropdownTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    height: 22,
+    marginBottom: 4,
+    width: '100%',
+  },
+  variantDropdownText: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: '#4338CA',
+    flex: 1,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    marginBottom: 12,
+  },
+  modalHeaderInfo: {
+    flex: 1,
+    marginRight: 8,
+  },
+  modalTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  modalSubtitle: {
+    fontSize: 11.5,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  modalCloseBtn: {
+    padding: 4,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
+  },
+  variantOptionsList: {
+    gap: 8,
+  },
+  variantOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+  },
+  variantOptionRowSelected: {
+    borderColor: '#6366F1',
+    backgroundColor: '#EEF2FF',
+  },
+  variantOptionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  radioCircle: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioCircleSelected: {
+    borderColor: '#6366F1',
+  },
+  radioDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+    backgroundColor: '#6366F1',
+  },
+  variantOptionLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  variantOptionLabelSelected: {
+    color: '#4338CA',
+    fontWeight: '700',
+  },
+  variantOptionRight: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+  },
+  variantOptionPrice: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  variantOptionMrp: {
+    fontSize: 11,
+    color: '#94A3B8',
+    textDecorationLine: 'line-through',
   },
 });

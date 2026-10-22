@@ -12,10 +12,16 @@ import { COLORS } from '../theme/colors';
 import { SPACING, RADIUS } from '../theme/spacing';
 import { GradientButton } from '../components/common/GradientButton';
 import { useApp } from '../context/AppContext';
+import { StorageService } from '../services/storageService';
 
 export const S05_Onboarding4Screen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { setActiveScreen, goBack, handleOnboardingSkip } = useApp();
+
+  const handleGetStarted = async () => {
+    await StorageService.saveItem(StorageService.KEYS.ONBOARDING_DONE, true);
+    setActiveScreen('Blinkit_Home');
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 20 }]}>
@@ -57,7 +63,7 @@ export const S05_Onboarding4Screen: React.FC = () => {
 
         <GradientButton
           title="Get Started"
-          onPress={() => setActiveScreen('C06_MobileNumber')}
+          onPress={handleGetStarted}
           style={styles.ctaButton}
         />
       </View>

@@ -10,8 +10,47 @@ import {
 import { Server, Socket } from 'socket.io';
 import { Logger, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { ChatMessage, ChatMessageDocument } from './schemas/chat-message.schema';
+import { Order, OrderDocument } from '../orders/schemas/order.schema';
+import { Store, StoreDocument } from '../stores/schemas/store.schema';
+
+// Centralized real road distance calculation helper (OSRM + Haversine fallback)
+async function calculateRealRoadDistance(
+  fromLat: number,
+  fromLng: number,
+  toLat: number,
+  toLng: number,
+): Promise<{ distanceKm: number; durationMinutes: number }> {
+  try {
+    const controller = new AbortController();
+    const tId = setTimeout(() => controller.abort(), 1200);
+    const url = `https://router.project-osrm.org/route/v1/driving/${fromLng},${fromLat};${toLng},${toLat}?overview=false`;
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(tId);
+    if (res.ok) {
+      const json: any = await res.json();
+      if (json.code === 'Ok' && json.routes?.[0]?.distance !== undefined) {
+        const km = Number((json.routes[0].distance / 1000).toFixed(1));
+        const mins = Math.max(1, Math.round((km / 22) * 60));
+        return { distanceKm: km, durationMinutes: mins };
+      }
+    }
+  } catch {}
+
+  const R = 6371;
+  const dLat = ((toLat - fromLat) * Math.PI) / 180;
+  const dLon = ((toLng - fromLng) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((fromLat * Math.PI) / 180) *
+      Math.cos((toLat * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const km = Number((R * c * 1.25).toFixed(1));
+  const mins = Math.max(1, Math.round((km / 20) * 60));
+  return { distanceKm: km, durationMinutes: mins };
+}
 
 @WebSocketGateway({
   cors: {
@@ -26,6 +65,12 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     @Optional()
     @InjectModel(ChatMessage.name)
     private readonly chatModel?: Model<ChatMessageDocument>,
+    @Optional()
+    @InjectModel(Order.name)
+    private readonly orderModel?: Model<OrderDocument>,
+    @Optional()
+    @InjectModel(Store.name)
+    private readonly storeModel?: Model<StoreDocument>,
   ) {}
 
   @WebSocketServer()
@@ -89,10 +134,45 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     const storeId = typeof payload === 'string' ? payload : payload?.storeId;
     if (storeId) {
       client.join(`store_${storeId}`);
-      this.logger.log(`Client ${client.id} joined store room: store_${storeId}`);
+      client.join(`store:${storeId}`);
+      this.logger.log(`Client ${client.id} joined store room: store_${storeId} / store:${storeId}`);
       return { event: 'joined', storeId };
     }
     return { event: 'error', message: 'Missing storeId' };
+  }
+
+  // Hyperlocal Rider Hub geofencing: Riders join their assigned dark store hub room
+  @SubscribeMessage('join_hub')
+  @SubscribeMessage('register_rider')
+  handleJoinHub(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: any,
+  ) {
+    const rawId = typeof payload === 'string' ? payload : (payload?.hubId || payload?.storeId || payload?.areaId);
+    if (rawId) {
+      const hubId = String(rawId);
+      client.join(`store_${hubId}`);
+      client.join(`store:${hubId}`);
+      client.join(`hub_${hubId}`);
+      this.logger.log(`[WebSocket] Rider ${client.id} joined hyperlocal rooms: store_${hubId}, hub_${hubId}`);
+      return { event: 'joined_hub', hubId };
+    }
+    return { event: 'error', message: 'Missing hubId' };
+  }
+
+  @SubscribeMessage('leave_hub')
+  handleLeaveHub(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: any,
+  ) {
+    const rawId = typeof payload === 'string' ? payload : (payload?.hubId || payload?.storeId || payload?.areaId);
+    if (rawId) {
+      const hubId = String(rawId);
+      client.leave(`store_${hubId}`);
+      client.leave(`store:${hubId}`);
+      client.leave(`hub_${hubId}`);
+      return { event: 'left_hub', hubId };
+    }
   }
 
   @SubscribeMessage('leave_store')
@@ -103,11 +183,12 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     const storeId = typeof payload === 'string' ? payload : payload?.storeId;
     if (storeId) {
       client.leave(`store_${storeId}`);
+      client.leave(`store:${storeId}`);
       return { event: 'left', storeId };
     }
   }
 
-  // Cross-device synchronization rooms for User Cart & Wishlist
+  // Cross-device synchronization rooms for User Cart & Wishlist & Customer Notifications
   @SubscribeMessage('join_user')
   handleJoinUser(
     @ConnectedSocket() client: Socket,
@@ -116,7 +197,8 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     const userId = typeof payload === 'string' ? payload : (payload?.userId || payload?.id);
     if (userId) {
       client.join(`user_${userId}`);
-      this.logger.log(`Client ${client.id} joined user sync room: user_${userId}`);
+      client.join(`user:${userId}`);
+      this.logger.log(`Client ${client.id} joined user sync room: user_${userId} / user:${userId}`);
       return { event: 'joined', userId };
     }
     return { event: 'error', message: 'Missing userId' };
@@ -130,8 +212,62 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     const userId = typeof payload === 'string' ? payload : (payload?.userId || payload?.id);
     if (userId) {
       client.leave(`user_${userId}`);
+      client.leave(`user:${userId}`);
       return { event: 'left', userId };
     }
+  }
+
+  // Scoped Room for Rider Personal Notifications
+  @SubscribeMessage('join_rider')
+  handleJoinRider(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: any,
+  ) {
+    const rawId = typeof payload === 'string' ? payload : (payload?.riderId || payload?.id);
+    if (rawId) {
+      const riderId = String(rawId);
+      client.join(`rider_${riderId}`);
+      client.join(`rider:${riderId}`);
+      this.logger.log(`Client ${client.id} joined rider room: rider_${riderId} / rider:${riderId}`);
+      return { event: 'joined', riderId };
+    }
+    return { event: 'error', message: 'Missing riderId' };
+  }
+
+  @SubscribeMessage('leave_rider')
+  handleLeaveRider(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: any,
+  ) {
+    const rawId = typeof payload === 'string' ? payload : (payload?.riderId || payload?.id);
+    if (rawId) {
+      const riderId = String(rawId);
+      client.leave(`rider_${riderId}`);
+      client.leave(`rider:${riderId}`);
+      return { event: 'left', riderId };
+    }
+  }
+
+  // Scoped Room for Admin Console Notifications
+  @SubscribeMessage('join_admin')
+  handleJoinAdmin(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: any,
+  ) {
+    client.join('admin');
+    client.join('admin_room');
+    this.logger.log(`Client ${client.id} joined admin notification rooms (admin / admin_room)`);
+    return { event: 'joined_admin' };
+  }
+
+  @SubscribeMessage('leave_admin')
+  handleLeaveAdmin(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: any,
+  ) {
+    client.leave('admin');
+    client.leave('admin_room');
+    return { event: 'left_admin' };
   }
 
   // Real-time synchronization for Local Shop Vendors
@@ -200,7 +336,8 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   // Delivery partner updates GPS location
   @SubscribeMessage('update_delivery_location')
-  handleLocationUpdate(
+  @SubscribeMessage('location_updated')
+  async handleLocationUpdate(
     @MessageBody()
     data: {
       orderId: string;
@@ -236,13 +373,77 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     const orderId = String(data.orderId);
     const cleanOrderId = orderId.replace(/^#/, '');
 
+    let distToCustomer = 0;
+    let distToStore = 0;
+    let etaToCustomer = 0;
+    let etaToStore = 0;
+
+    try {
+      if (this.orderModel) {
+        const orderQuery: any = Types.ObjectId.isValid(cleanOrderId)
+          ? { $or: [{ _id: new Types.ObjectId(cleanOrderId) }, { orderNumber: orderId }, { orderNumber: cleanOrderId }] }
+          : { orderNumber: { $in: [orderId, cleanOrderId, `#${cleanOrderId}`] } };
+
+        const order = await this.orderModel.findOne(orderQuery).populate('storeId').lean();
+
+        if (order) {
+          // Customer Coordinates
+          const custCoords = order.deliveryAddress?.coordinates;
+          if (Array.isArray(custCoords) && custCoords.length >= 2) {
+            const custLng = custCoords[0];
+            const custLat = custCoords[1];
+            if (custLat && custLng) {
+              const res = await calculateRealRoadDistance(lat, lng, custLat, custLng);
+              distToCustomer = res.distanceKm;
+              etaToCustomer = res.durationMinutes;
+            }
+          }
+
+          // Store Coordinates
+          const storeDoc: any = order.storeId;
+          const storeCoords = storeDoc?.location?.coordinates;
+          if (Array.isArray(storeCoords) && storeCoords.length >= 2) {
+            const sLng = storeCoords[0];
+            const sLat = storeCoords[1];
+            if (sLat && sLng) {
+              const res = await calculateRealRoadDistance(lat, lng, sLat, sLng);
+              distToStore = res.distanceKm;
+              etaToStore = res.durationMinutes;
+            }
+          }
+
+          if (distToCustomer > 0) {
+            await this.orderModel.updateOne(
+              { _id: order._id },
+              {
+                $set: {
+                  currentDistanceKm: Number(distToCustomer.toFixed(1)),
+                  currentEtaMinutes: etaToCustomer,
+                },
+              },
+            ).exec().catch(() => {});
+          }
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(`Failed computing road distance for order ${orderId}: ${err?.message}`);
+    }
+
     const payload = {
       orderId,
       partnerId: data.partnerId || '',
+      riderLocation: { lat, lng },
       latitude: lat,
       longitude: lng,
       lat,
       lng,
+      distanceToCustomer: distToCustomer > 0 ? distToCustomer.toFixed(1) : undefined,
+      distanceToStore: distToStore > 0 ? distToStore.toFixed(1) : undefined,
+      distanceKm: distToCustomer > 0 ? Number(distToCustomer.toFixed(1)) : undefined,
+      eta: etaToCustomer,
+      etaMinutes: etaToCustomer,
+      etaToCustomer,
+      etaToStore,
       speed: typeof data.speed === 'number' ? data.speed : 0,
       heading: typeof data.heading === 'number' ? data.heading : 0,
       timestamp: new Date().toISOString(),
@@ -250,17 +451,20 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 
     if (this.server) {
       // 1. Emit to customer tracking room (both orderId and cleanOrderId)
+      this.server.to(`order_${orderId}`).emit('location_updated', payload);
       this.server.to(`order_${orderId}`).emit('rider_location_update', payload);
       this.server.to(`order_${orderId}`).emit('update_delivery_location', payload);
       this.server.to(`order_${orderId}`).emit('delivery.location.updated', payload);
 
       if (cleanOrderId !== orderId) {
+        this.server.to(`order_${cleanOrderId}`).emit('location_updated', payload);
         this.server.to(`order_${cleanOrderId}`).emit('rider_location_update', payload);
         this.server.to(`order_${cleanOrderId}`).emit('update_delivery_location', payload);
         this.server.to(`order_${cleanOrderId}`).emit('delivery.location.updated', payload);
       }
 
-      // 2. Broadcast to Admin Console and all connected apps
+      // 2. Broadcast to Admin Console, Dark Store App, Rider Radar and all connected apps
+      this.server.emit('location_updated', payload);
       this.server.emit('rider_location_update', payload);
       this.server.emit('update_delivery_location', payload);
     }
@@ -317,11 +521,15 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
         storeId,
         broadcastStoreIds: broadcastIds,
         items: order.items,
+        distanceKm: order.deliveryDistanceKm || order.distanceKm || 0,
+        deliveryDistanceKm: order.deliveryDistanceKm || order.distanceKm || 0,
+        deliveryFee: order.deliveryFee || 0,
         createdAt: order.createdAt || new Date().toISOString(),
         order,
       };
 
-      // Emit to targeted store room, all broadcast candidate store rooms, admin console, and global broadcast fallback
+      // Emit to targeted store room, all broadcast candidate store rooms, and admin console
+      // NOTE: global server.emit removed — it caused cross-store order leakage (SRS §13.1)
       if (storeId) {
         this.server.to(`store_${storeId}`).emit('new_order', payload);
       }
@@ -331,7 +539,6 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
         }
       }
       this.server.to('admin').emit('new_order', payload);
-      this.server.emit('new_order', payload);
       this.logger.log(`[WebSocket] Dispatched new_order to stores [${Array.from(new Set([storeId, ...broadcastIds].filter(Boolean))).join(', ')}]: ${order.orderNumber}`);
     }
   }
@@ -429,15 +636,21 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
         this.server.to(`user_${uId}`).emit('order.status.updated', payload);
       }
 
-      // 2. Emit globally to Admin Console Kanban, Rider Radar, and Customer App listeners
-      this.server.emit('order_status', payload);
-      this.server.emit('order.status.updated', payload);
-      this.server.emit('orderStatusUpdated', payload);
-      this.server.emit('orderUpdate', payload);
-      this.server.emit(`orderStatusUpdate_${orderId}`, payload);
+      // 2. Emit to store room (scoped) + admin — no global broadcast to prevent cross-store leakage (SRS §13.1)
+      const orderStoreId = additionalData?.storeId?.toString?.() || additionalData?.storeId;
+      if (orderStoreId) {
+        this.server.to(`store_${orderStoreId}`).emit('order_status', payload);
+        this.server.to(`store_${orderStoreId}`).emit('order.status.updated', payload);
+        this.server.to(`store_${orderStoreId}`).emit('orderStatusUpdated', payload);
+      }
+      this.server.to('admin').emit('order_status', payload);
+      this.server.to('admin').emit('order.status.updated', payload);
+      // Per-order room event aliases for backward compat (orderId-specific, not global)
+      this.server.to(`order_${orderId}`).emit('orderUpdate', payload);
+      this.server.to(`order_${orderId}`).emit(`orderStatusUpdate_${orderId}`, payload);
       if (additionalData?.orderNumber) {
         const clean = additionalData.orderNumber.toString().replace(/^#/, '');
-        this.server.emit(`orderStatusUpdate_${clean}`, payload);
+        this.server.to(`order_${clean}`).emit(`orderStatusUpdate_${clean}`, payload);
       }
 
       this.logger.log(`[WebSocket] Emitted order_status (${status}) for order: ${orderId} (${additionalData?.orderNumber || ''}) with rider: ${formattedName}`);
@@ -913,14 +1126,49 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
   }
 
+  emitScopedNotification(room: string, payload: any) {
+    if (!this.server || !room) return;
+    const data = {
+      ...payload,
+      id: payload.id || payload._id || `notif_${Date.now()}`,
+      timestamp: payload.createdAt || new Date().toISOString(),
+    };
+
+    // 1. Primary unified notification:new event
+    this.server.to(room).emit('notification:new', data);
+    this.server.to(room).emit('in_app_notification', data);
+
+    // 2. Also emit to complementary alias room (e.g. user:123 and user_123)
+    if (room.includes(':')) {
+      const alias = room.replace(':', '_');
+      this.server.to(alias).emit('notification:new', data);
+      this.server.to(alias).emit('in_app_notification', data);
+    } else if (room.includes('_')) {
+      const alias = room.replace('_', ':');
+      this.server.to(alias).emit('notification:new', data);
+      this.server.to(alias).emit('in_app_notification', data);
+    }
+
+    if (room === 'admin' || room === 'admin_room') {
+      this.server.to('admin').emit('notification:new', data);
+      this.server.to('admin_room').emit('notification:new', data);
+      this.server.to('admin_room').emit('in_app_notification', data);
+    }
+
+    this.logger.log(`[WebSocket] Emitted scoped notification:new to [${room}]: "${payload.title}" (${payload.type || 'NOTICE'})`);
+  }
+
   emitInAppNotification(userId: string, payload: any) {
     if (this.server && userId) {
       const data = {
         userId: userId.toString(),
         ...payload,
+        id: payload.id || payload._id || `notif_${Date.now()}`,
         timestamp: new Date().toISOString(),
       };
-      // 1. Emit to user personal room
+      // 1. Emit notification:new and in_app_notification to user personal rooms
+      this.server.to(`user_${userId}`).emit('notification:new', data);
+      this.server.to(`user:${userId}`).emit('notification:new', data);
       this.server.to(`user_${userId}`).emit('in_app_notification', data);
       this.server.to(`user_${userId}`).emit('notification', data);
 
@@ -932,14 +1180,19 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
 
       // 3. Emit to role room if provided
       if (payload.role === 'ADMIN') {
+        this.server.to('admin').emit('notification:new', data);
+        this.server.to('admin_room').emit('notification:new', data);
         this.server.to('admin_room').emit('in_app_notification', data);
         this.server.emit('admin_notification', data);
       } else if (payload.role === 'VENDOR') {
-        this.server.to(`vendor_${userId}`).emit('in_app_notification', data);
+        this.server.to(`vendor_${userId}`).emit('notification:new', data);
+        this.server.to(`vendor:${userId}`).emit('notification:new', data);
       } else if (payload.role === 'STORE') {
-        this.server.to(`store_${userId}`).emit('in_app_notification', data);
+        this.server.to(`store_${userId}`).emit('notification:new', data);
+        this.server.to(`store:${userId}`).emit('notification:new', data);
       } else if (payload.role === 'RIDER') {
-        this.server.to(`rider_${userId}`).emit('in_app_notification', data);
+        this.server.to(`rider_${userId}`).emit('notification:new', data);
+        this.server.to(`rider:${userId}`).emit('notification:new', data);
       }
 
       this.logger.log(`[WebSocket] Emitted notification to user_${userId}: "${payload.title}" (${payload.type || 'DEFAULT'})`);

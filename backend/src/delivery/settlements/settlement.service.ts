@@ -11,6 +11,7 @@ import {
   RiderSettlementRequest,
   RiderSettlementRequestDocument,
 } from '../schemas/delivery-partner.schema';
+import { DeliveryPartnerCacheService } from '../common/partner-cache.service';
 
 @Injectable()
 export class SettlementService {
@@ -23,17 +24,15 @@ export class SettlementService {
     private bankAccountModel: Model<RiderBankAccountDocument>,
     @InjectModel(RiderSettlementRequest.name)
     private settlementRequestModel: Model<RiderSettlementRequestDocument>,
+    private readonly partnerCacheService: DeliveryPartnerCacheService,
   ) {}
 
+  public clearPartnerCache(userId?: string) {
+    this.partnerCacheService.invalidate(userId);
+  }
+
   private async getPartner(userId: string): Promise<DeliveryPartnerDocument> {
-    const userObjId = Types.ObjectId.isValid(userId) ? new Types.ObjectId(userId) : null;
-    const partner = await this.partnerModel.findOne({
-      $or: [{ userId: userObjId }, { userId: userId }],
-    });
-    if (!partner) {
-      throw new NotFoundException('Delivery partner not found');
-    }
-    return partner;
+    return this.partnerCacheService.getPartner(userId);
   }
 
   async getTodaySettlement(userId: string) {
@@ -41,17 +40,17 @@ export class SettlementService {
     const settlements = await this.settlementModel.find({
       riderId: partner._id,
       period: 'TODAY',
-    });
+    }).lean();
 
-    const basePayout = settlements.reduce((sum, s) => sum + (s.basePay || 0), 0);
+    const basePayout = settlements.reduce((sum: number, s: any) => sum + (s.basePay || 0), 0);
     const incentives = 0; // Incentives removed completely as per business rule
-    const tips = settlements.reduce((sum, s) => sum + (s.tip || 0), 0);
-    const adjustments = settlements.reduce((sum, s) => sum + (s.adjustment || 0), 0);
+    const tips = settlements.reduce((sum: number, s: any) => sum + (s.tip || 0), 0);
+    const adjustments = settlements.reduce((sum: number, s: any) => sum + (s.adjustment || 0), 0);
     const netPayableToday = basePayout + tips + adjustments;
 
     // Calculate real week and month earnings from database for this rider
-    const allRiderSettlements = await this.settlementModel.find({ riderId: partner._id });
-    const totalLifetimeEarnings = allRiderSettlements.reduce((sum, s) => sum + (s.total || 0), 0);
+    const allRiderSettlements = await this.settlementModel.find({ riderId: partner._id }, 'total').lean();
+    const totalLifetimeEarnings = allRiderSettlements.reduce((sum: number, s: any) => sum + (s.total || 0), 0);
 
     const totalCod = partner.totalCodCollected || 0;
     const totalEarn = partner.totalEarnings || totalLifetimeEarnings;

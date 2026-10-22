@@ -17,7 +17,7 @@ import { NotificationDispatcherService } from './dispatcher.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('notifications')
-@Controller('notifications')
+@Controller(['api/v1/notifications', 'notifications'])
 export class NotificationsController {
   constructor(
     private readonly notificationService: NotificationService,
@@ -83,36 +83,81 @@ export class NotificationsController {
   }
 
   /**
-   * Endpoint 3: Get Notifications History
+   * Endpoint 3: Unread Count
+   * GET /api/v1/notifications/unread-count
+   * GET /notifications/unread-count
+   */
+  @Get(['unread-count', 'unread'])
+  @ApiOperation({ summary: 'Get unread notification count for authenticated actor' })
+  async getUnreadCount(
+    @CurrentUser() user: any,
+    @Req() req: any,
+    @Query('userId') queryUserId?: string,
+    @Query('storeId') queryStoreId?: string,
+    @Query('riderId') queryRiderId?: string,
+    @Query('role') queryRole?: string,
+  ) {
+    const role = queryRole || user?.role || req?.headers['x-role'];
+    const storeId = queryStoreId || user?.storeId || req?.headers['x-store-id'];
+    const riderId = queryRiderId || user?.riderId || req?.headers['x-rider-id'];
+    const recipientId = queryUserId || user?.id || user?._id || req?.headers['x-user-id'];
+
+    const count = await this.notificationService.getUnreadCount({
+      recipientId,
+      role,
+      storeId,
+      riderId,
+    });
+
+    return {
+      success: true,
+      count,
+      data: { count },
+    };
+  }
+
+  /**
+   * Endpoint 4: Get Notifications History
    * GET /api/v1/notifications/history
    * GET /api/v1/notifications
    */
   @Get(['', 'history'])
-  @ApiOperation({ summary: 'Fetch user in-app notifications history' })
+  @ApiOperation({ summary: 'Fetch user/store/rider/admin notifications history' })
   async getUserNotifications(
     @CurrentUser() user: any,
     @Req() req: any,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('userId') queryUserId?: string,
+    @Query('storeId') queryStoreId?: string,
+    @Query('riderId') queryRiderId?: string,
+    @Query('role') queryRole?: string,
   ) {
-    const userId = queryUserId || user?.id || user?._id || req?.headers['x-user-id'];
-    if (!userId) {
-      return { success: true, data: { notifications: [], total: 0, unreadCount: 0 } };
-    }
-    const result = await this.notificationService.getUserNotifications(
-      userId,
-      Number(page) || 1,
-      Number(limit) || 20,
-    );
+    const role = queryRole || user?.role || req?.headers['x-role'];
+    const storeId = queryStoreId || user?.storeId || req?.headers['x-store-id'];
+    const riderId = queryRiderId || user?.riderId || req?.headers['x-rider-id'];
+    const recipientId = queryUserId || user?.id || user?._id || req?.headers['x-user-id'];
+
+    const result = await this.notificationService.getNotifications({
+      recipientId,
+      role,
+      storeId,
+      riderId,
+      page: Number(page) || 1,
+      limit: Number(limit) || 20,
+    });
+
     return {
       success: true,
       data: result,
+      notifications: result.notifications,
+      unreadCount: result.unreadCount,
+      total: result.total,
     };
   }
 
   /**
-   * Endpoint 4: Mark as Read
+   * Endpoint 5: Mark as Read
    * POST /api/v1/notifications/:id/read
    * PATCH /api/v1/notifications/:id/read
    */
@@ -135,10 +180,27 @@ export class NotificationsController {
   }
 
   @Post('read-all')
-  @ApiOperation({ summary: 'Mark all notifications as read for current user' })
-  async markAllAsRead(@CurrentUser() user: any, @Req() req: any, @Body('userId') bodyUserId?: string) {
-    const userId = bodyUserId || user?.id || user?._id || req?.headers['x-user-id'];
-    return this.notificationService.markAllAsRead(userId);
+  @Patch('read-all')
+  @ApiOperation({ summary: 'Mark all notifications as read for current user/store/rider' })
+  async markAllAsRead(
+    @CurrentUser() user: any,
+    @Req() req: any,
+    @Body('userId') bodyUserId?: string,
+    @Body('storeId') bodyStoreId?: string,
+    @Body('riderId') bodyRiderId?: string,
+    @Body('role') bodyRole?: string,
+  ) {
+    const role = bodyRole || user?.role || req?.headers['x-role'];
+    const storeId = bodyStoreId || user?.storeId || req?.headers['x-store-id'];
+    const riderId = bodyRiderId || user?.riderId || req?.headers['x-rider-id'];
+    const recipientId = bodyUserId || user?.id || user?._id || req?.headers['x-user-id'];
+
+    return this.notificationService.markAllAsRead({
+      recipientId,
+      role,
+      storeId,
+      riderId,
+    });
   }
 
   @Delete(':id')

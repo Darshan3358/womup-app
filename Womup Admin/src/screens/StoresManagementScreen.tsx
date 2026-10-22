@@ -9,6 +9,7 @@ import {
   Modal,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -36,6 +37,9 @@ import {
   Sliders,
   Users,
   AlertTriangle,
+  Maximize2,
+  Minimize2,
+  ChevronLeft,
 } from 'lucide-react-native';
 import { COLORS, GRADIENTS, RADIUS, SPACING } from '../theme';
 import { ApiService } from '../services/api';
@@ -50,6 +54,7 @@ export const StoresManagementScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'All' | 'Active' | 'Pending' | 'On Shift' | 'Logged In'>('All');
+  const [isFullView, setIsFullView] = useState(false);
 
   // Sync stores from real-time admin context (WebSocket & DB)
   useEffect(() => {
@@ -549,20 +554,36 @@ export const StoresManagementScreen: React.FC = () => {
         {/* Row 1: Search Box & New Store Button */}
         <View style={styles.searchRowContainer}>
           <View style={styles.searchBox}>
-            <Search size={18} color={COLORS.textMuted} style={styles.searchIcon} />
+            <Search size={16} color={COLORS.textMuted} style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search by Store Name, Area, Code, or..."
+              placeholder="Search stores, areas, codes..."
               placeholderTextColor={COLORS.textMuted}
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
             {searchQuery ? (
               <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <X size={16} color={COLORS.textMuted} />
+                <X size={15} color={COLORS.textMuted} />
               </TouchableOpacity>
             ) : null}
           </View>
+
+          <TouchableOpacity
+            style={[styles.fullViewBtn, isFullView && styles.fullViewBtnActive]}
+            onPress={() => setIsFullView(!isFullView)}
+            activeOpacity={0.85}
+            accessibilityLabel="Full View"
+          >
+            {isFullView ? (
+              <Minimize2 size={13} color={COLORS.purple} />
+            ) : (
+              <Maximize2 size={13} color={COLORS.navy} />
+            )}
+            <Text style={[styles.fullViewBtnText, isFullView && styles.fullViewBtnTextActive]}>
+              {isFullView ? 'Compact' : 'Full View'}
+            </Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.createStoreBtn}
@@ -576,7 +597,7 @@ export const StoresManagementScreen: React.FC = () => {
               end={{ x: 1, y: 0 }}
               style={styles.createBtnGradient}
             >
-              <Plus size={15} color={COLORS.white} />
+              <Plus size={14} color={COLORS.white} />
               <Text style={styles.createBtnText}>NEW STORE</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -712,7 +733,244 @@ export const StoresManagementScreen: React.FC = () => {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={true}
         >
-          {cityGroups.map((cityName) => {
+          {isFullView && (
+            <View style={styles.fullViewHeaderBar}>
+              <TouchableOpacity
+                style={styles.fullViewBackBtn}
+                onPress={() => setIsFullView(false)}
+                activeOpacity={0.75}
+              >
+                <ChevronLeft size={16} color={COLORS.purple} />
+                <Text style={styles.fullViewBackText}>Back to Compact View</Text>
+              </TouchableOpacity>
+              <View style={styles.fullViewCountBadge}>
+                <Text style={styles.fullViewCountText}>
+                  {filteredStores.length} {filteredStores.length === 1 ? 'STORE' : 'STORES'}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {isFullView ? (
+            <View style={styles.fullViewStoresList}>
+              {filteredStores.map((store) => {
+                const hasLogin = !!store.loginId;
+                const hasLoggedIn = !!store.lastLoginAt;
+                const isStoreActive = store.isActive !== false;
+                const staffOnShift = Number(store.staffOnShift ?? (store.isOnShift ? 1 : 0));
+                const staffTotal = Number(store.staffTotal ?? (staffOnShift > 0 ? staffOnShift : 1));
+                const hasPickers = staffOnShift > 0;
+                const coordsText = Array.isArray(store.coordinates) && store.coordinates.length >= 2
+                  ? `${store.coordinates[0]}, ${store.coordinates[1]}`
+                  : null;
+
+                return (
+                  <View key={store.id} style={styles.fullViewCard}>
+                    {/* Top Header: Name and Status Badge */}
+                    <View style={styles.fullViewCardTop}>
+                      <View style={{ flex: 1, marginRight: 8 }}>
+                        <Text style={styles.fullViewStoreName}>{store.name}</Text>
+                        <View style={styles.fullViewIdRow}>
+                          <View style={styles.fullViewIdBadge}>
+                            <Text style={styles.fullViewIdText}>ID: {store.id}</Text>
+                          </View>
+                          <View style={styles.fullViewCodeBadge}>
+                            <Text style={styles.fullViewCodeText}>CODE: {store.code}</Text>
+                          </View>
+                        </View>
+                      </View>
+
+                      {store.status === 'PENDING' ? (
+                        <View style={[styles.activeTag, { backgroundColor: '#FEF3C7' }]}>
+                          <View style={[styles.activeDot, { backgroundColor: '#F59E0B' }]} />
+                          <Text style={[styles.activeTagText, { color: '#B45309' }]}>APPROVAL PENDING</Text>
+                        </View>
+                      ) : !isStoreActive ? (
+                        <View style={[styles.activeTag, styles.statusInactiveTag]}>
+                          <View style={[styles.activeDot, { backgroundColor: COLORS.error }]} />
+                          <Text style={[styles.activeTagText, { color: COLORS.error }]}>STORE INACTIVE</Text>
+                        </View>
+                      ) : hasPickers ? (
+                        <View style={[styles.activeTag, styles.statusOnlineTag]}>
+                          <View style={[styles.activeDot, { backgroundColor: COLORS.success }]} />
+                          <Text style={[styles.activeTagText, { color: COLORS.success }]}>
+                            ACTIVE · {staffOnShift}/{staffTotal} ON SHIFT
+                          </Text>
+                        </View>
+                      ) : (
+                        <View style={[styles.activeTag, styles.statusWarningTag]}>
+                          <View style={[styles.activeDot, { backgroundColor: '#F59E0B' }]} />
+                          <Text style={[styles.activeTagText, { color: '#B45309' }]}>
+                            ACTIVE · NO PICKERS
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Warning Banner if Store is Active but 0 pickers on shift */}
+                    {isStoreActive && !hasPickers && (
+                      <View style={styles.unattendedWarningBox}>
+                        <AlertTriangle size={13} color="#D97706" style={{ marginRight: 6 }} />
+                        <Text style={styles.unattendedWarningText}>
+                          ⚠️ Orders may not be picked — no pickers currently on shift
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Operating Area, City, Address & Location Info */}
+                    <View style={styles.fullViewInfoSection}>
+                      <View style={styles.fullViewInfoRow}>
+                        <Text style={styles.fullViewInfoLabel}>OPERATING AREA:</Text>
+                        <Text style={styles.fullViewInfoValue}>
+                          {store.areaName || 'Paldi / Central'}
+                        </Text>
+                      </View>
+
+                      <View style={styles.fullViewInfoRow}>
+                        <Text style={styles.fullViewInfoLabel}>CITY / CLUSTER:</Text>
+                        <Text style={styles.fullViewInfoValue}>
+                          {store.cityName || store.city || 'Ahmedabad'}
+                        </Text>
+                      </View>
+
+                      <View style={styles.fullViewInfoRow}>
+                        <Text style={styles.fullViewInfoLabel}>ADDRESS:</Text>
+                        <Text style={styles.fullViewInfoValue}>
+                          {store.address
+                            ? `${store.address}${store.pincode ? ` - ${store.pincode}` : ''}`
+                            : 'Physical address pending specification'}
+                        </Text>
+                      </View>
+
+                      {coordsText && (
+                        <View style={styles.fullViewInfoRow}>
+                          <Text style={styles.fullViewInfoLabel}>GPS COORDS:</Text>
+                          <Text style={[styles.fullViewInfoValue, { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 11 }]}>
+                            {coordsText}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Authentication & Store Login Credentials Box */}
+                    <View style={styles.fullViewCredBox}>
+                      <View style={styles.fullViewCredTextCol}>
+                        <Text style={styles.fullViewCredLabel}>STORE LOGIN ID</Text>
+                        <Text style={styles.fullViewCredValue}>
+                          {hasLogin ? store.loginId : 'No Login ID Assigned'}
+                        </Text>
+                      </View>
+
+                      <View style={styles.fullViewCredActions}>
+                        {hasLogin && (
+                          <TouchableOpacity
+                            style={styles.copyBtn}
+                            onPress={() => copyToClipboard(store.loginId!, 'Store ID')}
+                            activeOpacity={0.7}
+                          >
+                            <Copy size={13} color={COLORS.textPrimary} />
+                            <Text style={styles.copyBtnText}>Copy ID</Text>
+                          </TouchableOpacity>
+                        )}
+
+                        <TouchableOpacity
+                          style={styles.resetBtn}
+                          onPress={() => openResetPasswordModal(store)}
+                          activeOpacity={0.7}
+                        >
+                          <KeyRound size={13} color={COLORS.purple} />
+                          <Text style={styles.resetBtnText}>Reset Password</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    {/* Operational Metrics Grid */}
+                    <View style={styles.fullViewMetricsGrid}>
+                      <View style={styles.fullViewMetricCard}>
+                        <Package size={16} color={COLORS.hotPink} />
+                        <View>
+                          <Text style={styles.fullViewMetricVal}>{store.orderCount || 0}</Text>
+                          <Text style={styles.fullViewMetricLbl}>Orders Handled</Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.fullViewMetricCard}>
+                        <Bike size={16} color={COLORS.blue} />
+                        <View>
+                          <Text style={styles.fullViewMetricVal}>{store.riderCount || 0}</Text>
+                          <Text style={styles.fullViewMetricLbl}>Assigned Riders</Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.fullViewMetricCard}>
+                        <Radio size={16} color={COLORS.purple} />
+                        <View>
+                          <Text style={styles.fullViewMetricVal}>{store.serviceRadiusKm || 4.5} km</Text>
+                          <Text style={styles.fullViewMetricLbl}>Service Radius</Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.fullViewMetricCard}>
+                        <Clock size={16} color={COLORS.success} />
+                        <View>
+                          <Text style={styles.fullViewMetricVal}>{store.estimatedDeliveryMinutes || 9} mins</Text>
+                          <Text style={styles.fullViewMetricLbl}>Delivery SLA</Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* Approval Banner if Pending */}
+                    {store.status === 'PENDING' && (
+                      <View style={styles.storeApprovalBanner}>
+                        <View style={styles.storeApprovalLeft}>
+                          <AlertTriangle size={15} color="#D97706" style={{ marginRight: 6 }} />
+                          <View>
+                            <Text style={styles.storeApprovalTitle}>Approval Required</Text>
+                            <Text style={styles.storeApprovalSub}>Dark Store registration is awaiting admin verification</Text>
+                          </View>
+                        </View>
+                        <View style={styles.storeApprovalBtns}>
+                          <TouchableOpacity
+                            style={styles.rejectStoreBtn}
+                            onPress={() => handleRejectStore(store.id)}
+                          >
+                            <X size={13} color={COLORS.error} style={{ marginRight: 4 }} />
+                            <Text style={styles.rejectStoreBtnText}>Reject</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.approveStoreBtn}
+                            onPress={() => handleApproveStore(store.id)}
+                          >
+                            <CheckCircle2 size={13} color="#FFFFFF" style={{ marginRight: 4 }} />
+                            <Text style={styles.approveStoreBtnText}>Approve Store</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Footer: Shift / Last Login & Delete Store Action */}
+                    <View style={styles.fullViewFooterRow}>
+                      <Text style={styles.lastLoginText}>
+                        {hasLoggedIn
+                          ? `Last Login: ${new Date(store.lastLoginAt!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                          : 'Shift: Shared Store Tablet'}
+                      </Text>
+
+                      <TouchableOpacity
+                        style={styles.fullViewDeleteBtn}
+                        onPress={() => setDeleteConfirmStore(store)}
+                        activeOpacity={0.7}
+                      >
+                        <Trash2 size={13} color={COLORS.error} />
+                        <Text style={styles.fullViewDeleteText}>Delete Store</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          ) : (
+            cityGroups.map((cityName) => {
             const cityStores = storesByCity[cityName] || [];
             return (
               <View key={cityName} style={styles.citySectionGroup}>
@@ -945,7 +1203,8 @@ export const StoresManagementScreen: React.FC = () => {
                 </View>
               </View>
             );
-          })}
+          })
+        )}
         </ScrollView>
       )}
 
@@ -2733,5 +2992,238 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: COLORS.white,
+  },
+  /* Full View Styles */
+  fullViewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.input,
+    paddingHorizontal: 9,
+    height: 42,
+    flexShrink: 0,
+    justifyContent: 'center',
+  },
+  fullViewBtnActive: {
+    backgroundColor: '#F5F3FF',
+    borderColor: COLORS.purple,
+  },
+  fullViewBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.navy,
+  },
+  fullViewBtnTextActive: {
+    color: COLORS.purple,
+  },
+  fullViewHeaderBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F3F0FF',
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginBottom: 12,
+  },
+  fullViewBackBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: COLORS.white,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+  },
+  fullViewBackText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.purple,
+  },
+  fullViewCountBadge: {
+    backgroundColor: COLORS.purple,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: RADIUS.pill,
+  },
+  fullViewCountText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: COLORS.white,
+    letterSpacing: 0.3,
+  },
+  fullViewStoresList: {
+    gap: 14,
+    paddingBottom: 24,
+  },
+  fullViewCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+    gap: 12,
+  },
+  fullViewCardTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  fullViewStoreName: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.navy,
+    flexShrink: 1,
+  },
+  fullViewIdRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 4,
+  },
+  fullViewIdBadge: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  fullViewIdText: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontWeight: '600',
+  },
+  fullViewCodeBadge: {
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  fullViewCodeText: {
+    fontSize: 11,
+    color: '#4F46E5',
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  fullViewInfoSection: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 8,
+  },
+  fullViewInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  fullViewInfoLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+    minWidth: 95,
+  },
+  fullViewInfoValue: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    flex: 1,
+  },
+  fullViewCredBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FAF5FF',
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+    borderRadius: 10,
+    padding: 12,
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  fullViewCredTextCol: {
+    flex: 1,
+    minWidth: 140,
+  },
+  fullViewCredLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: COLORS.purple,
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  fullViewCredValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.navy,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  fullViewCredActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  fullViewMetricsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  fullViewMetricCard: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  fullViewMetricVal: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: COLORS.navy,
+  },
+  fullViewMetricLbl: {
+    fontSize: 10,
+    color: COLORS.textMuted,
+    fontWeight: '600',
+  },
+  fullViewFooterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  fullViewDeleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: '#FEE2E2',
+  },
+  fullViewDeleteText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.error,
   },
 });

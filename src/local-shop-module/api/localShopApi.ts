@@ -1,5 +1,6 @@
 import { LocalVendor, LocalTransaction, CoinLedgerItem } from '../types/localShop.types';
 import { api } from '../../services/api';
+import { StorageService } from '../../services/storageService';
 
 export interface BackendCategoryItem {
   _id?: string;
@@ -242,10 +243,10 @@ export const LocalShopApi = {
     try {
       const res = await api.get<any>('/users/me');
       if (res.success && res.data) {
-        return res.data.shoppingCoins ?? 2000;
+        return res.data.shoppingCoins ?? 0;
       }
     } catch {}
-    return 2000;
+    return 0;
   },
 
   // 5b. Get Detailed Wallet Balances (Shopping Coins + App Download Income)
@@ -258,26 +259,118 @@ export const LocalShopApi = {
       const res = await api.get<any>('/users/wallet-summary');
       if (res.success && res.data) {
         return {
-          shoppingCoins: res.data.shoppingCoins ?? 2000,
+          shoppingCoins: res.data.shoppingCoins ?? 0,
           appDownloadIncome: res.data.appDownloadIncome ?? 0,
           availableIncome: res.data.availableIncome ?? 0,
         };
       }
     } catch {}
     return {
-      shoppingCoins: 2000,
-      appDownloadIncome: 500,
-      availableIncome: 500,
+      shoppingCoins: 0,
+      appDownloadIncome: 0,
+      availableIncome: 0,
     };
   },
 
   // 6. Get Past Local Orders
   async getLocalOrders(): Promise<LocalTransaction[]> {
+    try {
+      const user = await StorageService.getItem<any>(StorageService.KEYS.USER, null).catch(() => null);
+      const queryParams = new URLSearchParams();
+      if (user?.id || user?._id) {
+        queryParams.append('customerId', String(user.id || user._id));
+      }
+      if (user?.phone) {
+        queryParams.append('phone', String(user.phone));
+      }
+      const endpoint = `/local-shops/my-orders${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      const res = await api.get<any>(endpoint);
+      if (res && res.success && Array.isArray(res.data)) {
+        return res.data.map((item: any) => {
+          let dateStr = 'Recently';
+          if (item.createdAt || item.date) {
+            try {
+              const d = new Date(item.createdAt || item.date);
+              dateStr = d.toLocaleDateString('en-IN', {
+                day: 'numeric',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              });
+            } catch {}
+          }
+          return {
+            id: item.id || item._id,
+            orderNumber: item.orderNumber || '#WML-ORDER',
+            vendorId: item.vendorId,
+            vendorName: item.vendorName || 'Local Merchant',
+            vendorCategory: item.vendorCategory || 'Local Vendor',
+            amount: Number(item.billAmount || item.amount || 0),
+            coinsEarned: Number(item.coinsEarned || 0),
+            coinsUsed: Number(item.coinsUsed || 0),
+            cashPaid: Number(item.cashPaid || 0),
+            paymentMethod: item.paymentMethod || 'COIN',
+            status: item.status || 'SUCCESS',
+            date: dateStr,
+            createdAt: item.createdAt,
+            qrScanned: true,
+          };
+        });
+      }
+    } catch (e) {
+      console.warn('[LocalShopApi] getLocalOrders error:', e);
+    }
     return [];
   },
 
   // 7. Get Coin Ledger History
   async getCoinHistory(): Promise<CoinLedgerItem[]> {
+    try {
+      const res = await api.get<any>('/coins/transactions?page=1&limit=100');
+      if (res.success && res.data) {
+        const txs = res.data.transactions || res.data || [];
+        return txs.map((tx: any) => {
+          const ref = (tx.referenceType || '').toUpperCase();
+          const desc = tx.description || 'Shopping Coin Transaction';
+          const lowerDesc = desc.toLowerCase();
+          const isDebit = tx.type === 'SPEND' || tx.type === 'DEBIT' || ref === 'VENDOR_REDEEM' || lowerDesc.includes('redeem') || lowerDesc.includes('checkout') || lowerDesc.includes('used');
+          
+          let vendorName = '🛒 Grocery Order Reward';
+          if (ref === 'VENDOR_REDEEM' || (isDebit && (lowerDesc.includes('store') || lowerDesc.includes('merchant')))) {
+            vendorName = '🏪 Local Store Coin Redemption';
+          } else if (ref === 'TIER_COIN_INCOME' || lowerDesc.includes('level')) {
+            vendorName = '🎖️ Level Token Bonus';
+          } else if (ref === 'MONTHLY_ALLOCATION' || lowerDesc.includes('monthly')) {
+            vendorName = '📅 Monthly Token Credit';
+          } else if (ref === 'SIGNUP_BONUS' || lowerDesc.includes('welcome') || lowerDesc.includes('signup')) {
+            vendorName = '🎁 Welcome Bonus';
+          } else if (isDebit) {
+            vendorName = '⚡ Checkout Coin Redemption';
+          }
+
+          const dateObj = tx.createdAt ? new Date(tx.createdAt) : new Date();
+          const dateStr = dateObj.toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+
+          return {
+            id: tx._id || tx.id,
+            vendorName,
+            type: isDebit ? 'SPENT' : 'EARNED',
+            coins: tx.coins || tx.amount || 0,
+            date: dateStr,
+            description: desc,
+          };
+        });
+      }
+    } catch (e) {
+      console.warn('Failed to fetch coin history in localShopApi:', e);
+    }
     return [];
   },
 

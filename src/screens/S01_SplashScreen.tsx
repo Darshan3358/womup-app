@@ -3,16 +3,14 @@ import {
   View,
   Image,
   StyleSheet,
-  useWindowDimensions,
   Pressable,
+  StatusBar,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
+import { StorageService } from '../services/storageService';
 
 export const S01_SplashScreen: React.FC = () => {
-  const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
   const { setActiveScreen } = useApp();
   const { isAuthenticated, isLoading } = useAuth();
 
@@ -25,7 +23,7 @@ export const S01_SplashScreen: React.FC = () => {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasNavigatedRef = useRef<boolean>(false);
 
-  const navigateNext = () => {
+  const navigateNext = async () => {
     if (hasNavigatedRef.current) return;
     hasNavigatedRef.current = true;
 
@@ -35,8 +33,22 @@ export const S01_SplashScreen: React.FC = () => {
     }
 
     if (setActiveScreenRef.current) {
-      // Direct app open: Always navigate straight to Blinkit Home page!
-      setActiveScreenRef.current('Blinkit_Home');
+      try {
+        const isOnboardingDone = await StorageService.getItem<boolean>(
+          StorageService.KEYS.ONBOARDING_DONE,
+          false
+        );
+
+        // If user is already authenticated or already went through onboarding, go straight to dashboard
+        if (authStateRef.current.isAuthenticated || isOnboardingDone) {
+          setActiveScreenRef.current('Blinkit_Home');
+        } else {
+          // First time opening app: display onboarding screens first
+          setActiveScreenRef.current('C02_Onboarding1');
+        }
+      } catch (e) {
+        setActiveScreenRef.current('C02_Onboarding1');
+      }
     }
   };
 
@@ -54,29 +66,14 @@ export const S01_SplashScreen: React.FC = () => {
     };
   }, []); // Run ONCE on mount
 
-  // Clean, focused logo sizing (no animations)
-  const logoWidth = Math.min(width * 0.65, 270);
-  const logoHeight = Math.round(logoWidth * (277 / 338));
-
   return (
-    <Pressable
-      onPress={navigateNext}
-      style={[
-        styles.container,
-        {
-          paddingTop: insets.top,
-          paddingBottom: insets.bottom,
-        },
-      ]}
-    >
+    <Pressable onPress={navigateNext} style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FED2EB" translucent />
       <View style={styles.centerStage}>
         <Image
-          source={require('../../assets/Wormup.png')}
-          style={{
-            width: logoWidth,
-            height: logoHeight,
-          }}
-          resizeMode="contain"
+          source={require('../../assets/splashfinal.png')}
+          style={styles.splashImage}
+          resizeMode="cover"
         />
       </View>
     </Pressable>
@@ -86,7 +83,7 @@ export const S01_SplashScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#05052A', // Deep midnight navy brand background
+    backgroundColor: '#FED2EB',
     justifyContent: 'center',
     alignItems: 'center',
     width: '100%',
@@ -94,8 +91,14 @@ const styles = StyleSheet.create({
   },
   centerStage: {
     flex: 1,
+    width: '100%',
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  splashImage: {
     width: '100%',
+    height: '100%',
+    maxWidth: 520,
   },
 });

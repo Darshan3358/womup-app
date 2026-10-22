@@ -36,7 +36,11 @@ class ApiClient {
     options: RequestInit & { _isRetry?: boolean } = {},
   ): Promise<{ success: boolean; data?: T; message?: string }> {
     const isGet = !options.method || options.method.toUpperCase() === 'GET';
-    const cacheKey = `${endpoint}_${this.token || 'anon'}`;
+    // Include full endpoint (with query string) + token so that requests to the same
+    // path but different params (areaId, storeId, page, etc.) are NOT deduplicated
+    // together. Previously this was just `endpoint + token` which could merge a
+    // Thaltej product query with a Chandlodiya product query.
+    const cacheKey = `${endpoint}|${this.token || 'anon'}`;
 
     // De-duplicate concurrent in-flight GET requests (prevents 10+ components spamming simultaneously)
     if (isGet && !options._isRetry && this.inFlightGetRequests.has(cacheKey)) {

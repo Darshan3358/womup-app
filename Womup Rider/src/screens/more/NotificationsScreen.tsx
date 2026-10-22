@@ -15,7 +15,7 @@ import { RiderNotification } from '../../types/rider.types';
 import { COLORS } from '../../theme/colors';
 
 export const NotificationsScreen: React.FC = () => {
-  const { setSubScreen } = useRider();
+  const { setSubScreen, setCurrentTab } = useRider();
   const [notifications, setNotifications] = useState<RiderNotification[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -65,17 +65,51 @@ export const NotificationsScreen: React.FC = () => {
     ]);
   };
 
-  const getTypeBadge = (type: RiderNotification['type']): { icon: keyof typeof Ionicons.glyphMap; color: string; label: string } => {
-    switch (type) {
-      case 'PAYOUT':
-        return { icon: 'wallet-outline', color: COLORS.onlineGreen, label: 'PAYOUT' };
-      case 'ORDER':
-        return { icon: 'cube-outline', color: COLORS.hotPink, label: 'ORDER' };
-      case 'SAFETY':
-        return { icon: 'shield-checkmark-outline', color: COLORS.blue, label: 'COMPLIANCE' };
-      default:
-        return { icon: 'notifications-outline', color: COLORS.navy, label: 'HUB ALERT' };
+  const getTypeBadge = (type: any): { icon: keyof typeof Ionicons.glyphMap; color: string; label: string } => {
+    const t = String(type || '').toUpperCase();
+    if (t.includes('NEW_DELIVERY') || t.includes('ASSIGNED')) {
+      return { icon: 'bicycle-outline', color: '#3B82F6', label: 'NEW JOB' };
     }
+    if (t.includes('COMPLETED') || t.includes('DELIVERED')) {
+      return { icon: 'checkmark-done-circle-outline', color: '#10B981', label: 'COMPLETED' };
+    }
+    if (t.includes('CANCEL')) {
+      return { icon: 'close-circle-outline', color: '#EF4444', label: 'CANCELLED' };
+    }
+    if (t.includes('KYC_APPROVED')) {
+      return { icon: 'shield-checkmark-outline', color: '#10B981', label: 'KYC APPROVED' };
+    }
+    if (t.includes('KYC_REJECTED')) {
+      return { icon: 'alert-circle-outline', color: '#EF4444', label: 'KYC REJECTED' };
+    }
+    if (t.includes('EARNING') || t.includes('PAYOUT') || t.includes('INCENTIVE')) {
+      return { icon: 'wallet-outline', color: '#10B981', label: 'EARNINGS' };
+    }
+    if (t.includes('SAFETY') || t.includes('COMPLIANCE')) {
+      return { icon: 'shield-outline', color: COLORS.blue, label: 'COMPLIANCE' };
+    }
+    return { icon: 'notifications-outline', color: COLORS.navy, label: 'DISPATCH' };
+  };
+
+  const handleItemClick = async (item: RiderNotification) => {
+    await handleMarkRead(item.id);
+
+    const t = String(item.type || '').toUpperCase();
+    if (item.orderId || t.includes('ORDER') || t.includes('DELIVERY') || t.includes('ASSIGN')) {
+      setSubScreen('None');
+      setCurrentTab('Deliveries');
+      return;
+    }
+    if (t.includes('KYC') || t.includes('DOCUMENT')) {
+      setSubScreen('Documents');
+      return;
+    }
+    if (t.includes('EARNING') || t.includes('PAYOUT')) {
+      setSubScreen('None');
+      setCurrentTab('Earnings');
+      return;
+    }
+    setSubScreen('None');
   };
 
   return (
@@ -127,7 +161,7 @@ export const NotificationsScreen: React.FC = () => {
               <TouchableOpacity
                 key={item.id}
                 style={[styles.notifCard, !item.isRead && styles.unreadCard]}
-                onPress={() => handleMarkRead(item.id)}
+                onPress={() => handleItemClick(item)}
                 activeOpacity={0.8}
               >
                 <View style={styles.notifHeader}>

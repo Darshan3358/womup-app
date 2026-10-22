@@ -30,7 +30,15 @@ const AREAS = [
   { name: 'Ghatlodia', city: 'Ahmedabad', pincodes: ['380061'], centerLat: 23.0729, centerLng: 72.5613, radiusKm: 3.5, defaultDeliveryMinutes: 11, sortOrder: 3 },
   { name: 'Bopal', city: 'Ahmedabad', pincodes: ['380058'], centerLat: 23.0234, centerLng: 72.4651, radiusKm: 4.0, defaultDeliveryMinutes: 12, sortOrder: 4 },
   { name: 'SG Highway', city: 'Ahmedabad', pincodes: ['380054'], centerLat: 23.0380, centerLng: 72.4972, radiusKm: 4.0, defaultDeliveryMinutes: 10, sortOrder: 5 },
-  { name: 'Thaltej', city: 'Ahmedabad', pincodes: ['380054'], centerLat: 23.0623, centerLng: 72.5106, radiusKm: 3.5, defaultDeliveryMinutes: 11, sortOrder: 6 },
+  { name: 'Thaltej', city: 'Ahmedabad', pincodes: ['380059'], centerLat: 23.0623, centerLng: 72.5106, radiusKm: 3.5, defaultDeliveryMinutes: 11, sortOrder: 6 },
+  { name: 'Vastrapur', city: 'Ahmedabad', pincodes: ['380015'], centerLat: 23.0350, centerLng: 72.5290, radiusKm: 3.5, defaultDeliveryMinutes: 10, sortOrder: 7 },
+  { name: 'Chandlodiya - Tragad', city: 'Ahmedabad', pincodes: ['382481', '382470'], centerLat: 23.1150, centerLng: 72.5450, radiusKm: 4.5, defaultDeliveryMinutes: 9, sortOrder: 8 },
+  { name: 'Maninagar', city: 'Ahmedabad', pincodes: ['380008'], centerLat: 22.9978, centerLng: 72.6033, radiusKm: 3.5, defaultDeliveryMinutes: 10, sortOrder: 9 },
+  { name: 'Paldi', city: 'Ahmedabad', pincodes: ['380007'], centerLat: 23.0129, centerLng: 72.5632, radiusKm: 3.5, defaultDeliveryMinutes: 10, sortOrder: 10 },
+  { name: 'Ramol', city: 'Ahmedabad', pincodes: ['382449'], centerLat: 22.9850, centerLng: 72.6450, radiusKm: 3.5, defaultDeliveryMinutes: 12, sortOrder: 11 },
+  { name: 'Hathijan / Vatva side', city: 'Ahmedabad', pincodes: ['382440'], centerLat: 22.9650, centerLng: 72.6350, radiusKm: 4.0, defaultDeliveryMinutes: 12, sortOrder: 12 },
+  { name: 'Lambha', city: 'Ahmedabad', pincodes: ['382440'], centerLat: 22.9450, centerLng: 72.5950, radiusKm: 3.5, defaultDeliveryMinutes: 12, sortOrder: 13 },
+  { name: 'Isanpur', city: 'Ahmedabad', pincodes: ['382443'], centerLat: 22.9820, centerLng: 72.5980, radiusKm: 3.5, defaultDeliveryMinutes: 11, sortOrder: 14 },
 ];
 
 // ─── Categories ──────────────────────────────────────────────────────────────

@@ -54,6 +54,7 @@ import { SettlementService } from './settlements/settlement.service';
 import { DutyService } from './duty/duty.service';
 import { DocumentService } from './documents/document.service';
 import { SupportService } from './support/support.service';
+import { DeliveryPartnerCacheService } from './common/partner-cache.service';
 
 @Module({
   imports: [
@@ -101,6 +102,7 @@ import { SupportService } from './support/support.service';
     SupportController,
   ],
   providers: [
+    DeliveryPartnerCacheService,
     DeliveryAuthService,
     RiderService,
     DeliveryOrderService,
@@ -112,6 +114,7 @@ import { SupportService } from './support/support.service';
     EmailService,
   ],
   exports: [
+    DeliveryPartnerCacheService,
     DeliveryAuthService,
     RiderService,
     DeliveryOrderService,
