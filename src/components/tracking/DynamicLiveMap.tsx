@@ -157,8 +157,10 @@ export const DynamicLiveMap: React.FC<DynamicLiveMapProps> = ({
         }
       }
     };
-    window.addEventListener('message', handleMsg);
-    return () => window.removeEventListener('message', handleMsg);
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      window.addEventListener('message', handleMsg);
+      return () => window.removeEventListener('message', handleMsg);
+    }
   }, []);
 
   // When Store or Customer GPS is missing, display clear diagnostic error state

@@ -148,7 +148,7 @@ export const MapPicker: React.FC<MapPickerProps> = ({
       }
     };
 
-    if (typeof window !== 'undefined') {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
       window.addEventListener('message', handleMapMessage);
       return () => window.removeEventListener('message', handleMapMessage);
     }

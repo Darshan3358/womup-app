@@ -324,15 +324,15 @@ export const S11_AddAddressScreen: React.FC = () => {
     goBack,
   } = useApp();
 
-  const [fullName, setFullName] = useState(selectedAddress.fullName || user.fullName || '');
-  const [phoneNumber, setPhoneNumber] = useState(selectedAddress.phoneNumber || user.phoneNumber || '');
-  const [houseFlat, setHouseFlat] = useState(selectedAddress.houseFlat || '');
-  const [streetArea, setStreetArea] = useState(selectedAddress.areaLandmark || '');
+  const [fullName, setFullName] = useState(selectedAddress?.fullName || user?.fullName || '');
+  const [phoneNumber, setPhoneNumber] = useState(selectedAddress?.phoneNumber || user?.phoneNumber || '');
+  const [houseFlat, setHouseFlat] = useState(selectedAddress?.houseFlat || '');
+  const [streetArea, setStreetArea] = useState(selectedAddress?.areaLandmark || '');
 
   // Pre-fill city from preferred city
-  const initialCityName = user.preferredCityName || selectedAddress.city || 'Ahmedabad';
+  const initialCityName = user?.preferredCityName || selectedAddress?.city || 'Ahmedabad';
   const [selectedCity, setSelectedCity] = useState<CityOption>({
-    id: user.preferredCityId || 'city_ahm',
+    id: user?.preferredCityId || 'city_ahm',
     name: initialCityName,
     code: 'AHM',
     state: 'Gujarat',
@@ -340,11 +340,11 @@ export const S11_AddAddressScreen: React.FC = () => {
   });
 
   const [selectedArea, setSelectedArea] = useState<AreaOption | null>(null);
-  const [pincode, setPincode] = useState(selectedAddress.pincode || '382481');
+  const [pincode, setPincode] = useState(selectedAddress?.pincode || '382481');
   const [addressType, setAddressType] = useState<'Home' | 'Work' | 'Other'>('Home');
   const [mapCoords, setMapCoords] = useState<{ latitude: number; longitude: number }>({
-    latitude: selectedAddress.latitude || 23.1150,
-    longitude: selectedAddress.longitude || 72.5450,
+    latitude: selectedAddress?.latitude || 23.1150,
+    longitude: selectedAddress?.longitude || 72.5450,
   });
 
   // Track the authoritative selected area ID and request sequence to prevent stale async overwrites
@@ -399,14 +399,14 @@ export const S11_AddAddressScreen: React.FC = () => {
         }));
         setCities(mapped);
         const match = mapped.find(
-          (c) => c.name.toLowerCase() === initialCityName.toLowerCase() || c.id === user.preferredCityId
+          (c) => (c.name && initialCityName && c.name.toLowerCase() === initialCityName.toLowerCase()) || (user?.preferredCityId && c.id === user.preferredCityId)
         );
         if (match) {
           setSelectedCity(match);
         }
       }
     });
-  }, [user.preferredCityId, user.preferredCityName]);
+  }, [user?.preferredCityId, user?.preferredCityName]);
 
   // 2. Fetch areas for reference (without overriding coordinates)
   useEffect(() => {
@@ -570,7 +570,7 @@ export const S11_AddAddressScreen: React.FC = () => {
     let isMounted = true;
     const initLocation = async () => {
       // 1. If explicit coordinates exist in selectedAddress
-      if (selectedAddress.latitude && selectedAddress.longitude) {
+      if (selectedAddress?.latitude && selectedAddress?.longitude) {
         setMapCoords({ latitude: selectedAddress.latitude, longitude: selectedAddress.longitude });
         detectAreaForLocation(selectedAddress.latitude, selectedAddress.longitude);
         return;
