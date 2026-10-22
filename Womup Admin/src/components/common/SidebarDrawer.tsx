@@ -74,9 +74,9 @@ export const SidebarDrawer: React.FC = () => {
       presentationStyle="overFullScreen"
     >
       <View style={styles.backdrop}>
-        {/* Clickable Backdrop overlay on the left side of the drawer */}
+        {/* Fullscreen Backdrop overlay behind the drawer */}
         <TouchableOpacity
-          style={styles.backdropDismiss}
+          style={StyleSheet.absoluteFill}
           onPress={() => setIsSidebarOpen(false)}
           activeOpacity={1}
         />
@@ -126,9 +126,8 @@ export const SidebarDrawer: React.FC = () => {
             contentContainerStyle={styles.menuContent}
             showsVerticalScrollIndicator={true}
             bounces={true}
+            scrollEnabled={true}
             keyboardShouldPersistTaps="handled"
-            nestedScrollEnabled={true}
-            scrollEventThrottle={16}
             overScrollMode="always"
           >
             <Text style={styles.menuSectionTitle}>PRIMARY MODULES</Text>
@@ -457,20 +456,21 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     flexDirection: 'row',
-  },
-  backdropDismiss: {
-    flex: 1,
+    justifyContent: 'flex-end',
   },
   drawerPanel: {
     width: '84%',
     maxWidth: 340,
     height: '100%',
+    maxHeight: '100%',
     backgroundColor: COLORS.white,
     shadowColor: '#000',
     shadowOffset: { width: -4, height: 0 },
     shadowOpacity: 0.25,
     shadowRadius: 10,
     elevation: 16,
+    overflow: 'hidden',
+    display: 'flex',
     flexDirection: 'column',
   },
   drawerHeader: {
@@ -546,13 +546,14 @@ const styles = StyleSheet.create({
   },
   menuScroll: {
     flex: 1,
+    height: '100%',
     width: '100%',
-    flexShrink: 1,
   },
   menuContent: {
     paddingHorizontal: 10,
     paddingTop: 12,
-    paddingBottom: 80,
+    paddingBottom: 60,
+    flexGrow: 1,
   },
   menuSectionTitle: {
     fontSize: 10,
