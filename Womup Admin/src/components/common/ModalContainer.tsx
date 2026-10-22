@@ -39,7 +39,7 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({
       >
         {/* Click outside to close */}
         <TouchableOpacity
-          style={styles.backdropTouchable}
+          style={StyleSheet.absoluteFill}
           onPress={onClose}
           activeOpacity={1}
         />
@@ -56,7 +56,6 @@ export const ModalContainer: React.FC<ModalContainerProps> = ({
             style={styles.body}
             contentContainerStyle={styles.bodyContent}
             keyboardShouldPersistTaps="handled"
-            nestedScrollEnabled={true}
             showsVerticalScrollIndicator={true}
           >
             {children}
@@ -73,9 +72,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(5, 6, 42, 0.6)',
     justifyContent: 'flex-end',
   },
-  backdropTouchable: {
-    flex: 1,
-  },
   modalContent: {
     backgroundColor: COLORS.white,
     borderTopLeftRadius: RADIUS.bottomSheet,
@@ -83,6 +79,8 @@ const styles = StyleSheet.create({
     height: '85%',
     maxHeight: '90%',
     overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
   },
   header: {
     flexDirection: 'row',

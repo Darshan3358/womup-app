@@ -759,8 +759,15 @@ export const CustomersScreen: React.FC = () => {
         transparent={true}
         animationType="fade"
         onRequestClose={() => setIsDetailModalOpen(false)}
+        statusBarTranslucent={true}
       >
         <View style={styles.modalOverlay}>
+          {/* Click backdrop to dismiss */}
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            onPress={() => setIsDetailModalOpen(false)}
+            activeOpacity={1}
+          />
           <View style={styles.modalCard}>
             {/* Modal Header */}
             <View style={styles.modalHeader}>
@@ -2131,7 +2138,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     width: '100%',
     maxWidth: 620,
-    maxHeight: '88%',
+    height: '85%',
+    maxHeight: '90%',
     borderRadius: RADIUS.card,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -2139,6 +2147,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 20,
     elevation: 10,
+    display: 'flex',
+    flexDirection: 'column',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -2204,10 +2214,12 @@ const styles = StyleSheet.create({
   },
   modalScroll: {
     flex: 1,
+    height: '100%',
   },
   modalScrollContent: {
     padding: SPACING.lg,
     paddingBottom: SPACING.xl,
+    flexGrow: 1,
   },
   toastBanner: {
     flexDirection: 'row',
