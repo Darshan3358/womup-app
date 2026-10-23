@@ -27,6 +27,13 @@ import {
 import { COLORS } from '../theme/colors';
 import { LocationService } from '../services/locationService';
 
+let NativeWebViewComponent: any = null;
+try {
+  NativeWebViewComponent = require('react-native-webview').WebView;
+} catch {
+  NativeWebViewComponent = null;
+}
+
 interface MapPickerProps {
   initialLatitude?: number;
   initialLongitude?: number;
@@ -250,11 +257,20 @@ export const MapPicker: React.FC<MapPickerProps> = ({
     }).addTo(map);
 
     function emitCoords(lat, lng) {
-      window.parent.postMessage({
-        type: 'MAP_PIN_MOVED',
-        latitude: lat,
-        longitude: lng
-      }, '*');
+      if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'MAP_PIN_MOVED',
+          latitude: lat,
+          longitude: lng
+        }));
+      }
+      if (window.parent) {
+        window.parent.postMessage({
+          type: 'MAP_PIN_MOVED',
+          latitude: lat,
+          longitude: lng
+        }, '*');
+      }
     }
 
     marker.on('dragend', function() {
@@ -348,6 +364,28 @@ export const MapPicker: React.FC<MapPickerProps> = ({
               borderRadius: 16,
             }}
             title="OpenStreetMap Delivery Pin"
+          />
+        ) : NativeWebViewComponent ? (
+          <NativeWebViewComponent
+            originWhitelist={['*']}
+            source={{ html: mapHtml }}
+            style={{
+              width: '100%',
+              height: 320,
+              borderRadius: 16,
+            }}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            scrollEnabled={false}
+            onMessage={(event: any) => {
+              try {
+                const data = JSON.parse(event.nativeEvent.data);
+                if (data.type === 'MAP_PIN_MOVED') {
+                  setLatitude(data.latitude);
+                  setLongitude(data.longitude);
+                }
+              } catch (_) {}
+            }}
           />
         ) : (
           <View style={styles.gridOverlay}>

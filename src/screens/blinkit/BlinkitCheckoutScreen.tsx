@@ -102,6 +102,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     liveCheckoutState,
     emitCheckoutChange,
     setLocationModalVisible,
+    isServiceable,
   } = useApp();
 
   const [couponCodeInput, setCouponCodeInput] = useState('');
@@ -891,6 +892,13 @@ export const BlinkitCheckoutScreen: React.FC = () => {
 
   const handlePlaceOrderClick = () => {
     if (isSubmitting || isRazorpayVerifying || isCalculatingFee) return;
+    if (!isServiceable || areaDetectionStatus?.isServiceable === false) {
+      Alert.alert(
+        'Delivery Unavailable',
+        'Sorry, WormUp is not serviceable in your area. We are expanding soon!'
+      );
+      return;
+    }
     // Show Pre-Order Address Confirmation Popup first as requested by user
     setShowAddressConfirmModal(true);
   };
@@ -1790,14 +1798,22 @@ export const BlinkitCheckoutScreen: React.FC = () => {
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={handlePlaceOrderClick}
-          style={[styles.placeOrderBtn, (isSubmitting || isCalculatingFee) && { opacity: 0.8 }]}
-          disabled={isSubmitting || isCalculatingFee}
+          style={[
+            styles.placeOrderBtn,
+            (isSubmitting || isCalculatingFee || !isServiceable || areaDetectionStatus?.isServiceable === false) && {
+              opacity: 0.6,
+              backgroundColor: '#94A3B8',
+            },
+          ]}
+          disabled={isSubmitting || isCalculatingFee || !isServiceable || areaDetectionStatus?.isServiceable === false}
           accessibilityLabel="Place Order"
         >
           {isSubmitting ? (
             <ActivityIndicator color={COLORS.white} size="small" />
           ) : isCalculatingFee ? (
             <Text style={styles.placeOrderBtnText}>Calculating Total...</Text>
+          ) : (!isServiceable || areaDetectionStatus?.isServiceable === false) ? (
+            <Text style={styles.placeOrderBtnText}>Delivery Unavailable</Text>
           ) : (
             <Text style={styles.placeOrderBtnText}>Place Order • ₹{finalPayable} ➔</Text>
           )}

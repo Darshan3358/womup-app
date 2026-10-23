@@ -533,15 +533,19 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
       if (storeId) {
         this.server.to(`store_${storeId}`).emit('new_order', payload);
         this.server.to(`store:${storeId}`).emit('new_order', payload);
+        this.server.to(`hub_${storeId}`).emit('new_order', payload);
       }
       for (const bId of broadcastIds) {
         if (bId !== storeId) {
           this.server.to(`store_${bId}`).emit('new_order', payload);
           this.server.to(`store:${bId}`).emit('new_order', payload);
+          this.server.to(`hub_${bId}`).emit('new_order', payload);
         }
       }
       this.server.to('admin').emit('new_order', payload);
-      this.logger.log(`[WebSocket] Dispatched new_order to stores [${Array.from(new Set([storeId, ...broadcastIds].filter(Boolean))).join(', ')}]: ${order.orderNumber}`);
+      // Emit to active delivery riders to refresh radar screen
+      this.server.emit('new_order', payload);
+      this.logger.log(`[WebSocket] Dispatched new_order to stores [${Array.from(new Set([storeId, ...broadcastIds].filter(Boolean))).join(', ')}] & riders: ${order.orderNumber}`);
     }
   }
 

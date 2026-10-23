@@ -539,28 +539,51 @@ export class OrdersService {
       let authoritativeMrp: number | null = null;
       let authoritativeStock: number | null = null;
 
-      // 1. Check if area pricing override exists for this store's area
-      if (store.areaId) {
-        const areaIdStr = store.areaId.toString();
-        const areaIdObj = Types.ObjectId.isValid(areaIdStr) ? new Types.ObjectId(areaIdStr) : null;
-        const areaPricingQuery: any = {
-          $or: areaIdObj ? [{ areaId: areaIdObj }, { areaId: areaIdStr }] : [{ areaId: areaIdStr }],
-        };
-        if (vId) {
-          const vIdStr = vId.toString();
-          const vIdObj = Types.ObjectId.isValid(vIdStr) ? new Types.ObjectId(vIdStr) : null;
-          areaPricingQuery.variantId = { $in: vIdObj ? [vIdObj, vIdStr] : [vIdStr] };
-        } else if (prodId) {
-          const prodIdStr = prodId.toString();
-          const prodIdObj = Types.ObjectId.isValid(prodIdStr) ? new Types.ObjectId(prodIdStr) : null;
-          areaPricingQuery.productId = { $in: prodIdObj ? [prodIdObj, prodIdStr] : [prodIdStr] };
-        }
+      // 1. Check if area pricing override exists for store's area, matchedArea, or dto.areaId
+      const candidateAreaIds: any[] = [];
+      if (store.areaId) candidateAreaIds.push(store.areaId);
+      if (matchedArea?._id) candidateAreaIds.push(matchedArea._id);
+      if (dto.areaId) candidateAreaIds.push(dto.areaId);
 
-        const areaPricingDoc = await this.connection.collection('area_pricing').findOne(areaPricingQuery);
-        if (areaPricingDoc && typeof areaPricingDoc.price === 'number') {
-          authoritativePrice = areaPricingDoc.price;
-          if (typeof areaPricingDoc.mrp === 'number') authoritativeMrp = areaPricingDoc.mrp;
-          if (typeof areaPricingDoc.stock === 'number') authoritativeStock = areaPricingDoc.stock;
+      const candidateAreaIdStrs = candidateAreaIds.map((a) => a.toString());
+      const candidateAreaIdObjs = candidateAreaIdStrs
+        .filter((s) => Types.ObjectId.isValid(s))
+        .map((s) => new Types.ObjectId(s));
+
+      const vIdStr = vId ? vId.toString() : null;
+      const vIdObj = vIdStr && Types.ObjectId.isValid(vIdStr) ? new Types.ObjectId(vIdStr) : null;
+      const prodIdStr = prodId ? prodId.toString() : null;
+      const prodIdObj = prodIdStr && Types.ObjectId.isValid(prodIdStr) ? new Types.ObjectId(prodIdStr) : null;
+
+      const areaPricingQuery: any = {
+        areaId: { $in: [...candidateAreaIdObjs, ...candidateAreaIdStrs] },
+      };
+      if (vId) {
+        areaPricingQuery.variantId = { $in: vIdObj ? [vIdObj, vIdStr] : [vIdStr] };
+      } else if (prodId) {
+        areaPricingQuery.productId = { $in: prodIdObj ? [prodIdObj, prodIdStr] : [prodIdStr] };
+      }
+
+      const areaPricingDoc = await this.connection.collection('area_pricing').findOne(areaPricingQuery);
+      if (areaPricingDoc && typeof areaPricingDoc.price === 'number') {
+        authoritativePrice = areaPricingDoc.price;
+        if (typeof areaPricingDoc.mrp === 'number') authoritativeMrp = areaPricingDoc.mrp;
+        if (typeof areaPricingDoc.stock === 'number') authoritativeStock = areaPricingDoc.stock;
+      }
+
+      // 1b. If still null, check if item.unitPrice matches any active area pricing for this product/variant
+      if (authoritativePrice === null && typeof item.unitPrice === 'number') {
+        const itemPricingMatch = await this.connection.collection('area_pricing').findOne({
+          $or: [
+            ...(vId ? [{ variantId: vIdStr }, { variantId: vIdObj }] : []),
+            ...(prodId ? [{ productId: prodIdStr }, { productId: prodIdObj }] : []),
+          ],
+          price: item.unitPrice,
+        });
+        if (itemPricingMatch) {
+          authoritativePrice = itemPricingMatch.price;
+          if (typeof itemPricingMatch.mrp === 'number') authoritativeMrp = itemPricingMatch.mrp;
+          if (typeof itemPricingMatch.stock === 'number') authoritativeStock = itemPricingMatch.stock;
         }
       }
 

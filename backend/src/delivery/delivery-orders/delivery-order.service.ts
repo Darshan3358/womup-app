@@ -383,6 +383,7 @@ export class DeliveryOrderService implements OnModuleInit {
         createdAt: { $gte: maxOrderAge },
         status: {
           $in: [
+            OrderStatus.PLACED,
             OrderStatus.PACKING,
             OrderStatus.PACKED,
           ],
