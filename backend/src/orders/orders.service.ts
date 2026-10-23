@@ -417,8 +417,13 @@ export class OrdersService {
       throw new BadRequestException('Delivery not available at your location. Selected address is outside all configured service areas.');
     }
 
-    // Step 3: Find active, eligible stores strictly assigned to the detected area's actual ID (or requested store)
-    const areaIdObj = Types.ObjectId.isValid(matchedArea._id.toString()) ? new Types.ObjectId(matchedArea._id.toString()) : matchedArea._id;
+    // Step 3: Find active, eligible stores that service this area or customer's coordinates
+    const allActiveStores = await this.storeModel.find({ isActive: true }).exec();
+
+    // Filter stores with valid coordinates and strictly enforce admin-configured delivery radius
+    const R_EARTH = 6371;
+    const eligibleStores: Array<{ store: StoreDocument; distKm: number }> = [];
+    const seenStoreIds = new Set<string>();
     const areaIdStr = matchedArea._id.toString();
 
     const isRequestedStoreInArea = requestedStore && (
@@ -426,57 +431,42 @@ export class OrdersService {
       (matchedArea.hubStoreId && requestedStore._id.toString() === matchedArea.hubStoreId.toString())
     );
 
-    let candidateStores = await this.storeModel.find({
-      $or: [
-        { areaId: areaIdObj },
-        { areaId: areaIdStr },
-        ...(matchedArea.hubStoreId ? [{ _id: matchedArea.hubStoreId }] : []),
-        ...(isRequestedStoreInArea ? [{ _id: requestedStore._id }] : []),
-      ],
-      isActive: true,
-    }).exec();
+    for (const cand of allActiveStores) {
+      const candIdStr = cand._id.toString();
+      const candAreaIdStr = cand.areaId?.toString();
+      const isAreaDirectMatch =
+        candAreaIdStr === areaIdStr ||
+        (matchedArea.hubStoreId && candIdStr === matchedArea.hubStoreId.toString()) ||
+        (isRequestedStoreInArea && candIdStr === requestedStore._id.toString()) ||
+        (cand.areaName &&
+          matchedArea.name &&
+          (cand.areaName.toLowerCase().includes(matchedArea.name.toLowerCase()) ||
+            matchedArea.name.toLowerCase().includes(cand.areaName.toLowerCase())));
 
-    // Filter stores with valid coordinates and strictly enforce admin-configured delivery radius
-    const R_EARTH = 6371;
-    const eligibleStores: Array<{ store: StoreDocument; distKm: number }> = [];
-
-    for (const cand of candidateStores) {
-      const sCoords = cand.location?.coordinates;
+      const sCoords =
+        cand.location?.coordinates ||
+        ((cand as any).longitude && (cand as any).latitude
+          ? [(cand as any).longitude, (cand as any).latitude]
+          : null);
+      let distKm = 999;
       if (sCoords && Array.isArray(sCoords) && sCoords.length >= 2) {
         const [sLng, sLat] = sCoords;
         if (!isNaN(sLat) && !isNaN(sLng) && sLat !== 0 && sLng !== 0) {
           const dLat = ((lat - sLat) * Math.PI) / 180;
           const dLng = ((lng - sLng) * Math.PI) / 180;
-          const a = Math.sin(dLat / 2) ** 2 + Math.cos((sLat * Math.PI) / 180) * Math.cos((lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
-          const distKm = Number((R_EARTH * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))).toFixed(2));
-          const maxRadiusKm = Number(cand.serviceRadiusKm) || 6.0;
-
-          if (distKm <= maxRadiusKm) {
-            eligibleStores.push({ store: cand, distKm });
-          }
+          const a =
+            Math.sin(dLat / 2) ** 2 +
+            Math.cos((sLat * Math.PI) / 180) *
+              Math.cos((lat * Math.PI) / 180) *
+              Math.sin(dLng / 2) ** 2;
+          distKm = Number((R_EARTH * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))).toFixed(2));
         }
       }
-    }
 
-    // Dynamic Geofence Fallback: If no store matched strictly by areaId, check any active dark store whose serviceRadiusKm covers customer coordinates
-    if (eligibleStores.length === 0) {
-      const allActiveStores = await this.storeModel.find({ isActive: true }).exec();
-      for (const cand of allActiveStores) {
-        const sCoords = cand.location?.coordinates || ((cand as any).longitude && (cand as any).latitude ? [(cand as any).longitude, (cand as any).latitude] : null);
-        if (sCoords && Array.isArray(sCoords) && sCoords.length >= 2) {
-          const [sLng, sLat] = sCoords;
-          if (!isNaN(sLat) && !isNaN(sLng) && sLat !== 0 && sLng !== 0) {
-            const dLat = ((lat - sLat) * Math.PI) / 180;
-            const dLng = ((lng - sLng) * Math.PI) / 180;
-            const a = Math.sin(dLat / 2) ** 2 + Math.cos((sLat * Math.PI) / 180) * Math.cos((lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
-            const distKm = Number((R_EARTH * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))).toFixed(2));
-            const maxRadiusKm = Number(cand.serviceRadiusKm) || 6.0;
-
-            if (distKm <= maxRadiusKm) {
-              eligibleStores.push({ store: cand, distKm });
-            }
-          }
-        }
+      const maxRadiusKm = Number(cand.serviceRadiusKm) || 6.0;
+      if ((distKm <= maxRadiusKm || isAreaDirectMatch) && !seenStoreIds.has(candIdStr)) {
+        seenStoreIds.add(candIdStr);
+        eligibleStores.push({ store: cand, distKm: distKm < 999 ? distKm : 1.0 });
       }
     }
 
@@ -792,7 +782,12 @@ export class OrdersService {
     const estimatedArrival = new Date(Date.now() + 9 * 60 * 1000); // 9 mins
     const deliveryOtp = Math.floor(1000 + Math.random() * 9000).toString();
 
-    const broadcastStoreIds = (eligibleStores || []).map((e) => e.store._id);
+    const broadcastStoreIds = Array.from(
+      new Set([
+        store._id.toString(),
+        ...(eligibleStores || []).map((e) => e.store._id.toString()),
+      ])
+    ).map((id) => new Types.ObjectId(id));
     const resolvedAreaId = matchedArea
       ? (Types.ObjectId.isValid(matchedArea._id.toString()) ? new Types.ObjectId(matchedArea._id.toString()) : matchedArea._id)
       : undefined;
