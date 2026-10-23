@@ -2,6 +2,17 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import * as crypto from 'crypto';
+import * as dns from 'dns';
+
+// Force Node.js DNS to strictly prefer IPv4 across the process
+try {
+  dns.setDefaultResultOrder('ipv4first');
+} catch (e) {}
+
+// Strict IPv4 DNS lookup to prevent ENETUNREACH on IPv6 cloud environments
+const ipv4Lookup = (hostname: string, options: any, callback: (err: any, address: string, family: number) => void) => {
+  dns.lookup(hostname, { family: 4 }, callback);
+};
 
 @Injectable()
 export class EmailService {
@@ -17,31 +28,31 @@ export class EmailService {
     const cleanPass = (rawPass || '').replace(/\s+/g, '');
 
     if (user && cleanPass) {
-      // Primary SSL Port 465
+      // Primary SSL Port 465 (Forced IPv4)
       this.transporter465 = nodemailer.createTransport({
         host: 'smtp.gmail.com',
         port: 465,
         secure: true,
-        family: 4, // Force IPv4
+        lookup: ipv4Lookup,
         auth: { user, pass: cleanPass },
         connectionTimeout: 8000,
         greetingTimeout: 8000,
         socketTimeout: 10000,
       } as any);
 
-      // Fallback TLS Port 587
+      // Fallback TLS Port 587 (Forced IPv4)
       this.transporter587 = nodemailer.createTransport({
         host: 'smtp.gmail.com',
         port: 587,
         secure: false,
-        family: 4,
+        lookup: ipv4Lookup,
         auth: { user, pass: cleanPass },
         connectionTimeout: 8000,
         greetingTimeout: 8000,
         socketTimeout: 10000,
       } as any);
 
-      this.logger.log(`Email Service initialized with: ${user}`);
+      this.logger.log(`Email Service initialized with: ${user} (Forced IPv4)`);
     } else {
       this.logger.warn('EMAIL_USER or EMAIL_PASS not set');
     }
@@ -166,6 +177,7 @@ export class EmailService {
 
   /** Send OTP email to user */
   async sendOtpEmail(email: string, otp: string): Promise<boolean> {
+    this.logger.log(`[Email OTP] Generated Code for ${email}: ${otp}`);
     const fromName = 'Womup Security';
     const html = `
 <!DOCTYPE html>
