@@ -3,6 +3,14 @@
     "name": "Worm Up Dark Store",
     "slug": "womup-store",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/2914feef-5f54-4157-b543-c428319fd864",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -23,7 +31,8 @@
       },
       "package": "com.womup.store",
       "permissions": [
-        "CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -38,6 +47,12 @@
           "cameraPermission": "Wom Up needs access to your camera to take product photos."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "2914feef-5f54-4157-b543-c428319fd864"
+      }
+    },
+    "owner": "darshanthanki007"
   }
 }
