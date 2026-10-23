@@ -3,9 +3,7 @@
     "name": "Worm Up",
     "slug": "womup-customer",
     "version": "1.0.0",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.0.0",
     "updates": {
       "url": "https://u.expo.dev/d05b7fce-0f74-4d20-8b8b-59b06b5cda95",
       "checkAutomatically": "ON_LOAD",

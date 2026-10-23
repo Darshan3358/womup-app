@@ -3,9 +3,7 @@
     "name": "Worm Up Dark Store",
     "slug": "womup-store",
     "version": "1.0.0",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.0.0",
     "updates": {
       "url": "https://u.expo.dev/2914feef-5f54-4157-b543-c428319fd864",
       "checkAutomatically": "ON_LOAD",

@@ -3,9 +3,7 @@
     "name": "Womup Vendor",
     "slug": "womup-vendor",
     "version": "1.0.0",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.0.0",
     "updates": {
       "url": "https://u.expo.dev/49446215-3cca-4522-8a2b-cc249807deff",
       "checkAutomatically": "ON_LOAD",

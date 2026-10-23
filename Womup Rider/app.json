@@ -3,9 +3,7 @@
     "name": "Womup Delivery Partner",
     "slug": "womup-rider",
     "version": "1.0.0",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.0.0",
     "updates": {
       "url": "https://u.expo.dev/2ec66fde-09d4-485e-bd01-f5c26b9ad253",
       "checkAutomatically": "ON_LOAD",
