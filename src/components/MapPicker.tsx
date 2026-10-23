@@ -59,6 +59,7 @@ export const MapPicker: React.FC<MapPickerProps> = ({
   const [gettingLocation, setGettingLocation] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [resolvedAddress, setResolvedAddress] = useState<string>('');
+  const [mapLoaded, setMapLoaded] = useState(false);
 
   useEffect(() => {
     if (initialLatitude && initialLongitude) {
@@ -122,36 +123,46 @@ export const MapPicker: React.FC<MapPickerProps> = ({
   };
 
   const iframeRef = React.useRef<any>(null);
+  const webviewRef = React.useRef<any>(null);
 
   // Sync external coordinate updates to the embedded Leaflet map
   useEffect(() => {
+    const dataObj = {
+      type: 'PAN_TO',
+      lat: latitude,
+      lng: longitude,
+      zoom,
+    };
+
     if (Platform.OS === 'web' && iframeRef.current?.contentWindow) {
       try {
-        iframeRef.current.contentWindow.postMessage(
-          {
-            type: 'PAN_TO',
-            lat: latitude,
-            lng: longitude,
-            zoom,
-          },
-          '*'
-        );
+        iframeRef.current.contentWindow.postMessage(dataObj, '*');
+      } catch {
+        // silent
+      }
+    } else if (webviewRef.current) {
+      try {
+        webviewRef.current.postMessage(JSON.stringify(dataObj));
       } catch {
         // silent
       }
     }
   }, [latitude, longitude, zoom]);
 
-  // Listen for user pin movements or map clicks from Leaflet
+  // Listen for user pin movements or map clicks from Leaflet on web
   useEffect(() => {
     const handleMapMessage = (event: MessageEvent) => {
-      if (event.data && event.data.type === 'MAP_PIN_MOVED') {
-        const newLat = Number(Number(event.data.latitude).toFixed(6));
-        const newLng = Number(Number(event.data.longitude).toFixed(6));
-        setLatitude(newLat);
-        setLongitude(newLng);
-        setConfirmed(false);
-        onLocationSelect({ latitude: newLat, longitude: newLng });
+      if (event.data) {
+        if (event.data.type === 'MAP_PIN_MOVED') {
+          const newLat = Number(Number(event.data.latitude).toFixed(6));
+          const newLng = Number(Number(event.data.longitude).toFixed(6));
+          setLatitude(newLat);
+          setLongitude(newLng);
+          setConfirmed(false);
+          onLocationSelect({ latitude: newLat, longitude: newLng });
+        } else if (event.data.type === 'MAP_READY') {
+          setMapLoaded(true);
+        }
       }
     };
 
@@ -166,11 +177,10 @@ export const MapPicker: React.FC<MapPickerProps> = ({
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body, #map { width: 100%; height: 100%; background: #F8FAFC; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    html, body, #map { width: 100%; height: 100%; background: #F1F5F9; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     .custom-pin {
       display: flex;
       flex-direction: column;
@@ -180,31 +190,31 @@ export const MapPicker: React.FC<MapPickerProps> = ({
     }
     .custom-pin:active { cursor: grabbing; }
     .pin-badge {
-      background: #111827;
+      background: #0F172A;
       color: #FFFFFF;
       font-size: 11px;
       font-weight: 700;
-      padding: 3px 8px;
+      padding: 4px 10px;
       border-radius: 12px;
       white-space: nowrap;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
       margin-bottom: 2px;
       letter-spacing: 0.3px;
     }
     .pin-circle {
-      width: 34px;
-      height: 34px;
-      background: #DC2626;
+      width: 38px;
+      height: 38px;
+      background: #EF4444;
       border: 3px solid #FFFFFF;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 4px 12px rgba(220, 38, 38, 0.45);
+      box-shadow: 0 4px 14px rgba(239, 68, 68, 0.5);
       color: white;
     }
     .pin-shadow {
-      width: 14px;
+      width: 16px;
       height: 5px;
       background: rgba(0,0,0,0.25);
       border-radius: 50%;
@@ -216,82 +226,119 @@ export const MapPicker: React.FC<MapPickerProps> = ({
       left: 50%;
       transform: translateX(-50%);
       z-index: 1000;
-      background: rgba(17, 24, 39, 0.85);
-      backdrop-filter: blur(4px);
+      background: rgba(15, 23, 42, 0.88);
       color: #FFFFFF;
       font-size: 11px;
       font-weight: 600;
-      padding: 5px 12px;
+      padding: 6px 14px;
       border-radius: 20px;
       pointer-events: none;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+      white-space: nowrap;
     }
     .leaflet-control-attribution {
       font-size: 9px !important;
-      background: rgba(255,255,255,0.7) !important;
+      background: rgba(255,255,255,0.75) !important;
     }
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 </head>
 <body>
-  <div class="hint-banner">👆 Tap map or drag pin to select exact location</div>
+  <div class="hint-banner">📍 Drag pin or tap map to set location</div>
   <div id="map"></div>
   <script>
-    var map = L.map('map', { zoomControl: false }).setView([${latitude}, ${longitude}], ${zoom});
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>'
-    }).addTo(map);
-
-    L.control.zoom({ position: 'topright' }).addTo(map);
-
-    var pinIcon = L.divIcon({
-      className: 'custom-pin',
-      html: '<div class="pin-badge">${pinTitle}</div><div class="pin-circle"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5" fill="white"/></svg></div><div class="pin-shadow"></div>',
-      iconSize: [120, 64],
-      iconAnchor: [60, 60]
-    });
-
-    var marker = L.marker([${latitude}, ${longitude}], {
-      draggable: true,
-      icon: pinIcon
-    }).addTo(map);
-
-    function emitCoords(lat, lng) {
+    function notify(type, payload) {
+      var msg = JSON.stringify(Object.assign({ type: type }, payload || {}));
       if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          type: 'MAP_PIN_MOVED',
-          latitude: lat,
-          longitude: lng
-        }));
+        window.ReactNativeWebView.postMessage(msg);
       }
       if (window.parent) {
-        window.parent.postMessage({
-          type: 'MAP_PIN_MOVED',
-          latitude: lat,
-          longitude: lng
-        }, '*');
+        window.parent.postMessage(Object.assign({ type: type }, payload || {}), '*');
       }
     }
 
-    marker.on('dragend', function() {
-      var p = marker.getLatLng();
-      emitCoords(p.lat, p.lng);
-    });
+    try {
+      var map = L.map('map', {
+        zoomControl: false,
+        attributionControl: false
+      }).setView([${latitude}, ${longitude}], ${zoom});
 
-    map.on('click', function(e) {
-      marker.setLatLng(e.latlng);
-      emitCoords(e.latlng.lat, e.latlng.lng);
-    });
+      // CartoDB Voyager - high performance, retina, never rate-limited or blocked
+      var cartoTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        subdomains: ['a', 'b', 'c', 'd'],
+        maxZoom: 19
+      }).addTo(map);
+
+      // OpenStreetMap fallback if CartoDB fails
+      cartoTiles.on('tileerror', function() {
+        if (!window.usedOSMFallback) {
+          window.usedOSMFallback = true;
+          L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+        }
+      });
+
+      L.control.zoom({ position: 'topright' }).addTo(map);
+
+      var pinIcon = L.divIcon({
+        className: 'custom-pin',
+        html: '<div class="pin-badge">${pinTitle}</div><div class="pin-circle"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5" fill="white"/></svg></div><div class="pin-shadow"></div>',
+        iconSize: [120, 64],
+        iconAnchor: [60, 60]
+      });
+
+      var marker = L.marker([${latitude}, ${longitude}], {
+        draggable: true,
+        icon: pinIcon
+      }).addTo(map);
+
+      function emitCoords(lat, lng) {
+        notify('MAP_PIN_MOVED', { latitude: lat, longitude: lng });
+      }
+
+      marker.on('dragend', function() {
+        var p = marker.getLatLng();
+        emitCoords(p.lat, p.lng);
+      });
+
+      map.on('click', function(e) {
+        marker.setLatLng(e.latlng);
+        emitCoords(e.latlng.lat, e.latlng.lng);
+      });
+
+      // Invalidate map size so tiles calculate properly after WebView finishes layout
+      function invalidate() {
+        if (map) map.invalidateSize(true);
+      }
+      setTimeout(invalidate, 100);
+      setTimeout(invalidate, 400);
+      setTimeout(invalidate, 1000);
+      window.addEventListener('resize', invalidate);
+
+      notify('MAP_READY', {});
+    } catch (err) {
+      console.error('Leaflet initialization error:', err);
+      notify('MAP_ERROR', { error: String(err) });
+    }
+
+    function handleIncomingMessage(raw) {
+      try {
+        var evData = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (!evData) return;
+        if (evData.type === 'PAN_TO' && window.map && window.marker) {
+          var nLat = evData.lat;
+          var nLng = evData.lng;
+          var nZoom = evData.zoom || window.map.getZoom();
+          window.map.setView([nLat, nLng], nZoom, { animate: true });
+          window.marker.setLatLng([nLat, nLng]);
+        }
+      } catch (_) {}
+    }
 
     window.addEventListener('message', function(ev) {
-      if (!ev.data) return;
-      if (ev.data.type === 'PAN_TO') {
-        var nLat = ev.data.lat;
-        var nLng = ev.data.lng;
-        var nZoom = ev.data.zoom || map.getZoom();
-        map.setView([nLat, nLng], nZoom, { animate: true });
-        marker.setLatLng([nLat, nLng]);
-      }
+      handleIncomingMessage(ev.data);
+    });
+    document.addEventListener('message', function(ev) {
+      handleIncomingMessage(ev.data);
     });
   </script>
 </body>
@@ -367,22 +414,43 @@ export const MapPicker: React.FC<MapPickerProps> = ({
           />
         ) : NativeWebViewComponent ? (
           <NativeWebViewComponent
+            ref={webviewRef}
             originWhitelist={['*']}
-            source={{ html: mapHtml }}
+            source={{
+              html: mapHtml,
+              baseUrl: 'https://localhost',
+            }}
             style={{
               width: '100%',
               height: 320,
               borderRadius: 16,
+              backgroundColor: '#F1F5F9',
+            }}
+            containerStyle={{
+              width: '100%',
+              height: 320,
+              borderRadius: 16,
+              overflow: 'hidden',
             }}
             javaScriptEnabled={true}
             domStorageEnabled={true}
             scrollEnabled={false}
+            mixedContentMode="always"
+            androidHardwareAccelerationDisabled={false}
+            androidLayerType="hardware"
+            overScrollMode="never"
+            setSupportMultipleWindows={false}
+            allowsInlineMediaPlayback={true}
+            cacheEnabled={true}
+            onLoadEnd={() => setMapLoaded(true)}
             onMessage={(event: any) => {
               try {
                 const data = JSON.parse(event.nativeEvent.data);
                 if (data.type === 'MAP_PIN_MOVED') {
                   setLatitude(data.latitude);
                   setLongitude(data.longitude);
+                } else if (data.type === 'MAP_READY') {
+                  setMapLoaded(true);
                 }
               } catch (_) {}
             }}
@@ -402,6 +470,14 @@ export const MapPicker: React.FC<MapPickerProps> = ({
               </View>
               <View style={styles.pinShadow} />
             </View>
+          </View>
+        )}
+
+        {/* Loading Overlay */}
+        {!mapLoaded && (
+          <View style={styles.mapLoadingOverlay} pointerEvents="none">
+            <ActivityIndicator size="small" color="#059669" />
+            <Text style={styles.mapLoadingText}>Loading live map...</Text>
           </View>
         )}
 
@@ -722,5 +798,18 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
+  },
+  mapLoadingOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(241, 245, 249, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    zIndex: 20,
+  },
+  mapLoadingText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
   },
 });

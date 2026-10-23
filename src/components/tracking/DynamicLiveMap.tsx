@@ -210,8 +210,8 @@ export const DynamicLiveMap: React.FC<DynamicLiveMapProps> = ({
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body, #map { width: 100%; height: 100%; background: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
@@ -314,11 +314,21 @@ export const DynamicLiveMap: React.FC<DynamicLiveMapProps> = ({
       scrollWheelZoom: false
     }).setView([(storeLat + custLat)/2, (storeLng + custLng)/2], 14);
 
-    // OpenStreetMap tiles with attribution
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors'
+    // CartoDB Voyager tiles (high-speed, retina, mobile friendly)
+    var cartoTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      subdomains: ['a', 'b', 'c', 'd'],
+      maxZoom: 19
     }).addTo(map);
+
+    cartoTiles.on('tileerror', function() {
+      if (!window.usedOSMFallback) {
+        window.usedOSMFallback = true;
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+      }
+    });
+
+    setTimeout(function() { if (map) map.invalidateSize(true); }, 200);
+    setTimeout(function() { if (map) map.invalidateSize(true); }, 600);
 
     // 1. STORE MARKER (Pickup Point)
     var storeIcon = L.divIcon({
@@ -514,11 +524,17 @@ export const DynamicLiveMap: React.FC<DynamicLiveMapProps> = ({
         <View style={[styles.mapViewport, { height: mapHeight, overflow: 'hidden' }]}>
           <NativeWebViewComponent
             originWhitelist={['*']}
-            source={{ html: mapHtml }}
+            source={{
+              html: mapHtml,
+              baseUrl: 'https://localhost',
+            }}
             style={{ width: '100%', height: '100%', borderRadius: 18 }}
             javaScriptEnabled={true}
             domStorageEnabled={true}
             scrollEnabled={false}
+            mixedContentMode="always"
+            androidHardwareAccelerationDisabled={false}
+            androidLayerType="hardware"
           />
           <TouchableOpacity
             style={styles.openExternalMapBtn}
