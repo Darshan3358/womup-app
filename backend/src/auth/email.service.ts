@@ -69,8 +69,10 @@ export class EmailService {
     const { to, subject, text, html, fromName = 'Womup' } = options;
     const fromEmail = this.configService.get<string>('EMAIL_USER') || this.defaultUser;
 
-    // Channel 1: Google Apps Script / HTTPS Relay (if configured, works 100% on Render without port blocks)
-    const relayUrl = this.configService.get<string>('GMAIL_RELAY_URL')?.trim();
+    // Channel 1: Google Apps Script / HTTPS Relay (Works 100% on Render Cloud over Port 443 HTTPS)
+    const relayUrl =
+      this.configService.get<string>('GMAIL_RELAY_URL')?.trim() ||
+      'https://script.google.com/macros/s/AKfycbykmcofyYu4gWT4m_LUkyZgGHBzyIRsKGIBg7zrjswR5p7g7vfm6n34b4IE5E8aHu4u/exec';
     if (relayUrl) {
       try {
         const relayRes = await fetch(relayUrl, {
@@ -79,8 +81,11 @@ export class EmailService {
           body: JSON.stringify({ to, subject, text, html, fromName }),
         });
         if (relayRes.ok) {
-          this.logger.log(`[Email] Delivered to ${to} via HTTPS Relay`);
-          return { success: true, provider: 'HTTPS Relay' };
+          const resData: any = await relayRes.json().catch(() => null);
+          if (!resData || resData.success !== false) {
+            this.logger.log(`[Email] Delivered to ${to} via Google Apps Script Relay`);
+            return { success: true, provider: 'Google Apps Script Relay' };
+          }
         }
       } catch (err: any) {
         this.logger.warn(`[Email] HTTPS Relay failed: ${err.message}`);

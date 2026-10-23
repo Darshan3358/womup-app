@@ -281,11 +281,12 @@ export const BlinkitOrderAgainScreen: React.FC = () => {
               You haven't placed any orders yet. Browse products and get fresh items delivered in 9 minutes!
             </Text>
             <TouchableOpacity
+              activeOpacity={0.85}
               onPress={() => setActiveScreen('Blinkit_Home')}
-              style={[styles.repeatOrderBtn, { marginTop: 14 }]}
+              style={styles.startShoppingBtn}
             >
-              <Ionicons name="basket-outline" size={16} color={COLORS.white} style={{ marginRight: 6 }} />
-              <Text style={styles.repeatOrderBtnText}>Start Shopping</Text>
+              <Ionicons name="basket-outline" size={17} color={COLORS.white} style={{ marginRight: 8 }} />
+              <Text style={styles.startShoppingBtnText}>Start Shopping</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -910,6 +911,27 @@ const styles = StyleSheet.create({
     color: '#697293',
     maxWidth: 290,
     lineHeight: 18,
+  },
+  startShoppingBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F23D9B',
+    paddingHorizontal: 28,
+    paddingVertical: 12,
+    borderRadius: 24,
+    shadowColor: '#F23D9B',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
+    marginTop: 18,
+  },
+  startShoppingBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
 });
 

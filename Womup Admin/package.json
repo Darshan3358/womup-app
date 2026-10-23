@@ -21,6 +21,7 @@
     "expo-image-picker": "~16.0.6",
     "expo-linear-gradient": "~14.0.1",
     "expo-status-bar": "~2.0.0",
+    "expo-updates": "^0.26.19",
     "express": "^5.2.1",
     "lucide-react-native": "^0.475.0",
     "mongodb": "^7.6.0",

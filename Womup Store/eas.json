@@ -11,20 +11,22 @@
       }
     },
     "preview": {
+      "channel": "preview",
       "distribution": "internal",
       "android": {
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://localhost:5050/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://womup-app-uquz.onrender.com/api/v1"
       }
     },
     "production": {
+      "channel": "production",
       "android": {
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://localhost:5050/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://womup-app-uquz.onrender.com/api/v1"
       }
     }
   },
