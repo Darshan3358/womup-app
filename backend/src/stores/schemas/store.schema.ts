@@ -54,6 +54,9 @@ export class Store {
   @Prop({ default: false })
   isOnShift?: boolean;
 
+  @Prop({ default: true })
+  isOnline?: boolean;
+
   @Prop({ default: '07:00' })
   openingTime: string;
 

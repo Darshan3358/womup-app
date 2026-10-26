@@ -13,6 +13,20 @@ export class StoresController {
     return this.storesService.findAll();
   }
 
+  @Get('stores/local')
+  @ApiOperation({ summary: 'Get nearby local dark stores within 5km radius' })
+  async getNearbyLocalStores(
+    @Query('lat') lat?: number,
+    @Query('lng') lng?: number,
+    @Query('radius') radius?: number,
+  ) {
+    return this.storesService.getNearbyLocalStores(
+      lat ? Number(lat) : undefined,
+      lng ? Number(lng) : undefined,
+      radius ? Number(radius) : 5,
+    );
+  }
+
   @Get('stores/:id')
   @ApiOperation({ summary: 'Get dark store by ID' })
   async getStoreById(@Param('id') id: string) {

@@ -85,6 +85,9 @@ export class Vendor {
   @Prop({ default: true })
   isOpenNow: boolean;
 
+  @Prop({ default: true })
+  isOnline: boolean;
+
   // Media
   @Prop({ default: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&q=80' })
   imageUrl: string;

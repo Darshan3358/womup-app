@@ -33,6 +33,7 @@ interface VendorAuthContextType {
   verifyCollectionRequest: (id: string) => Promise<void>;
   rejectCollectionRequest: (id: string, reason?: string) => Promise<void>;
   refreshData: () => Promise<void>;
+  toggleStoreOnline: () => Promise<boolean>;
 }
 
 const VendorAuthContext = createContext<VendorAuthContextType>({} as any);
@@ -251,6 +252,22 @@ export const VendorAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
+  const toggleStoreOnline = async (): Promise<boolean> => {
+    if (!vendor?.vendorCode) return false;
+    const currentState = vendor.isOnline !== false && vendor.isOpenNow !== false;
+    const targetState = !currentState;
+    try {
+      const res = await VendorApi.toggleOnlineStatus(vendor.vendorCode, targetState);
+      if (res.success) {
+        setVendor((prev) => (prev ? { ...prev, isOnline: targetState, isOpenNow: targetState } : null));
+        return true;
+      }
+    } catch (e) {
+      console.warn('Failed to toggle store online status:', e);
+    }
+    return false;
+  };
+
   return (
     <VendorAuthContext.Provider
       value={{
@@ -273,6 +290,7 @@ export const VendorAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         verifyCollectionRequest,
         rejectCollectionRequest,
         refreshData,
+        toggleStoreOnline,
       }}
     >
       {children}

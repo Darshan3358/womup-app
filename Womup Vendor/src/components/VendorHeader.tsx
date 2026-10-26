@@ -6,7 +6,16 @@ import { COLORS, GRADIENTS } from '../theme';
 import { useVendor } from '../context/VendorAuthContext';
 
 export const VendorHeader: React.FC = () => {
-  const { vendor, setIsQRModalVisible, pendingRequests, refreshData } = useVendor();
+  const { vendor, setIsQRModalVisible, pendingRequests, refreshData, toggleStoreOnline } = useVendor();
+  const [isToggling, setIsToggling] = React.useState(false);
+  const isOnline = vendor?.isOnline !== false && vendor?.isOpenNow !== false;
+
+  const handleToggleOnline = async () => {
+    if (isToggling) return;
+    setIsToggling(true);
+    await toggleStoreOnline();
+    setIsToggling(false);
+  };
 
   return (
     <LinearGradient colors={GRADIENTS.navyHeader} style={styles.container}>
@@ -18,10 +27,17 @@ export const VendorHeader: React.FC = () => {
           <View>
             <View style={styles.storeNameRow}>
               <Text style={styles.storeName}>{vendor?.storeName || 'Vendor Store'}</Text>
-              <View style={styles.onlineBadge}>
-                <View style={styles.greenDot} />
-                <Text style={styles.onlineText}>Online</Text>
-              </View>
+              <TouchableOpacity
+                style={[styles.onlineBadge, !isOnline && styles.offlineBadge]}
+                onPress={handleToggleOnline}
+                activeOpacity={0.7}
+                disabled={isToggling}
+              >
+                <View style={[styles.greenDot, !isOnline && styles.redDot]} />
+                <Text style={[styles.onlineText, !isOnline && styles.offlineText]}>
+                  {isToggling ? '...' : isOnline ? 'Online' : 'Offline'}
+                </Text>
+              </TouchableOpacity>
             </View>
             <Text style={styles.vendorCode}>
               ID: {vendor?.vendorCode || 'VND001'} • {vendor?.categoryName} • {vendor?.city}
@@ -99,10 +115,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(16, 185, 129, 0.2)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 8,
     gap: 4,
+  },
+  offlineBadge: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
   },
   greenDot: {
     width: 6,
@@ -110,10 +129,16 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: '#10B981',
   },
+  redDot: {
+    backgroundColor: '#EF4444',
+  },
   onlineText: {
     fontSize: 10,
     fontWeight: '700',
     color: '#10B981',
+  },
+  offlineText: {
+    color: '#EF4444',
   },
   vendorCode: {
     fontSize: 11,

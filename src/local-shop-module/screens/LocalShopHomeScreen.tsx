@@ -96,7 +96,7 @@ export const LocalShopHomeScreen: React.FC = () => {
     })();
   }, []);
 
-  // Load live vendors from MongoDB
+  // Load live vendors from MongoDB within 5km radius
   const loadVendors = async () => {
     setIsLoading(true);
     try {
@@ -104,7 +104,8 @@ export const LocalShopHomeScreen: React.FC = () => {
         selectedCategory,
         searchQuery,
         userLocation.lat,
-        userLocation.lng
+        userLocation.lng,
+        5 // 🚨 Strict 5km Radius
       );
       setVendors(data);
       if (data.length > 0 && !selectedVendor) {
@@ -406,11 +407,21 @@ export const LocalShopHomeScreen: React.FC = () => {
             </View>
           ) : vendors.length === 0 ? (
             <View style={styles.emptyState}>
-              <Ionicons name="storefront-outline" size={60} color="#CBD5E1" />
-              <Text style={styles.emptyTitle}>No shops nearby</Text>
+              <View style={styles.emptyIconCircle}>
+                <Ionicons name="storefront" size={40} color="#E11D48" />
+              </View>
+              <Text style={styles.emptyTitle}>No Stores Nearby</Text>
               <Text style={styles.emptyDesc}>
-                We're expanding rapidly! New partner stores coming to your area soon.
+                We couldn't find any local stores online within 5km of your location. Please check back later!
               </Text>
+              <TouchableOpacity
+                style={styles.emptyRefreshBtn}
+                activeOpacity={0.8}
+                onPress={onRefresh}
+              >
+                <Ionicons name="refresh" size={15} color="#FFFFFF" style={{ marginRight: 6 }} />
+                <Text style={styles.emptyRefreshBtnText}>Refresh Stores</Text>
+              </TouchableOpacity>
             </View>
           ) : (
             vendors.map((vendor) => (
@@ -561,11 +572,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  emptyIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#FFF1F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FECDD3',
+  },
   emptyTitle: {
     fontSize: 18,
     fontWeight: '800',
     color: '#1E293B',
-    marginTop: 12,
+    marginTop: 14,
   },
   emptyDesc: {
     fontSize: 13,
@@ -573,5 +594,25 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 6,
     lineHeight: 18,
+    maxWidth: 280,
+  },
+  emptyRefreshBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E11D48',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 24,
+    marginTop: 18,
+    shadowColor: '#E11D48',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  emptyRefreshBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

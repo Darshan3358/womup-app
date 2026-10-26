@@ -20,6 +20,7 @@ export const LocalShopApi = {
     query?: string,
     lat?: number,
     lng?: number,
+    radius: number = 5,
   ): Promise<LocalVendor[]> {
     try {
       const params = new URLSearchParams();
@@ -29,8 +30,9 @@ export const LocalShopApi = {
       if (query && query.trim() !== '') {
         params.append('query', query.trim());
       }
-      if (lat !== undefined) params.append('lat', lat.toString());
-      if (lng !== undefined) params.append('lng', lng.toString());
+      if (lat !== undefined && !isNaN(lat)) params.append('lat', lat.toString());
+      if (lng !== undefined && !isNaN(lng)) params.append('lng', lng.toString());
+      params.append('radius', (radius || 5).toString());
 
       const url = `/local-shops${params.toString() ? `?${params.toString()}` : ''}`;
       const res = await api.get<any>(url);

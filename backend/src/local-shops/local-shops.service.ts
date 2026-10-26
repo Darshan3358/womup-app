@@ -248,38 +248,82 @@ export class LocalShopsService implements OnModuleInit {
   async getNearbyShops(
     lat?: number,
     lng?: number,
-    radiusKm: number = 25,
+    radiusKm: number = 5, // Default 5km radius as requested
     category?: string,
     city?: string,
     query?: string,
   ) {
-    const filter: any = { isActive: true };
+    // 🚨 Strict Filter: Sirf Active, Online, Open, aur Non-blocked stores
+    const queryFilter: any = {
+      isActive: true,
+      isOpenNow: { $ne: false },
+      isOnline: { $ne: false },
+      vendorStatus: { $ne: 3 }, // Exclude Rejected
+      isBlocked: { $ne: 1 },
+      isSuspended: { $ne: 1 },
+    };
 
     if (category && category !== 'All' && category !== 'More') {
-      filter.categoryName = { $regex: new RegExp(`^${category}$`, 'i') };
+      queryFilter.categoryName = { $regex: new RegExp(`^${category}$`, 'i') };
     }
 
     if (city) {
-      filter.city = { $regex: new RegExp(city, 'i') };
+      queryFilter.city = { $regex: new RegExp(city, 'i') };
     }
 
     if (query && query.trim() !== '') {
       const q = query.trim();
-      filter.$or = [
+      queryFilter.$or = [
         { storeName: { $regex: q, $options: 'i' } },
         { categoryName: { $regex: q, $options: 'i' } },
         { address: { $regex: q, $options: 'i' } },
       ];
     }
 
-    const docs = await this.vendorModel.find(filter).lean();
-    const userLat = lat ?? 23.1288;
-    const userLng = lng ?? 72.5507;
+    const userLat = lat ? Number(lat) : 23.1288;
+    const userLng = lng ? Number(lng) : 72.5507;
+    const maxRadiusMeters = (radiusKm || 5) * 1000;
 
-    const formatted = docs.map((v) => {
-      const vLat = v.coordinates?.coordinates?.[1] ?? 23.1288;
-      const vLng = v.coordinates?.coordinates?.[0] ?? 72.5507;
-      const distance = this.calculateDistance(userLat, userLng, vLat, vLng);
+    let docs: any[] = [];
+
+    // 1. Primary Strategy: MongoDB $geoNear aggregation within radiusKm (5km)
+    try {
+      docs = await this.vendorModel.aggregate([
+        {
+          $geoNear: {
+            near: { type: 'Point', coordinates: [userLng, userLat] },
+            distanceField: 'distanceInMeters',
+            maxDistance: maxRadiusMeters,
+            key: 'coordinates',
+            query: queryFilter,
+            spherical: true,
+          },
+        },
+        { $sort: { distanceInMeters: 1 } },
+      ]);
+    } catch (aggErr) {
+      // 2. Resilient Fallback: If 2dsphere index differences occur, query with filter and apply Haversine distance
+      const rawDocs = await this.vendorModel.find(queryFilter).lean();
+      docs = rawDocs
+        .map((v: any) => {
+          const vLat = v.coordinates?.coordinates?.[1] ?? v.latitude ?? 23.1288;
+          const vLng = v.coordinates?.coordinates?.[0] ?? v.longitude ?? 72.5507;
+          const distKm = this.calculateDistance(userLat, userLng, vLat, vLng);
+          return {
+            ...v,
+            distanceInMeters: distKm * 1000,
+          };
+        })
+        .filter((v: any) => v.distanceInMeters <= maxRadiusMeters)
+        .sort((a: any, b: any) => a.distanceInMeters - b.distanceInMeters);
+    }
+
+    const formatted = docs.map((v: any) => {
+      const vLat = v.coordinates?.coordinates?.[1] ?? v.latitude ?? 23.1288;
+      const vLng = v.coordinates?.coordinates?.[0] ?? v.longitude ?? 72.5507;
+      const distance = v.distanceInMeters !== undefined
+        ? Number((v.distanceInMeters / 1000).toFixed(1))
+        : this.calculateDistance(userLat, userLng, vLat, vLng);
       const styling = this.getCategoryStyling(v.categoryName);
 
       return {
@@ -297,10 +341,11 @@ export class LocalShopsService implements OnModuleInit {
         pincode: v.pincode,
         phone: v.ownerPhone,
         ownerName: v.ownerName,
-        timings: `${v.openingTime} - ${v.closingTime}`,
-        openingTime: v.openingTime,
-        closingTime: v.closingTime,
+        timings: `${v.openingTime || '8:00 AM'} - ${v.closingTime || '9:00 PM'}`,
+        openingTime: v.openingTime || '8:00 AM',
+        closingTime: v.closingTime || '9:00 PM',
         isOpenNow: v.isOpenNow ?? true,
+        isOnline: v.isOnline ?? true,
         distanceKm: distance,
         distance,
         rating: v.rating ?? 4.8,
@@ -311,13 +356,13 @@ export class LocalShopsService implements OnModuleInit {
         bannerUrl: v.bannerUrl || v.imageUrl,
         verified: v.isVerified ?? true,
         isVerified: v.isVerified ?? true,
-        upiId: v.upiId || `${v.vendorCode.toLowerCase()}@okhdfcbank`,
-        qrCodeUrl: v.qrCodeUrl || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=${v.upiId || 'wormup@okaxis'}&pn=${encodeURIComponent(v.storeName)}`,
+        upiId: v.upiId || `${v.vendorCode?.toLowerCase() || 'vendor'}@okhdfcbank`,
+        qrCodeUrl: v.qrCodeUrl || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=${v.upiId || 'wormup@okaxis'}&pn=${encodeURIComponent(v.storeName || 'Store')}`,
         ...styling,
       };
     });
 
-    // Sort ascending by distance
+    // Ensure strict ascending sort by distance
     formatted.sort((a, b) => a.distanceKm - b.distanceKm);
 
     return formatted;
@@ -2552,6 +2597,39 @@ export class LocalShopsService implements OnModuleInit {
     }));
 
     return [...ongoingList, ...completedList, ...verifiedListFromRequests];
+  }
+
+  // ── Toggle Vendor Online / Offline Status ──
+  async toggleVendorOnlineStatus(vendorCode: string, isOnline?: boolean, isOpenNow?: boolean) {
+    const updateData: any = {};
+    if (typeof isOnline === 'boolean') updateData.isOnline = isOnline;
+    if (typeof isOpenNow === 'boolean') updateData.isOpenNow = isOpenNow;
+
+    if (Object.keys(updateData).length === 0) {
+      const current = await this.vendorModel.findOne({ vendorCode: vendorCode.toUpperCase() });
+      const nextState = !(current?.isOnline !== false && current?.isOpenNow !== false);
+      updateData.isOnline = nextState;
+      updateData.isOpenNow = nextState;
+    } else if (typeof isOnline === 'boolean' && typeof isOpenNow !== 'boolean') {
+      updateData.isOpenNow = isOnline;
+    } else if (typeof isOpenNow === 'boolean' && typeof isOnline !== 'boolean') {
+      updateData.isOnline = isOpenNow;
+    }
+
+    const updated = await this.vendorModel.findOneAndUpdate(
+      { vendorCode: vendorCode.toUpperCase() },
+      { $set: updateData },
+      { new: true },
+    );
+
+    return {
+      success: true,
+      vendorCode: updated?.vendorCode,
+      storeName: updated?.storeName,
+      isOnline: updated?.isOnline ?? true,
+      isOpenNow: updated?.isOpenNow ?? true,
+      message: `Store status updated to ${updated?.isOnline ? 'Online' : 'Offline'}`,
+    };
   }
 }
 

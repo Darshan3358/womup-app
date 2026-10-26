@@ -73,6 +73,57 @@ export class StoresService {
     }));
   }
 
+  async getNearbyLocalStores(lat?: number, lng?: number, radiusKm: number = 5) {
+    const userLat = lat ? Number(lat) : 23.1288;
+    const userLng = lng ? Number(lng) : 72.5507;
+    const radiusInMeters = (radiusKm || 5) * 1000;
+
+    let stores: any[] = [];
+    try {
+      stores = await this.storeModel.aggregate([
+        {
+          $geoNear: {
+            near: { type: 'Point', coordinates: [userLng, userLat] },
+            distanceField: 'distanceInMeters',
+            maxDistance: radiusInMeters,
+            key: 'location',
+            query: {
+              isActive: true,
+              isOnline: { $ne: false },
+            },
+            spherical: true,
+          },
+        },
+        { $sort: { distanceInMeters: 1 } },
+      ]);
+    } catch {
+      const allActive = await this.storeModel.find({
+        isActive: true,
+        isOnline: { $ne: false },
+      }).lean();
+
+      stores = allActive
+        .map((s: any) => {
+          const sLng = s.location?.coordinates?.[0] ?? 72.5507;
+          const sLat = s.location?.coordinates?.[1] ?? 23.1288;
+          const distKm = haversineDistanceKm(userLat, userLng, sLat, sLng);
+          return {
+            ...s,
+            distanceInMeters: distKm * 1000,
+          };
+        })
+        .filter((s: any) => s.distanceInMeters <= radiusInMeters)
+        .sort((a: any, b: any) => a.distanceInMeters - b.distanceInMeters);
+    }
+
+    return stores.map((s: any) => ({
+      ...s,
+      id: s.id || (s._id ? s._id.toString() : ''),
+      distanceKm: s.distanceInMeters !== undefined ? Number((s.distanceInMeters / 1000).toFixed(1)) : 0,
+      isOnline: s.isOnline ?? true,
+    }));
+  }
+
   async adminGetStores(query?: { status?: string; search?: string }) {
     const filter: any = {};
     if (query?.status && query.status !== 'All') {

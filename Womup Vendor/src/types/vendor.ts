@@ -21,6 +21,7 @@ export interface VendorProfile {
   openingTime: string;
   closingTime: string;
   isOpenNow: boolean;
+  isOnline?: boolean;
   rating: number;
   totalReviews: number;
   totalTransactions: number;

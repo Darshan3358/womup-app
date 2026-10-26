@@ -346,4 +346,19 @@ export const VendorApi = {
     } catch {}
     return null;
   },
+
+  // 11. Toggle Store Online / Offline Status
+  async toggleOnlineStatus(vendorCode: string, isOnline?: boolean): Promise<{ success: boolean; isOnline?: boolean; message?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/vendor/toggle-status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vendorCode, isOnline }),
+      });
+      const data = await res.json();
+      return data;
+    } catch (e: any) {
+      return { success: false, message: e.message || 'Failed to toggle status' };
+    }
+  },
 };

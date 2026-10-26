@@ -44,11 +44,11 @@ export class LocalShopsController {
     return { success: true, data: categories };
   }
 
-  @Get(['local-shops', 'local/nearby-shops'])
-  @ApiOperation({ summary: 'Get nearby local vendors with distance calculation' })
+  @Get(['local-shops', 'local/nearby-shops', 'stores/local'])
+  @ApiOperation({ summary: 'Get nearby local vendors within 5km radius with strict online filter' })
   @ApiQuery({ name: 'lat', required: false, type: Number })
   @ApiQuery({ name: 'lng', required: false, type: Number })
-  @ApiQuery({ name: 'radius', required: false, type: Number })
+  @ApiQuery({ name: 'radius', required: false, type: Number, description: 'Radius in km, default 5km' })
   @ApiQuery({ name: 'category', required: false, type: String })
   @ApiQuery({ name: 'city', required: false, type: String })
   @ApiQuery({ name: 'query', required: false, type: String })
@@ -63,7 +63,7 @@ export class LocalShopsController {
     const vendors = await this.localShopsService.getNearbyShops(
       lat ? Number(lat) : undefined,
       lng ? Number(lng) : undefined,
-      radius ? Number(radius) : 25,
+      radius ? Number(radius) : 5, // 🚨 Strict 5km radius default
       category,
       city,
       query,
@@ -378,6 +378,19 @@ export class LocalShopsController {
     const identifier = vendorCode || mobile || 'VND001';
     const vendor = await this.localShopsService.vendorLogin(identifier, '');
     return { success: true, data: vendor };
+  }
+
+  @Post(['vendor/toggle-status', 'vendor/toggle-online'])
+  @ApiOperation({ summary: 'Toggle vendor online/offline and open/closed status' })
+  async vendorToggleStatus(
+    @Body() body: { vendorCode: string; isOnline?: boolean; isOpenNow?: boolean },
+  ) {
+    const res = await this.localShopsService.toggleVendorOnlineStatus(
+      body?.vendorCode || 'VND001',
+      body?.isOnline,
+      body?.isOpenNow,
+    );
+    return res;
   }
 
   @Get('vendor/dashboard-stats')
