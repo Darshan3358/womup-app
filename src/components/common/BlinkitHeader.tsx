@@ -129,12 +129,40 @@ export const BlinkitHeader: React.FC<BlinkitHeaderProps> = ({
 
   const displayEta = deliveryEtaMinutes ? `${deliveryEtaMinutes} minutes` : etaTime;
   const isSavedAddress = selectedAddressSource === 'SAVED' && selectedAddress && selectedAddress.type !== 'Current';
-  const areaName =
-    currentAreaName ||
-    (isSavedAddress
-      ? (selectedAddress.areaLandmark || selectedAddress.street || selectedAddress.houseFlat || 'Ahmedabad')
-      : (selectedAddress?.areaLandmark || selectedAddress?.street || 'Ahmedabad'));
-  const cityName = (isSavedAddress ? selectedAddress.city : null) || currentCityName || user?.preferredCityName || 'Ahmedabad';
+
+  // Display the real reverse-geocoded detected address (e.g. "A, Tragad gam road, Godrej Garden City, Tragad, 382470")
+  // Priority:
+  // 1. Explicit readableAddress from real-time GPS reverse geocoder
+  // 2. Saved address components if a saved address is active
+  // 3. Clean deliveryLocation text
+  // 4. shortAddress
+  // 5. Fallback areaName, cityName
+  const displayLocationText = (() => {
+    if (selectedAddress?.readableAddress && selectedAddress.readableAddress.trim().length > 0) {
+      return selectedAddress.readableAddress.trim();
+    }
+    if (isSavedAddress && selectedAddress) {
+      const parts = [
+        selectedAddress.houseFlat,
+        selectedAddress.areaLandmark || selectedAddress.street,
+        selectedAddress.city,
+      ].filter(Boolean);
+      if (parts.length > 0) return parts.join(', ');
+    }
+    if (deliveryLocation && deliveryLocation !== 'Set Delivery Location') {
+      const cleaned = deliveryLocation.replace(/^Current Location\s*[—–-]\s*/i, '').trim();
+      if (cleaned && !cleaned.toLowerCase().startsWith('set delivery')) {
+        return cleaned;
+      }
+    }
+    if (selectedAddress?.shortAddress) {
+      return selectedAddress.shortAddress.trim();
+    }
+    const fallbackArea = currentAreaName || selectedAddress?.areaLandmark || selectedAddress?.street || 'Ahmedabad';
+    const fallbackCity = (isSavedAddress ? selectedAddress?.city : null) || currentCityName || user?.preferredCityName || 'Ahmedabad';
+    return `${fallbackArea}, ${fallbackCity}`;
+  })();
+
   const cleanStoreName = (
     currentStoreName || (isServiceable !== false ? 'Wom Up Dark Store' : 'Delivery Unavailable')
   )
@@ -174,7 +202,7 @@ export const BlinkitHeader: React.FC<BlinkitHeaderProps> = ({
 
                 <View style={styles.locationRow}>
                   <Text style={styles.locationSubtitle} numberOfLines={1}>
-                    {areaName}, {cityName}
+                    {displayLocationText}
                   </Text>
                   <Feather
                     name="chevron-down"
@@ -393,6 +421,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     lineHeight: 16,
+    flexShrink: 1,
   },
   storeStatusRow: {
     flexDirection: 'row',

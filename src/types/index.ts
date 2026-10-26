@@ -94,6 +94,8 @@ export interface Address {
   isDefault?: boolean;
   latitude?: number;
   longitude?: number;
+  readableAddress?: string;
+  shortAddress?: string;
 }
 
 export interface OrderItem {

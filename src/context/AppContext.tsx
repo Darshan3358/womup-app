@@ -467,21 +467,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!loc) return;
     const epoch = ++activeSelectionEpochRef.current;
 
+    const fullReadable = loc.readableAddress || loc.shortAddress || 'Current GPS Location';
     const shortLabel = loc.shortAddress || loc.readableAddress;
-    const displayLabel = `Current Location — ${shortLabel}`;
+    const displayLabel = fullReadable;
 
     const addressObj: Address = {
       id: `current_${Date.now()}`,
       type: 'Current' as const,
       fullName: user.fullName || 'Customer',
       phoneNumber: user.phoneNumber || '',
-      houseFlat: loc.street || 'Current GPS Location',
-      areaLandmark: loc.areaLandmark || loc.shortAddress,
+      houseFlat: loc.street || loc.readableAddress || 'Current GPS Location',
+      areaLandmark: loc.areaLandmark || loc.shortAddress || '',
       city: loc.city || 'Ahmedabad',
       pincode: loc.pincode || '380015',
       latitude: loc.latitude,
       longitude: loc.longitude,
       isDefault: true,
+      readableAddress: fullReadable,
+      shortAddress: shortLabel,
     };
 
     setSelectedAddressState(addressObj);
@@ -1561,8 +1564,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setSelectedAddressId(addrId);
           setSelectedAddressSource(isGps ? 'GPS' : 'SAVED');
 
-          const shortLabel = savedAddress.houseFlat || savedAddress.areaLandmark || savedAddress.city;
-          setDeliveryLocation(isGps ? `Current Location — ${shortLabel}` : `${savedAddress.type || 'Home'} — ${shortLabel}`);
+          const shortLabel = savedAddress.readableAddress || savedAddress.houseFlat || savedAddress.areaLandmark || savedAddress.city;
+          setDeliveryLocation(isGps ? (savedAddress.readableAddress || shortLabel) : `${savedAddress.type || 'Home'} — ${shortLabel}`);
           if (savedAddress.latitude && savedAddress.longitude) {
             initialLat = Number(savedAddress.latitude);
             initialLng = Number(savedAddress.longitude);
@@ -1580,20 +1583,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (detected) {
             initialLat = detected.latitude;
             initialLng = detected.longitude;
+            const fullAddress = detected.readableAddress || detected.shortAddress || 'Current GPS Location';
             const shortLabel = detected.shortAddress || detected.readableAddress;
-            setDeliveryLocation(`Current Location — ${shortLabel}`);
+            setDeliveryLocation(fullAddress);
             const addressObj: Address = {
               id: `current_${Date.now()}`,
               type: 'Current' as const,
               fullName: user?.fullName || 'Customer',
               phoneNumber: user?.phoneNumber || '',
-              houseFlat: detected.street || 'Current GPS Location',
-              areaLandmark: detected.areaLandmark || detected.shortAddress,
+              houseFlat: detected.street || detected.readableAddress || 'Current GPS Location',
+              areaLandmark: detected.areaLandmark || detected.shortAddress || '',
               city: detected.city || 'Ahmedabad',
               pincode: detected.pincode || '380015',
               latitude: detected.latitude,
               longitude: detected.longitude,
               isDefault: true,
+              readableAddress: fullAddress,
+              shortAddress: shortLabel,
             };
             setSelectedAddressState(addressObj);
             setSelectedAddressId(addressObj.id);
@@ -1619,20 +1625,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 try {
                   const loc = await LocationService.getCurrentLocation();
                   if (loc) {
+                    const fullAddress = loc.readableAddress || loc.shortAddress || 'Current GPS Location';
                     const shortLabel = loc.shortAddress || loc.readableAddress;
-                    setDeliveryLocation(`Current Location — ${shortLabel}`);
+                    setDeliveryLocation(fullAddress);
                     const addrObj: Address = {
                       id: `current_${Date.now()}`,
                       type: 'Current' as const,
                       fullName: 'Customer',
                       phoneNumber: '',
-                      houseFlat: loc.street || 'Current GPS Location',
-                      areaLandmark: loc.areaLandmark || loc.shortAddress,
+                      houseFlat: loc.street || loc.readableAddress || 'Current GPS Location',
+                      areaLandmark: loc.areaLandmark || loc.shortAddress || '',
                       city: loc.city || 'Ahmedabad',
                       pincode: loc.pincode || '380015',
                       latitude: loc.latitude,
                       longitude: loc.longitude,
                       isDefault: true,
+                      readableAddress: fullAddress,
+                      shortAddress: shortLabel,
                     };
                     setSelectedAddressState(addrObj);
                     setSelectedAddressId(addrObj.id);

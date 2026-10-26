@@ -1124,8 +1124,10 @@ export const BlinkitCheckoutScreen: React.FC = () => {
                   </View>
                 )}
               </View>
-              <Text style={styles.choiceTitle}>Chandlodiya - Tragad</Text>
-              <Text style={styles.choiceCoords}>Lat: 23.1288, Lng: 72.5587</Text>
+              <Text style={styles.choiceTitle} numberOfLines={2}>
+                {selectedAddress?.readableAddress || selectedAddress?.shortAddress || (deliveryLocation ? deliveryLocation.replace(/^Current Location\s*[—–-]\s*/i, '').trim() : '') || 'Chandlodiya - Tragad'}
+              </Text>
+              <Text style={styles.choiceCoords}>Lat: {Number(activeLat).toFixed(4)}, Lng: {Number(activeLng).toFixed(4)}</Text>
               <Text style={styles.choiceSub}>⚡ Instant 9-min Express Delivery</Text>
             </TouchableOpacity>
 
@@ -2177,7 +2179,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
 
               <Text style={styles.confirmAddressMainText}>
                 {selectedAddressType === 'CURRENT_GPS'
-                  ? 'Chandlodiya - Tragad Area'
+                  ? (selectedAddress?.readableAddress || selectedAddress?.shortAddress || (deliveryLocation ? deliveryLocation.replace(/^Current Location\s*[—–-]\s*/i, '').trim() : '') || 'Current GPS Location')
                   : (houseFlat ? `${houseFlat}, ${street ? street + ', ' : ''}${areaLandmark}` : areaLandmark)}
               </Text>
 
