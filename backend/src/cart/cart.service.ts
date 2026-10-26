@@ -902,11 +902,21 @@ export class CartService {
 
         itemSubtotal += price * qty;
         mrpTotal += mrp * qty;
+        const pIdStr = pId ? pId.toString() : undefined;
         rePricedItems.push({
           ...it,
-          id: pId ? pId.toString() : undefined,
-          productId: pId ? pId.toString() : undefined,
+          id: pIdStr,
+          productId: pIdStr,
           variantId: vId ? vId.toString() : undefined,
+          product: {
+            id: pIdStr,
+            name: it.name,
+            sellingPrice: price,
+            price,
+            mrp,
+            imageUrl: it.imageUrl || it.product?.imageUrl || '',
+            quantityLabel: it.packSize || it.quantityLabel || it.product?.quantityLabel || '1 unit',
+          },
           price,
           sellingPrice: price,
           mrp,

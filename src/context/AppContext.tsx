@@ -867,25 +867,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       const newCart: CartItem[] = cartSummary.items.map((it: any) => {
+        const prod = it.product || it;
         const vPrice = it.variant?.price !== undefined
           ? Number(it.variant.price)
-          : Number(it.product.sellingPrice ?? (it.subtotal && it.quantity ? it.subtotal / it.quantity : 0));
+          : Number(prod.sellingPrice ?? prod.price ?? (it.subtotal && it.quantity ? it.subtotal / it.quantity : 0));
         const vMrp = it.variant?.mrp !== undefined
           ? Number(it.variant.mrp)
-          : Number(it.product.mrp ?? (it.totalMrp && it.quantity ? it.totalMrp / it.quantity : vPrice));
-        const vLabel = it.variant?.label || it.product.quantityLabel || '1 unit';
-        const resolvedVId = it.variantId || it.variant?.id || it.variant?._id;
+          : Number(prod.mrp ?? (it.totalMrp && it.quantity ? it.totalMrp / it.quantity : vPrice));
+        const vLabel = it.variant?.label || prod.quantityLabel || prod.packSize || '1 unit';
+        const resolvedVId = it.variantId || it.variant?.id || it.variant?._id || prod.selectedVariantId;
+        const resolvedPId = prod.id || prod._id || prod.productId || it.productId || it.id;
         return {
           product: {
-            id: it.product.id || it.product._id,
-            name: it.product.name,
-            brand: it.product.brand || '',
-            categoryId: it.product.categoryId || '',
+            id: resolvedPId,
+            name: prod.name || '',
+            brand: prod.brand || '',
+            categoryId: prod.categoryId || '',
             sellingPrice: vPrice,
             mrp: vMrp,
-            discountPercent: vMrp > vPrice ? Math.round(((vMrp - vPrice) / vMrp) * 100) : (it.product.discountPercent || 0),
-            stock: it.variant?.stock ?? it.product.stock ?? 100,
-            imageUrl: it.product.imageUrl,
+            discountPercent: vMrp > vPrice ? Math.round(((vMrp - vPrice) / vMrp) * 100) : (prod.discountPercent || 0),
+            stock: it.variant?.stock ?? prod.stock ?? 100,
+            imageUrl: prod.imageUrl || '',
             quantityLabel: vLabel,
             shoppingCoins: 0,
             rating: 4.8,
@@ -893,7 +895,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             deliveryMinutes: 9,
             selectedVariantId: resolvedVId,
           } as any,
-          quantity: it.quantity,
+          quantity: it.quantity || 1,
         };
       });
 
