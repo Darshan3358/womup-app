@@ -139,6 +139,9 @@ export const CartService = {
     rateUsed: number;
     rateSource: string;
     total: number;
+    itemSubtotal?: number;
+    mrpTotal?: number;
+    items?: any[];
     areaName?: string;
     cityName?: string;
     storeName?: string;

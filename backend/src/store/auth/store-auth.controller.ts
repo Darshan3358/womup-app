@@ -46,6 +46,18 @@ export class StoreAuthController {
     return this.storeAuthService.verifyOtp(dto.email, dto.otp);
   }
 
+  @Post('auth/change-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Change Store Login password' })
+  async changePassword(
+    @Request() req: any,
+    @Body() body: { currentPassword?: string; oldPassword?: string; newPassword: string }
+  ) {
+    const curPass = body.currentPassword || body.oldPassword || '';
+    return this.storeAuthService.changePassword(req.user.id, curPass, body.newPassword);
+  }
+
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

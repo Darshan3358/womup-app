@@ -647,6 +647,16 @@ export class CartService {
       const areaTerms = effectiveArea.split(/[-–—,]/).map((t: string) => t.trim()).filter(Boolean);
       const termRegexes = areaTerms.map((t: string) => new RegExp(t.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&'), 'i'));
 
+      // Phonetic expansions for common area name spellings in Ahmedabad
+      const phoneticTerms: RegExp[] = [];
+      if (/chandlod/i.test(effectiveArea) || /tragad/i.test(effectiveArea)) {
+        phoneticTerms.push(/chandlodiy?a/i);
+        phoneticTerms.push(/tragad/i);
+      }
+      if (/prah?alad/i.test(effectiveArea)) {
+        phoneticTerms.push(/prah?alad/i);
+      }
+
       const matchedStore = await db.collection('stores').findOne({
         isActive: true,
         $or: [
@@ -655,6 +665,8 @@ export class CartService {
           { name: new RegExp(escaped, 'i') },
           ...termRegexes.map((r: RegExp) => ({ areaName: r })),
           ...termRegexes.map((r: RegExp) => ({ name: r })),
+          ...phoneticTerms.map((r: RegExp) => ({ areaName: r })),
+          ...phoneticTerms.map((r: RegExp) => ({ name: r })),
         ],
       });
 
@@ -841,17 +853,67 @@ export class CartService {
       ? Number((minPayout - rawFee).toFixed(2))
       : 0;
 
-    // 6. Subtotals
+    // 6. Subtotals & Dynamic Item Re-pricing per Store/Area
+    let targetAreaId = resolvedStore?.areaId || (rateRecord as any)?.areaId;
+    if (!targetAreaId && effectiveArea) {
+      const aDoc = await db.collection('areas').findOne({
+        name: new RegExp(`^${effectiveArea.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i'),
+      });
+      if (aDoc) targetAreaId = aDoc._id;
+    }
+
     let itemSubtotal = 0;
     let mrpTotal = 0;
+    const rePricedItems: any[] = [];
+
     if (Array.isArray(items) && items.length > 0) {
-      items.forEach((it: any) => {
+      for (const it of items) {
         const qty = Math.max(1, Number(it.quantity) || 1);
-        const price = typeof it.sellingPrice === 'number' ? it.sellingPrice : (typeof it.price === 'number' ? it.price : 60);
-        const mrp = typeof it.mrp === 'number' ? it.mrp : price;
+        let price = typeof it.sellingPrice === 'number' ? it.sellingPrice : (typeof it.price === 'number' ? it.price : 60);
+        let mrp = typeof it.mrp === 'number' ? it.mrp : price;
+
+        const pId = it.productId || it.product?.id || it.product?._id || it.id || it._id;
+        const vId = it.variantId || it.variant?.id || it.variant?._id || it.product?.selectedVariantId;
+
+        if (targetAreaId && (pId || vId)) {
+          try {
+            const areaObjId = Types.ObjectId.isValid(targetAreaId) ? new Types.ObjectId(targetAreaId) : targetAreaId;
+            let apDoc: any = null;
+            if (vId) {
+              const vObjId = Types.ObjectId.isValid(vId) ? new Types.ObjectId(vId) : vId;
+              apDoc = await db.collection('area_pricing').findOne({
+                variantId: { $in: [vObjId, vId.toString()] },
+                $or: [{ areaId: areaObjId }, { areaId: targetAreaId.toString() }],
+              });
+            }
+            if (!apDoc && pId) {
+              const pObjId = Types.ObjectId.isValid(pId) ? new Types.ObjectId(pId) : pId;
+              apDoc = await db.collection('area_pricing').findOne({
+                productId: { $in: [pObjId, pId.toString()] },
+                $or: [{ areaId: areaObjId }, { areaId: targetAreaId.toString() }],
+              });
+            }
+            if (apDoc && typeof apDoc.price === 'number') {
+              price = apDoc.price;
+              if (apDoc.mrp) mrp = apDoc.mrp;
+            }
+          } catch {}
+        }
+
         itemSubtotal += price * qty;
         mrpTotal += mrp * qty;
-      });
+        rePricedItems.push({
+          ...it,
+          id: pId ? pId.toString() : undefined,
+          productId: pId ? pId.toString() : undefined,
+          variantId: vId ? vId.toString() : undefined,
+          price,
+          sellingPrice: price,
+          mrp,
+          quantity: qty,
+          subtotal: price * qty,
+        });
+      }
     } else {
       itemSubtotal = dto.itemSubtotal || 60;
       mrpTotal = dto.mrpTotal || 75;
@@ -879,6 +941,7 @@ export class CartService {
         itemSubtotal,
         mrpTotal,
         discount: Math.max(0, mrpTotal - itemSubtotal),
+        items: rePricedItems,
         deliveryFee,
         deliveryDistanceMeters: routeDistanceMeters,
         deliveryDistanceKm: distanceKm,

@@ -13,6 +13,7 @@ export const COLORS = {
   danger: '#EF4444',
   red: '#EF4444',
   background: '#F8FAFC',
+  card: '#FFFFFF',
   cardWhite: '#FFFFFF',
   white: '#FFFFFF',
   surfaceCard: '#FFFFFF',

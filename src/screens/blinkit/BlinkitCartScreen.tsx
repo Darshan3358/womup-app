@@ -41,6 +41,7 @@ export const BlinkitCartScreen: React.FC = () => {
     setActiveScreen,
     goBack,
     setLocationModalVisible,
+    syncCartFromSummary,
   } = useApp();
 
   const isSavedAddress = selectedAddressSource === 'SAVED' && selectedAddress && selectedAddress.type !== 'Current';
@@ -116,10 +117,14 @@ export const BlinkitCartScreen: React.FC = () => {
 
       const res = await CartService.calculateDynamicDeliveryFee({
         items: blinkitCartList.map((item) => ({
+          id: item.product.id,
+          productId: item.product.id,
           name: item.product.name,
           price: item.product.sellingPrice,
+          sellingPrice: item.product.sellingPrice,
           mrp: item.product.mrp,
           quantity: item.quantity,
+          variantId: (item.product as any).selectedVariantId,
         })),
         cityName: cityKey,
         areaName: areaKey,
@@ -140,6 +145,13 @@ export const BlinkitCartScreen: React.FC = () => {
             distanceKm: res.distanceKm || currentDistanceKm,
             rateUsed: res.rateUsed || 12,
             areaName: res.areaName || areaKey,
+          });
+        }
+        if (Array.isArray(res.items) && res.items.length > 0) {
+          syncCartFromSummary({
+            items: res.items,
+            subtotalSelling: res.itemSubtotal,
+            subtotalMrp: res.mrpTotal,
           });
         }
         setIsCalculatingFee(false);

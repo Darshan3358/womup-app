@@ -13,6 +13,7 @@ const KEYS = {
   BLINKIT_CART: '@wormup_blinkit_cart',
   WISHLIST: '@wormup_wishlist',
   AUTH_VERIFICATION_ID: '@wormup_verification_id',
+  AREAS: '@wormup_dynamic_areas',
 };
 
 export const StorageService = {

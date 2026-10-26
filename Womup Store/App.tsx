@@ -31,6 +31,9 @@ import { ST13b_InventoryLogsScreen } from './src/screens/inventory/ST13b_Invento
 import { ST17_AddProductScreen } from './src/screens/inventory/ST17_AddProductScreen';
 import { ST14_ShiftHistoryScreen } from './src/screens/profile/ST14_ShiftHistoryScreen';
 import { ST15_StaffProfileScreen } from './src/screens/profile/ST15_StaffProfileScreen';
+import { ST18_StoreInfoScreen } from './src/screens/profile/ST18_StoreInfoScreen';
+import { ST19_ChangePasswordScreen } from './src/screens/profile/ST19_ChangePasswordScreen';
+import { ST20_HelpSupportScreen } from './src/screens/profile/ST20_HelpSupportScreen';
 import { ST17_OrderHistoryScreen } from './src/screens/history/ST17_OrderHistoryScreen';
 
 const MainStoreApp: React.FC = () => {
@@ -54,6 +57,9 @@ const MainStoreApp: React.FC = () => {
     if (subScreen === 'InventoryLogs') return <ST13b_InventoryLogsScreen />;
     if (subScreen === 'ShiftHistory') return <ST14_ShiftHistoryScreen />;
     if (subScreen === 'AddProduct') return <ST17_AddProductScreen />;
+    if (subScreen === 'StoreInfo') return <ST18_StoreInfoScreen />;
+    if (subScreen === 'ChangePassword') return <ST19_ChangePasswordScreen />;
+    if (subScreen === 'HelpSupport') return <ST20_HelpSupportScreen />;
 
     // Primary Tabs
     switch (currentTab) {

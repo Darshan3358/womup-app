@@ -146,6 +146,13 @@ export class StoreApiService {
     await AsyncStorage.removeItem('@womup_store_session');
   }
 
+  static async changePassword(currentPassword: string, newPassword: string) {
+    return this.request<{ success: boolean; message: string }>('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+  }
+
   static async sendOtp(email: string) {
     return this.request<{ success: boolean; message: string; expiresInSeconds: number }>(
       '/auth/send-otp',

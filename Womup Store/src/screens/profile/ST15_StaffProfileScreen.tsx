@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -6,242 +6,304 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Modal,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../context/StoreContext';
 import { COLORS } from '../../theme/colors';
 
+const LANGUAGE_STORAGE_KEY = '@womup_store_language';
+
+interface LanguageOption {
+  code: string;
+  name: string;
+  nativeName: string;
+}
+
+const LANGUAGES: LanguageOption[] = [
+  { code: 'en', name: 'English', nativeName: 'English (Default)' },
+  { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी' },
+  { code: 'gu', name: 'Gujarati', nativeName: 'ગુજરાતી' },
+];
+
 export const ST15_StaffProfileScreen: React.FC = () => {
   const { staff, store, logout, setSubScreen } = useStore();
+  const [selectedLanguage, setSelectedLanguage] = useState<string>('English');
+  const [isLangModalOpen, setIsLangModalOpen] = useState<boolean>(false);
 
-  const handleStoreInfo = () => {
-    Alert.alert(
-      'Store Information',
-      `Store: ${store?.name || 'Green Park Dark Store'}\nStore ID: ${store?.code || 'DS-003'}\nCity: ${store?.cityName || store?.city || 'Ahmedabad'}\nAddress: ${store?.address || '123, Green Park, Ahmedabad - 380015'}\nOperating Hours: 7:00 AM - 11:00 PM`
-    );
+  useEffect(() => {
+    const loadLang = async () => {
+      try {
+        const saved = await AsyncStorage.getItem(LANGUAGE_STORAGE_KEY);
+        if (saved) {
+          const match = LANGUAGES.find((l) => l.code === saved || l.name === saved);
+          if (match) setSelectedLanguage(match.name);
+        }
+      } catch (_) {}
+    };
+    loadLang();
+  }, []);
+
+  const handleSelectLanguage = async (lang: LanguageOption) => {
+    setSelectedLanguage(lang.name);
+    setIsLangModalOpen(false);
+    try {
+      await AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, lang.code);
+    } catch (_) {}
   };
 
-  const handleChangePassword = () => {
+  const handleLogoutConfirm = () => {
     Alert.alert(
-      'Change Password',
-      'Please contact your Dark Store Admin or Operations Manager to update terminal credentials.'
-    );
-  };
-
-  const handleLanguage = () => {
-    Alert.alert('Language', 'Current app language is English (Default).');
-  };
-
-  const handleHelp = () => {
-    Alert.alert(
-      'Dark Store Support',
-      'For immediate dispatch assistance, call toll-free: 1800-WOMUP-STORE or email ops@womup.in'
-    );
-  };
-
-  const handleLogout = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to end your terminal session?',
+      'Sign Out Terminal',
+      `Are you sure you want to log out of ${store?.name || 'this Dark Store'}?\n\nActive picking session will be closed.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign Out', style: 'destructive', onPress: logout },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await logout();
+            } catch (err: any) {
+              Alert.alert('Error', err.message || 'Logout failed');
+            }
+          },
+        },
       ]
     );
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Profile Card Matching Wireframe Screen 15 */}
-      <View style={styles.profileCard}>
-        <View style={styles.avatar}>
-          <Ionicons name="person" size={40} color="#FFFFFF" />
+    <View style={{ flex: 1, backgroundColor: COLORS.background }}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+        {/* Profile Card */}
+        <View style={styles.profileCard}>
+          <View style={styles.avatar}>
+            <Ionicons name="person" size={40} color="#FFFFFF" />
+          </View>
+
+          <Text style={styles.staffName}>
+            {staff?.fullName || `${store?.name || 'Dark Store'} Staff`}
+          </Text>
+          <Text style={styles.staffRole}>Dark Store Partner</Text>
+          <Text style={styles.storeId}>Store ID: {store?.code || 'STORE-01'}</Text>
         </View>
 
-        <Text style={styles.staffName}>{staff?.fullName || 'Darshan Thanki'}</Text>
-        <Text style={styles.staffRole}>Dark Store Partner</Text>
-        <Text style={styles.storeId}>Store ID: {store?.code || 'DS-003'}</Text>
-      </View>
-
-      {/* Menu List */}
-      <View style={styles.menuCard}>
-        {/* Store Information */}
-        <TouchableOpacity
-          style={styles.menuRow}
-          onPress={handleStoreInfo}
-          activeOpacity={0.7}
-        >
-          <View style={styles.menuLeft}>
-            <View style={[styles.iconCircle, { backgroundColor: '#EEF2FF' }]}>
-              <Ionicons name="storefront-outline" size={18} color="#4F46E5" />
+        {/* Menu List */}
+        <View style={styles.menuCard}>
+          {/* 1. Store Information */}
+          <TouchableOpacity
+            style={styles.menuRow}
+            onPress={() => setSubScreen('StoreInfo')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.menuLeft}>
+              <View style={[styles.iconCircle, { backgroundColor: '#EEF2FF' }]}>
+                <Ionicons name="storefront-outline" size={18} color="#4F46E5" />
+              </View>
+              <Text style={styles.menuLabel}>Store Information</Text>
             </View>
-            <Text style={styles.menuLabel}>Store Information</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-        </TouchableOpacity>
-
-        <View style={styles.divider} />
-
-        {/* Change Password */}
-        <TouchableOpacity
-          style={styles.menuRow}
-          onPress={handleChangePassword}
-          activeOpacity={0.7}
-        >
-          <View style={styles.menuLeft}>
-            <View style={[styles.iconCircle, { backgroundColor: '#FEF3C7' }]}>
-              <Ionicons name="lock-closed-outline" size={18} color="#D97706" />
-            </View>
-            <Text style={styles.menuLabel}>Change Password</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-        </TouchableOpacity>
-
-        <View style={styles.divider} />
-
-        {/* Language */}
-        <TouchableOpacity
-          style={styles.menuRow}
-          onPress={handleLanguage}
-          activeOpacity={0.7}
-        >
-          <View style={styles.menuLeft}>
-            <View style={[styles.iconCircle, { backgroundColor: '#ECFDF5' }]}>
-              <Ionicons name="globe-outline" size={18} color="#059669" />
-            </View>
-            <Text style={styles.menuLabel}>Language</Text>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <Text style={styles.langValue}>English</Text>
             <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-          </View>
-        </TouchableOpacity>
+          </TouchableOpacity>
 
-        <View style={styles.divider} />
+          <View style={styles.divider} />
 
-        {/* Help & Support */}
-        <TouchableOpacity
-          style={styles.menuRow}
-          onPress={handleHelp}
-          activeOpacity={0.7}
-        >
-          <View style={styles.menuLeft}>
-            <View style={[styles.iconCircle, { backgroundColor: '#FDF2F8' }]}>
-              <Ionicons name="help-circle-outline" size={18} color="#FF3B98" />
+          {/* 2. Change Password */}
+          <TouchableOpacity
+            style={styles.menuRow}
+            onPress={() => setSubScreen('ChangePassword')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.menuLeft}>
+              <View style={[styles.iconCircle, { backgroundColor: '#FEF3C7' }]}>
+                <Ionicons name="lock-closed-outline" size={18} color="#D97706" />
+              </View>
+              <Text style={styles.menuLabel}>Change Password</Text>
             </View>
-            <Text style={styles.menuLabel}>Help & Support</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-        </TouchableOpacity>
+            <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+          </TouchableOpacity>
 
-        <View style={styles.divider} />
+          <View style={styles.divider} />
 
-        {/* Shift / Audit shortcuts */}
-        <TouchableOpacity
-          style={styles.menuRow}
-          onPress={() => setSubScreen('ShiftHistory')}
-          activeOpacity={0.7}
-        >
-          <View style={styles.menuLeft}>
-            <View style={[styles.iconCircle, { backgroundColor: '#EFF6FF' }]}>
-              <Ionicons name="time-outline" size={18} color="#2563EB" />
+          {/* 3. Language Selector */}
+          <TouchableOpacity
+            style={styles.menuRow}
+            onPress={() => setIsLangModalOpen(true)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.menuLeft}>
+              <View style={[styles.iconCircle, { backgroundColor: '#ECFDF5' }]}>
+                <Ionicons name="globe-outline" size={18} color="#059669" />
+              </View>
+              <Text style={styles.menuLabel}>Language</Text>
             </View>
-            <Text style={styles.menuLabel}>Shift History & Attendance</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-        </TouchableOpacity>
-
-        <View style={styles.divider} />
-
-        {/* Logout */}
-        <TouchableOpacity
-          style={styles.menuRow}
-          onPress={handleLogout}
-          activeOpacity={0.7}
-        >
-          <View style={styles.menuLeft}>
-            <View style={[styles.iconCircle, { backgroundColor: '#FEE2E2' }]}>
-              <Ionicons name="log-out-outline" size={18} color="#EF4444" />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.langValue}>{selectedLanguage}</Text>
+              <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
             </View>
-            <Text style={[styles.menuLabel, { color: '#EF4444' }]}>Logout</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color="#EF4444" />
-        </TouchableOpacity>
-      </View>
+          </TouchableOpacity>
 
-      <Text style={styles.versionText}>WormUp Dark Store Partner v2.4.0</Text>
-    </ScrollView>
+          <View style={styles.divider} />
+
+          {/* 4. Help & Support */}
+          <TouchableOpacity
+            style={styles.menuRow}
+            onPress={() => setSubScreen('HelpSupport')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.menuLeft}>
+              <View style={[styles.iconCircle, { backgroundColor: '#FDF2F8' }]}>
+                <Ionicons name="help-circle-outline" size={18} color="#FF3B98" />
+              </View>
+              <Text style={styles.menuLabel}>Help & Support</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+          </TouchableOpacity>
+
+          <View style={styles.divider} />
+
+          {/* 5. Shift History & Attendance */}
+          <TouchableOpacity
+            style={styles.menuRow}
+            onPress={() => setSubScreen('ShiftHistory')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.menuLeft}>
+              <View style={[styles.iconCircle, { backgroundColor: '#EFF6FF' }]}>
+                <Ionicons name="time-outline" size={18} color="#2563EB" />
+              </View>
+              <Text style={styles.menuLabel}>Shift History & Attendance</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+          </TouchableOpacity>
+
+          <View style={styles.divider} />
+
+          {/* 6. Logout */}
+          <TouchableOpacity
+            style={styles.menuRow}
+            onPress={handleLogoutConfirm}
+            activeOpacity={0.7}
+          >
+            <View style={styles.menuLeft}>
+              <View style={[styles.iconCircle, { backgroundColor: '#FEE2E2' }]}>
+                <Ionicons name="log-out-outline" size={18} color="#EF4444" />
+              </View>
+              <Text style={[styles.menuLabel, { color: '#EF4444', fontWeight: '600' }]}>Logout</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#EF4444" />
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+
+      {/* Language Selection Modal */}
+      <Modal
+        visible={isLangModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsLangModalOpen(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setIsLangModalOpen(false)}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Language</Text>
+              <TouchableOpacity onPress={() => setIsLangModalOpen(false)}>
+                <Ionicons name="close" size={22} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            {LANGUAGES.map((lang) => {
+              const isSelected = selectedLanguage === lang.name;
+              return (
+                <TouchableOpacity
+                  key={lang.code}
+                  style={[styles.langOption, isSelected && styles.langOptionSelected]}
+                  onPress={() => handleSelectLanguage(lang)}
+                  activeOpacity={0.75}
+                >
+                  <View>
+                    <Text style={[styles.langName, isSelected && styles.langNameSelected]}>
+                      {lang.name}
+                    </Text>
+                    <Text style={styles.langNative}>{lang.nativeName}</Text>
+                  </View>
+                  {isSelected && (
+                    <Ionicons name="checkmark-circle" size={22} color="#4F46E5" />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: COLORS.background,
   },
   content: {
     padding: 16,
-    paddingBottom: 32,
+    paddingBottom: 40,
   },
   profileCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
     paddingVertical: 24,
     paddingHorizontal: 16,
     alignItems: 'center',
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#071B52',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    borderColor: COLORS.border,
   },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#071B52',
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#0F172A',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
   },
   staffName: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#071B52',
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: 4,
+    textAlign: 'center',
   },
   staffRole: {
     fontSize: 13,
-    color: '#64748B',
-    marginTop: 2,
+    color: COLORS.textSecondary,
+    marginBottom: 4,
   },
   storeId: {
     fontSize: 12,
-    color: '#94A3B8',
-    marginTop: 2,
     fontWeight: '600',
+    color: '#64748B',
+    letterSpacing: 0.5,
   },
   menuCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    backgroundColor: COLORS.card,
+    borderRadius: 16,
+    paddingVertical: 4,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingVertical: 6,
-    marginBottom: 20,
-    shadowColor: '#071B52',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    borderColor: COLORS.border,
   },
   menuRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
     paddingVertical: 14,
+    paddingHorizontal: 16,
   },
   menuLeft: {
     flexDirection: 'row',
@@ -257,12 +319,12 @@ const styles = StyleSheet.create({
   },
   menuLabel: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#071B52',
+    fontWeight: '600',
+    color: COLORS.textPrimary,
   },
   langValue: {
     fontSize: 13,
-    color: '#64748B',
+    color: COLORS.textSecondary,
     fontWeight: '500',
   },
   divider: {
@@ -270,9 +332,66 @@ const styles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
     marginHorizontal: 16,
   },
-  versionText: {
-    fontSize: 11,
-    color: '#94A3B8',
-    textAlign: 'center',
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  langOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    marginBottom: 8,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  langOptionSelected: {
+    backgroundColor: '#EEF2FF',
+    borderColor: '#818CF8',
+  },
+  langName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+  langNameSelected: {
+    color: '#4F46E5',
+    fontWeight: '700',
+  },
+  langNative: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
   },
 });

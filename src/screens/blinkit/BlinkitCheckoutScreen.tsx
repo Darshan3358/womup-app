@@ -660,7 +660,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
   const activeLat = Number(selectedAddress?.latitude) ||
     (selectedAddressType === 'CURRENT_GPS' ? 23.1288 : (matchedArea?.lat || 23.0125));
   const activeLng = Number(selectedAddress?.longitude) ||
-    (selectedAddressType === 'CURRENT_GPS' ? 72.5507 : (matchedArea?.lng || 72.5082));
+    (selectedAddressType === 'CURRENT_GPS' ? 72.5587 : (matchedArea?.lng || 72.5082));
   const currentDistanceKm = 1.2;
 
   const cartItemCount = blinkitCartList.length;
@@ -697,10 +697,14 @@ export const BlinkitCheckoutScreen: React.FC = () => {
       try {
         const res = await CartService.calculateDynamicDeliveryFee({
           items: blinkitCartList.map((item: any) => ({
+            id: item.product.id,
+            productId: item.product.id,
             name: item.product.name,
             price: item.product.sellingPrice,
+            sellingPrice: item.product.sellingPrice,
             mrp: item.product.mrp,
             quantity: item.quantity,
+            variantId: (item.product as any).selectedVariantId,
           })),
           cityName: cityKey,
           areaName: areaKey,
@@ -729,6 +733,13 @@ export const BlinkitCheckoutScreen: React.FC = () => {
               isServiceable: true,
               areaName: areaKey,
               storeName: res.storeName,
+            });
+          }
+          if (Array.isArray(res.items) && res.items.length > 0) {
+            syncCartFromSummary({
+              items: res.items,
+              subtotalSelling: res.itemSubtotal,
+              subtotalMrp: res.mrpTotal,
             });
           }
         }

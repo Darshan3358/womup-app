@@ -9,7 +9,10 @@ export type SubScreen =
   | 'Performance'
   | 'InventoryLogs'
   | 'ShiftHistory'
-  | 'AddProduct';
+  | 'AddProduct'
+  | 'StoreInfo'
+  | 'ChangePassword'
+  | 'HelpSupport';
 
 export interface StoreStaffProfile {
   id: string;

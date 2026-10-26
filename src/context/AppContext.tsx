@@ -19,7 +19,7 @@ import { AddressService } from '../services/addressService';
 import { LocationService } from '../services/locationService';
 import { api } from '../services/api';
 import io, { Socket } from 'socket.io-client';
-import { matchAreaByName } from '../data/areas';
+import { matchAreaByName, syncAreasFromBackend } from '../data/areas';
 
 export interface BlinkitCartEntry {
   product: BlinkitProduct;
@@ -1527,6 +1527,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setCurrentOrder((prev) => prev || savedOrders[0]);
         }
       } catch (e) {}
+
+      // 0. Sync live dynamic areas & dark stores from MongoDB
+      syncAreasFromBackend().catch(() => {});
 
       // 3. Resolve Real Delivery Area & Dark Store from GPS / Saved Address
       try {
