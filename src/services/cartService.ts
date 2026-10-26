@@ -123,16 +123,19 @@ export const CartService = {
    * Authoritative dynamic delivery fee calculation:
    * Resolves distance (Haversine) × ratePerKm (Area > City > Global) with Floor & Cap.
    */
-  async calculateDynamicDeliveryFee(params: {
-    items?: any[];
-    deliveryAddress?: any;
-    storeId?: string;
-    cityName?: string;
-    areaName?: string;
-    distanceKm?: number;
-    tip?: number;
-    forceRefresh?: boolean;
-  }): Promise<{
+  async calculateDynamicDeliveryFee(
+    params: {
+      items?: any[];
+      deliveryAddress?: any;
+      storeId?: string;
+      cityName?: string;
+      areaName?: string;
+      distanceKm?: number;
+      tip?: number;
+      forceRefresh?: boolean;
+    },
+    signal?: AbortSignal
+  ): Promise<{
     deliveryFee: number;
     handlingFee: number;
     distanceKm: number;
@@ -178,7 +181,7 @@ export const CartService = {
     // 3. Create single shared promise — uses centralized api client (correct URL + auth header)
     const promise = (async () => {
       try {
-        const res = await api.post<any>('/cart/calculate', params);
+        const res = await api.post<any>('/cart/calculate', params, undefined, { signal });
         if (res.success && res.data) {
           _feeCache.set(cacheKey, { data: res.data, ts: Date.now() });
           return res.data;

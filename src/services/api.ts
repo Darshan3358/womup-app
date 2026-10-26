@@ -222,23 +222,25 @@ class ApiClient {
   }
 
   // HTTP Helpers
-  get<T>(endpoint: string, headers?: Record<string, string>) {
-    return this.request<T>(endpoint, { method: 'GET', headers });
+  get<T>(endpoint: string, headers?: Record<string, string>, options?: Partial<RequestInit>) {
+    return this.request<T>(endpoint, { method: 'GET', headers, ...options });
   }
 
-  post<T>(endpoint: string, body?: any, headers?: Record<string, string>) {
+  post<T>(endpoint: string, body?: any, headers?: Record<string, string>, options?: Partial<RequestInit>) {
     return this.request<T>(endpoint, {
       method: 'POST',
       headers,
       body: body ? JSON.stringify(body) : undefined,
+      ...options,
     });
   }
 
-  patch<T>(endpoint: string, body?: any, headers?: Record<string, string>) {
+  patch<T>(endpoint: string, body?: any, headers?: Record<string, string>, options?: Partial<RequestInit>) {
     return this.request<T>(endpoint, {
       method: 'PATCH',
       headers,
       body: body ? JSON.stringify(body) : undefined,
+      ...options,
     });
   }
 

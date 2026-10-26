@@ -23,7 +23,6 @@ import { AppIcon } from '../../components/common/AppIcon';
 import { ShieldCheck, CheckCircle2, MapPin, Compass, Home as HomeIcon, Check, Plus, X, ArrowRight } from 'lucide-react-native';
 import { CartService } from '../../services/cartService';
 import { LocationService } from '../../services/locationService';
-import { matchAreaByName, AHMEDABAD_AREAS } from '../../data/areas';
 import { LocalShopApi } from '../../local-shop-module/api/localShopApi';
 import { resolveImageThumbnail } from '../../utils/imageUrl';
 import { useApp } from '../../context/AppContext';
@@ -188,9 +187,6 @@ export const BlinkitCheckoutScreen: React.FC = () => {
   ) || savedAddrs[0];
 
   const activeAddr = isSavedInitially ? (selectedAddress || activeSavedAddr) : null;
-  const matchedInitialArea = isSavedInitially && activeAddr
-    ? matchAreaByName(activeAddr.areaLandmark || activeAddr.street || activeAddr.houseFlat || '')
-    : null;
 
   // Address Selection & Store Routing State (defaults to user-selected address, not forced GPS)
   const [selectedAddressType, setSelectedAddressType] = useState<'CURRENT_GPS' | 'SAVED'>(
@@ -202,22 +198,22 @@ export const BlinkitCheckoutScreen: React.FC = () => {
   const [houseFlat, setHouseFlat] = useState(
     isSavedInitially
       ? cleanHouseFlat(activeAddr?.houseFlat) || ''
-      : 'GPS Location'
+      : selectedAddress?.houseFlat || 'GPS Location'
   );
   const [street, setStreet] = useState(
     isSavedInitially
       ? activeAddr?.street || ''
-      : 'Chandlodiya - Tragad Area'
+      : selectedAddress?.street || selectedAddress?.readableAddress || ''
   );
   const [areaLandmark, setAreaLandmark] = useState(
     isSavedInitially
-      ? (activeAddr?.areaLandmark || matchedInitialArea?.name || 'Prahlad Nagar')
-      : 'Chandlodiya - Tragad'
+      ? (activeAddr?.areaLandmark || currentAreaName || '')
+      : (selectedAddress?.areaLandmark || currentAreaName || '')
   );
   const [pincode, setPincode] = useState(
     isSavedInitially
-      ? (activeAddr?.pincode || matchedInitialArea?.pincode || '380015')
-      : '382481'
+      ? (activeAddr?.pincode || selectedAddress?.pincode || '')
+      : (selectedAddress?.pincode || '')
   );
 
   // Visual confirmation state for area auto-detection
@@ -228,11 +224,9 @@ export const BlinkitCheckoutScreen: React.FC = () => {
   } | null>({
     isServiceable: true,
     areaName: isSavedInitially
-      ? (matchedInitialArea?.name || activeAddr?.areaLandmark || 'Prahlad Nagar')
-      : (currentAreaName || 'Chandlodiya - Tragad'),
-    storeName: isSavedInitially
-      ? (matchedInitialArea?.storeName || 'Wom Up Prahlad Nagar Dark Store')
-      : (currentStoreName || 'Wom Up Chandlodiya - Tragad Dark Store'),
+      ? (activeAddr?.areaLandmark || currentAreaName || '')
+      : (currentAreaName || ''),
+    storeName: currentStoreName || '',
   });
 
   // Explicit selection mode flag: 'saved' ignores background GPS updates to prevent auto-changing
@@ -242,56 +236,44 @@ export const BlinkitCheckoutScreen: React.FC = () => {
   const isManualSelectionRef = useRef(isSavedInitially);
   const lastResolvedCoordsRef = useRef<string>('');
 
-  const handleSelectGpsMode = () => {
+  const handleSelectGpsMode = async () => {
     setAddressSource('gps');
     isManualSelectionRef.current = true;
-    lastResolvedCoordsRef.current = '23.1288_72.5507';
+
+    // 1. Real GPS location fetch karo
+    const detectedLoc = await LocationService.getCurrentLocation();
+    if (!detectedLoc) {
+      Alert.alert('Location Error', 'Unable to fetch current GPS location. Please enter address manually.');
+      return;
+    }
+
+    const { latitude, longitude, pincode: detPin, city, readableAddress } = detectedLoc;
+    lastResolvedCoordsRef.current = `${latitude.toFixed(4)}_${longitude.toFixed(4)}`;
+
     setSelectedAddressType('CURRENT_GPS');
     setHouseFlat('GPS Location');
-    setStreet('Chandlodiya - Tragad Area');
-    setAreaLandmark('Chandlodiya - Tragad');
-    setPincode('382481');
-    setDeliveryLocation('Current Location — Chandlodiya - Tragad');
+    setStreet(readableAddress || 'Detected via GPS');
+    setAreaLandmark(city || '');
+    setPincode(detPin || '');
+    setDeliveryLocation(`Current Location — ${readableAddress || 'Detected via GPS'}`);
     setDeliveryEtaMinutes(9);
-    setAreaDetectionStatus({
-      isServiceable: true,
-      areaName: 'Chandlodiya - Tragad',
-      storeName: 'Wom Up Chandlodiya - Tragad Dark Store',
-    });
-
-    const gpsAddr = {
-      id: 'current_gps',
-      type: 'Current' as const,
-      fullName: customerName,
-      phoneNumber: customerPhone,
-      houseFlat: 'GPS Location',
-      street: 'Chandlodiya - Tragad Area',
-      areaLandmark: 'Chandlodiya - Tragad',
-      city: 'Ahmedabad',
-      pincode: '382481',
-      latitude: 23.1288,
-      longitude: 72.5587,
-      isDefault: true,
-    };
-    setSelectedAddress(gpsAddr);
 
     emitCheckoutChange({
       selectedAddressType: 'CURRENT_GPS',
       houseFlat: 'GPS Location',
-      street: 'Chandlodiya - Tragad Area',
-      areaLandmark: 'Chandlodiya - Tragad',
-      pincode: '382481',
+      street: readableAddress || 'Detected via GPS',
+      areaLandmark: city || '',
+      pincode: detPin || '',
       recipientName: customerName,
       phoneNumber: customerPhone,
     });
 
-    // Resolve authoritative MongoDB ObjectId area & store from backend (forceRefresh: true)
-    LocationService.resolveArea(23.1288, 72.5587, true).then(async (loc) => {
-      if (loc && loc.areaId) {
+    // 2. Backend se area & store resolve karo
+    try {
+      const loc = await LocationService.resolveArea(latitude, longitude, true);
+      if (loc && loc.areaId && loc.storeId) {
         setCurrentArea(loc.areaId, loc.areaName);
-        if (loc.storeId) {
-          setCurrentStore(loc.storeId, loc.storeName || loc.areaName);
-        }
+        setCurrentStore(loc.storeId, loc.storeName || loc.areaName);
         if (loc.deliveryMinutes) {
           setDeliveryEtaMinutes(loc.deliveryMinutes);
         }
@@ -301,101 +283,95 @@ export const BlinkitCheckoutScreen: React.FC = () => {
           storeName: loc.storeName || loc.areaName,
         });
 
-        // Trigger server cart location update so backend recalculates area prices
-        try {
-          const updatedCart = await CartService.setCartLocation(loc.areaId, loc.storeId);
-          if (updatedCart) {
-            syncCartFromSummary(updatedCart);
-          }
-        } catch (err) {
-          console.warn('[Checkout] Failed to re-price cart for new location:', err);
+        const gpsAddr = {
+          id: 'current_gps',
+          type: 'Current' as const,
+          fullName: customerName,
+          phoneNumber: customerPhone,
+          houseFlat: 'GPS Location',
+          street: readableAddress || 'Detected via GPS',
+          areaLandmark: loc.areaName,
+          city: city || 'Ahmedabad',
+          pincode: detPin || '',
+          latitude: latitude,
+          longitude: longitude,
+          isDefault: true,
+        };
+        setSelectedAddress(gpsAddr);
+
+        // 3. Server par cart location update karo (Price sync is the key)
+        const updatedCart = await CartService.setCartLocation(loc.areaId, loc.storeId);
+        if (updatedCart) {
+          syncCartFromSummary(updatedCart); // UI me prices update honge
         }
+      } else {
+        setAreaDetectionStatus({ isServiceable: false, areaName: 'Unknown', storeName: 'None' });
       }
-    }).catch((e) => {
-      console.warn('[Checkout] GPS resolve failed:', e);
-    });
+    } catch (error) {
+      console.error('Failed to resolve GPS area:', error);
+    }
   };
 
-  const handleSelectSavedAddr = (addr?: any) => {
+  const handleSelectSavedAddr = async (targetAddr?: any) => {
     setAddressSource('saved');
     isManualSelectionRef.current = true;
 
-    const targetAddr = addr || activeSavedAddr || savedAddrs[0];
-    const matchedAddrArea = matchAreaByName(
-      targetAddr?.areaLandmark || targetAddr?.landmark || targetAddr?.street || targetAddr?.houseFlat || ''
-    );
+    const addr = targetAddr || activeSavedAddr || savedAddrs[0];
+    const lat = addr?.latitude;
+    const lng = addr?.longitude;
 
-    let lat = typeof targetAddr?.latitude === 'number' && !isNaN(targetAddr.latitude)
-      ? targetAddr.latitude
-      : (matchedAddrArea?.lat || 23.0125);
-    let lng = typeof targetAddr?.longitude === 'number' && !isNaN(targetAddr.longitude)
-      ? targetAddr.longitude
-      : (matchedAddrArea?.lng || 72.5082);
-
-    if (matchedAddrArea) {
-      const distFromMatched = Math.sqrt(
-        Math.pow((lat - matchedAddrArea.lat) * 111, 2) +
-        Math.pow((lng - matchedAddrArea.lng) * 111 * Math.cos((lat * Math.PI) / 180), 2)
-      );
-      if (distFromMatched > 5) {
-        lat = matchedAddrArea.lat;
-        lng = matchedAddrArea.lng;
-      }
+    if (!lat || !lng) {
+      Alert.alert('Error', 'Saved address has invalid coordinates. Please add a new address.');
+      return;
     }
-    lastResolvedCoordsRef.current = `${lat.toFixed(4)}_${lng.toFixed(4)}`;
 
-    const areaName = matchedAddrArea?.name || targetAddr?.areaLandmark || targetAddr?.landmark || 'Prahlad Nagar';
-    const storeName = matchedAddrArea?.storeName || 'Wom Up Prahlad Nagar Dark Store';
-    const pin = targetAddr?.pincode || matchedAddrArea?.pincode || '380015';
-
+    lastResolvedCoordsRef.current = `${Number(lat).toFixed(4)}_${Number(lng).toFixed(4)}`;
     setSelectedAddressType('SAVED');
-    setHouseFlat(cleanHouseFlat(targetAddr?.houseFlat) || '');
-    setStreet(targetAddr?.street || '');
-    setAreaLandmark(areaName);
-    setPincode(pin);
-    setDeliveryLocation(targetAddr ? `Home — ${cleanHouseFlat(targetAddr?.houseFlat)}, ${targetAddr?.street || areaName}` : 'Current Location');
-    setDeliveryEtaMinutes(8);
-    setAreaDetectionStatus({
-      isServiceable: true,
-      areaName: areaName,
-      storeName: storeName,
-    });
+    const cleanedH = cleanHouseFlat(addr?.houseFlat) || '';
+    const streetV = addr?.street || '';
+    const areaV = addr?.areaLandmark || addr?.city || '';
+    const pinV = addr?.pincode || '';
+
+    setHouseFlat(cleanedH);
+    setStreet(streetV);
+    setAreaLandmark(areaV);
+    setPincode(pinV);
+    setDeliveryLocation(`${addr?.type || 'Home'} — ${cleanedH ? cleanedH + ', ' : ''}${areaV}`);
 
     const fullAddr = {
-      id: targetAddr?.id || targetAddr?._id || 'addr_saved',
-      type: (targetAddr?.type || 'Home') as any,
+      ...addr,
+      id: addr?.id || addr?._id || 'addr_saved',
+      type: (addr?.type || 'Home') as any,
       fullName: customerName,
       phoneNumber: customerPhone,
-      houseFlat: cleanHouseFlat(targetAddr?.houseFlat),
-      street: targetAddr?.street || '',
-      areaLandmark: areaName,
-      city: targetAddr?.city || 'Ahmedabad',
-      pincode: pin,
+      houseFlat: cleanedH,
+      street: streetV,
+      areaLandmark: areaV,
+      city: addr?.city || 'Ahmedabad',
+      pincode: pinV,
       latitude: lat,
       longitude: lng,
       isDefault: true,
     };
     setSelectedAddress(fullAddr as any);
-    CartService.clearCache();
+    CartService.clearCache(); // Clear old cache
 
     emitCheckoutChange({
       selectedAddressType: 'SAVED',
-      addressId: targetAddr?.id || targetAddr?._id || 'addr_saved',
-      houseFlat: cleanHouseFlat(targetAddr?.houseFlat),
-      street: targetAddr?.street || '',
-      areaLandmark: areaName,
-      pincode: pin,
+      addressId: addr?.id || addr?._id || 'addr_saved',
+      houseFlat: cleanedH,
+      street: streetV,
+      areaLandmark: areaV,
+      pincode: pinV,
       recipientName: customerName,
       phoneNumber: customerPhone,
     });
 
-    // Resolve authoritative MongoDB ObjectId area & store from backend (forceRefresh: true)
-    LocationService.resolveArea(lat, lng, true).then(async (loc) => {
-      if (loc && loc.areaId) {
+    try {
+      const loc = await LocationService.resolveArea(lat, lng, true);
+      if (loc && loc.areaId && loc.storeId) {
         setCurrentArea(loc.areaId, loc.areaName);
-        if (loc.storeId) {
-          setCurrentStore(loc.storeId, loc.storeName || loc.areaName);
-        }
+        setCurrentStore(loc.storeId, loc.storeName || loc.areaName);
         if (loc.deliveryMinutes) {
           setDeliveryEtaMinutes(loc.deliveryMinutes);
         }
@@ -405,71 +381,18 @@ export const BlinkitCheckoutScreen: React.FC = () => {
           storeName: loc.storeName || loc.areaName,
         });
 
-        // Trigger server cart location update so backend recalculates area prices
-        try {
-          const updatedCart = await CartService.setCartLocation(loc.areaId, loc.storeId);
-          if (updatedCart) {
-            syncCartFromSummary(updatedCart);
-          }
-        } catch (err) {
-          console.warn('[Checkout] Failed to re-price cart for new location:', err);
+        // Sync cart prices
+        const updatedCart = await CartService.setCartLocation(loc.areaId, loc.storeId);
+        if (updatedCart) {
+          syncCartFromSummary(updatedCart);
         }
+      } else {
+        setAreaDetectionStatus({ isServiceable: false, areaName: 'Unknown', storeName: 'None' });
       }
-    }).catch((e) => {
-      console.warn('[Checkout] Saved address resolve failed:', e);
-    });
+    } catch (error) {
+      console.error('Failed to resolve saved address area:', error);
+    }
   };
-
-  // Debounced Area Detection from AHMEDABAD_AREAS when typing in Area & Landmark (350ms)
-  useEffect(() => {
-    if (!areaLandmark || areaLandmark.trim().length < 3) return;
-    const timer = setTimeout(async () => {
-      const matched = matchAreaByName(areaLandmark);
-      if (matched) {
-        const coordKey = `${matched.lat.toFixed(4)}_${matched.lng.toFixed(4)}`;
-        if (lastResolvedCoordsRef.current === coordKey) {
-          return; // Skip duplicate resolve when already active for these coordinates
-        }
-        lastResolvedCoordsRef.current = coordKey;
-        setPincode(matched.pincode);
-        try {
-          const area = await LocationService.resolveArea(matched.lat, matched.lng, false);
-          if (area) {
-            setCurrentArea(area.areaId, area.areaName);
-            if (area.storeId) {
-              setCurrentStore(area.storeId, area.storeName || matched.storeName);
-            }
-            if (area.deliveryMinutes) {
-              setDeliveryEtaMinutes(area.deliveryMinutes);
-            }
-            setAreaDetectionStatus({
-              isServiceable: true,
-              areaName: area.areaName,
-              storeName: area.storeName || matched.storeName,
-            });
-            setSelectedAddress({
-              ...selectedAddress,
-              areaLandmark: area.areaName,
-              pincode: matched.pincode,
-              latitude: matched.lat,
-              longitude: matched.lng,
-            });
-
-            try {
-              const updatedCart = await CartService.setCartLocation(area.areaId, area.storeId);
-              if (updatedCart) {
-                syncCartFromSummary(updatedCart);
-              }
-            } catch {}
-          }
-        } catch (e) {
-          console.warn('[BlinkitCheckout] Typing area resolve warning:', e);
-        }
-      }
-    }, 350);
-
-    return () => clearTimeout(timer);
-  }, [areaLandmark]);
 
   // Auto-sync form and selector cards when addressSource or context updates
   useEffect(() => {
@@ -477,30 +400,29 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     if (addressSource === 'saved') {
       const target = activeSavedAddr || (selectedAddress?.type !== 'Current' ? selectedAddress : null);
       if (target) {
-        const matched = matchAreaByName(target.areaLandmark || target.street || target.houseFlat || '');
         setSelectedAddressType('SAVED');
         setHouseFlat(cleanHouseFlat(target.houseFlat));
         setStreet(target.street || '');
-        setAreaLandmark(target.areaLandmark || matched?.name || 'Prahlad Nagar');
-        setPincode(target.pincode || matched?.pincode || '380015');
+        setAreaLandmark(target.areaLandmark || currentAreaName || '');
+        setPincode(target.pincode || '');
         setAreaDetectionStatus({
           isServiceable: true,
-          areaName: matched?.name || target.areaLandmark || 'Prahlad Nagar',
-          storeName: matched?.storeName || 'Wom Up Prahlad Nagar Dark Store',
+          areaName: target.areaLandmark || currentAreaName || '',
+          storeName: currentStoreName || 'Wom Up Dark Store',
         });
       }
       return;
     }
     if (addressSource === 'gps') {
       setSelectedAddressType('CURRENT_GPS');
-      setHouseFlat('GPS Location');
-      setStreet('Chandlodiya - Tragad Area');
-      setAreaLandmark('Chandlodiya - Tragad');
-      setPincode('382481');
+      setHouseFlat(selectedAddress?.houseFlat || 'GPS Location');
+      setStreet(selectedAddress?.street || selectedAddress?.readableAddress || '');
+      setAreaLandmark(selectedAddress?.areaLandmark || currentAreaName || '');
+      setPincode(selectedAddress?.pincode || '');
       setAreaDetectionStatus({
         isServiceable: true,
-        areaName: 'Chandlodiya - Tragad',
-        storeName: currentStoreName || 'Wom Up Chandlodiya - Tragad Dark Store',
+        areaName: selectedAddress?.areaLandmark || currentAreaName || '',
+        storeName: currentStoreName || 'Wom Up Dark Store',
       });
     }
   }, [currentAreaName, currentStoreName, addressSource]);
@@ -553,47 +475,11 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     }
     if (liveCheckoutState?.selectedAddressType) {
       if (liveCheckoutState.selectedAddressType === 'CURRENT_GPS' && selectedAddressType !== 'CURRENT_GPS') {
-        setAddressSource('gps');
-        isManualSelectionRef.current = true;
-        setSelectedAddressType('CURRENT_GPS');
-        setHouseFlat('GPS Location');
-        setStreet('Chandlodiya - Tragad Area');
-        setAreaLandmark('Chandlodiya - Tragad');
-        setPincode('382481');
-        setDeliveryLocation('Current Location — Chandlodiya - Tragad');
-        setDeliveryEtaMinutes(9);
-        LocationService.resolveArea(23.1288, 72.5507, true).then(async (loc) => {
-          if (loc && loc.areaId) {
-            setCurrentArea(loc.areaId, loc.areaName);
-            if (loc.storeId) setCurrentStore(loc.storeId, loc.storeName || loc.areaName);
-            await CartService.setCartLocation(loc.areaId, loc.storeId);
-          }
-        }).catch(() => {});
+        handleSelectGpsMode();
       } else if (liveCheckoutState.selectedAddressType === 'SAVED' && selectedAddressType !== 'SAVED') {
-        setAddressSource('saved');
-        isManualSelectionRef.current = true;
-        setSelectedAddressType('SAVED');
         const targetAddr = savedAddrs.find((a: any) => a.id === liveCheckoutState.addressId) || savedAddrs[0];
         if (targetAddr) {
-          const lat = targetAddr?.latitude || 23.0500;
-          const lng = targetAddr?.longitude || 72.5160;
-          const cleanedH = cleanHouseFlat(targetAddr?.houseFlat);
-          const streetV = targetAddr?.street || '';
-          const landV = targetAddr?.areaLandmark || 'Ahmedabad';
-          const pinV = targetAddr?.pincode || '382481';
-          setHouseFlat(cleanedH);
-          setStreet(streetV);
-          setAreaLandmark(landV);
-          setPincode(pinV);
-          setDeliveryLocation(`Home — ${cleanedH ? cleanedH + ', ' : ''}${streetV ? streetV + ', ' : ''}${landV}`);
-          setDeliveryEtaMinutes(8);
-          LocationService.resolveArea(lat, lng, true).then(async (loc) => {
-            if (loc && loc.areaId) {
-              setCurrentArea(loc.areaId, loc.areaName);
-              if (loc.storeId) setCurrentStore(loc.storeId, loc.storeName || loc.areaName);
-              await CartService.setCartLocation(loc.areaId, loc.storeId);
-            }
-          }).catch(() => {});
+          handleSelectSavedAddr(targetAddr);
         }
       }
     }
@@ -652,21 +538,17 @@ export const BlinkitCheckoutScreen: React.FC = () => {
 
   // Effective area text priority: explicit form input > selected address > currentAreaName
   const effectiveAreaText = isSavedAddress
-    ? (selectedAddress?.areaLandmark || areaLandmark || (selectedAddress as any)?.area || selectedAddress?.street || 'Prahlad Nagar')
-    : (areaLandmark || selectedAddress?.areaLandmark || currentAreaName || 'Chandlodiya - Tragad');
-
-  const matchedArea = matchAreaByName(effectiveAreaText);
+    ? (selectedAddress?.areaLandmark || areaLandmark || (selectedAddress as any)?.area || selectedAddress?.street || '')
+    : (areaLandmark || selectedAddress?.areaLandmark || currentAreaName || '');
 
   // Active coordinates: always take explicit selectedAddress coordinates first
-  const activeLat = Number(selectedAddress?.latitude) ||
-    (selectedAddressType === 'CURRENT_GPS' ? 23.1288 : (matchedArea?.lat || 23.0125));
-  const activeLng = Number(selectedAddress?.longitude) ||
-    (selectedAddressType === 'CURRENT_GPS' ? 72.5587 : (matchedArea?.lng || 72.5082));
+  const activeLat = Number(selectedAddress?.latitude) || 0;
+  const activeLng = Number(selectedAddress?.longitude) || 0;
   const currentDistanceKm = 1.2;
 
   const cartItemCount = blinkitCartList.length;
   const cityKey = selectedAddress?.city || currentCityName || 'Ahmedabad';
-  const areaKey = matchedArea?.name || effectiveAreaText || 'Chandlodiya - Tragad';
+  const areaKey = currentAreaName || effectiveAreaText || selectedAddress?.areaLandmark || '';
   const addressIdKey = selectedAddress?.id || selectedAddressType;
 
   const cachedFeeData = CartService.getCachedDeliveryFee({
@@ -691,33 +573,37 @@ export const BlinkitCheckoutScreen: React.FC = () => {
 
   useEffect(() => {
     let isMounted = true;
+    const abortController = new AbortController();
     let timer: any = null;
 
     const fetchFee = async () => {
       setIsCalculatingFee(true);
       try {
-        const res = await CartService.calculateDynamicDeliveryFee({
-          items: blinkitCartList.map((item: any) => ({
-            id: item.product.id,
-            productId: item.product.id,
-            name: item.product.name,
-            price: item.product.sellingPrice,
-            sellingPrice: item.product.sellingPrice,
-            mrp: item.product.mrp,
-            quantity: item.quantity,
-            variantId: (item.product as any).selectedVariantId,
-          })),
-          cityName: cityKey,
-          areaName: areaKey,
-          storeId: currentStoreId || undefined,
-          deliveryAddress: {
-            latitude: activeLat,
-            longitude: activeLng,
-            area: areaKey,
-            city: cityKey,
+        const res = await CartService.calculateDynamicDeliveryFee(
+          {
+            items: blinkitCartList.map((item: any) => ({
+              id: item.product.id,
+              productId: item.product.id,
+              name: item.product.name,
+              price: item.product.sellingPrice,
+              sellingPrice: item.product.sellingPrice,
+              mrp: item.product.mrp,
+              quantity: item.quantity,
+              variantId: (item.product as any).selectedVariantId,
+            })),
+            cityName: cityKey,
+            areaName: areaKey,
+            storeId: currentStoreId || undefined,
+            deliveryAddress: {
+              latitude: activeLat,
+              longitude: activeLng,
+              area: areaKey,
+              city: cityKey,
+            },
+            forceRefresh: true,
           },
-          forceRefresh: true,
-        });
+          abortController.signal
+        );
 
         if (isMounted && res) {
           setDynamicDeliveryFee(res.deliveryFee);
@@ -744,17 +630,20 @@ export const BlinkitCheckoutScreen: React.FC = () => {
             });
           }
         }
-      } catch (err) {
-        console.warn('[BlinkitCheckout] Live calculate fee error:', err);
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') {
+          console.warn('[BlinkitCheckout] Live calculate fee error:', err);
+        }
       } finally {
         if (isMounted) setIsCalculatingFee(false);
       }
     };
 
-    timer = setTimeout(fetchFee, 120);
+    timer = setTimeout(fetchFee, 150);
 
     return () => {
       isMounted = false;
+      abortController.abort();
       if (timer) clearTimeout(timer);
     };
   }, [cartItemCount, cityKey, areaKey, addressIdKey, selectedAddressType, activeLat, activeLng, currentStoreId]);
@@ -1130,9 +1019,11 @@ export const BlinkitCheckoutScreen: React.FC = () => {
                 )}
               </View>
               <Text style={styles.choiceTitle} numberOfLines={2}>
-                {selectedAddress?.readableAddress || selectedAddress?.shortAddress || (deliveryLocation ? deliveryLocation.replace(/^Current Location\s*[—–-]\s*/i, '').trim() : '') || 'Chandlodiya - Tragad'}
+                {selectedAddress?.readableAddress || selectedAddress?.shortAddress || (deliveryLocation ? deliveryLocation.replace(/^Current Location\s*[—–-]\s*/i, '').trim() : '') || currentAreaName || 'Current Location'}
               </Text>
-              <Text style={styles.choiceCoords}>Lat: {Number(activeLat).toFixed(4)}, Lng: {Number(activeLng).toFixed(4)}</Text>
+              <Text style={styles.choiceCoords}>
+                {activeLat && activeLng ? `Lat: ${Number(activeLat).toFixed(4)}, Lng: ${Number(activeLng).toFixed(4)}` : 'Detecting GPS...'}
+              </Text>
               <Text style={styles.choiceSub}>⚡ Instant 9-min Express Delivery</Text>
             </TouchableOpacity>
 
