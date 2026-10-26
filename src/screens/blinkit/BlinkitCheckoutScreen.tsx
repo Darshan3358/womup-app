@@ -269,7 +269,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
       city: 'Ahmedabad',
       pincode: '382481',
       latitude: 23.1288,
-      longitude: 72.5507,
+      longitude: 72.5587,
       isDefault: true,
     };
     setSelectedAddress(gpsAddr);
@@ -285,7 +285,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     });
 
     // Resolve authoritative MongoDB ObjectId area & store from backend (forceRefresh: true)
-    LocationService.resolveArea(23.1288, 72.5507, true).then(async (loc) => {
+    LocationService.resolveArea(23.1288, 72.5587, true).then(async (loc) => {
       if (loc && loc.areaId) {
         setCurrentArea(loc.areaId, loc.areaName);
         if (loc.storeId) {
@@ -1125,7 +1125,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
                 )}
               </View>
               <Text style={styles.choiceTitle}>Chandlodiya - Tragad</Text>
-              <Text style={styles.choiceCoords}>Lat: 23.1288, Lng: 72.5507</Text>
+              <Text style={styles.choiceCoords}>Lat: 23.1288, Lng: 72.5587</Text>
               <Text style={styles.choiceSub}>⚡ Instant 9-min Express Delivery</Text>
             </TouchableOpacity>
 
