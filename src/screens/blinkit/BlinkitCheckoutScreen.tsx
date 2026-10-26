@@ -622,13 +622,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
               storeName: res.storeName,
             });
           }
-          if (Array.isArray(res.items) && res.items.length > 0) {
-            syncCartFromSummary({
-              items: res.items,
-              subtotalSelling: res.itemSubtotal,
-              subtotalMrp: res.mrpTotal,
-            });
-          }
+          // Do not call syncCartFromSummary inside fetchFee to avoid triggering infinite re-renders
         }
       } catch (err: any) {
         if (err?.name !== 'AbortError') {
@@ -639,7 +633,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
       }
     };
 
-    timer = setTimeout(fetchFee, 150);
+    timer = setTimeout(fetchFee, 250);
 
     return () => {
       isMounted = false;

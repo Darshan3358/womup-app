@@ -1721,120 +1721,74 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // When currentAreaId or currentStoreId or currentAreaName updates, re-fetch products with store-specific stock and area prices
   useEffect(() => {
-    if (currentAreaId || currentStoreId || currentAreaName) {
-      ProductService.fetchProducts({
-        areaId: currentAreaId || undefined,
-        storeId: currentStoreId || undefined,
-      }).then((liveProducts) => {
-        if (liveProducts && liveProducts.length > 0) {
-          setSelectedProduct(liveProducts[0]);
-          setSelectedBlinkitProduct(mapProductToBlinkit(liveProducts[0]));
+    if (!currentAreaId && !currentStoreId && !currentAreaName) return;
 
-          // Dynamically sync blinkitCart prices with newly resolved store catalog (e.g. ₹7 vs ₹12)
-          setBlinkitCart((prev) => {
-            const updated = { ...prev };
-            let hasChanged = false;
-            Object.keys(updated).forEach((cartKey) => {
-              const item = updated[cartKey];
-              const rawProdId = item.product.id;
-              const matched = liveProducts.find(
-                (p) =>
-                  p.id === rawProdId ||
-                  (p as any)._id === rawProdId ||
-                  p.name.toLowerCase().trim() === item.product.name.toLowerCase().trim()
+    let isMounted = true;
+    ProductService.fetchProducts({
+      areaId: currentAreaId || undefined,
+      storeId: currentStoreId || undefined,
+    }).then((liveProducts) => {
+      if (isMounted && liveProducts && liveProducts.length > 0) {
+        setSelectedProduct(liveProducts[0]);
+        setSelectedBlinkitProduct(mapProductToBlinkit(liveProducts[0]));
+
+        // Dynamically sync existing blinkitCart item prices without triggering server cart fetch
+        setBlinkitCart((prev) => {
+          const updated = { ...prev };
+          let hasChanged = false;
+          Object.keys(updated).forEach((cartKey) => {
+            const item = updated[cartKey];
+            const rawProdId = item.product.id;
+            const matched = liveProducts.find(
+              (p) =>
+                p.id === rawProdId ||
+                (p as any)._id === rawProdId ||
+                p.name.toLowerCase().trim() === item.product.name.toLowerCase().trim()
+            );
+
+            let targetPrice = matched ? matched.sellingPrice : item.product.sellingPrice;
+            let targetMrp = matched ? matched.mrp : item.product.mrp;
+            let targetStock = matched ? (matched.stock ?? item.product.stock) : item.product.stock;
+
+            if (matched?.variants && matched.variants.length > 0) {
+              const matchedVariant = matched.variants.find((v: any) =>
+                (v.id && (item.product as any).selectedVariantId === v.id) ||
+                (v.label && item.product.packSize && v.label.toLowerCase().trim() === item.product.packSize.toLowerCase().trim()) ||
+                (v.weightOrVolume && item.product.packSize && v.weightOrVolume.toLowerCase().trim() === item.product.packSize.toLowerCase().trim()) ||
+                (v.label && (item.product as any).quantityLabel && v.label.toLowerCase().trim() === (item.product as any).quantityLabel.toLowerCase().trim())
               );
-
-              let targetPrice = matched ? matched.sellingPrice : item.product.sellingPrice;
-              let targetMrp = matched ? matched.mrp : item.product.mrp;
-              let targetStock = matched ? (matched.stock ?? item.product.stock) : item.product.stock;
-
-              // Check if item has a specific variant (e.g. 250 g variant of Tomato with dynamic area price)
-              if (matched?.variants && matched.variants.length > 0) {
-                const matchedVariant = matched.variants.find((v: any) =>
-                  (v.id && (item.product as any).selectedVariantId === v.id) ||
-                  (v.label && item.product.packSize && v.label.toLowerCase().trim() === item.product.packSize.toLowerCase().trim()) ||
-                  (v.weightOrVolume && item.product.packSize && v.weightOrVolume.toLowerCase().trim() === item.product.packSize.toLowerCase().trim()) ||
-                  (v.label && (item.product as any).quantityLabel && v.label.toLowerCase().trim() === (item.product as any).quantityLabel.toLowerCase().trim())
-                );
-                if (matchedVariant) {
-                  targetPrice = matchedVariant.price ?? targetPrice;
-                  targetMrp = matchedVariant.mrp ?? targetMrp;
-                  targetStock = matchedVariant.stock ?? targetStock;
-                }
+              if (matchedVariant) {
+                targetPrice = matchedVariant.price ?? targetPrice;
+                targetMrp = matchedVariant.mrp ?? targetMrp;
+                targetStock = matchedVariant.stock ?? targetStock;
               }
-
-              if (item.product.sellingPrice !== targetPrice || item.product.mrp !== targetMrp) {
-                hasChanged = true;
-                updated[cartKey] = {
-                  ...item,
-                  product: {
-                    ...item.product,
-                    sellingPrice: targetPrice,
-                    mrp: targetMrp,
-                    stock: targetStock,
-                  },
-                };
-              }
-            });
-            if (hasChanged) {
-              StorageService.saveItem(StorageService.KEYS.BLINKIT_CART, updated);
-              return updated;
             }
-            return prev;
+
+            if (item.product.sellingPrice !== targetPrice || item.product.mrp !== targetMrp) {
+              hasChanged = true;
+              updated[cartKey] = {
+                ...item,
+                product: {
+                  ...item.product,
+                  sellingPrice: targetPrice,
+                  mrp: targetMrp,
+                  stock: targetStock,
+                },
+              };
+            }
           });
+          if (hasChanged) {
+            StorageService.saveItem(StorageService.KEYS.BLINKIT_CART, updated);
+            return updated;
+          }
+          return prev;
+        });
+      }
+    });
 
-          // Also pull authoritative server cart with resolved area and store
-          CartService.getServerCart(currentAreaId || undefined, currentStoreId || undefined).then((serverCart) => {
-            if (serverCart && Array.isArray(serverCart.items) && serverCart.items.length > 0) {
-              const newCart: CartItem[] = serverCart.items.map((it: any) => {
-                const vPrice = it.variant?.price !== undefined
-                  ? Number(it.variant.price)
-                  : Number(it.product.sellingPrice ?? (it.subtotal && it.quantity ? it.subtotal / it.quantity : 0));
-                const vMrp = it.variant?.mrp !== undefined
-                  ? Number(it.variant.mrp)
-                  : Number(it.product.mrp ?? (it.totalMrp && it.quantity ? it.totalMrp / it.quantity : vPrice));
-                const vLabel = it.variant?.label || it.variant?.weightOrVolume || it.product.quantityLabel || '1 unit';
-                const resolvedVId = it.variantId || it.variant?.id || it.variant?._id;
-                return {
-                  product: {
-                    id: it.product.id || it.product._id,
-                    name: it.product.name,
-                    brand: it.product.brand || '',
-                    categoryId: it.product.categoryId || '',
-                    sellingPrice: vPrice,
-                    mrp: vMrp,
-                    discountPercent: vMrp > vPrice ? Math.round(((vMrp - vPrice) / vMrp) * 100) : (it.product.discountPercent || 0),
-                    stock: it.variant?.stock ?? it.product.stock ?? 100,
-                    imageUrl: it.product.imageUrl,
-                    quantityLabel: vLabel,
-                    shoppingCoins: 0,
-                    rating: 4.8,
-                    reviewCount: 50,
-                    deliveryMinutes: 9,
-                    selectedVariantId: resolvedVId,
-                  } as any,
-                  quantity: it.quantity,
-                };
-              });
-              setCart(newCart);
-              const newBlinkitCart: Record<string, { product: BlinkitProduct; quantity: number }> = {};
-              newCart.forEach((ci) => {
-                const bp = mapProductToBlinkit(ci.product);
-                bp.packSize = ci.product.quantityLabel || '1 unit';
-                (bp as any).selectedVariantId = (ci.product as any).selectedVariantId;
-                const k = (ci.product as any).selectedVariantId ? `${ci.product.id}_${(ci.product as any).selectedVariantId}` : ci.product.id;
-                newBlinkitCart[k] = {
-                  product: bp,
-                  quantity: ci.quantity,
-                };
-              });
-              setBlinkitCart(newBlinkitCart);
-              StorageService.saveItem(StorageService.KEYS.BLINKIT_CART, newBlinkitCart);
-            }
-          }).catch(() => {});
-        }
-      });
-    }
+    return () => {
+      isMounted = false;
+    };
   }, [currentAreaId, currentStoreId, currentAreaName, catalogVersion]);
 
   // Re-reconcile cart whenever user navigates to Cart Screen

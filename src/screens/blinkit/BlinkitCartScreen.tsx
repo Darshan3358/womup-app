@@ -90,6 +90,7 @@ export const BlinkitCartScreen: React.FC = () => {
 
   useEffect(() => {
     let isMounted = true;
+    const abortController = new AbortController();
     let timer: any = null;
 
     const fetchFee = async () => {
@@ -119,28 +120,32 @@ export const BlinkitCartScreen: React.FC = () => {
       }
 
       try {
-        const res = await CartService.calculateDynamicDeliveryFee({
-          items: blinkitCartList.map((item) => ({
-            id: item.product.id,
-            productId: item.product.id,
-            name: item.product.name,
-            price: item.product.sellingPrice,
-            sellingPrice: item.product.sellingPrice,
-            mrp: item.product.mrp,
-            quantity: item.quantity,
-            variantId: (item.product as any).selectedVariantId,
-          })),
-          cityName: cityKey,
-          areaName: areaKey,
-          storeId: currentStoreId || undefined,
-          distanceKm: currentDistanceKm,
-          deliveryAddress: {
-            latitude: activeLat,
-            longitude: activeLng,
-            area: areaKey,
-            city: cityKey,
+        const res = await CartService.calculateDynamicDeliveryFee(
+          {
+            items: blinkitCartList.map((item) => ({
+              id: item.product.id,
+              productId: item.product.id,
+              name: item.product.name,
+              price: item.product.sellingPrice,
+              sellingPrice: item.product.sellingPrice,
+              mrp: item.product.mrp,
+              quantity: item.quantity,
+              variantId: (item.product as any).selectedVariantId,
+            })),
+            cityName: cityKey,
+            areaName: areaKey,
+            storeId: currentStoreId || undefined,
+            distanceKm: currentDistanceKm,
+            deliveryAddress: {
+              latitude: activeLat,
+              longitude: activeLng,
+              area: areaKey,
+              city: cityKey,
+            },
+            forceRefresh: true,
           },
-        });
+          abortController.signal
+        );
 
         if (isMounted && res) {
           setDynamicDeliveryFee(res.deliveryFee);
@@ -152,16 +157,12 @@ export const BlinkitCartScreen: React.FC = () => {
               areaName: res.areaName || areaKey,
             });
           }
-          if (Array.isArray(res.items) && res.items.length > 0) {
-            syncCartFromSummary({
-              items: res.items,
-              subtotalSelling: res.itemSubtotal,
-              subtotalMrp: res.mrpTotal,
-            });
-          }
+          // Do not call syncCartFromSummary inside fetchFee to avoid triggering infinite re-renders
         }
-      } catch (err) {
-        console.warn('[BlinkitCart] calculate fee error:', err);
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') {
+          console.warn('[BlinkitCart] calculate fee error:', err);
+        }
       } finally {
         if (isMounted) {
           setIsCalculatingFee(false);
@@ -169,10 +170,11 @@ export const BlinkitCartScreen: React.FC = () => {
       }
     };
 
-    timer = setTimeout(fetchFee, 100);
+    timer = setTimeout(fetchFee, 200);
 
     return () => {
       isMounted = false;
+      abortController.abort();
       if (timer) clearTimeout(timer);
     };
   }, [blinkitCartCount, areaKey, cityKey, activeLat, activeLng, currentStoreId]);
