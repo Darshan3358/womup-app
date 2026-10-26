@@ -39,7 +39,7 @@ export const S09_ReferralCodeScreen: React.FC = () => {
           setSponsorValid(res.valid);
           if (res.valid) {
             setSponsorName(res.sponsorName);
-            setSponsorStatusText(res.isCompanyRoot ? 'WormUp Company Root' : `Valid Sponsor: ${res.sponsorName}`);
+            setSponsorStatusText(res.isCompanyRoot ? 'WOMUP Company Root' : `Valid Sponsor: ${res.sponsorName}`);
             setErrorMessage('');
           } else {
             setSponsorName('');
@@ -200,7 +200,7 @@ export const S09_ReferralCodeScreen: React.FC = () => {
         <View style={styles.defaultSponsorNote}>
           <Ionicons name="information-circle-outline" size={16} color={COLORS.navy} />
           <Text style={styles.defaultSponsorNoteText}>
-            💡 If left blank, you will automatically join under <Text style={{ fontWeight: '700' }}>Womup Company</Text> (Default Root Sponsor: WORMUP001).
+            💡 If left blank, you will automatically join under <Text style={{ fontWeight: '700' }}>WOMUP Company</Text> (Default Root Sponsor: WOMUP001).
           </Text>
         </View>
 

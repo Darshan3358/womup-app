@@ -1,57 +1,39 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNotifications } from '../../context/NotificationContext';
+import { NotificationCenterModal } from '../../components/common/NotificationCenterModal';
 
 interface WomupHeaderProps {
   location?: string;
   onOpenMenu?: () => void;
   onSelectLocation?: () => void;
   onOpenNotifications?: () => void;
-  onBackToQuickCommerce?: () => void;
 }
 
 export const WomupHeader: React.FC<WomupHeaderProps> = ({
   location = 'Ahmedabad',
-  onOpenMenu,
   onSelectLocation,
   onOpenNotifications,
-  onBackToQuickCommerce,
 }) => {
+  const { unreadCount } = useNotifications();
+  const [isNotificationModalVisible, setNotificationModalVisible] = useState(false);
+
+  const handleNotificationsPress = () => {
+    if (onOpenNotifications) {
+      onOpenNotifications();
+    } else {
+      setNotificationModalVisible(true);
+    }
+  };
+
   return (
     <View style={styles.container}>
-      {/* Top Quick Commerce Switcher Banner */}
-      {onBackToQuickCommerce && (
-        <TouchableOpacity
-          style={styles.quickCommerceSwitch}
-          activeOpacity={0.8}
-          onPress={onBackToQuickCommerce}
-          accessibilityLabel="Back to WOMUP Express 9-Min Delivery"
-        >
-          <View style={styles.switchFlashBadge}>
-            <Ionicons name="flash" size={13} color="#FFFFFF" />
-          </View>
-          <Text style={styles.quickCommerceText}>
-            Back to <Text style={{ fontWeight: '800', color: '#92400E' }}>WOMUP Express 9-Min Delivery</Text>
-          </Text>
-          <View style={styles.switchActionPill}>
-            <Text style={styles.switchActionText}>GO BACK</Text>
-            <Ionicons name="arrow-forward" size={11} color="#FFFFFF" />
-          </View>
-        </TouchableOpacity>
-      )}
 
       <View style={styles.headerRow}>
-        {/* Left: Hamburger Menu + Brand Name */}
+        {/* Left: Brand Name without hamburger icon */}
         <View style={styles.leftActionsRow}>
-          <TouchableOpacity
-            style={styles.iconButton}
-            activeOpacity={0.7}
-            onPress={onOpenMenu}
-            accessibilityLabel="Menu"
-          >
-            <Ionicons name="menu-outline" size={24} color="#0F172A" />
-          </TouchableOpacity>
-          <Text style={styles.headerBrandText}>WomUp</Text>
+          <Text style={styles.headerBrandText}>WOMART</Text>
         </View>
 
         {/* Right: Location & Notifications */}
@@ -69,20 +51,28 @@ export const WomupHeader: React.FC<WomupHeaderProps> = ({
             <Ionicons name="chevron-down" size={13} color="#E11D48" />
           </TouchableOpacity>
 
-          {/* Notifications with badge "3" */}
+          {/* Notifications with real badge & popup modal */}
           <TouchableOpacity
             style={styles.bellButton}
             activeOpacity={0.7}
-            onPress={onOpenNotifications}
+            onPress={handleNotificationsPress}
             accessibilityLabel="Notifications"
           >
             <Ionicons name="notifications-outline" size={24} color="#0F172A" />
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>3</Text>
-            </View>
+            {unreadCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Notifications Modal Popup (matching customer app) */}
+      <NotificationCenterModal
+        visible={isNotificationModalVisible}
+        onClose={() => setNotificationModalVisible(false)}
+      />
     </View>
   );
 };
@@ -96,48 +86,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
-  quickCommerceSwitch: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FEF3C7',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 20,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-  },
-  switchFlashBadge: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#D97706',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 6,
-  },
-  quickCommerceText: {
-    fontSize: 11.5,
-    color: '#78350F',
-    fontWeight: '600',
-    flex: 1,
-  },
-  switchActionPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#B45309',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
-    gap: 3,
-  },
-  switchActionText: {
-    color: '#FFFFFF',
-    fontSize: 9.5,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
+
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -171,10 +120,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerBrandText: {
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 18,
+    fontWeight: '900',
     color: '#0F172A',
-    marginLeft: 6,
+    marginLeft: 2,
     letterSpacing: -0.2,
   },
   logoContainer: {
@@ -257,11 +206,12 @@ const styles = StyleSheet.create({
   badge: {
     position: 'absolute',
     top: 2,
-    right: 3,
+    right: 2,
     backgroundColor: '#EF4444',
     borderRadius: 9,
-    width: 16,
+    minWidth: 16,
     height: 16,
+    paddingHorizontal: 3,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1.5,

@@ -13,6 +13,7 @@ import { Order, OrderSchema } from '../orders/schemas/order.schema';
 import { Inventory, InventorySchema } from '../inventory/schemas/inventory.schema';
 import { Product, ProductSchema } from '../products/schemas/product.schema';
 import { DeliveryPartner, DeliveryPartnerSchema } from '../delivery/schemas/delivery-partner.schema';
+import { Vendor, VendorSchema } from '../local-shops/schemas/vendor.schema';
 import { OtpVerification, OtpVerificationSchema } from '../auth/schemas/otp.schema';
 
 import { Area, AreaSchema } from '../areas/schemas/area.schema';
@@ -41,6 +42,7 @@ import { StoreInventoryService } from './inventory/store-inventory.service';
       { name: Inventory.name, schema: InventorySchema },
       { name: Product.name, schema: ProductSchema },
       { name: DeliveryPartner.name, schema: DeliveryPartnerSchema },
+      { name: Vendor.name, schema: VendorSchema },
       { name: OtpVerification.name, schema: OtpVerificationSchema },
       { name: Area.name, schema: AreaSchema },
       { name: City.name, schema: CitySchema },

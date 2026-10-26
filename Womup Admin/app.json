@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Womup Admin Console",
-    "slug": "womup-admin",
+    "name": "WOMART Admin Console",
+    "slug": "womart-admin",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -22,7 +22,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.web3apk.womupadmin"
+      "bundleIdentifier": "com.web3apk.womupadmin",
+      "infoPlist": {
+        "CFBundleDisplayName": "WOMART Admin"
+      }
     },
     "android": {
       "package": "com.web3apk.womupadmin",

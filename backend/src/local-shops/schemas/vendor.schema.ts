@@ -365,6 +365,8 @@ VendorSchema.index({ coordinates: '2dsphere' });
 VendorSchema.index({ location: '2dsphere' });
 VendorSchema.index({ city: 1, categoryName: 1, isActive: 1 });
 VendorSchema.index({ vendorCode: 1 }, { unique: true });
-VendorSchema.index({ vendorStatus: 1 });
-VendorSchema.index({ isBlocked: 1 });
-VendorSchema.index({ isSuspended: 1 });
+VendorSchema.index({ ownerPhone: 1 }, { sparse: true });
+VendorSchema.index({ vendorMobile: 1 }, { sparse: true });
+VendorSchema.index({ vendorEmail: 1 }, { sparse: true });
+VendorSchema.index({ vendorAadharNo: 1 }, { sparse: true });
+

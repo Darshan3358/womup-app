@@ -69,7 +69,7 @@ const BlinkitProductCardComponent: React.FC<BlinkitProductCardProps> = ({
     if (!isServiceable) {
       Alert.alert(
         'Delivery Unavailable',
-        'Sorry, WormUp is not serviceable in your area. We are expanding soon!'
+        'Sorry, WOMART is not serviceable in your area. We are expanding soon!'
       );
       return;
     }

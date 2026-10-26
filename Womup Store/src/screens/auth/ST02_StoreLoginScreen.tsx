@@ -67,10 +67,10 @@ export const ST02_StoreLoginScreen: React.FC = () => {
         {/* Brand Header */}
         <View style={styles.brandHeader}>
           <View style={styles.brandRow}>
-            <Text style={styles.brandWorm}>Worm</Text>
-            <Text style={styles.brandUp}>Up</Text>
+            <Text style={styles.brandWorm}>WOM</Text>
+            <Text style={styles.brandUp}>ART</Text>
           </View>
-          <Text style={styles.brandSubtitle}>Dark Store Partner</Text>
+          <Text style={styles.brandSubtitle}>Store Partner • by Womup</Text>
         </View>
 
         {/* Welcome Section */}

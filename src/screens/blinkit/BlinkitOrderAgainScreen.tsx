@@ -8,6 +8,7 @@ import {
   StyleSheet,
   useWindowDimensions,
   ImageSourcePropType,
+  Platform,
 } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { COLORS } from '../../theme/colors';
@@ -291,120 +292,6 @@ export const BlinkitOrderAgainScreen: React.FC = () => {
           </View>
         )}
 
-        {/* Bestsellers Section (SRS Section 26 & 27) */}
-        <View style={styles.bestsellersSection}>
-          <View style={styles.bestsellersHeaderRow}>
-            <Text style={styles.bestsellersTitle}>Bestsellers</Text>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => setActiveScreen('C15_ProductListing')}
-            >
-              <Text style={styles.viewAllText}>View All →</Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.productRail}
-          >
-            {bestsellersList.map((prod) => {
-              const discountPercent =
-                prod.mrp > prod.sellingPrice
-                  ? Math.round(((prod.mrp - prod.sellingPrice) / prod.mrp) * 100)
-                  : 12;
-
-              const isFav = isInWishlist(prod.id);
-
-              return (
-                <View key={prod.id} style={styles.bestsellerCard}>
-                  {/* Discount Badge */}
-                  <View style={styles.bsDiscountBadge}>
-                    <Text style={styles.bsDiscountText}>{discountPercent}% OFF</Text>
-                  </View>
-
-                  {/* Wishlist Heart */}
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    onPress={() => toggleWishlist(prod)}
-                    style={styles.bsWishlistBtn}
-                    accessibilityLabel="Wishlist"
-                  >
-                    <Ionicons
-                      name={isFav ? 'heart' : 'heart-outline'}
-                      size={14}
-                      color={isFav ? '#F23D9B' : '#9299AE'}
-                    />
-                  </TouchableOpacity>
-
-                  {/* Product Image (Full Fit) */}
-                  <TouchableOpacity
-                    activeOpacity={0.9}
-                    onPress={() => handleOpenProductDetail(prod)}
-                    style={styles.bsImageWrapper}
-                  >
-                    <Image
-                      source={{ uri: resolveImageThumbnail(prod.imageUrl) }}
-                      style={styles.bsImage}
-                      resizeMode="cover"
-                    />
-                  </TouchableOpacity>
-
-                  {/* Product Name */}
-                  <TouchableOpacity
-                    activeOpacity={0.9}
-                    onPress={() => handleOpenProductDetail(prod)}
-                  >
-                    <Text style={styles.bsProductName} numberOfLines={2}>
-                      {prod.name}
-                    </Text>
-                  </TouchableOpacity>
-
-                  {/* Rating */}
-                  <View style={styles.bsRatingRow}>
-                    <Ionicons name="star" size={11} color="#F59E0B" />
-                    <Text style={styles.bsRatingText}>{prod.rating || 4.8}</Text>
-                  </View>
-
-                  {/* Price & Add Button */}
-                  <View style={styles.bsActionRow}>
-                    <View>
-                      <Text style={styles.bsPrice}>₹{prod.sellingPrice}</Text>
-                      {prod.mrp > prod.sellingPrice && (
-                        <Text style={styles.bsMrp}>₹{prod.mrp}</Text>
-                      )}
-                    </View>
-
-                    <TouchableOpacity
-                      activeOpacity={0.85}
-                      onPress={() =>
-                        addToCart({
-                          id: prod.id,
-                          name: prod.name,
-                          brand: prod.brand,
-                          categoryId: prod.category || 'c1',
-                          sellingPrice: prod.sellingPrice,
-                          mrp: prod.mrp,
-                          discountPercent,
-                          shoppingCoins: 10,
-                          rating: prod.rating,
-                          reviewCount: prod.reviewCount,
-                          stock: prod.stock,
-                          deliveryMinutes: prod.deliveryMinutes,
-                          description: '',
-                          quantityLabel: prod.packSize || '1 unit',
-                        })
-                      }
-                      style={styles.bsAddBtn}
-                    >
-                      <Text style={styles.bsAddBtnText}>ADD</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              );
-            })}
-          </ScrollView>
-        </View>
 
         <View style={{ height: 100 }} />
       </ScrollView>

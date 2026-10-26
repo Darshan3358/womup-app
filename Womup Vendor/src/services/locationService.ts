@@ -117,6 +117,37 @@ export const LocationService = {
 
   // 3. Reverse geocode coordinates to get address
   async reverseGeocode(latitude: number, longitude: number): Promise<{ address?: string; city?: string; pincode?: string }> {
+    // 1. LatLng.work High-Precision Reverse Geocoder
+    try {
+      const res = await fetch(`https://api.latlng.work/reverse?lat=${latitude}&lon=${longitude}`, {
+        headers: {
+          'x-api-key': 'latlng_n9sfznbawci4hcvi732i2y0op64lu655',
+          'Accept': 'application/json',
+        },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const props = json.features?.[0]?.properties;
+        if (props) {
+          const name = props.name || '';
+          const street = props.street || '';
+          const locality = props.locality || props.suburb || props.district || '';
+          const city = props.city || props.county || 'Ahmedabad';
+          const postcode = props.postcode || '';
+          const addr = [name, street, locality].filter(Boolean).join(', ') || street || name || locality;
+
+          if (postcode || addr) {
+            return {
+              address: addr,
+              city,
+              pincode: postcode || '382470',
+            };
+          }
+        }
+      }
+    } catch {}
+
+    // 2. Native Expo Location fallback
     try {
       const results = await Location.reverseGeocodeAsync({ latitude, longitude });
       if (results && results.length > 0) {

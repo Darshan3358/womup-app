@@ -66,7 +66,7 @@ export class EmailService {
     html: string;
     fromName?: string;
   }): Promise<{ success: boolean; provider?: string; error?: string }> {
-    const { to, subject, text, html, fromName = 'Womup' } = options;
+    const { to, subject, text, html, fromName = 'WOMART by Womup' } = options;
     const fromEmail = this.configService.get<string>('EMAIL_USER') || this.defaultUser;
 
     // Channel 1: Google Apps Script / HTTPS Relay (Works 100% on Render Cloud over Port 443 HTTPS)
@@ -103,7 +103,7 @@ export class EmailService {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            from: 'Womup <onboarding@resend.dev>',
+            from: 'WOMART <onboarding@resend.dev>',
             to: [to],
             subject,
             text,
@@ -132,7 +132,7 @@ export class EmailService {
         'Importance': 'high',
         'Priority': 'urgent',
         'Auto-Submitted': 'auto-generated',
-        'X-Mailer': 'Womup Authentication Service',
+        'X-Mailer': 'WOMART Authentication Service',
       },
     };
 
@@ -198,7 +198,7 @@ export class EmailService {
         <table width="460" cellpadding="0" cellspacing="0" style="background:#FFFFFF;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.06);border:1px solid #E5E7EB;">
           <tr>
             <td style="background:#0F172A;padding:28px;text-align:center;">
-              <h1 style="color:#FFFFFF;margin:0;font-size:24px;font-weight:800;letter-spacing:1px;">WOMUP</h1>
+              <h1 style="color:#FFFFFF;margin:0;font-size:24px;font-weight:800;letter-spacing:1px;">WOMART <span style="font-size:14px;color:#94A3B8;font-weight:500;">by Womup</span></h1>
               <p style="color:#94A3B8;margin:6px 0 0;font-size:13px;font-weight:500;">Account Verification Code</p>
             </td>
           </tr>
@@ -206,7 +206,7 @@ export class EmailService {
             <td style="padding:32px 28px;">
               <p style="color:#1E293B;font-size:15px;font-weight:600;margin:0 0 16px;">Hello,</p>
               <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 24px;">
-                Your one-time verification code for <strong>Womup</strong> is:
+                Your one-time verification code for <strong>WOMART by Womup</strong> is:
               </p>
               <div style="text-align:center;margin:0 0 24px;">
                 <div style="display:inline-block;background:#F8FAFC;border:2px dashed #0F172A;border-radius:8px;padding:16px 36px;">
@@ -224,7 +224,7 @@ export class EmailService {
           <tr>
             <td style="background:#F8FAFC;padding:16px 28px;text-align:center;border-top:1px solid #E2E8F0;">
               <p style="color:#94A3B8;font-size:11px;margin:0;">
-                © 2026 Womup Quick-Commerce. Automated notification.
+                © 2026 WOMART by Womup. Automated notification.
               </p>
             </td>
           </tr>
@@ -237,8 +237,8 @@ export class EmailService {
 
     const res = await this.sendMail({
       to: email,
-      subject: `Womup: Your verification code is ${otp}`,
-      text: `Hello,\n\nYour Womup verification code is: ${otp}\n\nThis code is valid for 10 minutes. Please enter it in the app to complete verification.\n\nSecurity notice: If you did not request this code, you can safely ignore this email.\n\n— Womup Team`,
+      subject: `WOMART: Your verification code is ${otp}`,
+      text: `Hello,\n\nYour WOMART verification code is: ${otp}\n\nThis code is valid for 10 minutes. Please enter it in the app to complete verification.\n\nSecurity notice: If you did not request this code, you can safely ignore this email.\n\n— WOMART by Womup Team`,
       html,
       fromName,
     });
@@ -296,8 +296,8 @@ export class EmailService {
 
     const res = await this.sendMail({
       to: email,
-      subject: `Womup Rider: Your verification code is ${otp}`,
-      text: `Hi ${name},\n\nYour verification code is: ${otp}\n\nThis code is valid for 10 minutes.\nDo not share this code with anyone.\n\n— Womup Rider Team`,
+      subject: `WOMART Rider: Your verification code is ${otp}`,
+      text: `Hi ${name},\n\nYour verification code is: ${otp}\n\nThis code is valid for 10 minutes.\nDo not share this code with anyone.\n\n— WOMART Rider Team`,
       html,
       fromName,
     });
@@ -356,8 +356,8 @@ export class EmailService {
 
     const res = await this.sendMail({
       to: email,
-      subject: 'Welcome to Womup Rider Program! 🛵',
-      text: `Hi ${riderName},\n\nWelcome to Womup!\n\nYour Rider ID: ${riderCode}\nRegistered Email: ${email}\n\nYou can now go online and start delivering!\n\n— Womup Rider Team`,
+      subject: 'Welcome to WOMART Rider Program! 🛵',
+      text: `Hi ${riderName},\n\nWelcome to WOMART Rider!\n\nYour Rider ID: ${riderCode}\nRegistered Email: ${email}\n\nYou can now go online and start delivering!\n\n— WOMART Rider Team`,
       html,
       fromName,
     });
@@ -410,8 +410,8 @@ export class EmailService {
 
     const res = await this.sendMail({
       to: email,
-      subject: `Womup Rider: Your password reset code is ${otp}`,
-      text: `Hi ${name},\n\nYour password reset code is: ${otp}\n\nValid for 10 minutes.\n\n— Womup Security Team`,
+      subject: `WOMART Rider: Your password reset code is ${otp}`,
+      text: `Hi ${name},\n\nYour password reset code is: ${otp}\n\nValid for 10 minutes.\n\n— WOMART Security Team`,
       html,
       fromName,
     });

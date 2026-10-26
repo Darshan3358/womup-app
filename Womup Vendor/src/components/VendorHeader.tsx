@@ -40,7 +40,7 @@ export const VendorHeader: React.FC = () => {
               </TouchableOpacity>
             </View>
             <Text style={styles.vendorCode}>
-              ID: {vendor?.vendorCode || 'VND001'} • {vendor?.categoryName} • {vendor?.city}
+              ID: {vendor?.vendorCode || 'VND001'} • WOMART Partner • {vendor?.city}
             </Text>
           </View>
         </View>

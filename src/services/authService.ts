@@ -171,6 +171,7 @@ export const AuthService = {
     aadhaarNumber?: string,
     aadhaarFrontImage?: string,
     aadhaarBackImage?: string,
+    password?: string,
   ): Promise<{ success: boolean; user?: any; token?: string; message?: string }> {
     const res = await api.post<any>('/auth/register', {
       verificationId,
@@ -186,25 +187,63 @@ export const AuthService = {
       aadhaarNumber,
       aadhaarFrontImage,
       aadhaarBackImage,
+      password,
     });
-    if (res.success && res.data) {
-      if (res.data.accessToken) {
-        api.setToken(res.data.accessToken);
-        await StorageService.saveItem(StorageService.KEYS.AUTH_TOKEN, res.data.accessToken);
-        if (res.data.refreshToken) {
-          await StorageService.saveItem(StorageService.KEYS.REFRESH_TOKEN, res.data.refreshToken);
+    if (res.success) {
+      const accessToken = (res as any).accessToken || res.data?.accessToken;
+      const refreshToken = (res as any).refreshToken || res.data?.refreshToken;
+      const user = (res as any).user || res.data?.user;
+      if (accessToken) {
+        api.setToken(accessToken);
+        await StorageService.saveItem(StorageService.KEYS.AUTH_TOKEN, accessToken);
+        if (refreshToken) {
+          await StorageService.saveItem(StorageService.KEYS.REFRESH_TOKEN, refreshToken);
         }
       }
       return {
         success: true,
-        user: res.data.user,
-        token: res.data.accessToken,
-        message: res.data.message,
+        user,
+        token: accessToken,
+        message: res.message || res.data?.message,
       };
     }
     return {
       success: false,
       message: res.message || 'Registration failed',
+    };
+  },
+
+  async login(
+    identifier: string,
+    password?: string,
+    otp?: string
+  ): Promise<{ success: boolean; user?: any; token?: string; message?: string }> {
+    const res = await api.post<any>('/auth/login', {
+      identifier: identifier.trim(),
+      password: password?.trim(),
+      otp: otp?.trim(),
+    });
+    if (res.success) {
+      const accessToken = (res as any).accessToken || res.data?.accessToken;
+      const refreshToken = (res as any).refreshToken || res.data?.refreshToken;
+      const user = (res as any).user || res.data?.user;
+      if (accessToken) {
+        api.setToken(accessToken);
+        await StorageService.saveItem(StorageService.KEYS.AUTH_TOKEN, accessToken);
+        if (refreshToken) {
+          await StorageService.saveItem(StorageService.KEYS.REFRESH_TOKEN, refreshToken);
+        }
+      }
+      return {
+        success: true,
+        user,
+        token: accessToken,
+        message: res.message || res.data?.message,
+      };
+    }
+    return {
+      success: false,
+      message: res.message || 'Login failed',
     };
   },
 

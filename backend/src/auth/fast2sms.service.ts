@@ -54,7 +54,7 @@ export class Fast2SmsService {
     }
 
     return new Promise((resolve) => {
-      const message = `Your Womup verification code is: ${otp}. Valid for 10 minutes. Do not share with anyone.`;
+      const message = `Your WOMART verification code is: ${otp}. Valid for 10 minutes. Do not share with anyone.`;
       const body = JSON.stringify({
         route: 'q', // Quick transactional route
         numbers: mobile,

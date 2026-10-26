@@ -27,6 +27,9 @@ import {
   OtpVerification,
   OtpVerificationDocument,
 } from '../../auth/schemas/otp.schema';
+import { DeliveryPartner, DeliveryPartnerDocument } from '../../delivery/schemas/delivery-partner.schema';
+import { Vendor, VendorDocument } from '../../local-shops/schemas/vendor.schema';
+import { assertCrossRoleIdentityUniqueness } from '../../common/services/cross-role-validator';
 import { Role } from '../../common/enums/role.enum';
 import { MailService } from '../../common/services/mail.service';
 import { RegisterStoreDto } from './dto/store-auth.dto';
@@ -47,6 +50,10 @@ export class StoreAuthService {
     @InjectModel(City.name) private cityModel: Model<CityDocument>,
     @InjectModel(Inventory.name) private inventoryModel: Model<InventoryDocument>,
     @InjectModel(Product.name) private productModel: Model<ProductDocument>,
+    @InjectModel(DeliveryPartner.name)
+    private partnerModel: Model<DeliveryPartnerDocument>,
+    @InjectModel(Vendor.name)
+    private vendorModel: Model<VendorDocument>,
     @InjectModel(OtpVerification.name)
     private otpModel: Model<OtpVerificationDocument>,
     private jwtService: JwtService,
@@ -113,13 +120,16 @@ export class StoreAuthService {
       );
     }
 
-    // 4. Check uniqueness of email and phone
-    const duplicate = await this.storeModel.findOne({
-      $or: [{ email: cleanEmail }, { phone: cleanPhone }],
-    }).exec();
-    if (duplicate) {
-      throw new ConflictException('A store with this email or phone number is already registered.');
-    }
+    // 4. Strict Cross-Role Single-Identity Check (Mobile, Email)
+    await assertCrossRoleIdentityUniqueness({
+      targetRole: 'Dark Store',
+      phone: cleanPhone,
+      email: cleanEmail,
+      userModel: this.userModel,
+      partnerModel: this.partnerModel,
+      storeModel: this.storeModel,
+      vendorModel: this.vendorModel,
+    });
 
     // 5. Generate unique loginId
     const cleanAreaCode = (area.code || area.name).toLowerCase().replace(/[^a-z0-9]/g, '');

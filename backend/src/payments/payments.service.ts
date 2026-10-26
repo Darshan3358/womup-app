@@ -298,7 +298,8 @@ export class PaymentsService {
         }
 
         // Sponsor Commission (0.4% Team Purchase for others or 3% for veg)
-        if (customer.sponsorId) {
+        // Conditional Earning Check: Customer must be from an eligible pincode
+        if (customer && customer.isIncomeEligible && customer.sponsorId) {
           const sponsorRate = (vendor.categoryName === 'Vegetables' || (vendor as any).storeCategory === 'Vegetables') ? 0.03 : 0.004;
           const sponsorCommission = Math.round(billAmount * sponsorRate * 100) / 100;
           if (sponsorCommission > 0) {

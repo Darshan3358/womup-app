@@ -394,7 +394,7 @@ export const BlinkitProfileScreen: React.FC = () => {
   };
 
   const handleShareApp = async () => {
-    const shareMessage = `Hey! I get fresh groceries, snacks and prints delivered in 9 minutes with Womup! 🚀\nUse my referral code ${user.referralCode || 'WORMUP50'} to get ₹50 off your first order.\nDownload now: https://womup.app/invite`;
+    const shareMessage = `Hey! I get fresh groceries, snacks and prints delivered in 9 minutes with WOMART! 🚀\nUse my referral code ${user.referralCode || 'WOMUP50'} to get ₹50 off your first order.\nDownload now: https://womup.app/invite`;
     try {
       if (Platform.OS === 'web') {
         if (typeof navigator !== 'undefined' && navigator.clipboard) {
@@ -767,6 +767,12 @@ export const BlinkitProfileScreen: React.FC = () => {
 
           {/* Section 2: Payment and coupons */}
           {renderSectionCard('Payment and coupons', [
+            {
+              icon: 'credit-card',
+              label: 'My Income & Withdrawals',
+              badge: `₹${user.availableIncome || 0}`,
+              onPress: () => setActiveScreen('Blinkit_Money'),
+            },
             {
               icon: 'wallet',
               label: 'Womup Money',

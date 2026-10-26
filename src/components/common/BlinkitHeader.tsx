@@ -129,9 +129,11 @@ export const BlinkitHeader: React.FC<BlinkitHeaderProps> = ({
 
   const displayEta = deliveryEtaMinutes ? `${deliveryEtaMinutes} minutes` : etaTime;
   const isSavedAddress = selectedAddressSource === 'SAVED' && selectedAddress && selectedAddress.type !== 'Current';
-  const areaName = isSavedAddress
-    ? (selectedAddress.areaLandmark || selectedAddress.street || selectedAddress.houseFlat || currentAreaName || 'Ahmedabad')
-    : (currentAreaName || selectedAddress?.areaLandmark || 'Ahmedabad');
+  const areaName =
+    currentAreaName ||
+    (isSavedAddress
+      ? (selectedAddress.areaLandmark || selectedAddress.street || selectedAddress.houseFlat || 'Ahmedabad')
+      : (selectedAddress?.areaLandmark || selectedAddress?.street || 'Ahmedabad'));
   const cityName = (isSavedAddress ? selectedAddress.city : null) || currentCityName || user?.preferredCityName || 'Ahmedabad';
   const cleanStoreName = (
     currentStoreName || (isServiceable !== false ? 'Wom Up Dark Store' : 'Delivery Unavailable')
@@ -150,7 +152,6 @@ export const BlinkitHeader: React.FC<BlinkitHeaderProps> = ({
               activeOpacity={0.85}
               onPress={() => setActiveScreen('Blinkit_Home')}
               style={styles.logoContainer}
-              accessibilityLabel="WOM UP Home"
             >
               <Image
                 source={require('../../../assets/Wormup.png')}

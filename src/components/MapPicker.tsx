@@ -177,6 +177,7 @@ export const MapPicker: React.FC<MapPickerProps> = ({
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; img-src * data: blob: https:;" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -263,17 +264,20 @@ export const MapPicker: React.FC<MapPickerProps> = ({
         attributionControl: false
       }).setView([${latitude}, ${longitude}], ${zoom});
 
-      // CartoDB Voyager - high performance, retina, never rate-limited or blocked
-      var cartoTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        subdomains: ['a', 'b', 'c', 'd'],
-        maxZoom: 19
+      // Clean OpenStreetMap tiles (Fast, no API key required, no watermark)
+      var mainTiles = L.tileLayer('https://tile.openstreetmap.de/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
       }).addTo(map);
 
-      // OpenStreetMap fallback if CartoDB fails
-      cartoTiles.on('tileerror', function() {
-        if (!window.usedOSMFallback) {
-          window.usedOSMFallback = true;
-          L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+      // Esri World Street Map fallback if tile fails
+      mainTiles.on('tileerror', function() {
+        if (!window.usedFallback) {
+          window.usedFallback = true;
+          L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19,
+            attribution: 'Tiles &copy; Esri'
+          }).addTo(map);
         }
       });
 
@@ -418,7 +422,6 @@ export const MapPicker: React.FC<MapPickerProps> = ({
             originWhitelist={['*']}
             source={{
               html: mapHtml,
-              baseUrl: 'https://localhost',
             }}
             style={{
               width: '100%',

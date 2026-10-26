@@ -112,7 +112,7 @@ export const BlinkitMoneyScreen: React.FC = () => {
 
   // ── Withdrawal Modal State ──
   const [isWithdrawModalVisible, setWithdrawModalVisible] = useState(false);
-  const [withdrawAmountInput, setWithdrawAmountInput] = useState('600');
+  const [withdrawAmountInput, setWithdrawAmountInput] = useState('');
   const [withdrawBankInput, setWithdrawBankInput] = useState('');
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [withdrawError, setWithdrawError] = useState('');
@@ -242,9 +242,9 @@ export const BlinkitMoneyScreen: React.FC = () => {
       setWithdrawError('Minimum withdrawal amount is ₹600 as per policy.');
       return;
     }
-    const available = user.availableIncome ?? 0;
+    const available = Number(user.availableIncome ?? 0);
     if (amt > available) {
-      setWithdrawError(`Insufficient available balance. You have ₹${available}.`);
+      setWithdrawError(`Insufficient available balance. You have ₹${available.toLocaleString('en-IN')}.`);
       return;
     }
     setIsWithdrawing(true);
@@ -254,11 +254,12 @@ export const BlinkitMoneyScreen: React.FC = () => {
       if (res.success) {
         const remaining = res.data?.availableIncome ?? (available - amt);
         setUser((prev) => ({ ...prev, availableIncome: remaining }));
-        setWithdrawSuccessMsg(res.message);
+        setWithdrawSuccessMsg(res.message || 'Withdrawal request submitted successfully. Admin will review it shortly.');
         setTimeout(() => {
           setWithdrawModalVisible(false);
           setWithdrawSuccessMsg('');
-        }, 1800);
+          setWithdrawAmountInput('');
+        }, 2200);
       } else {
         setWithdrawError(res.message || 'Withdrawal request failed.');
       }
@@ -1439,6 +1440,8 @@ export const BlinkitMoneyScreen: React.FC = () => {
               <TextInput
                 style={styles.amountInput}
                 keyboardType="numeric"
+                placeholder={Number(user.availableIncome || 0) >= 600 ? 'Enter amount (min ₹600)' : '0'}
+                placeholderTextColor="#94A3B8"
                 value={withdrawAmountInput}
                 onChangeText={(t) => {
                   setWithdrawAmountInput(t);
@@ -1446,6 +1449,33 @@ export const BlinkitMoneyScreen: React.FC = () => {
                 }}
               />
             </View>
+
+            {/* Insufficient Balance Notice if available < 600 */}
+            {Number(user.availableIncome || 0) < 600 && (
+              <View style={{ backgroundColor: '#FEF2F2', borderColor: '#FCA5A5', borderWidth: 1, borderRadius: 8, padding: 10, marginVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="alert-circle" size={16} color="#DC2626" />
+                <Text style={{ color: '#991B1B', fontSize: 11, fontWeight: '600', flex: 1 }}>
+                  Minimum ₹600 required. Current available income is ₹{Number(user.availableIncome || 0).toLocaleString('en-IN')}.
+                </Text>
+              </View>
+            )}
+
+            {/* Error notice if typed amount exceeds available */}
+            {(() => {
+              const available = Number(user.availableIncome || 0);
+              const amt = parseFloat(withdrawAmountInput) || 0;
+              if (amt > available && available >= 600) {
+                return (
+                  <View style={{ backgroundColor: '#FEF2F2', borderColor: '#FCA5A5', borderWidth: 1, borderRadius: 8, padding: 10, marginVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="alert-circle" size={16} color="#DC2626" />
+                    <Text style={{ color: '#991B1B', fontSize: 11, fontWeight: '600', flex: 1 }}>
+                      Requested amount exceeds available balance of ₹{available.toLocaleString('en-IN')}.
+                    </Text>
+                  </View>
+                );
+              }
+              return null;
+            })()}
 
             {/* Live TDS Deduction Calculation Box */}
             {(() => {
@@ -1455,7 +1485,7 @@ export const BlinkitMoneyScreen: React.FC = () => {
               return (
                 <View style={styles.tdsCalculationBox}>
                   <View style={styles.tdsRow}>
-                    <Text style={styles.tdsLabel}>Withdrawal Amount</Text>
+                    <Text style={styles.tdsLabel}>Requested Amount</Text>
                     <Text style={styles.tdsValue}>₹{amt.toLocaleString('en-IN')}</Text>
                   </View>
                   <View style={styles.tdsRow}>
@@ -1464,9 +1494,12 @@ export const BlinkitMoneyScreen: React.FC = () => {
                   </View>
                   <View style={styles.tdsDivider} />
                   <View style={styles.tdsRow}>
-                    <Text style={[styles.tdsLabel, { fontWeight: '800', color: '#065F46' }]}>Net Received (80%)</Text>
+                    <Text style={[styles.tdsLabel, { fontWeight: '800', color: '#065F46' }]}>Net Payable (80%)</Text>
                     <Text style={[styles.tdsValue, { fontWeight: '900', color: '#065F46', fontSize: 16 }]}>₹{net.toLocaleString('en-IN')}</Text>
                   </View>
+                  <Text style={{ fontSize: 10, color: '#64748B', marginTop: 6, textAlign: 'center' }}>
+                    🔒 Payout will be reviewed and transferred to your bank by Admin.
+                  </Text>
                 </View>
               );
             })()}
@@ -1484,28 +1517,50 @@ export const BlinkitMoneyScreen: React.FC = () => {
             </View>
 
             {/* Submit Button */}
-            <TouchableOpacity
-              activeOpacity={0.85}
-              disabled={isWithdrawing}
-              onPress={handleWithdrawSubmit}
-              style={styles.withdrawSubmitBtn}
-            >
-              <LinearGradient
-                colors={['#059669', '#047857']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.withdrawSubmitGradient}
-              >
-                {isWithdrawing ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <>
-                    <Ionicons name="shield-checkmark" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                    <Text style={styles.withdrawSubmitText}>Confirm & Transfer to Bank</Text>
-                  </>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
+            {(() => {
+              const available = Number(user.availableIncome || 0);
+              const amt = parseFloat(withdrawAmountInput) || 0;
+              const isAmountValid = amt >= 600 && amt <= available;
+
+              let buttonLabel = 'Submit Request to Admin';
+              if (available < 600) {
+                buttonLabel = 'Insufficient Balance (Min ₹600)';
+              } else if (amt > available) {
+                buttonLabel = 'Insufficient Available Balance';
+              } else if (amt < 600) {
+                buttonLabel = 'Minimum ₹600 Required';
+              }
+
+              return (
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  disabled={isWithdrawing || !isAmountValid}
+                  onPress={handleWithdrawSubmit}
+                  style={[styles.withdrawSubmitBtn, !isAmountValid ? { opacity: 0.6 } : null]}
+                >
+                  <LinearGradient
+                    colors={isAmountValid ? ['#059669', '#047857'] : ['#94A3B8', '#64748B']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.withdrawSubmitGradient}
+                  >
+                    {isWithdrawing ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <Ionicons
+                          name={isAmountValid ? 'send' : 'lock-closed'}
+                          size={16}
+                          color="#FFFFFF"
+                          style={{ marginRight: 6 }}
+                        />
+                        <Text style={styles.withdrawSubmitText}>{buttonLabel}</Text>
+                      </>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+              );
+            })()}
           </View>
         </View>
       </Modal>
@@ -2602,39 +2657,43 @@ const styles = StyleSheet.create({
   balanceCardDark: {
     backgroundColor: '#071B52',
     borderRadius: 20,
-    padding: 20,
+    padding: 16,
     marginBottom: 12,
     shadowColor: '#071B52',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 4,
+    overflow: 'hidden',
   },
   balanceCardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 6,
+    flexWrap: 'wrap',
+    gap: 6,
   },
   badgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
+    flexShrink: 1,
   },
   balanceBadgeDark: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
     color: '#93C5FD',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
   bonusTag: {
     backgroundColor: '#1E3A8A',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 5,
   },
   bonusTagText: {
-    fontSize: 9,
+    fontSize: 8.5,
     fontWeight: '800',
     color: '#FCD34D',
   },
@@ -2642,31 +2701,33 @@ const styles = StyleSheet.create({
     fontSize: 22,
   },
   balanceValueDark: {
-    fontSize: 32,
+    fontSize: 30,
     fontWeight: '900',
     color: '#FFFFFF',
     marginVertical: 4,
   },
   balanceSubDark: {
-    fontSize: 12,
+    fontSize: 11.5,
     color: '#FCD34D',
     fontWeight: '600',
     marginTop: 4,
     flex: 1,
+    minWidth: 150,
   },
   coinHistoryBadgeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
     backgroundColor: 'rgba(252, 211, 77, 0.15)',
     borderWidth: 1,
     borderColor: '#FCD34D',
-    borderRadius: 8,
-    paddingVertical: 3.5,
-    paddingHorizontal: 8,
+    borderRadius: 7,
+    paddingVertical: 2.5,
+    paddingHorizontal: 7,
+    flexShrink: 0,
   },
   coinHistoryBadgeText: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '700',
     color: '#FCD34D',
   },
@@ -2674,14 +2735,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 4,
+    marginTop: 6,
     gap: 8,
+    flexWrap: 'wrap',
   },
   tokenHistoryLinkBtn: {
-    paddingVertical: 3,
-    paddingHorizontal: 6,
+    paddingVertical: 3.5,
+    paddingHorizontal: 8,
     borderRadius: 6,
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    flexShrink: 0,
   },
   tokenHistoryLinkText: {
     fontSize: 11,

@@ -262,13 +262,13 @@ export const QRScannerScreen: React.FC<QRScannerScreenProps> = ({
               key: rzpData.keyId,
               amount: rzpData.amount,
               currency: 'INR',
-              name: 'WormUp Store Payment',
+              name: 'WOMART by Womup',
               description: `Payment to ${rzpData.vendorName || 'Vendor'}`,
               order_id: rzpData.razorpayOrderId,
               prefill: {
                 name: rzpData.customerName || 'Customer',
                 contact: rzpData.customerPhone || '9876543210',
-                email: rzpData.prefillEmail || 'customer@wormup.in',
+                email: rzpData.prefillEmail || 'customer@womup.in',
               },
               theme: { color: '#071B52' },
               handler: async (resp: any) => {

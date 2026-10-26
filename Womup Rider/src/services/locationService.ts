@@ -160,6 +160,32 @@ export class LocationTrackerService {
       return this.addressCache.get(key)!;
     }
     try {
+      const res = await fetch(`https://api.latlng.work/reverse?lat=${lat}&lon=${lng}`, {
+        headers: {
+          'x-api-key': 'latlng_n9sfznbawci4hcvi732i2y0op64lu655',
+          'Accept': 'application/json',
+        },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const props = json.features?.[0]?.properties;
+        if (props) {
+          const parts = [
+            props.name || props.street,
+            props.locality || props.suburb || props.district,
+            props.city || props.county || 'Ahmedabad',
+            props.postcode,
+          ].filter(Boolean);
+          if (parts.length > 0) {
+            const addr = parts.join(', ');
+            this.addressCache.set(key, addr);
+            return addr;
+          }
+        }
+      }
+    } catch {}
+
+    try {
       const geo = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
       if (geo && geo.length > 0) {
         const item = geo[0];

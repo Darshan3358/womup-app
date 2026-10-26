@@ -40,6 +40,9 @@ export class User {
   @Prop({ trim: true })
   registrationPincode?: string;
 
+  @Prop({ default: false, index: true })
+  isIncomeEligible: boolean; // True if user's registration pincode is in approved/eligible service zone. Only eligible users generate referral/MLM income for upline.
+
   @Prop({ trim: true })
   fullNameAsPerAadhaar?: string;
 
@@ -53,7 +56,7 @@ export class User {
   })
   verificationStatus: string;
 
-  @Prop({ trim: true })
+  @Prop({ trim: true, sparse: true, index: true })
   aadhaarNumber?: string;
 
   @Prop()

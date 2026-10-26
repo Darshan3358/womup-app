@@ -1072,6 +1072,111 @@ export const ApiService = {
     }
   },
 
+  async getPincodes(search?: string, status?: string): Promise<{ success: boolean; data: any[]; total?: number }> {
+    try {
+      const query = new URLSearchParams();
+      if (search) query.append('search', search);
+      if (status && status !== 'All') query.append('status', status.toLowerCase());
+      const res = await fetch(`${API_BASE_URL}/api/v1/admin/pincodes?${query.toString()}`);
+      const data = await res.json();
+      return data;
+    } catch (err: any) {
+      console.error('[API] Error fetching pincodes:', err);
+      return { success: false, data: [] };
+    }
+  },
+
+  async togglePincodeStatus(
+    id: string,
+    pincode: string,
+    isActive: boolean,
+    areaId?: string
+  ): Promise<{ success: boolean; message?: string; data?: any; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/admin/pincodes/${encodeURIComponent(id || pincode)}/toggle-status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pincode, isActive, areaId }),
+      });
+      const data = await res.json();
+      return data;
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error updating pincode status' };
+    }
+  },
+
+  async addPincode(payload: {
+    pincode: string;
+    areaId?: string;
+    cityId?: string;
+    cityName?: string;
+    areaName?: string;
+    storeId?: string;
+    storeName?: string;
+    isActive?: boolean;
+    isDeliveryAllowed?: boolean;
+    isIncomeEnabled?: boolean;
+    slaMinutes?: number;
+  }): Promise<{ success: boolean; message?: string; data?: any; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/admin/pincodes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      return data;
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error adding pincode' };
+    }
+  },
+
+  async updatePincode(
+    id: string,
+    payload: {
+      pincode?: string;
+      oldPincode?: string;
+      areaId?: string;
+      cityId?: string;
+      cityName?: string;
+      areaName?: string;
+      storeId?: string;
+      storeName?: string;
+      isActive?: boolean;
+      isDeliveryAllowed?: boolean;
+      isIncomeEnabled?: boolean;
+      slaMinutes?: number;
+    }
+  ): Promise<{ success: boolean; message?: string; data?: any; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/admin/pincodes/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      return data;
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error updating pincode' };
+    }
+  },
+
+  async deletePincode(
+    id: string,
+    pincode?: string
+  ): Promise<{ success: boolean; message?: string; data?: any; error?: string }> {
+    try {
+      const query = pincode ? `?pincode=${encodeURIComponent(pincode)}` : '';
+      const res = await fetch(`${API_BASE_URL}/api/v1/admin/pincodes/${encodeURIComponent(id || pincode || '')}${query}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      return data;
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error deleting pincode' };
+    }
+  },
+
   async assignStoreToArea(storeId: string, areaId: string, cityId?: string): Promise<{ success: boolean; message?: string; error?: string }> {
     try {
       const res = await fetch(`${API_BASE_URL}/api/admin/stores/${storeId}/assign-area`, {

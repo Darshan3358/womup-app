@@ -10,9 +10,9 @@ export const Header: React.FC = () => {
     <View style={styles.container}>
       <View style={styles.leftRow}>
         <View style={styles.logoBadge}>
-          <Text style={styles.logoText}>WOMUP</Text>
+          <Text style={styles.logoText}>WOMART</Text>
           <View style={styles.partnerPill}>
-            <Text style={styles.partnerText}>PARTNER</Text>
+            <Text style={styles.partnerText}>RIDER</Text>
           </View>
         </View>
       </View>

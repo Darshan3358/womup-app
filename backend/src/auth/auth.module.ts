@@ -13,6 +13,7 @@ import { RefreshToken, RefreshTokenSchema } from './schemas/refresh-token.schema
 import { CoinTransaction, CoinTransactionSchema } from '../coins/schemas/coin-transaction.schema';
 import { DeliveryPartner, DeliveryPartnerSchema } from '../delivery/schemas/delivery-partner.schema';
 import { Store, StoreSchema } from '../stores/schemas/store.schema';
+import { Vendor, VendorSchema } from '../local-shops/schemas/vendor.schema';
 import { City, CitySchema } from '../areas/schemas/city.schema';
 import { Area, AreaSchema } from '../areas/schemas/area.schema';
 import { ApprovedPincode, ApprovedPincodeSchema } from '../areas/schemas/approved-pincode.schema';
@@ -30,6 +31,7 @@ import { IncomeTransaction, IncomeTransactionSchema } from '../users/schemas/inc
       { name: CoinTransaction.name, schema: CoinTransactionSchema },
       { name: DeliveryPartner.name, schema: DeliveryPartnerSchema },
       { name: Store.name, schema: StoreSchema },
+      { name: Vendor.name, schema: VendorSchema },
       { name: City.name, schema: CitySchema },
       { name: Area.name, schema: AreaSchema },
       { name: ApprovedPincode.name, schema: ApprovedPincodeSchema },

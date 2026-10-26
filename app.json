@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Worm Up",
-    "slug": "womup-customer",
+    "name": "WOMART by Womup",
+    "slug": "womart",
     "version": "1.0.0",
     "runtimeVersion": "1.0.0",
     "updates": {
@@ -13,7 +13,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splashfinal.png",
+      "image": "./assets/WOMARTCUSTOMER.png",
       "resizeMode": "cover",
       "backgroundColor": "#FED2EB"
     },
@@ -23,26 +23,29 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Worm Up needs your location to show nearby stores and deliver accurately."
+          "locationAlwaysAndWhenInUsePermission": "WOMART needs your location to show nearby stores and deliver accurately."
         }
       ],
       "expo-document-picker",
       [
         "expo-image-picker",
         {
-          "photosPermission": "Worm Up needs access to your photos to print documents and images."
+          "photosPermission": "WOMART needs access to your photos to print documents and images."
         }
       ],
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow WormUp to access your camera to scan vendor counter QR codes."
+          "cameraPermission": "Allow WOMART to access your camera to scan vendor counter QR codes."
         }
       ]
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.wormup.customerapp"
+      "bundleIdentifier": "com.wormup.customerapp",
+      "infoPlist": {
+        "CFBundleDisplayName": "WOMART by Womup"
+      }
     },
     "android": {
       "package": "com.wormup.customerapp",

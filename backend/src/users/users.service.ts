@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, Optional } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Optional, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User, UserDocument } from './schemas/user.schema';
@@ -6,7 +6,12 @@ import { Product, ProductDocument } from '../products/schemas/product.schema';
 import { IncomeTransaction, IncomeTransactionDocument } from './schemas/income-transaction.schema';
 import { CoinTransaction, CoinTransactionDocument } from '../coins/schemas/coin-transaction.schema';
 import { TeamPurchaseIncome, TeamPurchaseIncomeDocument } from './schemas/team-purchase-income.schema';
+import { ApprovedPincode, ApprovedPincodeDocument } from '../areas/schemas/approved-pincode.schema';
+import { WithdrawalRequest, WithdrawalRequestDocument } from './schemas/withdrawal-request.schema';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { DeliveryPartner, DeliveryPartnerDocument } from '../delivery/schemas/delivery-partner.schema';
+import { Vendor, VendorDocument } from '../local-shops/schemas/vendor.schema';
+import { assertCrossRoleIdentityUniqueness } from '../common/services/cross-role-validator';
 import { TrackingGateway } from '../tracking/tracking.gateway';
 import { NotificationService } from '../notifications/notification.service';
 
@@ -30,6 +35,7 @@ export function sanitizePublicDocUrl(url?: string): string {
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(Product.name) private productModel: Model<ProductDocument>,
@@ -39,9 +45,46 @@ export class UsersService {
     private coinTxModel: Model<CoinTransactionDocument>,
     @InjectModel(TeamPurchaseIncome.name)
     private teamIncomeModel: Model<TeamPurchaseIncomeDocument>,
+    @InjectModel(ApprovedPincode.name)
+    private approvedPincodeModel: Model<ApprovedPincodeDocument>,
+    @InjectModel(WithdrawalRequest.name)
+    private withdrawalRequestModel: Model<WithdrawalRequestDocument>,
+    @InjectModel(DeliveryPartner.name)
+    private partnerModel: Model<DeliveryPartnerDocument>,
+    @InjectModel(Vendor.name)
+    private vendorModel: Model<VendorDocument>,
     private readonly trackingGateway: TrackingGateway,
     @Optional() private readonly notificationService?: NotificationService,
   ) {}
+
+  async evaluatePincodeEligibility(pincode?: string): Promise<boolean> {
+    const cleanPin = (pincode || '').trim();
+    if (!cleanPin || cleanPin.length !== 6) return false;
+
+    // 1. Authoritative check in approved_pincodes
+    const approved = await this.approvedPincodeModel.findOne({
+      pincode: cleanPin,
+    });
+    if (approved) {
+      if (
+        (approved as any).isActive === false ||
+        approved.isIncomeEnabled === false ||
+        approved.isDeliveryAllowed === false ||
+        approved.isRegistrationAllowed === false
+      ) {
+        return false;
+      }
+      return true;
+    }
+
+    const defaultApprovedPins = [
+      '380015', '380054', '382481', '380009', '380058', '380061',
+      '380001', '380004', '380006', '380051', '380052', '380059', '382424', '382480',
+      '384001', '384002', '384151', '383001', '391440', '390011', '390012',
+      '382421', '382225', '363421', '388001', '388325',
+    ];
+    return defaultApprovedPins.includes(cleanPin);
+  }
 
   private getNextMidnight(): Date {
     const tomorrow = new Date();
@@ -134,6 +177,16 @@ export class UsersService {
       if (!currentUser.birthday) {
         updateOps.$inc = { shoppingCoins: 50 };
       }
+    }
+
+    // Dynamic Pincode Re-evaluation Edge Case:
+    // If user changes their pincode, automatically recalculate isIncomeEligible
+    const newPin = updateData.customerPincode || (updateData as any).registrationPincode || (updateData as any).pincode;
+    if (newPin) {
+      const cleanPin = String(newPin).trim();
+      updateOps.$set.customerPincode = cleanPin;
+      updateOps.$set.registrationPincode = cleanPin;
+      updateOps.$set.isIncomeEligible = await this.evaluatePincodeEligibility(cleanPin);
     }
 
     const user = await this.userModel
@@ -260,6 +313,14 @@ export class UsersService {
     }
 
     if (cleanAadhaar) {
+      await assertCrossRoleIdentityUniqueness({
+        targetRole: 'Customer',
+        aadhaarNumber: cleanAadhaar,
+        excludeUserId: user._id,
+        userModel: this.userModel,
+        partnerModel: this.partnerModel,
+        vendorModel: this.vendorModel,
+      });
       user.aadhaarNumber = cleanAadhaar;
       (user as any).customer_aadhar_no = cleanAadhaar;
     }
@@ -369,7 +430,7 @@ export class UsersService {
     };
   }
 
-  // ── Customer Income Withdrawal (Min ₹600, 20% TDS, 80% Net Payout) ──
+  // ── Customer Income Withdrawal Request (Min ₹600, 20% TDS, Admin Approval Workflow) ──
   async withdrawIncome(userId: string, amount: number, bankDetails?: any) {
     await this.settleUserPendingIncome(userId);
     const user = await this.userModel.findById(userId);
@@ -380,24 +441,49 @@ export class UsersService {
       throw new BadRequestException('Please provide a valid withdrawal amount');
     }
 
-    // Rule: Minimum withdrawal ₹600
+    // Rule 1: Minimum withdrawal ₹600
     if (withdrawAmt < 600) {
       throw new BadRequestException('Minimum withdrawal amount is ₹600 as per policy');
     }
 
-    // Rule: Must have sufficient availableIncome
-    if ((user.availableIncome || 0) < withdrawAmt) {
-      throw new BadRequestException(`Insufficient available income balance (Available: ₹${user.availableIncome || 0})`);
+    // Rule 2: Must have sufficient availableIncome
+    const currentAvailable = Number(user.availableIncome || 0);
+    if (currentAvailable < withdrawAmt) {
+      throw new BadRequestException(`Insufficient available balance. You have ₹${currentAvailable.toLocaleString('en-IN')}`);
     }
 
-    // Rule: 20% TDS deduction
+    // Rule 3: 20% TDS deduction
     const tdsDeduction = Number((withdrawAmt * 0.20).toFixed(2));
     const netPayout = Number((withdrawAmt - tdsDeduction).toFixed(2));
 
-    user.availableIncome = Number(((user.availableIncome || 0) - withdrawAmt).toFixed(2));
+    // Deduct immediately from available balance to prevent double-spending (HOLD)
+    user.availableIncome = Number((currentAvailable - withdrawAmt).toFixed(2));
     user.walletBalance = Math.max(0, Number(((user.walletBalance || 0) - withdrawAmt).toFixed(2)));
     await user.save();
 
+    // Prepare bank / UPI details from user profile or request
+    const payoutDestination = {
+      accountHolderName: bankDetails?.accountHolderName || user.accountHolderName || user.fullNameAsPerAadhaar || user.name,
+      bankName: bankDetails?.bankName || user.bankName || 'Bank Transfer',
+      accountNumber: bankDetails?.accountNumber || user.accountNumber,
+      ifscCode: bankDetails?.ifscCode || user.ifscCode,
+      upiId: bankDetails?.upiId || user.upiId || bankDetails?.destination,
+      destination: bankDetails?.destination || user.upiId || user.accountNumber,
+    };
+
+    // Create PENDING WithdrawalRequest document for Admin review
+    const withdrawalDoc = await this.withdrawalRequestModel.create({
+      userId: user._id,
+      userName: user.fullNameAsPerAadhaar || user.name,
+      userPhone: user.phone,
+      amount: withdrawAmt,
+      tdsAmount: tdsDeduction,
+      netAmount: netPayout,
+      bankDetails: payoutDestination,
+      status: 'PENDING',
+    });
+
+    // Record Income Transaction with status 'PENDING'
     await this.incomeTxModel.create({
       userId: user._id,
       type: 'WITHDRAWAL',
@@ -405,24 +491,35 @@ export class UsersService {
       earnedAt: new Date(),
       availableFrom: new Date(),
       isUsable: false,
-      status: 'AVAILABLE',
-      description: `Income Withdrawal of ₹${withdrawAmt} (TDS 20%: -₹${tdsDeduction}, Net Payout: ₹${netPayout})`,
+      status: 'PENDING',
+      description: `Withdrawal Request #${withdrawalDoc._id.toString().slice(-6).toUpperCase()} of ₹${withdrawAmt} (TDS 20%: -₹${tdsDeduction}, Net: ₹${netPayout}). Status: Pending Admin Review`,
     });
 
+    // Notify user's real-time wallet
     this.trackingGateway.emitWalletUpdated(userId, {
       availableIncome: user.availableIncome,
       pendingIncome: user.pendingIncome,
       walletBalance: user.walletBalance,
     });
 
+    // Notify Admin via WebSocket
+    this.trackingGateway.server?.emit('new_withdrawal_request', {
+      requestId: String(withdrawalDoc._id),
+      userName: user.name,
+      amount: withdrawAmt,
+      netAmount: netPayout,
+    });
+
     return {
       success: true,
-      message: `Withdrawal request submitted! ₹${netPayout} will be credited after 20% TDS (-₹${tdsDeduction}).`,
+      message: 'Withdrawal request submitted successfully. Admin will review it shortly.',
       data: {
+        requestId: withdrawalDoc._id.toString(),
         requestedAmount: withdrawAmt,
         tdsDeducted: tdsDeduction,
         netPayout,
         availableIncome: user.availableIncome,
+        status: 'PENDING',
       },
     };
   }
@@ -656,7 +753,28 @@ export class UsersService {
   // ── Helper: Fetch 7 Levels Downline Tree ──
   private async get7LevelDownline(rootUserId: Types.ObjectId): Promise<Array<UserDocument[]>> {
     const levels: Array<UserDocument[]> = [];
+
+    const rootUser = await this.userModel.findById(rootUserId);
+    const isAdminAccount = rootUser && (
+      rootUser.role === 'ADMIN' ||
+      (rootUser as any).isCompanyAccount ||
+      rootUser.referralCode === 'WORMADMIN' ||
+      rootUser.referralCode === 'WORMUP001'
+    );
+
     let currentLevelParentIds = [rootUserId];
+    if (isAdminAccount) {
+      const adminUsers = await this.userModel.find({
+        $or: [
+          { referralCode: { $in: ['WORMUP001', 'WORMADMIN'] } },
+          { role: 'ADMIN' },
+          { isCompanyAccount: true },
+        ],
+      }).select('_id').exec();
+      currentLevelParentIds = adminUsers.map((u) => u._id);
+    }
+
+    const seenIds = new Set<string>(currentLevelParentIds.map((id) => id.toString()));
 
     for (let level = 1; level <= 7; level++) {
       if (currentLevelParentIds.length === 0) {
@@ -667,12 +785,15 @@ export class UsersService {
       const downlineMembers = await this.userModel.find({
         $or: [
           { referredBy: { $in: currentLevelParentIds } },
-          { sponsorId: { $in: currentLevelParentIds }, isCompanySponsored: false },
+          { sponsorId: { $in: currentLevelParentIds } },
+          { parentId: { $in: currentLevelParentIds } },
         ],
+        _id: { $nin: Array.from(seenIds).map((id) => new Types.ObjectId(id)) },
       }).exec();
 
       levels.push(downlineMembers);
       currentLevelParentIds = downlineMembers.map((m) => m._id);
+      downlineMembers.forEach((m) => seenIds.add(m._id.toString()));
     }
 
     return levels;
@@ -693,9 +814,10 @@ export class UsersService {
     const levelBreakdown = downlineLevels.map((members, index) => {
       const levelNum = index + 1;
       const memberCount = members.length;
-      const activeMemberCount = members.filter((m) => (m.monthlyPurchaseValue || 0) >= 2000).length;
-      const vegetableGMV = Number(members.reduce((sum, m) => sum + (m.monthlyVegetablePurchase || 0), 0).toFixed(2));
-      const otherGMV = Number(members.reduce((sum, m) => sum + (m.monthlyOtherPurchase || 0), 0).toFixed(2));
+      const eligibleMembers = members.filter((m) => m.isIncomeEligible);
+      const activeMemberCount = eligibleMembers.filter((m) => (m.monthlyPurchaseValue || 0) >= 2000).length;
+      const vegetableGMV = Number(eligibleMembers.reduce((sum, m) => sum + (m.monthlyVegetablePurchase || 0), 0).toFixed(2));
+      const otherGMV = Number(eligibleMembers.reduce((sum, m) => sum + (m.monthlyOtherPurchase || 0), 0).toFixed(2));
       const incomeEarned = Number(((vegetableGMV * 0.03) + (otherGMV * 0.004)).toFixed(2));
 
       totalTeamSize += memberCount;
@@ -703,10 +825,11 @@ export class UsersService {
       totalOtherGMV += otherGMV;
 
       const detailedMembers = members.map((m) => {
-        const veg = Number((m.monthlyVegetablePurchase || 0).toFixed(2));
-        const other = Number((m.monthlyOtherPurchase || 0).toFixed(2));
+        const isEligibleForIncome = !!m.isIncomeEligible;
+        const veg = isEligibleForIncome ? Number((m.monthlyVegetablePurchase || 0).toFixed(2)) : 0;
+        const other = isEligibleForIncome ? Number((m.monthlyOtherPurchase || 0).toFixed(2)) : 0;
         const mIncome = Number(((veg * 0.03) + (other * 0.004)).toFixed(2));
-        const isActive = (m.monthlyPurchaseValue || 0) >= 2000;
+        const isActive = isEligibleForIncome && (m.monthlyPurchaseValue || 0) >= 2000;
         const memberCode = m.referralCode || m.sponsorCode || (m.phone ? `WORM${m.phone.slice(-4)}` : `WORM${m._id.toString().slice(-4).toUpperCase()}`);
         return {
           id: m._id.toString(),
@@ -714,6 +837,8 @@ export class UsersService {
           phone: m.phone ? `${m.phone.slice(0, 3)}****${m.phone.slice(-3)}` : undefined,
           memberCode,
           isActive,
+          isIncomeEligible: isEligibleForIncome,
+          registrationPincode: m.registrationPincode,
           monthlyPurchaseValue: Number((m.monthlyPurchaseValue || 0).toFixed(2)),
           vegetableGMV: veg,
           otherGMV: other,
@@ -960,6 +1085,14 @@ export class UsersService {
   }
 
   async distributeKycRewards(user: any) {
+    // Conditional Earning Check: User B must be from an eligible pincode
+    if (!user.isIncomeEligible) {
+      this.logger.log(
+        `[MLM KYC] Skipping referral reward distribution: user ${user._id} (${user.registrationPincode || 'unknown pin'}) is not from an eligible pincode.`,
+      );
+      return;
+    }
+
     const TIERS = [
       { level: 1, appIncome: 20, coinIncome: 400 },
       { level: 2, appIncome: 10, coinIncome: 400 },
@@ -1357,8 +1490,10 @@ export class UsersService {
       customer.preferredCityName = updateDto.areaZone || updateDto.zoneName;
     }
     if (updateDto.pincode !== undefined || updateDto.customerPincode !== undefined) {
-      customer.customerPincode = updateDto.pincode || updateDto.customerPincode;
-      customer.registrationPincode = customer.customerPincode;
+      const newPin = String(updateDto.pincode || updateDto.customerPincode || '').trim();
+      customer.customerPincode = newPin;
+      customer.registrationPincode = newPin;
+      customer.isIncomeEligible = await this.evaluatePincodeEligibility(newPin);
     }
 
     // Bank Details
@@ -1434,6 +1569,17 @@ export class UsersService {
       user.aadhaarNumber ||
       (user as any).aadharNumber;
     if (aadharNum) {
+      const cleanAadhaar = String(aadharNum).replace(/\D/g, '');
+      if (cleanAadhaar.length === 12) {
+        await assertCrossRoleIdentityUniqueness({
+          targetRole: 'Customer',
+          aadhaarNumber: cleanAadhaar,
+          excludeUserId: user._id,
+          userModel: this.userModel,
+          partnerModel: this.partnerModel,
+          vendorModel: this.vendorModel,
+        });
+      }
       user.aadhaarNumber = aadharNum;
       (user as any).aadharNumber = aadharNum;
       (user as any).customer_aadhar_no = aadharNum;

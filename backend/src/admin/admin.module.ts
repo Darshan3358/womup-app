@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from '../users/schemas/user.schema';
+import { WithdrawalRequest, WithdrawalRequestSchema } from '../users/schemas/withdrawal-request.schema';
+import { IncomeTransaction, IncomeTransactionSchema } from '../users/schemas/income-transaction.schema';
 import { DeliveryPartner, DeliveryPartnerSchema, RiderSettlement, RiderSettlementSchema } from '../delivery/schemas/delivery-partner.schema';
 import { Store, StoreSchema } from '../stores/schemas/store.schema';
 import { Vendor, VendorSchema } from '../local-shops/schemas/vendor.schema';
@@ -16,6 +18,8 @@ import { NotificationsModule } from '../notifications/notifications.module';
   imports: [
     MongooseModule.forFeature([
       { name: User.name, schema: UserSchema },
+      { name: WithdrawalRequest.name, schema: WithdrawalRequestSchema },
+      { name: IncomeTransaction.name, schema: IncomeTransactionSchema },
       { name: DeliveryPartner.name, schema: DeliveryPartnerSchema },
       { name: RiderSettlement.name, schema: RiderSettlementSchema },
       { name: Store.name, schema: StoreSchema },

@@ -31,6 +31,7 @@ import { RiderOtpVerification, RiderOtpVerificationSchema } from './schemas/ride
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { Order, OrderSchema } from '../orders/schemas/order.schema';
 import { Store, StoreSchema } from '../stores/schemas/store.schema';
+import { Vendor, VendorSchema } from '../local-shops/schemas/vendor.schema';
 import { OtpVerification, OtpVerificationSchema } from '../auth/schemas/otp.schema';
 import { Fast2SmsService } from '../auth/fast2sms.service';
 import { EmailService } from '../auth/email.service';
@@ -71,6 +72,7 @@ import { DeliveryPartnerCacheService } from './common/partner-cache.service';
       { name: User.name, schema: UserSchema },
       { name: Order.name, schema: OrderSchema },
       { name: Store.name, schema: StoreSchema },
+      { name: Vendor.name, schema: VendorSchema },
       { name: OtpVerification.name, schema: OtpVerificationSchema },
       { name: RiderPayoutRate.name, schema: RiderPayoutRateSchema },
       { name: RiderOtpVerification.name, schema: RiderOtpVerificationSchema },

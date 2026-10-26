@@ -1,8 +1,8 @@
 {
-  "name": "wormup-backend",
+  "name": "womup-backend",
   "version": "1.0.0",
-  "description": "Worm Up Quick-Commerce Backend API",
-  "author": "Worm Up Team",
+  "description": "WOMART by Womup Quick-Commerce Backend API",
+  "author": "WOMUP Team",
   "private": true,
   "license": "UNLICENSED",
   "scripts": {

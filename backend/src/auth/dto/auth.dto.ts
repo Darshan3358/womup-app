@@ -167,6 +167,28 @@ export class RegisterDto {
   @IsString()
   @IsOptional()
   preferredCityName?: string;
+
+  @ApiProperty({ example: 'SecurePassword123', required: false, description: 'User login password' })
+  @IsString()
+  @IsOptional()
+  password?: string;
+}
+
+export class CustomerLoginDto {
+  @ApiProperty({ example: 'admin@wormup.com, 9999999999, or WORMADMIN', description: 'Phone, Email, or Sponsor ID' })
+  @IsString()
+  @IsNotEmpty({ message: 'Please enter your Phone, Email, or Sponsor ID' })
+  identifier: string;
+
+  @ApiProperty({ example: 'SecurePassword123', required: false, description: 'User password' })
+  @IsString()
+  @IsOptional()
+  password?: string;
+
+  @ApiProperty({ example: '123456', required: false, description: '6-digit OTP' })
+  @IsString()
+  @IsOptional()
+  otp?: string;
 }
 
 export class VerifyAadhaarDto {

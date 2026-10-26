@@ -205,6 +205,26 @@ export class OrdersService {
       await address.save();
     }
 
+    // Authoritative serviceability & active pincode check
+    const orderPincode = (address.pincode || '').trim();
+    if (orderPincode && orderPincode.length === 6) {
+      const db = this.connection.db;
+      if (db) {
+        const approvedPin = await db.collection('approved_pincodes').findOne({ pincode: orderPincode });
+        if (approvedPin && (approvedPin.isActive === false || approvedPin.isDeliveryAllowed === false)) {
+          throw new BadRequestException(
+            `Sorry, WormUp delivery is currently inactive in PIN code ${orderPincode} (${approvedPin.areaName || approvedPin.cityName}). Please choose a different delivery address.`
+          );
+        }
+        const areaMatch = await db.collection('areas').findOne({ pincodes: orderPincode });
+        if (areaMatch && areaMatch.isActive === false) {
+          throw new BadRequestException(
+            `Sorry, WormUp delivery is currently inactive in ${areaMatch.name} (PIN code ${orderPincode}).`
+          );
+        }
+      }
+    }
+
     let orderItems: any[] = [];
     let itemSubtotal = 0;
     let mrpTotal = 0;

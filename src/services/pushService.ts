@@ -75,7 +75,7 @@ class PushService {
   }
 
   handleNotificationReceived(notification: any, showToast?: (msg: string, title?: string) => void) {
-    const title = notification?.title || 'WormUp Alert';
+    const title = notification?.title || 'WOMART Alert';
     const body = notification?.body || notification?.message || '';
 
     if (showToast && body) {

@@ -8,6 +8,8 @@ import { VendorSettlement, VendorSettlementSchema } from './schemas/vendor-settl
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { IncomeTransaction, IncomeTransactionSchema } from '../users/schemas/income-transaction.schema';
 import { CoinTransaction, CoinTransactionSchema } from '../coins/schemas/coin-transaction.schema';
+import { DeliveryPartner, DeliveryPartnerSchema } from '../delivery/schemas/delivery-partner.schema';
+import { Store, StoreSchema } from '../stores/schemas/store.schema';
 import { TrackingModule } from '../tracking/tracking.module';
 import { AuthModule } from '../auth/auth.module';
 import { LocalShopsController } from './local-shops.controller';
@@ -24,6 +26,8 @@ import { LocalShopsService } from './local-shops.service';
       { name: User.name, schema: UserSchema },
       { name: IncomeTransaction.name, schema: IncomeTransactionSchema },
       { name: CoinTransaction.name, schema: CoinTransactionSchema },
+      { name: DeliveryPartner.name, schema: DeliveryPartnerSchema },
+      { name: Store.name, schema: StoreSchema },
     ]),
     TrackingModule,
     AuthModule,

@@ -12,14 +12,14 @@ import {
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ShieldCheck, Lock, Mail, Award, CheckCircle2, AlertCircle, ArrowRight, Sparkles } from 'lucide-react-native';
+import { ShieldCheck, Lock, Mail, Award, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react-native';
 import { COLORS, GRADIENTS, RADIUS, SPACING } from '../theme';
 import { useAdminState } from '../context/AdminStateContext';
 
 export const AdminLoginScreen: React.FC = () => {
   const { loginAdmin } = useAdminState();
-  const [identifier, setIdentifier] = useState('admin@wormup.com');
-  const [password, setPassword] = useState('admin123');
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,12 +38,6 @@ export const AdminLoginScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleQuickDemoLogin = () => {
-    setIdentifier('admin@wormup.com');
-    setPassword('admin123');
-    handleLogin('admin@wormup.com', 'admin123');
   };
 
   return (
@@ -65,8 +59,8 @@ export const AdminLoginScreen: React.FC = () => {
                 resizeMode="contain"
               />
             </View>
-            <Text style={styles.brandTitle}>Womup Admin</Text>
-            <Text style={styles.brandSubtitle}>SuperAdmin Management Console</Text>
+            <Text style={styles.brandTitle}>WOMART Admin</Text>
+            <Text style={styles.brandSubtitle}>SuperAdmin Management Console • by Womup</Text>
           </View>
 
           {/* Master Sponsor ID Highlight Card */}
@@ -169,19 +163,6 @@ export const AdminLoginScreen: React.FC = () => {
                   </>
                 )}
               </LinearGradient>
-            </TouchableOpacity>
-
-            {/* 1-Tap Demo Admin Login */}
-            <TouchableOpacity
-              style={styles.quickAccessBtn}
-              onPress={handleQuickDemoLogin}
-              disabled={loading}
-              activeOpacity={0.8}
-            >
-              <Sparkles size={16} color="#F562AF" />
-              <Text style={styles.quickAccessText}>
-                1-Tap Admin Login (Sponsor: WORMUP001)
-              </Text>
             </TouchableOpacity>
           </View>
 
@@ -393,23 +374,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: '#FFFFFF',
-  },
-  quickAccessBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(245, 98, 175, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(245, 98, 175, 0.3)',
-    borderRadius: 12,
-    paddingVertical: 12,
-    marginTop: 14,
-    gap: 8,
-  },
-  quickAccessText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#F562AF',
   },
   footer: {
     alignItems: 'center',

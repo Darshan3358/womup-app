@@ -464,7 +464,7 @@ export const BlinkitHomeScreen: React.FC = () => {
           <Feather name="alert-triangle" size={18} color="#DC2626" />
           <View style={styles.unserviceableTextWrap}>
             <Text style={[styles.unserviceableTitle, { color: '#DC2626' }]}>
-              ⚠️ Sorry, WormUp is not serviceable in your area.
+              ⚠️ Sorry, WOMART is not serviceable in your area.
             </Text>
             <Text style={styles.unserviceableSubtitle}>
               We are expanding soon! You can browse products, but ordering is disabled for unsupported locations.

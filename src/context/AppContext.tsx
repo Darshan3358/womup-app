@@ -113,6 +113,7 @@ interface AppContextType {
   updateQuantity: (productId: string, delta: number) => void;
   clearCart: () => void;
   cartSummary: CartSummary;
+  syncCartFromSummary: (cartSummary: any) => void;
 
   // Shopping Coins
   appliedCoins: number;
@@ -845,6 +846,74 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     api.delete('/wishlist').catch(() => {});
   };
 
+  // Synchronize local cart state directly from server cart summary (re-prices items per area)
+  const syncCartFromSummary = useCallback((cartSummary: any) => {
+    if (!cartSummary) return;
+
+    // Sync applied coins / useCoins preference authoritative from backend
+    if (typeof cartSummary.useCoins === 'boolean') {
+      const coins = cartSummary.useCoins ? (cartSummary.coinsUsed ?? cartSummary.appliedCoins ?? 0) : 0;
+      setAppliedCoins(coins);
+    } else if (typeof cartSummary.coinsUsed === 'number' || typeof cartSummary.appliedCoins === 'number') {
+      setAppliedCoins(cartSummary.coinsUsed ?? cartSummary.appliedCoins ?? 0);
+    }
+
+    if (Array.isArray(cartSummary.items)) {
+      if (cartSummary.items.length === 0) {
+        setCart([]);
+        setBlinkitCart({});
+        StorageService.removeItem(StorageService.KEYS.BLINKIT_CART);
+        return;
+      }
+
+      const newCart: CartItem[] = cartSummary.items.map((it: any) => {
+        const vPrice = it.variant?.price !== undefined
+          ? Number(it.variant.price)
+          : Number(it.product.sellingPrice ?? (it.subtotal && it.quantity ? it.subtotal / it.quantity : 0));
+        const vMrp = it.variant?.mrp !== undefined
+          ? Number(it.variant.mrp)
+          : Number(it.product.mrp ?? (it.totalMrp && it.quantity ? it.totalMrp / it.quantity : vPrice));
+        const vLabel = it.variant?.label || it.product.quantityLabel || '1 unit';
+        const resolvedVId = it.variantId || it.variant?.id || it.variant?._id;
+        return {
+          product: {
+            id: it.product.id || it.product._id,
+            name: it.product.name,
+            brand: it.product.brand || '',
+            categoryId: it.product.categoryId || '',
+            sellingPrice: vPrice,
+            mrp: vMrp,
+            discountPercent: vMrp > vPrice ? Math.round(((vMrp - vPrice) / vMrp) * 100) : (it.product.discountPercent || 0),
+            stock: it.variant?.stock ?? it.product.stock ?? 100,
+            imageUrl: it.product.imageUrl,
+            quantityLabel: vLabel,
+            shoppingCoins: 0,
+            rating: 4.8,
+            reviewCount: 50,
+            deliveryMinutes: 9,
+            selectedVariantId: resolvedVId,
+          } as any,
+          quantity: it.quantity,
+        };
+      });
+
+      setCart(newCart);
+      const newBlinkitCart: Record<string, { product: BlinkitProduct; quantity: number }> = {};
+      newCart.forEach((ci) => {
+        const bp = mapProductToBlinkit(ci.product);
+        bp.packSize = ci.product.quantityLabel || '1 unit';
+        (bp as any).selectedVariantId = (ci.product as any).selectedVariantId;
+        const k = (ci.product as any).selectedVariantId ? `${ci.product.id}_${(ci.product as any).selectedVariantId}` : ci.product.id;
+        newBlinkitCart[k] = {
+          product: bp,
+          quantity: ci.quantity,
+        };
+      });
+      setBlinkitCart(newBlinkitCart);
+      StorageService.saveItem(StorageService.KEYS.BLINKIT_CART, newBlinkitCart);
+    }
+  }, []);
+
   // Real-time WebSockets synchronization across Web & Mobile App
   const syncSocketRef = useRef<Socket | null>(null);
 
@@ -961,68 +1030,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     socket.on('cart_updated', (payload: any) => {
       if (!payload) return;
       if (payload.userId && payload.userId !== currentUserId) return;
-      const cartSummary = payload.cart;
-
-      // Sync applied coins / useCoins preference authoritative from backend
-      if (cartSummary) {
-        if (typeof cartSummary.useCoins === 'boolean') {
-          const coins = cartSummary.useCoins ? (cartSummary.coinsUsed ?? cartSummary.appliedCoins ?? 0) : 0;
-          setAppliedCoins(coins);
-        } else if (typeof cartSummary.coinsUsed === 'number' || typeof cartSummary.appliedCoins === 'number') {
-          setAppliedCoins(cartSummary.coinsUsed ?? cartSummary.appliedCoins ?? 0);
-        }
-      }
-
-      if (cartSummary && Array.isArray(cartSummary.items)) {
-        const newCart: CartItem[] = cartSummary.items.map((it: any) => {
-          const vPrice = it.variant?.price !== undefined
-            ? Number(it.variant.price)
-            : Number(it.product.sellingPrice ?? (it.subtotal && it.quantity ? it.subtotal / it.quantity : 0));
-          const vMrp = it.variant?.mrp !== undefined
-            ? Number(it.variant.mrp)
-            : Number(it.product.mrp ?? (it.totalMrp && it.quantity ? it.totalMrp / it.quantity : vPrice));
-          const vLabel = it.variant?.label || it.product.quantityLabel || '1 unit';
-          const resolvedVId = it.variantId || it.variant?.id || it.variant?._id;
-          return {
-            product: {
-              id: it.product.id || it.product._id,
-              name: it.product.name,
-              brand: it.product.brand || '',
-              categoryId: it.product.categoryId || '',
-              sellingPrice: vPrice,
-              mrp: vMrp,
-              discountPercent: vMrp > vPrice ? Math.round(((vMrp - vPrice) / vMrp) * 100) : (it.product.discountPercent || 0),
-              stock: it.variant?.stock ?? it.product.stock ?? 100,
-              imageUrl: it.product.imageUrl,
-              quantityLabel: vLabel,
-              shoppingCoins: 0,
-              rating: 4.8,
-              reviewCount: 50,
-              deliveryMinutes: 9,
-              selectedVariantId: resolvedVId,
-            } as any,
-            quantity: it.quantity,
-          };
-        });
-        setCart(newCart);
-        const newBlinkitCart: Record<string, { product: BlinkitProduct; quantity: number }> = {};
-        newCart.forEach((ci) => {
-          const bp = mapProductToBlinkit(ci.product);
-          bp.packSize = ci.product.quantityLabel || '1 unit';
-          (bp as any).selectedVariantId = (ci.product as any).selectedVariantId;
-          const k = (ci.product as any).selectedVariantId ? `${ci.product.id}_${(ci.product as any).selectedVariantId}` : ci.product.id;
-          newBlinkitCart[k] = {
-            product: bp,
-            quantity: ci.quantity,
-          };
-        });
-        setBlinkitCart(newBlinkitCart);
-        StorageService.saveItem(StorageService.KEYS.BLINKIT_CART, newBlinkitCart);
-      } else if (cartSummary && Array.isArray(cartSummary.items) && cartSummary.items.length === 0) {
-        setCart([]);
-        setBlinkitCart({});
-        StorageService.removeItem(StorageService.KEYS.BLINKIT_CART);
-      }
+      syncCartFromSummary(payload.cart);
     });
 
     // Real-time Orders synchronization (When order placed from Website or Mobile)
@@ -2369,6 +2377,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateQuantity,
     clearCart,
     cartSummary,
+    syncCartFromSummary,
     appliedCoins,
     setAppliedCoins,
     orders,
@@ -2458,7 +2467,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     activeScreen, navigateTo, goBack, canGoBack,
     user, selectedAddress, selectedAddressId, selectedAddressSource,
     setSelectedAddress, setActiveDeliveryAddress, setActiveGpsLocation, addAddress,
-    cart, cartCount, addToCart, removeFromCart, updateQuantity, clearCart, cartSummary,
+    cart, cartCount, addToCart, removeFromCart, updateQuantity, clearCart, cartSummary, syncCartFromSummary,
     appliedCoins, orders, currentOrder, placeOrder,
     selectedProduct, selectedCategoryId, selectedCategoryIds, selectedCategoryName,
     navigateToProductListing, searchQuery, isVoiceSearchActive, filters, isJumperVisible,

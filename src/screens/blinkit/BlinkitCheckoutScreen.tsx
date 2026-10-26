@@ -29,7 +29,7 @@ import { resolveImageThumbnail } from '../../utils/imageUrl';
 import { useApp } from '../../context/AppContext';
 
 // Resolve full-screen order celebration video asset
-const orderVideoAsset = require('../../../assets/gemini_generated_video_2981966f.mp4');
+const orderVideoAsset = require('../../../assets/order_placed_video.mp4');
 
 const getVideoSource = () => {
   if (typeof orderVideoAsset === 'string') return orderVideoAsset;
@@ -39,7 +39,7 @@ const getVideoSource = () => {
     const resolved = Image.resolveAssetSource(orderVideoAsset);
     if (resolved?.uri) return resolved.uri;
   } catch (e) { }
-  return '/assets/assets/gemini_generated_video_2981966f.mp4';
+  return '/assets/assets/order_placed_video.mp4';
 };
 
 const loadRazorpayScript = (): Promise<boolean> => {
@@ -103,6 +103,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     emitCheckoutChange,
     setLocationModalVisible,
     isServiceable,
+    syncCartFromSummary,
   } = useApp();
 
   const [couponCodeInput, setCouponCodeInput] = useState('');
@@ -301,7 +302,10 @@ export const BlinkitCheckoutScreen: React.FC = () => {
 
         // Trigger server cart location update so backend recalculates area prices
         try {
-          await CartService.setCartLocation(loc.areaId, loc.storeId);
+          const updatedCart = await CartService.setCartLocation(loc.areaId, loc.storeId);
+          if (updatedCart) {
+            syncCartFromSummary(updatedCart);
+          }
         } catch (err) {
           console.warn('[Checkout] Failed to re-price cart for new location:', err);
         }
@@ -371,6 +375,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
       isDefault: true,
     };
     setSelectedAddress(fullAddr as any);
+    CartService.clearCache();
 
     emitCheckoutChange({
       selectedAddressType: 'SAVED',
@@ -401,7 +406,10 @@ export const BlinkitCheckoutScreen: React.FC = () => {
 
         // Trigger server cart location update so backend recalculates area prices
         try {
-          await CartService.setCartLocation(loc.areaId, loc.storeId);
+          const updatedCart = await CartService.setCartLocation(loc.areaId, loc.storeId);
+          if (updatedCart) {
+            syncCartFromSummary(updatedCart);
+          }
         } catch (err) {
           console.warn('[Checkout] Failed to re-price cart for new location:', err);
         }
@@ -445,6 +453,13 @@ export const BlinkitCheckoutScreen: React.FC = () => {
               latitude: matched.lat,
               longitude: matched.lng,
             });
+
+            try {
+              const updatedCart = await CartService.setCartLocation(area.areaId, area.storeId);
+              if (updatedCart) {
+                syncCartFromSummary(updatedCart);
+              }
+            } catch {}
           }
         } catch (e) {
           console.warn('[BlinkitCheckout] Typing area resolve warning:', e);
@@ -632,29 +647,26 @@ export const BlinkitCheckoutScreen: React.FC = () => {
 
   const TIP_OPTIONS = [0, 10, 20, 30, 50];
 
-  const isSavedAddress = selectedAddressSource === 'SAVED' || selectedAddressType === 'SAVED';
+  const isSavedAddress = selectedAddressType === 'SAVED';
 
-  const matchedArea = matchAreaByName(
-    (isSavedAddress ? (selectedAddress?.areaLandmark || areaLandmark || (selectedAddress as any)?.area || selectedAddress?.street || selectedAddress?.houseFlat) : null) ||
-    currentAreaName ||
-    areaLandmark ||
-    selectedAddress?.areaLandmark ||
-    (selectedAddress as any)?.area ||
-    deliveryLocation
-  );
-  const activeLat = isSavedAddress
-    ? (matchedArea?.lat || Number(selectedAddress?.latitude) || 23.0125)
-    : (Number(selectedAddress?.latitude) || matchedArea?.lat || 23.0125);
-  const activeLng = isSavedAddress
-    ? (matchedArea?.lng || Number(selectedAddress?.longitude) || 72.5082)
-    : (Number(selectedAddress?.longitude) || matchedArea?.lng || 72.5082);
+  // Effective area text priority: explicit form input > selected address > currentAreaName
+  const effectiveAreaText = isSavedAddress
+    ? (selectedAddress?.areaLandmark || areaLandmark || (selectedAddress as any)?.area || selectedAddress?.street || 'Prahlad Nagar')
+    : (areaLandmark || selectedAddress?.areaLandmark || currentAreaName || 'Chandlodiya - Tragad');
+
+  const matchedArea = matchAreaByName(effectiveAreaText);
+
+  // Active coordinates: always take explicit selectedAddress coordinates first
+  const activeLat = Number(selectedAddress?.latitude) ||
+    (selectedAddressType === 'CURRENT_GPS' ? 23.1288 : (matchedArea?.lat || 23.0125));
+  const activeLng = Number(selectedAddress?.longitude) ||
+    (selectedAddressType === 'CURRENT_GPS' ? 72.5507 : (matchedArea?.lng || 72.5082));
   const currentDistanceKm = 1.2;
 
   const cartItemCount = blinkitCartList.length;
-  const cityKey = (isSavedAddress ? selectedAddress?.city : null) || currentCityName || 'Ahmedabad';
-  const areaKey = (isSavedAddress ? (selectedAddress?.areaLandmark || matchedArea?.name) : null) ||
-    matchedArea?.name || currentAreaName || selectedAddress?.areaLandmark || 'Prahlad Nagar';
-  const addressIdKey = selectedAddress?.id || 'current_selected_address';
+  const cityKey = selectedAddress?.city || currentCityName || 'Ahmedabad';
+  const areaKey = matchedArea?.name || effectiveAreaText || 'Chandlodiya - Tragad';
+  const addressIdKey = selectedAddress?.id || selectedAddressType;
 
   const cachedFeeData = CartService.getCachedDeliveryFee({
     cityName: cityKey,
@@ -709,18 +721,15 @@ export const BlinkitCheckoutScreen: React.FC = () => {
               ...res.breakdown,
               distanceKm: res.distanceKm || (res as any).routeDistanceKm || currentDistanceKm,
               rateUsed: res.rateUsed || 12,
-              areaName: res.areaName || areaKey,
+              areaName: areaKey,
             });
           }
           if (res.storeName) {
             setAreaDetectionStatus({
               isServiceable: true,
-              areaName: res.areaName || areaKey,
+              areaName: areaKey,
               storeName: res.storeName,
             });
-            if (res.storeId && res.storeId !== currentStoreId) {
-              setCurrentStore(res.storeId, res.storeName);
-            }
           }
         }
       } catch (err) {
@@ -895,7 +904,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     if (!isServiceable || areaDetectionStatus?.isServiceable === false) {
       Alert.alert(
         'Delivery Unavailable',
-        'Sorry, WormUp is not serviceable in your area. We are expanding soon!'
+        'Sorry, WOMART is not serviceable in your area. We are expanding soon!'
       );
       return;
     }
@@ -979,13 +988,13 @@ export const BlinkitCheckoutScreen: React.FC = () => {
             key: rzpData.keyId,
             amount: rzpData.amount,
             currency: 'INR',
-            name: 'WormUp Express Delivery',
+            name: 'WOMART by Womup',
             description: `Order Payment (${blinkitCartCount} items)`,
             order_id: rzpData.razorpayOrderId,
             prefill: {
               name: user?.fullName || rzpData.customerName || 'Customer',
               contact: user?.phoneNumber || rzpData.customerPhone || '9876543210',
-              email: user?.email || rzpData.prefillEmail || 'customer@wormup.in',
+              email: user?.email || rzpData.prefillEmail || 'customer@womup.in',
             },
             theme: { color: '#071B52' },
             handler: async (resp: any) => {
@@ -1671,24 +1680,9 @@ export const BlinkitCheckoutScreen: React.FC = () => {
             </View>
           )}
 
-          <View style={[styles.summaryRow, { alignItems: 'flex-start', paddingVertical: 8 }]}>
+          <View style={[styles.summaryRow, { alignItems: 'center', paddingVertical: 8 }]}>
             <View style={{ flex: 1, paddingRight: 8 }}>
               <Text style={styles.summaryLabel}>Delivery Partner Fee</Text>
-              <Text style={{ fontSize: 11, color: '#62677A', marginTop: 1 }}>
-                {isCalculatingFee
-                  ? 'Calculating live route fee...'
-                  : `${feeBreakdown?.distanceKm || currentDistanceKm} km · ₹${feeBreakdown?.rateUsed || 12}/km${
-                      feeBreakdown?.floorApplied ? ` (Base: ₹${feeBreakdown?.baseFee || 14.40})` : ''
-                    }`}
-              </Text>
-              {!isCalculatingFee && feeBreakdown?.floorApplied && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                  <ShieldCheck size={12} color="#4338CA" />
-                  <Text style={{ fontSize: 10, color: '#4338CA', fontWeight: '600' }}>
-                    +₹{(Number(feeBreakdown?.minimumPayout || 30) - Number(feeBreakdown?.baseFee || 14.40)).toFixed(2)} Floor Guarantee (Min ₹{feeBreakdown?.minimumPayout || 30})
-                  </Text>
-                </View>
-              )}
               {!isCalculatingFee && (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
                   <CheckCircle2 size={10} color="#059669" />
@@ -1992,7 +1986,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
             {/* Order & Amount Box */}
             <View style={styles.rzpAmountBox}>
               <Text style={styles.rzpAmountPayingTo}>
-                Paying to WormUp Express ({blinkitCartCount} items)
+                Paying to WOMART Express ({blinkitCartCount} items)
               </Text>
               <Text style={styles.rzpAmountText}>₹{finalPayable}</Text>
               <Text style={styles.rzpOrderIdText}>

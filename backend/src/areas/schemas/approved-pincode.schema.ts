@@ -20,6 +20,9 @@ export class ApprovedPincode {
   @Prop({ default: true })
   isDeliveryAllowed: boolean;
 
+  @Prop({ default: true })
+  isIncomeEnabled: boolean;
+
   @Prop()
   areaName?: string;
 

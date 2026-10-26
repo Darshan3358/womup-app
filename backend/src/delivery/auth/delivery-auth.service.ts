@@ -30,6 +30,9 @@ import {
 import { Role } from '../../common/enums/role.enum';
 import { Fast2SmsService } from '../../auth/fast2sms.service';
 import { EmailService } from '../../auth/email.service';
+import { Store, StoreDocument } from '../../stores/schemas/store.schema';
+import { Vendor, VendorDocument } from '../../local-shops/schemas/vendor.schema';
+import { assertCrossRoleIdentityUniqueness } from '../../common/services/cross-role-validator';
 
 export interface RegisterRiderDto {
   registrationToken?: string;
@@ -114,6 +117,10 @@ export class DeliveryAuthService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(DeliveryPartner.name)
     private partnerModel: Model<DeliveryPartnerDocument>,
+    @InjectModel(Store.name)
+    private storeModel: Model<StoreDocument>,
+    @InjectModel(Vendor.name)
+    private vendorModel: Model<VendorDocument>,
     @InjectModel(RiderBankAccount.name)
     private bankAccountModel: Model<RiderBankAccountDocument>,
     @InjectModel(OtpVerification.name)
@@ -142,6 +149,26 @@ export class DeliveryAuthService {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(cleanEmail)) {
       throw new BadRequestException('Please provide a valid email format');
+    }
+
+    // Strict Cross-Role Check: Cannot request Rider OTP with an email registered as Customer / Store / Vendor
+    const existingUser = await this.userModel.findOne({ email: cleanEmail });
+    if (existingUser && existingUser.role !== Role.DELIVERY_PARTNER) {
+      throw new ConflictException(
+        `This email is already registered as a ${existingUser.role === Role.ADMIN ? 'Admin' : 'Customer'}. You cannot use it for a Delivery Partner account.`
+      );
+    }
+    const existingStore = await this.storeModel.findOne({ email: cleanEmail });
+    if (existingStore) {
+      throw new ConflictException(
+        'This email is already registered with a Dark Store. You cannot use it for a Delivery Partner account.'
+      );
+    }
+    const existingVendor = await this.vendorModel.findOne({ vendorEmail: cleanEmail });
+    if (existingVendor) {
+      throw new ConflictException(
+        'This email is already registered with a Local Vendor. You cannot use it for a Delivery Partner account.'
+      );
     }
 
     // Rate Limiting: Max 3 OTP requests per 15 minutes per email
@@ -300,17 +327,17 @@ export class DeliveryAuthService {
       }
     }
 
-    // Check if email already registered
-    const existingRider = await this.partnerModel.findOne({
-      $or: [{ email: cleanEmail }, { phoneNumber: cleanMobile }],
+    // Strict Cross-Role Single-Identity Check (Mobile, Email, Aadhaar)
+    await assertCrossRoleIdentityUniqueness({
+      targetRole: 'Delivery Partner',
+      phone: cleanMobile,
+      email: cleanEmail,
+      aadhaarNumber: finalAadhaarNum,
+      userModel: this.userModel,
+      partnerModel: this.partnerModel,
+      storeModel: this.storeModel,
+      vendorModel: this.vendorModel,
     });
-    if (existingRider) {
-      throw new ConflictException(
-        existingRider.email === cleanEmail
-          ? 'An account with this email already exists. Please login.'
-          : 'An account with this mobile number already exists.'
-      );
-    }
 
     // Hash password (bcrypt 10 rounds)
     let passwordHash: string | undefined = undefined;

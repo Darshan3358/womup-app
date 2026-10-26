@@ -78,10 +78,10 @@ export class Store {
   @Prop({ trim: true })
   ownerName?: string;
 
-  @Prop({ trim: true, lowercase: true })
+  @Prop({ trim: true, lowercase: true, sparse: true, index: true })
   email?: string;
 
-  @Prop({ trim: true })
+  @Prop({ trim: true, sparse: true, index: true })
   phone?: string;
 
   @Prop({ trim: true, default: 'PENDING' })

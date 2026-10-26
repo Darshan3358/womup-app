@@ -293,7 +293,9 @@ export const ST02b_StoreRegistrationScreen: React.FC = () => {
         Alert.alert('Registration Failed', res?.message || 'Unable to register dark store.');
       }
     } catch (err: any) {
-      Alert.alert('Registration Error', err.message || 'Server error during store registration.');
+      const msg = err.message || 'Server error during store registration.';
+      const isConflict = msg.includes('already registered') || msg.includes('already exists') || msg.includes('Customer') || msg.includes('Rider') || msg.includes('Vendor');
+      Alert.alert(isConflict ? 'Account Already Exists' : 'Registration Error', msg);
     } finally {
       setIsSubmitting(false);
     }

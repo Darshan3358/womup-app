@@ -1,7 +1,7 @@
 import { Controller, Post, Get, Query, Body, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { SendOtpDto, VerifyOtpDto, RegisterDto, RegisterRiderDto, RefreshTokenDto, GoogleAuthDto, LinkPhoneDto, AdminLoginDto } from './dto/auth.dto';
+import { SendOtpDto, VerifyOtpDto, RegisterDto, RegisterRiderDto, RefreshTokenDto, GoogleAuthDto, LinkPhoneDto, AdminLoginDto, CustomerLoginDto } from './dto/auth.dto';
 
 @ApiTags('Authentication')
 @Controller('api/v1/auth')
@@ -67,6 +67,14 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Verification result' })
   async verifyOtp(@Body() dto: VerifyOtpDto) {
     return this.authService.verifyOtp(dto);
+  }
+
+  @Post('login')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Login customer using Phone, Email, or Sponsor ID with Password or OTP' })
+  @ApiResponse({ status: 200, description: 'Login successful with access and refresh tokens' })
+  async login(@Body() dto: CustomerLoginDto) {
+    return this.authService.customerLogin(dto);
   }
 
   @Post('register')

@@ -11,6 +11,9 @@ import { VendorSettlement, VendorSettlementDocument } from './schemas/vendor-set
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { IncomeTransaction, IncomeTransactionDocument } from '../users/schemas/income-transaction.schema';
 import { CoinTransaction, CoinTransactionDocument } from '../coins/schemas/coin-transaction.schema';
+import { DeliveryPartner, DeliveryPartnerDocument } from '../delivery/schemas/delivery-partner.schema';
+import { Store, StoreDocument } from '../stores/schemas/store.schema';
+import { assertCrossRoleIdentityUniqueness } from '../common/services/cross-role-validator';
 import { TrackingGateway } from '../tracking/tracking.gateway';
 import { EmailService } from '../auth/email.service';
 import { NotificationService } from '../notifications/notification.service';
@@ -40,6 +43,8 @@ export class LocalShopsService implements OnModuleInit {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(IncomeTransaction.name) private incomeTxModel: Model<IncomeTransactionDocument>,
     @InjectModel(CoinTransaction.name) private coinTxModel: Model<CoinTransactionDocument>,
+    @InjectModel(DeliveryPartner.name) private partnerModel: Model<DeliveryPartnerDocument>,
+    @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
     @Optional() private trackingGateway?: TrackingGateway,
     @Optional() private emailService?: EmailService,
     @Optional() private notificationService?: NotificationService,
@@ -47,12 +52,8 @@ export class LocalShopsService implements OnModuleInit {
 
   async onModuleInit() {
     await this.seedDefaultCategories();
-    await this.seedDefaultVendors();
-    // Ensure Gokul Vegetables is configured to 18% Shopping Coin Benefit per SRS
-    await this.vendorModel.updateOne(
-      { vendorCode: 'VND001' },
-      { $set: { shoppingCoinPercent: 18 } }
-    );
+    // Default vendors auto-seed disabled as requested by user to keep database clean
+    // await this.seedDefaultVendors();
   }
 
   // ── Seed Categories ────────────────────────────────────────────────────────
@@ -498,7 +499,8 @@ export class LocalShopsService implements OnModuleInit {
     }
 
     // Team Purchase Income (0.4% per notebook rule on eligible non-wallet purchases)
-    if (customer && customer.sponsorId && dto.paymentMethod !== 'WALLET' && billAmount > 0) {
+    // Conditional Earning Check: Customer must be from an eligible pincode
+    if (customer && customer.isIncomeEligible && customer.sponsorId && dto.paymentMethod !== 'WALLET' && billAmount > 0) {
       try {
         const sponsor = await this.userModel.findById(customer.sponsorId);
         if (sponsor) {
@@ -1180,6 +1182,19 @@ export class LocalShopsService implements OnModuleInit {
       ],
     });
 
+    // Strict Cross-Role Single-Identity Check (Mobile, Email, Aadhaar)
+    await assertCrossRoleIdentityUniqueness({
+      targetRole: 'Local Vendor',
+      phone: rawMobile,
+      email: dto.email,
+      aadhaarNumber: dto.aadhaarNumber,
+      excludeVendorId: existing ? existing._id : undefined,
+      userModel: this.userModel,
+      partnerModel: this.partnerModel,
+      storeModel: this.storeModel,
+      vendorModel: this.vendorModel,
+    });
+
     if (existing && existing.vendorStatus === 2) {
       throw new BadRequestException('A registered and approved vendor already exists with this mobile or email.');
     }
@@ -1838,7 +1853,8 @@ export class LocalShopsService implements OnModuleInit {
         }
 
         // Team Purchase Income (0.4% on eligible non-wallet purchases per notebook spec)
-        if (customer.sponsorId && request.paymentMethod !== 'WALLET' && request.billAmount > 0) {
+        // Conditional Earning Check: Customer must be from an eligible pincode
+        if (customer && customer.isIncomeEligible && customer.sponsorId && request.paymentMethod !== 'WALLET' && request.billAmount > 0) {
           try {
             const sponsor = await this.userModel.findById(customer.sponsorId);
             if (sponsor) {

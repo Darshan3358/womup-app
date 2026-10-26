@@ -308,31 +308,12 @@ export const LocalShopHomeScreen: React.FC = () => {
   // Master Screen: Home & Shops Tabs (Pixel-matched with the screenshot!)
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* 1. Header (Logo, Location: Admin-verified City/Area, Notification badge) */}
+      {/* 1. Header (Logo, Location: Admin-verified City/Area, Real Notifications Popup) */}
       <WomupHeader
         location={currentAreaName ? `${currentAreaName}` : (currentCityName || 'Ahmedabad')}
-        onOpenMenu={() => {
-          Alert.alert(
-            'WOMUP Menu',
-            'Select an option:',
-            [
-              { text: '⚡ Back to Womup (9-Min Express)', onPress: handleBackToMainApp },
-              { text: '🪙 My Coin Wallet', onPress: () => setActiveTab('My Coin') },
-              { text: '📦 My Orders', onPress: () => setActiveTab('My Orders') },
-              { text: 'Cancel', style: 'cancel' },
-            ]
-          );
-        }}
         onSelectLocation={() => {
           setIsCityModalVisible(true);
         }}
-        onOpenNotifications={() => {
-          Alert.alert(
-            'Notifications (3)',
-            '1. Gokul Vegetables added 15% coin cashback!\n2. You earned 75 coins from your last visit.\n3. Jay Medical Store is now open.'
-          );
-        }}
-        onBackToQuickCommerce={handleBackToMainApp}
       />
 
       <ScrollView

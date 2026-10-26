@@ -1,5 +1,5 @@
 {
-  "name": "worm-up-app",
+  "name": "womart-customer-app",
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
@@ -11,6 +11,7 @@
     "@react-navigation/native-stack": "^7.18.10",
     "expo": "~57.0.26",
     "expo-camera": "~57.0.6",
+    "expo-clipboard": "~57.0.2",
     "expo-document-picker": "~57.0.3",
     "expo-font": "~57.0.3",
     "expo-image-picker": "~57.0.20",

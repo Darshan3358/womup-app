@@ -8,6 +8,8 @@ import { Vendor, VendorDocument } from '../local-shops/schemas/vendor.schema';
 import { Order, OrderDocument } from '../orders/schemas/order.schema';
 import { OrderStatus } from '../common/enums/order-status.enum';
 import { AdminAuditLog, AdminAuditLogDocument } from './schemas/admin-audit-log.schema';
+import { WithdrawalRequest, WithdrawalRequestDocument } from '../users/schemas/withdrawal-request.schema';
+import { IncomeTransaction, IncomeTransactionDocument } from '../users/schemas/income-transaction.schema';
 import { TrackingGateway } from '../tracking/tracking.gateway';
 import { NotificationService } from '../notifications/notification.service';
 
@@ -61,6 +63,8 @@ export class AdminApprovalsService {
     @InjectModel(Vendor.name) private readonly vendorModel: Model<VendorDocument>,
     @InjectModel(Order.name) private readonly orderModel: Model<OrderDocument>,
     @InjectModel(AdminAuditLog.name) private readonly auditLogModel: Model<AdminAuditLogDocument>,
+    @InjectModel(WithdrawalRequest.name) private readonly withdrawalRequestModel: Model<WithdrawalRequestDocument>,
+    @InjectModel(IncomeTransaction.name) private readonly incomeTxModel: Model<IncomeTransactionDocument>,
     private readonly trackingGateway: TrackingGateway,
     @Optional() private readonly notificationService?: NotificationService,
   ) {}
@@ -115,9 +119,10 @@ export class AdminApprovalsService {
         this.orderModel.countDocuments({
           status: { $in: [OrderStatus.PLACED, OrderStatus.PACKING] },
         }),
-        this.riderSettlementModel.countDocuments({
-          status: 'PENDING',
-        }),
+        Promise.all([
+          this.riderSettlementModel.countDocuments({ status: 'PENDING' }),
+          this.withdrawalRequestModel.countDocuments({ status: 'PENDING' }),
+        ]).then(([r, c]) => r + c),
       ]);
 
       const staff = 0;
@@ -432,17 +437,25 @@ export class AdminApprovalsService {
     return { items, total: items.length };
   }
 
-  // ── Wallet Withdrawals Queue ──
+  // ── Wallet Withdrawals Queue (Both Rider Settlements & Customer Income Withdrawals) ──
   private async getWithdrawalsQueue(query: any): Promise<{ items: QueueItem[]; total: number }> {
-    const settlements = await this.riderSettlementModel
-      .find({ status: 'PENDING' })
-      .populate('riderId', 'fullName phoneNumber vehicleNumber')
-      .sort({ createdAt: -1 })
-      .limit(50)
-      .lean();
+    const [settlements, customerWithdrawals] = await Promise.all([
+      this.riderSettlementModel
+        .find({ status: 'PENDING' })
+        .populate('riderId', 'fullName phoneNumber vehicleNumber')
+        .sort({ createdAt: -1 })
+        .limit(50)
+        .lean(),
+      this.withdrawalRequestModel
+        .find({ status: 'PENDING' })
+        .populate('userId', 'name phone email availableIncome walletBalance')
+        .sort({ createdAt: -1 })
+        .limit(50)
+        .lean(),
+    ]);
 
     const now = Date.now();
-    const items: QueueItem[] = settlements.map((w: any) => {
+    const riderItems: QueueItem[] = settlements.map((w: any) => {
       const rider = w.riderId || {};
       const submitted = w.createdAt || new Date();
       const ageHours = Math.max(1, Math.round((now - new Date(submitted).getTime()) / (1000 * 60 * 60)));
@@ -451,7 +464,7 @@ export class AdminApprovalsService {
         id: String(w._id),
         type: 'WITHDRAWAL',
         name: rider.fullName || 'Partner Payout',
-        code: `WTH${String(w._id).slice(-5).toUpperCase()}`,
+        code: `RDR-${String(w._id).slice(-5).toUpperCase()}`,
         mobile: rider.phoneNumber || 'N/A',
         email: 'N/A',
         submittedAt: submitted,
@@ -466,11 +479,51 @@ export class AdminApprovalsService {
           payoutPeriod: `${w.periodStart ? new Date(w.periodStart).toLocaleDateString() : ''} - ${w.periodEnd ? new Date(w.periodEnd).toLocaleDateString() : ''}`,
           bankName: w.bankName || 'HDFC Bank',
           accountNumber: w.accountNumber || 'XXXX9182',
+          role: 'Delivery Partner',
         },
       };
     });
 
-    return { items, total: items.length };
+    const customerItems: QueueItem[] = customerWithdrawals.map((cw: any) => {
+      const user = (cw.userId as any) || {};
+      const submitted = cw.createdAt || new Date();
+      const ageHours = Math.max(1, Math.round((now - new Date(submitted).getTime()) / (1000 * 60 * 60)));
+
+      return {
+        id: String(cw._id),
+        type: 'WITHDRAWAL',
+        name: cw.userName || user.name || 'Customer Income Withdrawal',
+        code: `CUST-${String(cw._id).slice(-5).toUpperCase()}`,
+        mobile: cw.userPhone || user.phone || 'N/A',
+        email: user.email || 'N/A',
+        submittedAt: submitted,
+        ageHours,
+        documentsCount: 0,
+        documents: [],
+        status: 'PENDING',
+        priority: cw.amount >= 5000 ? 'HIGH' : 'NORMAL',
+        details: {
+          amount: cw.netAmount || cw.amount || 0,
+          grossAmount: cw.amount || 0,
+          tdsDeduction: cw.tdsAmount || 0,
+          netPayout: cw.netAmount || 0,
+          bankName: cw.bankDetails?.bankName || 'Bank / UPI',
+          accountNumber: cw.bankDetails?.accountNumber || cw.bankDetails?.upiId || cw.bankDetails?.destination || 'N/A',
+          accountHolderName: cw.bankDetails?.accountHolderName || cw.userName,
+          ifscCode: cw.bankDetails?.ifscCode || 'N/A',
+          upiId: cw.bankDetails?.upiId || 'N/A',
+          destination: cw.bankDetails?.destination || cw.bankDetails?.upiId || cw.bankDetails?.accountNumber || 'N/A',
+          isCustomerIncomeWithdrawal: true,
+          role: 'Customer',
+        },
+      };
+    });
+
+    const combined = [...customerItems, ...riderItems].sort(
+      (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+    );
+
+    return { items: combined, total: combined.length };
   }
 
   // ── Cancellations & Refunds Queue ──
@@ -1066,6 +1119,49 @@ export class AdminApprovalsService {
   }
 
   async approveWithdrawal(withdrawalId: string, adminId?: string) {
+    // 1. Check if this is a Customer Income Withdrawal Request
+    const customerReq = await this.withdrawalRequestModel.findById(withdrawalId);
+    if (customerReq) {
+      if (customerReq.status !== 'PENDING') {
+        throw new BadRequestException(`Withdrawal request is already ${customerReq.status}`);
+      }
+      customerReq.status = 'APPROVED';
+      customerReq.settledAt = new Date();
+      customerReq.reviewedAt = new Date();
+      if (adminId && Types.ObjectId.isValid(adminId)) {
+        customerReq.reviewedBy = new Types.ObjectId(adminId);
+      }
+      await customerReq.save();
+
+      // Update IncomeTransaction
+      await this.incomeTxModel.updateMany(
+        { userId: customerReq.userId, type: 'WITHDRAWAL', description: { $regex: customerReq._id.toString().slice(-6).toUpperCase() } },
+        { $set: { status: 'AVAILABLE', description: `Approved Payout: ₹${customerReq.netAmount} (TDS 20%: -₹${customerReq.tdsAmount}) transferred to ${customerReq.bankDetails?.bankName || 'Bank'}` } }
+      );
+
+      await this.logAudit({
+        actorId: adminId || 'ADMIN',
+        action: 'APPROVE_CUSTOMER_WITHDRAWAL',
+        entity: 'WithdrawalRequest',
+        entityId: String(customerReq._id),
+        newValue: { status: 'APPROVED', netAmount: customerReq.netAmount },
+      });
+
+      this.trackingGateway.server?.emit('withdrawal_approved', {
+        withdrawalId: String(customerReq._id),
+        userId: String(customerReq.userId),
+        amount: customerReq.netAmount,
+      });
+      this.broadcastSummary();
+
+      return {
+        success: true,
+        message: `Customer withdrawal #${customerReq._id.toString().slice(-6).toUpperCase()} of ₹${customerReq.netAmount} (Net) approved & processed via Bank/UPI`,
+        data: customerReq,
+      };
+    }
+
+    // 2. Fallback: Rider Settlement Withdrawal
     const settlement = await this.riderSettlementModel.findById(withdrawalId);
     if (!settlement) throw new NotFoundException(`Withdrawal request not found with ID ${withdrawalId}`);
 
@@ -1091,6 +1187,69 @@ export class AdminApprovalsService {
   }
 
   async rejectWithdrawal(withdrawalId: string, reason?: string, adminId?: string) {
+    // 1. Check if this is a Customer Income Withdrawal Request
+    const customerReq = await this.withdrawalRequestModel.findById(withdrawalId);
+    if (customerReq) {
+      if (customerReq.status !== 'PENDING') {
+        throw new BadRequestException(`Withdrawal request is already ${customerReq.status}`);
+      }
+      customerReq.status = 'REJECTED';
+      customerReq.adminRemarks = reason || 'Rejected by administrator';
+      customerReq.reviewedAt = new Date();
+      if (adminId && Types.ObjectId.isValid(adminId)) {
+        customerReq.reviewedBy = new Types.ObjectId(adminId);
+      }
+      await customerReq.save();
+
+      // Refund money back to customer wallet
+      const user = await this.userModel.findById(customerReq.userId);
+      if (user) {
+        user.availableIncome = Number(((user.availableIncome || 0) + customerReq.amount).toFixed(2));
+        user.walletBalance = Number(((user.walletBalance || 0) + customerReq.amount).toFixed(2));
+        await user.save();
+
+        // Create reversal/refund transaction
+        await this.incomeTxModel.create({
+          userId: user._id,
+          type: 'WITHDRAWAL',
+          amount: customerReq.amount,
+          earnedAt: new Date(),
+          availableFrom: new Date(),
+          isUsable: true,
+          status: 'AVAILABLE',
+          description: `Withdrawal Refund #${customerReq._id.toString().slice(-6).toUpperCase()}: ₹${customerReq.amount} refunded to available income (${reason || 'Rejected by Admin'})`,
+        });
+
+        this.trackingGateway.emitWalletUpdated(String(user._id), {
+          availableIncome: user.availableIncome,
+          pendingIncome: user.pendingIncome,
+          walletBalance: user.walletBalance,
+        });
+      }
+
+      await this.logAudit({
+        actorId: adminId || 'ADMIN',
+        action: 'REJECT_CUSTOMER_WITHDRAWAL',
+        entity: 'WithdrawalRequest',
+        entityId: String(customerReq._id),
+        newValue: { status: 'REJECTED', refundAmount: customerReq.amount, reason },
+      });
+
+      this.trackingGateway.server?.emit('withdrawal_rejected', {
+        withdrawalId: String(customerReq._id),
+        userId: String(customerReq.userId),
+        reason,
+      });
+      this.broadcastSummary();
+
+      return {
+        success: true,
+        message: `Customer withdrawal #${customerReq._id.toString().slice(-6).toUpperCase()} rejected. ₹${customerReq.amount} has been refunded to customer's available income.`,
+        data: customerReq,
+      };
+    }
+
+    // 2. Fallback: Rider Settlement Withdrawal
     const settlement = await this.riderSettlementModel.findById(withdrawalId);
     if (!settlement) throw new NotFoundException(`Withdrawal request not found with ID ${withdrawalId}`);
 

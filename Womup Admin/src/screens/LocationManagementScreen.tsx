@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -66,6 +66,28 @@ export const LocationManagementScreen: React.FC = () => {
   const [storeStatusFilter, setStoreStatusFilter] = useState<'All' | 'Assigned' | 'Available'>('All');
   const [pincodeStatusFilter, setPincodeStatusFilter] = useState<'All' | 'Active' | 'Inactive'>('All');
   const [togglingAreaId, setTogglingAreaId] = useState<string | null>(null);
+  const [dbPincodes, setDbPincodes] = useState<any[]>([]);
+  const [loadingPincodes, setLoadingPincodes] = useState(false);
+  const [togglingPincodeKey, setTogglingPincodeKey] = useState<string | null>(null);
+  const [pincodeToast, setPincodeToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const fetchDbPincodes = async () => {
+    try {
+      setLoadingPincodes(true);
+      const res = await ApiService.getPincodes();
+      if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+        setDbPincodes(res.data);
+      }
+    } catch (err) {
+      console.error('Error loading pincodes:', err);
+    } finally {
+      setLoadingPincodes(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDbPincodes();
+  }, []);
 
   // City Modal State
   const [showCityModal, setShowCityModal] = useState(false);
@@ -103,6 +125,21 @@ export const LocationManagementScreen: React.FC = () => {
   const [storeSla, setStoreSla] = useState('9');
   const [storeIsActive, setStoreIsActive] = useState(true);
   const [storeSubmitting, setStoreSubmitting] = useState(false);
+
+  // Pincode CRUD Modal State
+  const [showPincodeModal, setShowPincodeModal] = useState(false);
+  const [editingPincode, setEditingPincode] = useState<any | null>(null);
+  const [modalPincode, setModalPincode] = useState('');
+  const [modalCityId, setModalCityId] = useState('');
+  const [modalAreaId, setModalAreaId] = useState('');
+  const [modalStoreId, setModalStoreId] = useState('');
+  const [modalIsActive, setModalIsActive] = useState(true);
+  const [pincodeSubmitting, setPincodeSubmitting] = useState(false);
+
+  // Delete Confirmation Modal State
+  const [showDeletePincodeModal, setShowDeletePincodeModal] = useState(false);
+  const [pincodeToDelete, setPincodeToDelete] = useState<any | null>(null);
+  const [pincodeDeleting, setPincodeDeleting] = useState(false);
 
   // Calculate Metrics (Multi-Store Capacity Aware)
   const totalCities = cities.length;
@@ -175,7 +212,12 @@ export const LocationManagementScreen: React.FC = () => {
 
   // Complete GeoJSON Database Pincodes List
   const geojsonPincodes = useMemo(() => {
+    if (dbPincodes && dbPincodes.length > 0) {
+      return dbPincodes;
+    }
+
     const list: Array<{
+      id: string;
       pincode: string;
       areaId: string;
       areaName: string;
@@ -185,6 +227,7 @@ export const LocationManagementScreen: React.FC = () => {
       isActive: boolean;
       polygonCoordsCount: number;
       assignedStoreName: string;
+      hasActiveStore?: boolean;
       slaMinutes: number;
       centerLat?: number;
       centerLng?: number;
@@ -203,6 +246,7 @@ export const LocationManagementScreen: React.FC = () => {
 
       pins.forEach((pin) => {
         list.push({
+          id: `${pin}_${z.id || (z as any)._id}`,
           pincode: pin,
           areaId: z.id || (z as any)._id,
           areaName: z.name,
@@ -212,6 +256,7 @@ export const LocationManagementScreen: React.FC = () => {
           isActive: z.isActive !== false,
           polygonCoordsCount: polygonCoords,
           assignedStoreName: storeName,
+          hasActiveStore: !!store,
           slaMinutes: Number(z.slaMinutes) || 9,
           centerLat: z.centerLat,
           centerLng: z.centerLng,
@@ -221,7 +266,7 @@ export const LocationManagementScreen: React.FC = () => {
     });
 
     return list;
-  }, [zones, cities, darkStores]);
+  }, [dbPincodes, zones, cities, darkStores]);
 
   // Filtered GeoJSON Pincodes
   const filteredPincodes = useMemo(() => {
@@ -233,29 +278,79 @@ export const LocationManagementScreen: React.FC = () => {
         const pinMatch = item.pincode.toLowerCase().includes(q);
         const areaMatch = item.areaName.toLowerCase().includes(q);
         const cityMatch = item.cityName.toLowerCase().includes(q);
-        if (!pinMatch && !areaMatch && !cityMatch) return false;
+        const codeMatch = (item.areaCode || '').toLowerCase().includes(q);
+        if (!pinMatch && !areaMatch && !cityMatch && !codeMatch) return false;
       }
       return true;
     });
   }, [geojsonPincodes, pincodeStatusFilter, searchQuery]);
 
-  // Toggle Pincode / Area Status by Admin (Active vs Inactive)
-  const handleToggleAreaStatus = async (areaId: string, setActive: boolean) => {
-    setTogglingAreaId(areaId);
-    try {
-      const res = await ApiService.updateArea(areaId, { isActive: setActive });
-      if (res && res.success !== false) {
-        Alert.alert(
-          'Serviceability Updated',
-          `Area & Pincodes marked as ${setActive ? 'ACTIVE (Serviceable)' : 'INACTIVE (Unserviceable)'} successfully.`
+  // Toggle Pincode Status by Admin (Active vs Inactive)
+  const handleTogglePincodeStatus = async (item: any, setActive: boolean) => {
+    if (item.isActive === setActive) return;
+    const pinKey = `${item.pincode}_${item.areaId || item.id}`;
+    setTogglingPincodeKey(pinKey);
+    setTogglingAreaId(item.areaId || item.id);
+
+    // 1. Optimistic state update in local state for 0ms delay
+    setDbPincodes((prev) => {
+      if (!prev || prev.length === 0) {
+        return geojsonPincodes.map((p) =>
+          p.pincode === item.pincode ? { ...p, isActive: setActive, isDeliveryAllowed: setActive } : p
         );
+      }
+      return prev.map((p) => {
+        if (p.pincode === item.pincode || (item.areaId && p.areaId === item.areaId)) {
+          return { ...p, isActive: setActive, isDeliveryAllowed: setActive };
+        }
+        return p;
+      });
+    });
+
+    try {
+      const res = await ApiService.togglePincodeStatus(
+        item.id || item._id,
+        item.pincode,
+        setActive,
+        item.areaId
+      );
+
+      if (res && res.success !== false) {
+        const msg = `Pincode ${item.pincode} (${item.areaName}) is now ${setActive ? 'ACTIVE (Serviceable)' : 'INACTIVE (Unserviceable)'}.`;
+        setPincodeToast({ message: msg, type: 'success' });
+        setTimeout(() => setPincodeToast(null), 4500);
+
+        // Background sync
         refreshFromDb();
+        fetchDbPincodes();
       } else {
-        Alert.alert('Update Failed', res?.error || 'Failed to update serviceability.');
+        // Rollback on failure
+        setDbPincodes((prev) =>
+          prev.map((p) => {
+            if (p.pincode === item.pincode || (item.areaId && p.areaId === item.areaId)) {
+              return { ...p, isActive: !setActive, isDeliveryAllowed: !setActive };
+            }
+            return p;
+          })
+        );
+        const errMsg = res?.error || res?.message || 'Failed to update serviceability.';
+        setPincodeToast({ message: errMsg, type: 'error' });
+        setTimeout(() => setPincodeToast(null), 4500);
       }
     } catch (err: any) {
-      Alert.alert('Network Error', err.message || 'Error updating area serviceability.');
+      // Rollback on failure
+      setDbPincodes((prev) =>
+        prev.map((p) => {
+          if (p.pincode === item.pincode || (item.areaId && p.areaId === item.areaId)) {
+            return { ...p, isActive: !setActive, isDeliveryAllowed: !setActive };
+          }
+          return p;
+        })
+      );
+      setPincodeToast({ message: err?.message || 'Network error updating pincode.', type: 'error' });
+      setTimeout(() => setPincodeToast(null), 4500);
     } finally {
+      setTogglingPincodeKey(null);
       setTogglingAreaId(null);
     }
   };
@@ -576,6 +671,149 @@ export const LocationManagementScreen: React.FC = () => {
     setActiveSubTab('Areas');
   };
 
+  // Open Add Pincode Modal
+  const handleOpenAddPincode = () => {
+    setEditingPincode(null);
+    setModalPincode('');
+    const defCity = cities.find((c) => c.name.toLowerCase() === 'ahmedabad') || cities[0];
+    const cityIdStr = defCity ? (defCity.id || defCity._id || '') : '';
+    setModalCityId(cityIdStr);
+    const matchingZones = zones.filter((z) => (z.cityId && z.cityId === cityIdStr) || (z.city && defCity && z.city === defCity.name));
+    setModalAreaId(matchingZones[0] ? (matchingZones[0].id || matchingZones[0]._id || '') : '');
+    setModalStoreId('');
+    setModalIsActive(true);
+    setShowPincodeModal(true);
+  };
+
+  // Open Edit Pincode Modal
+  const handleOpenEditPincode = (item: any) => {
+    setEditingPincode(item);
+    setModalPincode(item.pincode);
+    const matchedCity = cities.find(
+      (c) => (item.cityId && (c.id === item.cityId || c._id === item.cityId)) || (item.cityName && c.name.toLowerCase() === item.cityName.toLowerCase())
+    );
+    setModalCityId(matchedCity ? (matchedCity.id || matchedCity._id || '') : (item.cityId || ''));
+    setModalAreaId(item.areaId || '');
+    const matchedStore = darkStores.find(
+      (s: any) => (item.storeId && (s.id === item.storeId || s._id === item.storeId)) || (item.assignedStoreName && s.name === item.assignedStoreName)
+    );
+    setModalStoreId(matchedStore ? (matchedStore.id || (matchedStore as any)._id || '') : (item.storeId || ''));
+    setModalIsActive(item.isActive !== false);
+    setShowPincodeModal(true);
+  };
+
+  // Save / Update Pincode
+  const handleSavePincode = async () => {
+    const cleanPin = modalPincode.trim();
+    if (!cleanPin || !/^\d{6}$/.test(cleanPin)) {
+      Alert.alert('Invalid Pincode', 'Please enter a valid 6-digit PIN code');
+      return;
+    }
+
+    const selectedCityDoc = cities.find((c) => c.id === modalCityId || c._id === modalCityId);
+    const selectedAreaDoc = zones.find((z) => z.id === modalAreaId || z._id === modalAreaId);
+    const selectedStoreDoc = darkStores.find((s: any) => s.id === modalStoreId || s._id === modalStoreId);
+
+    setPincodeSubmitting(true);
+    try {
+      if (editingPincode) {
+        // Edit existing pincode
+        const targetId = editingPincode.id || editingPincode._id || editingPincode.pincode;
+        const res = await ApiService.updatePincode(targetId, {
+          pincode: cleanPin,
+          oldPincode: editingPincode.pincode,
+          cityId: modalCityId || undefined,
+          cityName: selectedCityDoc?.name || editingPincode.cityName,
+          areaId: modalAreaId || undefined,
+          areaName: selectedAreaDoc?.name || editingPincode.areaName,
+          storeId: modalStoreId || undefined,
+          storeName: selectedStoreDoc?.name || undefined,
+          isActive: modalIsActive,
+          isDeliveryAllowed: modalIsActive,
+        });
+
+        if (res && res.success !== false) {
+          setPincodeToast({
+            message: `Pincode ${cleanPin} updated successfully!`,
+            type: 'success',
+          });
+          setShowPincodeModal(false);
+          await fetchDbPincodes();
+          refreshFromDb();
+        } else {
+          Alert.alert('Update Failed', res?.message || res?.error || 'Could not update pincode');
+        }
+      } else {
+        // Add new pincode
+        const res = await ApiService.addPincode({
+          pincode: cleanPin,
+          cityId: modalCityId || undefined,
+          cityName: selectedCityDoc?.name || 'Ahmedabad',
+          areaId: modalAreaId || undefined,
+          areaName: selectedAreaDoc?.name || cleanPin,
+          storeId: modalStoreId || undefined,
+          storeName: selectedStoreDoc?.name || undefined,
+          isActive: modalIsActive,
+          isDeliveryAllowed: modalIsActive,
+          isIncomeEnabled: true,
+        });
+
+        if (res && res.success !== false) {
+          setPincodeToast({
+            message: `PIN code ${cleanPin} added to serviceability master!`,
+            type: 'success',
+          });
+          setShowPincodeModal(false);
+          await fetchDbPincodes();
+          refreshFromDb();
+        } else {
+          Alert.alert('Add Pincode Failed', res?.message || res?.error || 'Could not add pincode');
+        }
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Network error occurred');
+    } finally {
+      setPincodeSubmitting(false);
+      setTimeout(() => setPincodeToast(null), 4500);
+    }
+  };
+
+  // Open Delete Confirmation
+  const handlePromptDeletePincode = (item: any) => {
+    setPincodeToDelete(item);
+    setShowDeletePincodeModal(true);
+  };
+
+  // Confirm Delete
+  const handleConfirmDeletePincode = async () => {
+    if (!pincodeToDelete) return;
+    setPincodeDeleting(true);
+    try {
+      const res = await ApiService.deletePincode(
+        pincodeToDelete.id || pincodeToDelete._id || pincodeToDelete.pincode,
+        pincodeToDelete.pincode
+      );
+
+      if (res && res.success !== false) {
+        setPincodeToast({
+          message: `PIN code ${pincodeToDelete.pincode} (${pincodeToDelete.areaName}) deleted successfully!`,
+          type: 'success',
+        });
+        setShowDeletePincodeModal(false);
+        setPincodeToDelete(null);
+        await fetchDbPincodes();
+        refreshFromDb();
+      } else {
+        Alert.alert('Cannot Delete', res?.message || res?.error || 'Failed to delete pincode');
+      }
+    } catch (err: any) {
+      Alert.alert('Delete Error', err?.message || 'Network error deleting pincode');
+    } finally {
+      setPincodeDeleting(false);
+      setTimeout(() => setPincodeToast(null), 4500);
+    }
+  };
+
   return (
     <View style={styles.container}>
       {/* 1. Top Header Banner */}
@@ -693,25 +931,33 @@ export const LocationManagementScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {activeSubTab !== 'Pincodes' && (
-          <TouchableOpacity
-            style={styles.actionAddBtn}
-            onPress={activeSubTab === 'Cities' ? handleOpenCreateCity : handleOpenCreateArea}
-            activeOpacity={0.85}
+        <TouchableOpacity
+          style={styles.actionAddBtn}
+          onPress={
+            activeSubTab === 'Cities'
+              ? handleOpenCreateCity
+              : activeSubTab === 'Areas'
+              ? handleOpenCreateArea
+              : handleOpenAddPincode
+          }
+          activeOpacity={0.85}
+        >
+          <LinearGradient
+            colors={GRADIENTS.primary}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.actionAddBtnGradient}
           >
-            <LinearGradient
-              colors={GRADIENTS.primary}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.actionAddBtnGradient}
-            >
-              <Plus size={15} color={COLORS.white} />
-              <Text style={styles.actionAddBtnText}>
-                {activeSubTab === 'Cities' ? 'Add City' : 'Add Area'}
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        )}
+            <Plus size={15} color={COLORS.white} />
+            <Text style={styles.actionAddBtnText}>
+              {activeSubTab === 'Cities'
+                ? 'Add City'
+                : activeSubTab === 'Areas'
+                ? 'Add Area'
+                : '+ Add New Pincode'}
+            </Text>
+          </LinearGradient>
+        </TouchableOpacity>
       </View>
 
       {/* 3. Search & Filter Bar */}
@@ -1242,6 +1488,33 @@ export const LocationManagementScreen: React.FC = () => {
               </Text>
             </View>
 
+            {/* Real-time Toast Feedback */}
+            {pincodeToast && (
+              <View
+                style={[
+                  styles.toastBox,
+                  pincodeToast.type === 'success' ? styles.toastSuccessBox : styles.toastErrorBox,
+                ]}
+              >
+                {pincodeToast.type === 'success' ? (
+                  <CheckCircle2 size={16} color={COLORS.success} />
+                ) : (
+                  <AlertCircle size={16} color={COLORS.error} />
+                )}
+                <Text
+                  style={[
+                    styles.toastText,
+                    pincodeToast.type === 'success' ? styles.toastSuccessText : styles.toastErrorText,
+                  ]}
+                >
+                  {pincodeToast.message}
+                </Text>
+                <TouchableOpacity onPress={() => setPincodeToast(null)} style={{ marginLeft: 'auto', padding: 4 }}>
+                  <X size={14} color={COLORS.textMuted} />
+                </TouchableOpacity>
+              </View>
+            )}
+
             {filteredPincodes.length === 0 ? (
               <View style={styles.emptyState}>
                 <Layers size={40} color={COLORS.textMuted} />
@@ -1262,15 +1535,19 @@ export const LocationManagementScreen: React.FC = () => {
                       <Text style={[styles.pincodeTh, { width: 160 }]}>GEOJSON POLYGON</Text>
                       <Text style={[styles.pincodeTh, { width: 220 }]}>ACTIVE DARK STORE</Text>
                       <Text style={[styles.pincodeTh, { width: 110, textAlign: 'center' }]}>STATUS</Text>
-                      <Text style={[styles.pincodeTh, { width: 210, textAlign: 'center' }]}>ADMIN ACTION</Text>
+                      <Text style={[styles.pincodeTh, { width: 280, textAlign: 'center' }]}>ADMIN ACTION</Text>
                     </View>
 
                     {/* Table Rows */}
                     {filteredPincodes.map((item, index) => {
-                      const isToggling = togglingAreaId === item.areaId;
+                      const isToggling =
+                        togglingPincodeKey === `${item.pincode}_${item.areaId || item.id}` ||
+                        (togglingAreaId && item.areaId && togglingAreaId === item.areaId);
+                      const hasNoStore = item.assignedStoreName === 'No Store Assigned' || !item.assignedStoreName;
+
                       return (
                         <View
-                          key={`${item.areaId}-${item.pincode}-${index}`}
+                          key={`${item.areaId || ''}-${item.pincode}-${index}`}
                           style={[
                             styles.pincodeTableRow,
                             index % 2 === 1 && styles.pincodeTableRowAlt,
@@ -1312,10 +1589,23 @@ export const LocationManagementScreen: React.FC = () => {
 
                           {/* 5. Dark Store */}
                           <View style={[styles.pincodeTd, { width: 220, flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
-                            <Store size={14} color={COLORS.navy} />
-                            <Text style={styles.pincodeStoreText} numberOfLines={1}>
-                              {item.assignedStoreName}
-                            </Text>
+                            <Store size={14} color={hasNoStore ? COLORS.warning : COLORS.navy} />
+                            <View style={{ flex: 1 }}>
+                              <Text
+                                style={[
+                                  styles.pincodeStoreText,
+                                  hasNoStore && { color: COLORS.warning, fontWeight: '700' },
+                                ]}
+                                numberOfLines={1}
+                              >
+                                {item.assignedStoreName}
+                              </Text>
+                              {hasNoStore ? (
+                                <Text style={{ fontSize: 10, color: COLORS.textMuted }}>
+                                  Add store to enable serviceability
+                                </Text>
+                              ) : null}
+                            </View>
                           </View>
 
                           {/* 6. Current Status Badge */}
@@ -1345,8 +1635,8 @@ export const LocationManagementScreen: React.FC = () => {
                             </View>
                           </View>
 
-                          {/* 7. Admin 2-Option Buttons: Active vs Inactive */}
-                          <View style={[styles.pincodeTd, { width: 210, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }]}>
+                          {/* 7. Admin Action Options: Active / Inactive + Edit ✏️ + Delete 🗑️ */}
+                          <View style={[styles.pincodeTd, { width: 280, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}>
                             {isToggling ? (
                               <ActivityIndicator size="small" color={COLORS.navy} />
                             ) : (
@@ -1357,7 +1647,7 @@ export const LocationManagementScreen: React.FC = () => {
                                     styles.adminPincodeBtnActive,
                                     item.isActive && styles.adminPincodeBtnActiveSelected,
                                   ]}
-                                  onPress={() => handleToggleAreaStatus(item.areaId, true)}
+                                  onPress={() => handleTogglePincodeStatus(item, true)}
                                   activeOpacity={0.8}
                                 >
                                   {item.isActive && <Check size={12} color={COLORS.white} />}
@@ -1378,7 +1668,7 @@ export const LocationManagementScreen: React.FC = () => {
                                     styles.adminPincodeBtnInactive,
                                     !item.isActive && styles.adminPincodeBtnInactiveSelected,
                                   ]}
-                                  onPress={() => handleToggleAreaStatus(item.areaId, false)}
+                                  onPress={() => handleTogglePincodeStatus(item, false)}
                                   activeOpacity={0.8}
                                 >
                                   {!item.isActive && <X size={12} color={COLORS.white} />}
@@ -1391,6 +1681,24 @@ export const LocationManagementScreen: React.FC = () => {
                                   >
                                     Inactive
                                   </Text>
+                                </TouchableOpacity>
+
+                                {/* Edit Pincode ✏️ */}
+                                <TouchableOpacity
+                                  style={styles.pincodeIconActionBtn}
+                                  onPress={() => handleOpenEditPincode(item)}
+                                  activeOpacity={0.7}
+                                >
+                                  <Edit2 size={13} color={COLORS.navy} />
+                                </TouchableOpacity>
+
+                                {/* Delete Pincode 🗑️ */}
+                                <TouchableOpacity
+                                  style={[styles.pincodeIconActionBtn, styles.pincodeDeleteActionBtn]}
+                                  onPress={() => handlePromptDeletePincode(item)}
+                                  activeOpacity={0.7}
+                                >
+                                  <Trash2 size={13} color={COLORS.error} />
                                 </TouchableOpacity>
                               </>
                             )}
@@ -1896,6 +2204,304 @@ export const LocationManagementScreen: React.FC = () => {
                   <ActivityIndicator size="small" color={COLORS.white} />
                 ) : (
                   <Text style={styles.submitBtnText}>Save Store</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ================= MODAL: ADD / EDIT PINCODE ================= */}
+      <Modal
+        visible={showPincodeModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowPincodeModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleRow}>
+                <Layers size={20} color={COLORS.purple} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.modalTitle}>
+                    {editingPincode ? `Edit Pincode: ${editingPincode.pincode}` : 'Add New Pincode'}
+                  </Text>
+                  <Text style={styles.modalSubtitle}>
+                    Configure serviceability, city mapping, area allocation & dark store
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setShowPincodeModal(false)}>
+                <X size={20} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 520 }}>
+              {/* Pincode Input */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>PIN Code (6 Digits) *</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="e.g. 382481"
+                  placeholderTextColor={COLORS.textMuted}
+                  value={modalPincode}
+                  onChangeText={(text) => setModalPincode(text.replace(/\D/g, '').slice(0, 6))}
+                  keyboardType="numeric"
+                  maxLength={6}
+                />
+              </View>
+
+              {/* City Selection */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Select City *</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
+                  {cities.map((c) => {
+                    const cIdStr = c.id || c._id || '';
+                    const isSelected = modalCityId === cIdStr;
+                    return (
+                      <TouchableOpacity
+                        key={cIdStr}
+                        style={[
+                          styles.citySelectChip,
+                          isSelected && styles.citySelectChipActive,
+                        ]}
+                        onPress={() => {
+                          setModalCityId(cIdStr);
+                          const matchingZones = zones.filter((z) => (z.cityId && z.cityId === cIdStr) || (z.city && z.city === c.name));
+                          if (matchingZones.length > 0) {
+                            setModalAreaId(matchingZones[0].id || matchingZones[0]._id || '');
+                          }
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.citySelectChipText,
+                            isSelected && styles.citySelectChipTextActive,
+                          ]}
+                        >
+                          {c.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+
+              {/* Area / Zone Selection */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Select Area / Micro-Hub *</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
+                  {zones
+                    .filter((z) => {
+                      if (!modalCityId) return true;
+                      const selCity = cities.find((c) => c.id === modalCityId || c._id === modalCityId);
+                      return (z.cityId && z.cityId === modalCityId) || (selCity && z.city && z.city.toLowerCase() === selCity.name.toLowerCase());
+                    })
+                    .map((z) => {
+                      const zIdStr = z.id || z._id || '';
+                      const isSelected = modalAreaId === zIdStr;
+                      return (
+                        <TouchableOpacity
+                          key={zIdStr}
+                          style={[
+                            styles.citySelectChip,
+                            isSelected && styles.citySelectChipActive,
+                          ]}
+                          onPress={() => setModalAreaId(zIdStr)}
+                        >
+                          <Text
+                            style={[
+                              styles.citySelectChipText,
+                              isSelected && styles.citySelectChipTextActive,
+                            ]}
+                          >
+                            {z.name}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                </ScrollView>
+              </View>
+
+              {/* Assign Dark Store (Optional) */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Assign Dark Store (Optional)</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
+                  <TouchableOpacity
+                    style={[
+                      styles.citySelectChip,
+                      !modalStoreId && styles.citySelectChipActive,
+                    ]}
+                    onPress={() => setModalStoreId('')}
+                  >
+                    <Text
+                      style={[
+                        styles.citySelectChipText,
+                        !modalStoreId && styles.citySelectChipTextActive,
+                      ]}
+                    >
+                      None / Auto Assign
+                    </Text>
+                  </TouchableOpacity>
+                  {darkStores.map((s: any) => {
+                    const sIdStr = s.id || s._id || '';
+                    const isSelected = modalStoreId === sIdStr;
+                    return (
+                      <TouchableOpacity
+                        key={sIdStr}
+                        style={[
+                          styles.citySelectChip,
+                          isSelected && styles.citySelectChipActive,
+                        ]}
+                        onPress={() => setModalStoreId(sIdStr)}
+                      >
+                        <Text
+                          style={[
+                            styles.citySelectChipText,
+                            isSelected && styles.citySelectChipTextActive,
+                          ]}
+                        >
+                          {s.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+
+              {/* Serviceability Status Toggle */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Serviceability Status</Text>
+                <View style={styles.statusToggleRow}>
+                  <TouchableOpacity
+                    style={[
+                      styles.statusOption,
+                      modalIsActive && styles.statusOptionActive,
+                    ]}
+                    onPress={() => setModalIsActive(true)}
+                  >
+                    <CheckCircle2
+                      size={14}
+                      color={modalIsActive ? COLORS.white : COLORS.textMuted}
+                    />
+                    <Text
+                      style={[
+                        styles.statusOptionText,
+                        modalIsActive && styles.statusOptionTextActive,
+                      ]}
+                    >
+                      Active (Serviceable)
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.statusOption,
+                      !modalIsActive && styles.statusOptionInactive,
+                    ]}
+                    onPress={() => setModalIsActive(false)}
+                  >
+                    <AlertCircle
+                      size={14}
+                      color={!modalIsActive ? COLORS.white : COLORS.textMuted}
+                    />
+                    <Text
+                      style={[
+                        styles.statusOptionText,
+                        !modalIsActive && styles.statusOptionTextInactive,
+                      ]}
+                    >
+                      Inactive (Disabled)
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                onPress={() => setShowPincodeModal(false)}
+              >
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.submitBtn}
+                onPress={handleSavePincode}
+                disabled={pincodeSubmitting}
+              >
+                {pincodeSubmitting ? (
+                  <ActivityIndicator size="small" color={COLORS.white} />
+                ) : (
+                  <Text style={styles.submitBtnText}>
+                    {editingPincode ? 'Update Pincode' : 'Add Pincode'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ================= MODAL: DELETE PINCODE CONFIRMATION ================= */}
+      <Modal
+        visible={showDeletePincodeModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDeletePincodeModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxWidth: 440 }]}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleRow}>
+                <View style={[styles.pincodeIconActionBtn, styles.pincodeDeleteActionBtn, { width: 34, height: 34, borderRadius: 8 }]}>
+                  <Trash2 size={18} color={COLORS.error} />
+                </View>
+                <View style={{ flex: 1, marginLeft: 8 }}>
+                  <Text style={[styles.modalTitle, { color: COLORS.error }]}>
+                    Delete Pincode: {pincodeToDelete?.pincode}
+                  </Text>
+                  <Text style={styles.modalSubtitle}>
+                    Permanent removal from serviceability master
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setShowDeletePincodeModal(false)}>
+                <X size={20} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ paddingVertical: 14 }}>
+              <View style={[styles.pincodeInfoNotice, { backgroundColor: '#FEF2F2', borderColor: '#FEE2E2', marginBottom: 14 }]}>
+                <AlertCircle size={16} color={COLORS.error} />
+                <Text style={[styles.pincodeInfoNoticeText, { color: '#991B1B' }]}>
+                  Are you sure you want to delete PIN code <Text style={{ fontWeight: '800' }}>{pincodeToDelete?.pincode}</Text> ({pincodeToDelete?.areaName})? This will permanently disable customer ordering in this area.
+                </Text>
+              </View>
+              <Text style={{ fontSize: 12, color: COLORS.textMuted, lineHeight: 18 }}>
+                🛡️ The system will automatically ensure no active or pending deliveries are assigned before deletion.
+              </Text>
+            </View>
+
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                onPress={() => setShowDeletePincodeModal(false)}
+              >
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.submitBtn, { backgroundColor: COLORS.error }]}
+                onPress={handleConfirmDeletePincode}
+                disabled={pincodeDeleting}
+              >
+                {pincodeDeleting ? (
+                  <ActivityIndicator size="small" color={COLORS.white} />
+                ) : (
+                  <Text style={styles.submitBtnText}>Delete Pincode</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -2935,5 +3541,48 @@ const styles = StyleSheet.create({
   },
   adminPincodeBtnTextInactiveSelected: {
     color: COLORS.white,
+  },
+  toastBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    marginBottom: 16,
+    gap: 8,
+  },
+  toastSuccessBox: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#10B981',
+  },
+  toastErrorBox: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#EF4444',
+  },
+  toastText: {
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
+  },
+  toastSuccessText: {
+    color: '#065F46',
+  },
+  toastErrorText: {
+    color: '#991B1B',
+  },
+  pincodeIconActionBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  pincodeDeleteActionBtn: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FEE2E2',
   },
 });

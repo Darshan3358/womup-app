@@ -46,6 +46,7 @@ const _areaMemoryCache = new Map<string, CachedAreaEntry>();
 const _inFlightAreaRequests = new Map<string, Promise<ResolvedArea | null>>();
 const _reverseGeocodeCache = new Map<string, { data: DetectedLocation; ts: number }>();
 const _inFlightReverseGeocode = new Map<string, Promise<DetectedLocation>>();
+const LATLNG_API_KEY = process.env.EXPO_PUBLIC_LATLNG_API_KEY || 'latlng_n9sfznbawci4hcvi732i2y0op64lu655';
 
 export const LocationService = {
   /**
@@ -155,58 +156,81 @@ export const LocationService = {
     let lng: number | null = null;
 
     if (Platform.OS === 'web') {
-      if (typeof navigator === 'undefined' || !navigator.geolocation) {
-        throw new Error('Geolocation is not supported by your browser.');
+      if (typeof navigator !== 'undefined' && navigator.geolocation) {
+        try {
+          const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(
+              resolve,
+              (err) => reject(err),
+              {
+                enableHighAccuracy: true,
+                timeout: 8000,
+                maximumAge: 60000,
+              }
+            );
+          });
+          lat = pos.coords.latitude;
+          lng = pos.coords.longitude;
+        } catch (e) {
+          console.warn('[LocationService] Browser geolocation prompt dismissed/timed out, checking IP location:', e);
+        }
       }
 
-      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-          resolve,
-          (err) => reject(err),
-          {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 0,
+      // If browser location wasn't available or was denied, resolve real live place via IP
+      if (lat === null || lng === null) {
+        try {
+          const ipRes = await fetch('https://ipwho.is/');
+          if (ipRes.ok) {
+            const ipData = await ipRes.json();
+            if (ipData && ipData.success !== false && ipData.latitude && ipData.longitude) {
+              const result: DetectedLocation = {
+                latitude: ipData.latitude,
+                longitude: ipData.longitude,
+                readableAddress: `${ipData.city || ''}, ${ipData.region || ''} ${ipData.postal || ''}`.trim(),
+                shortAddress: ipData.city || 'Ahmedabad',
+                street: ipData.connection?.isp || ipData.city || '',
+                areaLandmark: ipData.region || '',
+                city: ipData.city || 'Ahmedabad',
+                pincode: ipData.postal || '',
+              };
+              return result;
+            }
           }
-        );
-      });
-
-      lat = pos.coords.latitude;
-      lng = pos.coords.longitude;
+        } catch (ipErr) {
+          console.warn('[LocationService] IP geolocation fallback failed:', ipErr);
+        }
+      }
     } else {
       // Native Mobile (Android APK / iOS)
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        throw new Error('Location permission was denied. Please allow location access in your device settings.');
-      }
-
-      const isEnabled = await Location.hasServicesEnabledAsync();
-      if (!isEnabled) {
-        throw new Error('Device location (GPS) is disabled. Please turn on location services in device settings.');
-      }
-
-      let location: Location.LocationObject | null = null;
       try {
-        location = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-      } catch (e) {
-        location = await Location.getLastKnownPositionAsync();
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const isEnabled = await Location.hasServicesEnabledAsync();
+          if (isEnabled) {
+            let location: Location.LocationObject | null = null;
+            try {
+              location = await Location.getCurrentPositionAsync({
+                accuracy: Location.Accuracy.Balanced,
+              });
+            } catch (e) {
+              location = await Location.getLastKnownPositionAsync();
+            }
+            if (location) {
+              lat = location.coords.latitude;
+              lng = location.coords.longitude;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[LocationService] Native permission check failed:', err);
       }
-
-      if (!location) {
-        throw new Error('Unable to retrieve GPS coordinates. Please move to an open area and try again.');
-      }
-
-      lat = location.coords.latitude;
-      lng = location.coords.longitude;
     }
 
     if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) {
-      throw new Error('Invalid GPS coordinates received from device.');
+      return null;
     }
 
-    // Attempt real reverse geocoding for human-readable address
+    // Attempt real reverse geocoding for human-readable address & actual postal code
     return this.reverseGeocode(lat, lng);
   },
 
@@ -230,6 +254,128 @@ export const LocationService = {
     }
 
     const task = (async (): Promise<DetectedLocation> => {
+      // 1. LatLng.work High-Precision Reverse Geocoder (Primary for WOMART)
+      try {
+        const latlngUrl = `https://api.latlng.work/reverse?lat=${lat}&lon=${lng}`;
+        const res = await fetch(latlngUrl, {
+          headers: {
+            'x-api-key': LATLNG_API_KEY,
+            'Accept': 'application/json',
+          },
+        });
+        if (res.ok) {
+          const json = await res.json();
+          const feature = json.features?.[0];
+          if (feature && feature.properties) {
+            const props = feature.properties;
+            const name = props.name || '';
+            const street = props.street || '';
+            const locality = props.locality || props.suburb || props.district || '';
+            const city = props.city || props.county || 'Ahmedabad';
+            const postcode = props.postcode || '';
+
+            const primaryPlace = [name, street].filter(Boolean).join(', ') || street || name;
+            const areaLandmark = locality || props.county || '';
+            const rawParts = [name, street, locality, city, postcode]
+              .filter(Boolean)
+              .map((part: any) => String(part).trim())
+              .filter(Boolean);
+
+            const dedupedParts = rawParts.filter(
+              (part: string, i: number) => rawParts.findIndex((p: string) => p.toLowerCase() === part.toLowerCase()) === i
+            );
+            const readableAddress = dedupedParts.join(', ');
+            const shortAddress = primaryPlace || locality || city || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+
+            if (postcode || readableAddress) {
+              const result: DetectedLocation = {
+                latitude: lat,
+                longitude: lng,
+                readableAddress: readableAddress || `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+                shortAddress,
+                street: primaryPlace || shortAddress,
+                areaLandmark,
+                city: city || 'Ahmedabad',
+                pincode: postcode,
+              };
+              _reverseGeocodeCache.set(cacheKey, { data: result, ts: Date.now() });
+              return result;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[LocationService] LatLng.work reverse geocode failed, falling back:', err);
+      }
+
+      // 2. Native mobile (Android APK / iOS) - Native reverse geocoder provides direct device postal code
+      if (Platform.OS !== 'web') {
+        try {
+          const nativeResults = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+          if (nativeResults && nativeResults.length > 0) {
+            const item = nativeResults[0];
+            const postalCode = item.postalCode || '';
+            const city = item.city || item.subregion || item.region || 'Ahmedabad';
+            const street = item.street || item.name || '';
+            const locality = item.district || item.subregion || item.city || '';
+            const readableAddress = [street, locality, city, postalCode].filter(Boolean).join(', ');
+
+            if (postalCode) {
+              const result: DetectedLocation = {
+                latitude: lat,
+                longitude: lng,
+                readableAddress: readableAddress || `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+                shortAddress: locality || city || `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+                street: street || readableAddress,
+                areaLandmark: locality,
+                city: city || 'Ahmedabad',
+                pincode: postalCode,
+              };
+              _reverseGeocodeCache.set(cacheKey, { data: result, ts: Date.now() });
+              return result;
+            }
+          }
+        } catch (err) {
+          console.warn('[LocationService] Native reverse geocode failed, falling back to HTTP:', err);
+        }
+      }
+
+      // 3. OpenStreetMap Nominatim - High accuracy postal code resolution for Web & fallback
+      try {
+        const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`;
+        const res = await fetch(nominatimUrl, {
+          headers: { 'User-Agent': 'WOMART-App/1.0 (contact@womup.in)' },
+        });
+        if (res.ok) {
+          const d = await res.json();
+          const address = d.address || {};
+          const postcode = address.postcode || '';
+          const city = address.city || address.town || address.village || address.state_district || address.county || '';
+          const road = address.road || address.neighbourhood || address.suburb || '';
+          const locality = address.suburb || address.neighbourhood || address.village || '';
+
+          const rawParts = [road, locality, city, postcode].filter(Boolean);
+          const readableAddress = d.display_name || rawParts.join(', ');
+
+          if (postcode) {
+            const result: DetectedLocation = {
+              latitude: lat,
+              longitude: lng,
+              readableAddress: readableAddress || `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+              shortAddress: locality || city || `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+              street: road || locality || '',
+              areaLandmark: locality,
+              city: city || 'Ahmedabad',
+              pincode: postcode,
+            };
+            _reverseGeocodeCache.set(cacheKey, { data: result, ts: Date.now() });
+            return result;
+          }
+        }
+      } catch (e) {
+        console.warn('[LocationService] Nominatim reverse geocode lookup failed:', e);
+      }
+
+      // 4. BigDataCloud Fallback
       try {
         const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`;
         const response = await fetch(url);
@@ -245,7 +391,6 @@ export const LocationService = {
             .map((part) => String(part).trim())
             .filter(Boolean);
 
-          // Deduplicate case-insensitively while preserving natural hierarchy
           const dedupedParts = rawParts.filter(
             (part, i) => rawParts.findIndex((p) => p.toLowerCase() === part.toLowerCase()) === i
           );
@@ -267,12 +412,12 @@ export const LocationService = {
           return result;
         }
       } catch (e) {
-        console.warn('[LocationService] Reverse geocode lookup failed:', e);
+        console.warn('[LocationService] BigDataCloud reverse geocode lookup failed:', e);
       } finally {
         _inFlightReverseGeocode.delete(cacheKey);
       }
 
-      // Honest fallback: Real GPS coordinates without fabricating fake street names
+      // 5. Fallback with coordinates
       return {
         latitude: lat,
         longitude: lng,

@@ -173,7 +173,7 @@ export const S10_LocationPermissionScreen: React.FC = () => {
           </View>
           <Text style={styles.title}>Location Permission Required</Text>
           <Text style={styles.subtitle}>
-            Location permission is required to use WormUp. We need your location to check delivery availability and find dark stores in your area.
+            Location permission is required to use WOMART. We need your location to check delivery availability and find dark stores in your area.
           </Text>
 
           <View style={styles.deniedInfoBox}>

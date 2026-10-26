@@ -71,7 +71,7 @@ export const S01_SplashScreen: React.FC = () => {
       <StatusBar barStyle="dark-content" backgroundColor="#FED2EB" translucent />
       <View style={styles.centerStage}>
         <Image
-          source={require('../../assets/splashfinal.png')}
+          source={require('../../assets/WOMARTCUSTOMER.png')}
           style={styles.splashImage}
           resizeMode="cover"
         />

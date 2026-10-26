@@ -55,7 +55,7 @@ export const NOTIFICATION_TEMPLATES: Record<string, NotificationTemplate> = {
     role: 'CUSTOMER',
     type: 'PAYMENT_SUCCESS',
     title: '💰 Payment Successful',
-    body: (v) => `₹${v.amount || 0} paid to WormUp.`,
+    body: (v) => `₹${v.amount || 0} paid to WOMART.`,
     defaultChannels: ['websocket', 'push', 'db'],
     deepLink: () => 'wormup://wallet',
   },

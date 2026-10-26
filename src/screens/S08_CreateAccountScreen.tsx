@@ -24,6 +24,7 @@ import { useAuth } from '../context/AuthContext';
 import { AuthService } from '../services/authService';
 import { StorageService } from '../services/storageService';
 import { LocationService } from '../services/locationService';
+import * as Clipboard from 'expo-clipboard';
 
 interface CityItem {
   id: string;
@@ -49,7 +50,20 @@ export const S08_CreateAccountScreen: React.FC = () => {
   const [fullName, setFullName] = useState(user.fullName || '');
   const [email, setEmail] = useState(user.email || '');
   const [phone, setPhone] = useState(user.phoneNumber || '');
-  const [pincode, setPincode] = useState(user.registrationPincode || '382481');
+  const [pincode, setPincode] = useState(user.registrationPincode || '');
+
+  // Password fields for Account Security
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Success Modal & Credentials Display State
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [registeredSponsorId, setRegisteredSponsorId] = useState('');
+  const [registeredPassword, setRegisteredPassword] = useState('');
+  const [showRegisteredPassword, setShowRegisteredPassword] = useState(false);
+  const [copiedField, setCopiedField] = useState<'sponsor' | 'password' | null>(null);
 
   // Optional Aadhaar KYC Fields (Must remain optional and never block registration)
   const [aadhaarNumber, setAadhaarNumber] = useState(user.aadhaarNumber || '');
@@ -75,8 +89,8 @@ export const S08_CreateAccountScreen: React.FC = () => {
 
   // Pincode Serviceability State
   const [pincodeChecking, setPincodeChecking] = useState(false);
-  const [pincodeServiceable, setPincodeServiceable] = useState<boolean | null>(true);
-  const [pincodeStatusText, setPincodeStatusText] = useState('✓ Serviceable (Auto-detected)');
+  const [pincodeServiceable, setPincodeServiceable] = useState<boolean | null>(null);
+  const [pincodeStatusText, setPincodeStatusText] = useState('Detecting your location...');
 
   // Service City State
   const [cities, setCities] = useState<CityItem[]>([]);
@@ -91,11 +105,62 @@ export const S08_CreateAccountScreen: React.FC = () => {
     surname?: string;
     email?: string;
     phone?: string;
+    password?: string;
+    confirmPassword?: string;
     sponsor?: string;
     city?: string;
     pincode?: string;
     timing?: string;
   }>({});
+
+  const detectCurrentLocation = async () => {
+    setPincodeChecking(true);
+    setPincodeStatusText('Auto-detecting real location GPS...');
+    try {
+      const loc = await LocationService.getCurrentLocation();
+      if (loc) {
+        const detectedPin = loc.pincode ? String(loc.pincode).trim() : '';
+        const detectedCity = loc.city || 'Ahmedabad';
+
+        if (detectedPin && /^\d{6}$/.test(detectedPin)) {
+          setPincode(detectedPin);
+        }
+        if (detectedCity) {
+          setSelectedCityName(detectedCity);
+        }
+
+        // Live check serviceability for current coordinates & pin
+        const area = await LocationService.resolveArea(loc.latitude, loc.longitude, true);
+        if (area && area.success && area.serviceable) {
+          if (area.cityId) setSelectedCityId(area.cityId);
+          if (!detectedPin && (area.pincode || area.pincodes?.[0])) {
+            setPincode(area.pincode || area.pincodes![0]);
+          }
+          setPincodeServiceable(true);
+          setPincodeStatusText(`✓ Eligible Zone: ${area.areaName || ''} (${detectedCity})`);
+        } else if (detectedPin && /^\d{6}$/.test(detectedPin)) {
+          const pinRes = await AuthService.checkPincode(detectedPin);
+          setPincodeServiceable(pinRes.serviceable);
+          setPincodeStatusText(
+            pinRes.message || (pinRes.serviceable ? '✓ Serviceable Pincode' : 'Open for registration! Deliveries in active hubs.')
+          );
+          if (pinRes.serviceable && pinRes.city) {
+            setSelectedCityName(pinRes.city);
+          }
+        } else {
+          setPincodeServiceable(false);
+          setPincodeStatusText('Open for registration! Deliveries & team earnings in eligible zones.');
+        }
+      } else {
+        setPincodeStatusText('Please enter your 6-digit delivery pincode');
+      }
+    } catch (err) {
+      console.warn('GPS location auto-detect failed:', err);
+      setPincodeStatusText('Please enter your 6-digit delivery pincode');
+    } finally {
+      setPincodeChecking(false);
+    }
+  };
 
   useEffect(() => {
     // Check registration hours (10:00 PM to 6:00 AM IST)
@@ -106,42 +171,8 @@ export const S08_CreateAccountScreen: React.FC = () => {
       }
     });
 
-    // Auto-detect GPS location to strictly populate and lock City & Pincode
-    (async () => {
-      setPincodeChecking(true);
-      try {
-        const loc = await LocationService.getCurrentLocation();
-        if (loc) {
-          const area = await LocationService.resolveArea(loc.latitude, loc.longitude, true);
-          if (area && area.success && area.serviceable) {
-            const detectedPin = area.pincode || (area.pincodes && area.pincodes[0]) || loc.pincode || '382481';
-            const detectedCity = area.cityName || area.city || 'Ahmedabad';
-            setPincode(detectedPin);
-            setSelectedCityName(detectedCity);
-            if (area.cityId) setSelectedCityId(area.cityId);
-            setPincodeServiceable(true);
-            setPincodeStatusText(`✓ Serviceable: ${area.areaName || ''} (${detectedCity})`);
-          } else {
-            setPincodeServiceable(false);
-            setPincodeStatusText('Sorry, WormUp is not serviceable in your area.');
-          }
-        } else {
-          // Default fallback verification
-          const fallbackArea = await LocationService.resolveArea(23.1288, 72.5507, true);
-          if (fallbackArea && fallbackArea.serviceable) {
-            setPincode(fallbackArea.pincode || '382481');
-            setSelectedCityName(fallbackArea.cityName || fallbackArea.city || 'Ahmedabad');
-            if (fallbackArea.cityId) setSelectedCityId(fallbackArea.cityId);
-            setPincodeServiceable(true);
-            setPincodeStatusText(`✓ Serviceable: ${fallbackArea.areaName || 'Chandlodiya - Tragad'}`);
-          }
-        }
-      } catch (err) {
-        console.warn('GPS location auto-detect failed:', err);
-      } finally {
-        setPincodeChecking(false);
-      }
-    })();
+    // Auto-detect real live GPS location
+    detectCurrentLocation();
 
     // Fetch active cities configured by Admin
     AuthService.getCities().then((fetchedCities) => {
@@ -195,8 +226,8 @@ export const S08_CreateAccountScreen: React.FC = () => {
           const isValid = res.valid ?? res.isValid;
           setSponsorValid(isValid);
           if (isValid) {
-            setSponsorName(res.sponsorName || 'WormUp Sponsor');
-            setSponsorStatusText(res.isCompanyRoot ? 'WormUp Company Root' : `Sponsor: ${res.sponsorName}`);
+            setSponsorName(res.sponsorName || 'WOMUP Sponsor');
+            setSponsorStatusText(res.isCompanyRoot ? 'WOMUP Company Root' : `Sponsor: ${res.sponsorName}`);
             if (errors.sponsor) setErrors((prev) => ({ ...prev, sponsor: undefined }));
           } else {
             setSponsorName('');
@@ -222,6 +253,8 @@ export const S08_CreateAccountScreen: React.FC = () => {
       surname?: string;
       email?: string;
       phone?: string;
+      password?: string;
+      confirmPassword?: string;
       sponsor?: string;
       city?: string;
       pincode?: string;
@@ -243,6 +276,13 @@ export const S08_CreateAccountScreen: React.FC = () => {
       newErrors.phone = 'Please enter a valid 10-digit mobile number';
     }
 
+    // Password validation
+    if (!password || password.trim().length < 6) {
+      newErrors.password = 'Password must be at least 6 characters long';
+    } else if (password !== confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+    }
+
     // Sponsor validation check
     const cleanSponsor = sponsorCode.trim().toUpperCase();
     if (cleanSponsor) {
@@ -254,8 +294,6 @@ export const S08_CreateAccountScreen: React.FC = () => {
     const cleanPin = pincode.trim();
     if (!cleanPin || cleanPin.length !== 6 || !/^\d{6}$/.test(cleanPin)) {
       newErrors.pincode = 'Please enter a valid 6-digit Pincode';
-    } else if (pincodeServiceable === false) {
-      newErrors.pincode = pincodeStatusText || 'Service is not available in this pincode yet';
     }
 
     if (!selectedCityName || !selectedCityId) {
@@ -327,9 +365,11 @@ export const S08_CreateAccountScreen: React.FC = () => {
           cleanAadhaar || undefined,
           aadhaarFrontUrl || undefined,
           aadhaarBackUrl || undefined,
+          password.trim(),
         );
         setIsSubmitting(false);
         if (res.success && res.user) {
+          const assignedSponsor = res.user.referralCode || res.user.sponsorCode || 'WORMUP001';
           const updatedUser = {
             ...user,
             fullName: res.user.name || fullName.trim(),
@@ -340,7 +380,7 @@ export const S08_CreateAccountScreen: React.FC = () => {
             preferredCityName: res.user.preferredCityName || selectedCityName,
             registrationCity: res.user.city || selectedCityName,
             registrationPincode: res.user.pincode || cleanPin,
-            referralCode: res.user.referralCode || res.user.sponsorCode || finalSponsor || 'WORMUP001',
+            referralCode: assignedSponsor,
             sponsorCode: res.user.sponsorCode || finalSponsor || 'WORMUP001',
             isCompanySponsored: res.user.isCompanySponsored ?? (!finalSponsor),
             shoppingCoins: res.user.shoppingCoins ?? 2000,
@@ -359,15 +399,17 @@ export const S08_CreateAccountScreen: React.FC = () => {
           };
           setUser(updatedUser);
           StorageService.saveItem(StorageService.KEYS.USER, updatedUser);
-          if (res.token) {
-            await login(res.token, undefined, res.user);
-          }
-          StorageService.saveItem(StorageService.KEYS.ACTIVE_SCREEN, 'Blinkit_Home');
-          setActiveScreen('C10_LocationPermission');
+
+          // DO NOT navigate to dashboard directly!
+          // Open Success Modal displaying Sponsor ID & Password
+          setRegisteredSponsorId(assignedSponsor);
+          setRegisteredPassword(password.trim());
+          setShowSuccessModal(true);
           return;
         } else {
+          const isConflict = res.message?.includes('already registered') || res.message?.includes('already exists') || res.message?.includes('Delivery') || res.message?.includes('Store') || res.message?.includes('Vendor');
           Alert.alert(
-            'Registration Notice',
+            isConflict ? 'Account Already Exists' : 'Registration Notice',
             res.message || 'Could not complete registration. Please verify your details and try again.'
           );
           return;
@@ -375,9 +417,11 @@ export const S08_CreateAccountScreen: React.FC = () => {
       } catch (e: any) {
         setIsSubmitting(false);
         console.warn('Registration error:', e);
+        const msg = e?.message || 'Could not complete registration. Please check your network and try again.';
+        const isConflict = msg.includes('already registered') || msg.includes('already exists') || msg.includes('Delivery') || msg.includes('Store') || msg.includes('Vendor');
         Alert.alert(
-          'Registration Error',
-          e?.message || 'Could not complete registration. Please check your network and try again.'
+          isConflict ? 'Account Already Exists' : 'Registration Error',
+          msg
         );
         return;
       }
@@ -389,6 +433,31 @@ export const S08_CreateAccountScreen: React.FC = () => {
       );
       return;
     }
+  };
+
+  const handleCopySponsorId = async () => {
+    if (!registeredSponsorId) return;
+    await Clipboard.setStringAsync(registeredSponsorId);
+    setCopiedField('sponsor');
+    setTimeout(() => setCopiedField(null), 2500);
+  };
+
+  const handleCopyPassword = async () => {
+    if (!registeredPassword) return;
+    await Clipboard.setStringAsync(registeredPassword);
+    setCopiedField('password');
+    setTimeout(() => setCopiedField(null), 2500);
+  };
+
+  const handleProceedToLogin = () => {
+    setShowSuccessModal(false);
+    setUser({
+      ...user,
+      referralCode: registeredSponsorId,
+      email: email.trim(),
+      phoneNumber: phone.replace(/\D/g, ''),
+    });
+    setActiveScreen('C06_MobileNumber');
   };
 
   const filteredCities = cities.filter(
@@ -535,6 +604,68 @@ export const S08_CreateAccountScreen: React.FC = () => {
           </View>
           {errors.phone ? <Text style={styles.errorText}>{errors.phone}</Text> : null}
 
+          {/* Password Input */}
+          <Text style={styles.label}>
+            Password <Text style={styles.requiredAsterisk}>*</Text>
+          </Text>
+          <View style={[styles.inputContainer, errors.password ? styles.inputError : null]}>
+            <Ionicons name="lock-closed-outline" size={18} color={COLORS.textMuted} style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Create password (min 6 characters)"
+              placeholderTextColor={COLORS.secondaryText}
+              secureTextEntry={!showPassword}
+              value={password}
+              onChangeText={(text) => {
+                setPassword(text);
+                if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }));
+              }}
+            />
+            <TouchableOpacity
+              onPress={() => setShowPassword(!showPassword)}
+              style={styles.eyeBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons
+                name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                size={20}
+                color={COLORS.textMuted}
+              />
+            </TouchableOpacity>
+          </View>
+          {errors.password ? <Text style={styles.errorText}>{errors.password}</Text> : null}
+
+          {/* Confirm Password Input */}
+          <Text style={styles.label}>
+            Confirm Password <Text style={styles.requiredAsterisk}>*</Text>
+          </Text>
+          <View style={[styles.inputContainer, errors.confirmPassword ? styles.inputError : null]}>
+            <Ionicons name="lock-closed-outline" size={18} color={COLORS.textMuted} style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Confirm your password"
+              placeholderTextColor={COLORS.secondaryText}
+              secureTextEntry={!showConfirmPassword}
+              value={confirmPassword}
+              onChangeText={(text) => {
+                setConfirmPassword(text);
+                if (errors.confirmPassword) setErrors((prev) => ({ ...prev, confirmPassword: undefined }));
+              }}
+            />
+            <TouchableOpacity
+              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+              style={styles.eyeBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons
+                name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
+                size={20}
+                color={COLORS.textMuted}
+              />
+            </TouchableOpacity>
+          </View>
+          {errors.confirmPassword ? <Text style={styles.errorText}>{errors.confirmPassword}</Text> : null}
+
           {/* Sponsor ID Input (Optional) */}
           <View style={styles.labelRow}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -614,24 +745,32 @@ export const S08_CreateAccountScreen: React.FC = () => {
             </Text>
           )}
 
-          {/* Delivery Pincode Input (Non-editable, Auto-detected from GPS) */}
+          {/* Delivery Pincode Input (Non-editable, strictly Auto-detected from GPS) */}
           <View style={styles.labelRow}>
             <Text style={styles.label}>
               Delivery Pincode <Text style={styles.requiredAsterisk}>*</Text>
             </Text>
             {pincodeChecking ? (
-              <Text style={styles.pincodeCheckingText}>Detecting location...</Text>
-            ) : (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <ActivityIndicator size="small" color="#2563EB" />
+                <Text style={{ fontSize: 11, color: '#2563EB', fontWeight: '600' }}>Detecting...</Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={detectCurrentLocation}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+              >
                 <Ionicons name="lock-closed" size={12} color="#64748B" />
                 <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '600' }}>Auto-detected</Text>
-              </View>
+                <Ionicons name="refresh-outline" size={12} color="#2563EB" style={{ marginLeft: 2 }} />
+              </TouchableOpacity>
             )}
           </View>
           <View
             style={[
               styles.inputContainer,
-              { backgroundColor: '#F8FAFC', borderColor: pincodeServiceable === false ? COLORS.error : '#E2E8F0' },
+              { backgroundColor: '#F8FAFC', borderColor: pincodeServiceable === false ? '#93C5FD' : '#E2E8F0' },
               errors.pincode ? styles.inputError : null,
               pincodeServiceable === true ? styles.inputSuccess : null,
             ]}
@@ -643,29 +782,30 @@ export const S08_CreateAccountScreen: React.FC = () => {
                 pincodeServiceable === true
                   ? COLORS.success
                   : pincodeServiceable === false
-                  ? COLORS.error
+                  ? '#3B82F6'
                   : COLORS.textMuted
               }
               style={styles.inputIcon}
             />
             <TextInput
               style={[styles.input, { color: '#1E293B', fontWeight: '700' }]}
-              placeholder="Detecting location pincode..."
+              placeholder={pincodeChecking ? 'Detecting location...' : 'Auto-detected from GPS'}
               placeholderTextColor={COLORS.secondaryText}
               keyboardType="number-pad"
               maxLength={6}
               value={pincode}
               editable={false}
+              selectTextOnFocus={false}
             />
             {pincodeServiceable === true && (
               <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
             )}
             {pincodeServiceable === false && (
-              <Ionicons name="close-circle" size={20} color={COLORS.error} />
+              <Ionicons name="information-circle" size={20} color="#3B82F6" />
             )}
           </View>
           <Text style={{ fontSize: 11, color: '#64748B', marginTop: 3, marginBottom: 8 }}>
-            🔒 City and PIN code are auto-detected from your GPS location and cannot be edited.
+            🔒 City and PIN code are auto-detected from your GPS location.
           </Text>
           {errors.pincode ? (
             <Text style={styles.errorText}>{errors.pincode}</Text>
@@ -673,7 +813,7 @@ export const S08_CreateAccountScreen: React.FC = () => {
             <Text
               style={[
                 styles.pincodeStatusHint,
-                pincodeServiceable ? styles.pincodeSuccessText : styles.pincodeFailText,
+                pincodeServiceable ? styles.pincodeSuccessText : { color: '#2563EB', fontWeight: '600' },
               ]}
             >
               {pincodeStatusText}
@@ -726,10 +866,10 @@ export const S08_CreateAccountScreen: React.FC = () => {
           </View>
 
           {pincodeServiceable === false && (
-            <View style={{ backgroundColor: '#FEF2F2', borderColor: '#FCA5A5', borderWidth: 1, borderRadius: 10, padding: 12, marginVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Ionicons name="alert-circle" size={20} color="#DC2626" />
-              <Text style={{ color: '#991B1B', fontSize: 12, flex: 1, fontWeight: '600' }}>
-                Sorry, WormUp is not serviceable in your area. We are expanding soon!
+            <View style={{ backgroundColor: '#EFF6FF', borderColor: '#BFDBFE', borderWidth: 1, borderRadius: 10, padding: 12, marginVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Ionicons name="information-circle" size={20} color="#2563EB" />
+              <Text style={{ color: '#1E40AF', fontSize: 12, flex: 1, fontWeight: '500' }}>
+                Registration open across India! Instant delivery & referral income are active in designated launch zones.
               </Text>
             </View>
           )}
@@ -825,11 +965,11 @@ export const S08_CreateAccountScreen: React.FC = () => {
 
           {/* Continue Button */}
           <GradientButton
-            title={pincodeServiceable === false ? 'Area Not Serviceable' : 'Continue'}
+            title="Continue"
             onPress={handleContinue}
             loading={isSubmitting}
-            disabled={isSubmitting || pincodeServiceable === false}
-            style={pincodeServiceable === false ? { ...styles.button, opacity: 0.5 } : styles.button}
+            disabled={isSubmitting}
+            style={styles.button}
           />
         </View>
 
@@ -928,6 +1068,118 @@ export const S08_CreateAccountScreen: React.FC = () => {
                   <Text style={styles.emptyText}>No cities found matching "{citySearchQuery}"</Text>
                 </View>
               }
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Registration Success Modal */}
+      <Modal
+        visible={showSuccessModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {}}
+      >
+        <View style={styles.successModalOverlay}>
+          <View style={styles.successModalCard}>
+            {/* Celebration Icon */}
+            <View style={styles.celebrationCircle}>
+              <Ionicons name="checkmark-done" size={42} color={COLORS.white} />
+            </View>
+
+            <Text style={styles.successModalTitle}>Registration Successful! 🎉</Text>
+            <Text style={styles.successModalSubtitle}>
+              Please save your Sponsor ID and Password carefully. You will need them to login to your account.
+            </Text>
+
+            {/* Sponsor ID Box */}
+            <View style={styles.credentialCard}>
+              <View style={styles.credentialHeader}>
+                <View style={styles.credentialLabelRow}>
+                  <Ionicons name="ribbon-outline" size={16} color={COLORS.hotPink} />
+                  <Text style={styles.credentialLabel}>Your Sponsor ID (Referral Code)</Text>
+                </View>
+                {copiedField === 'sponsor' && (
+                  <Text style={styles.copiedBadgeText}>✓ Copied!</Text>
+                )}
+              </View>
+              <View style={styles.credentialValueRow}>
+                <Text style={styles.credentialValueCode}>{registeredSponsorId}</Text>
+                <TouchableOpacity
+                  style={[styles.copyBtn, copiedField === 'sponsor' && styles.copyBtnSuccess]}
+                  onPress={handleCopySponsorId}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={copiedField === 'sponsor' ? 'checkmark' : 'copy-outline'}
+                    size={15}
+                    color={COLORS.white}
+                  />
+                  <Text style={styles.copyBtnText}>
+                    {copiedField === 'sponsor' ? 'Copied' : 'Copy'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Password Box */}
+            <View style={styles.credentialCard}>
+              <View style={styles.credentialHeader}>
+                <View style={styles.credentialLabelRow}>
+                  <Ionicons name="key-outline" size={16} color={COLORS.hotPink} />
+                  <Text style={styles.credentialLabel}>Your Password</Text>
+                </View>
+                {copiedField === 'password' && (
+                  <Text style={styles.copiedBadgeText}>✓ Copied!</Text>
+                )}
+              </View>
+              <View style={styles.credentialValueRow}>
+                <Text style={styles.credentialValuePass}>
+                  {showRegisteredPassword ? registeredPassword : '••••••••••••'}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <TouchableOpacity
+                    style={styles.eyeBtnSmall}
+                    onPress={() => setShowRegisteredPassword(!showRegisteredPassword)}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name={showRegisteredPassword ? 'eye-off-outline' : 'eye-outline'}
+                      size={18}
+                      color={COLORS.hotPink}
+                    />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.copyBtn, copiedField === 'password' && styles.copyBtnSuccess]}
+                    onPress={handleCopyPassword}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name={copiedField === 'password' ? 'checkmark' : 'copy-outline'}
+                      size={15}
+                      color={COLORS.white}
+                    />
+                    <Text style={styles.copyBtnText}>
+                      {copiedField === 'password' ? 'Copied' : 'Copy'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+
+            {/* Security Notice */}
+            <View style={styles.securityNoticeRow}>
+              <Ionicons name="shield-checkmark" size={16} color="#059669" />
+              <Text style={styles.securityNoticeText}>
+                Your account is secure. You can log in using your Sponsor ID, Phone, or Email with your password.
+              </Text>
+            </View>
+
+            {/* Proceed to Login Button */}
+            <GradientButton
+              title="Proceed to Login"
+              onPress={handleProceedToLogin}
+              style={styles.proceedLoginBtn}
             />
           </View>
         </View>
@@ -1450,5 +1702,152 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.textMuted,
     fontWeight: '400',
+  },
+
+  /* Password eye button */
+  eyeBtn: {
+    padding: 6,
+    marginRight: 4,
+  },
+
+  /* Success Modal Styles */
+  successModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.lg,
+  },
+  successModalCard: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: COLORS.white,
+    borderRadius: 24,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+  celebrationCircle: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: '#10B981',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  successModalTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: COLORS.navy,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  successModalSubtitle: {
+    fontSize: 13,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 18,
+    paddingHorizontal: 8,
+  },
+  credentialCard: {
+    width: '100%',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 14,
+    marginBottom: 12,
+  },
+  credentialHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  credentialLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  credentialLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.navy,
+  },
+  copiedBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  credentialValueRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  credentialValueCode: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: COLORS.hotPink,
+    letterSpacing: 1,
+  },
+  credentialValuePass: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.navy,
+    letterSpacing: 0.5,
+  },
+  copyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: COLORS.hotPink,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: RADIUS.pill,
+  },
+  copyBtnSuccess: {
+    backgroundColor: '#059669',
+  },
+  copyBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.white,
+  },
+  eyeBtnSmall: {
+    padding: 6,
+    backgroundColor: '#FFF1F6',
+    borderRadius: 8,
+  },
+  securityNoticeRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 12,
+    padding: 10,
+    marginTop: 4,
+    marginBottom: 18,
+  },
+  securityNoticeText: {
+    fontSize: 11,
+    color: '#166534',
+    flex: 1,
+    lineHeight: 16,
+  },
+  proceedLoginBtn: {
+    width: '100%',
   },
 });

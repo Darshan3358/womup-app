@@ -266,7 +266,7 @@ export class NotificationsController {
     if (recipients.userIds && Array.isArray(recipients.userIds)) {
       const results = await this.dispatcherService.dispatchBatch(recipients.userIds, {
         role: recipients.roles?.[0] || 'CUSTOMER',
-        title: title || 'WormUp Alert',
+        title: title || 'WOMART Alert',
         body: content || '',
         type,
         deepLink,

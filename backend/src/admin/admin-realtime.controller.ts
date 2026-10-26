@@ -1291,6 +1291,626 @@ export class AdminRealtimeController {
   }
 
   /**
+   * Pincodes Master & Serviceability Toggle (Admin)
+   */
+  @Get(['api/v1/admin/pincodes', 'api/admin/pincodes', 'admin/pincodes'])
+  @ApiOperation({ summary: 'Get all database pincodes and their serviceability status' })
+  async getAdminPincodes(
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+  ) {
+    try {
+      const db = this.db;
+      if (!db) return { success: false, data: [] };
+
+      const [rawAreas, rawApproved, rawStores, rawCities] = await Promise.all([
+        db.collection('areas').find({}).toArray(),
+        db.collection('approved_pincodes').find({}).toArray(),
+        db.collection('stores').find({}).toArray(),
+        db.collection('cities').find({}).toArray(),
+      ]);
+
+      const pincodeMap = new Map<string, any>();
+
+      // 1. Process areas
+      for (const area of rawAreas) {
+        const aId = area._id.toString();
+        const pins = Array.isArray(area.pincodes) && area.pincodes.length > 0
+          ? area.pincodes
+          : (area.pincode ? [area.pincode] : []);
+
+        const city = rawCities.find((c: any) => c._id?.toString() === area.cityId?.toString() || c.id === area.cityId);
+        const cityName = area.cityName || city?.name || area.city || 'Ahmedabad';
+
+        const areaStores = rawStores.filter((s: any) => {
+          if (s.isActive === false) return false;
+          if (s.areaId && s.areaId.toString() === aId) return true;
+          if (s.areaName && area.name && s.areaName.toLowerCase() === area.name.toLowerCase()) return true;
+          return false;
+        });
+        const assignedStore = areaStores[0];
+        const assignedStoreName = assignedStore ? assignedStore.name : (area.hasActiveStore ? 'Assigned Dark Store' : 'No Store Assigned');
+        const polygonCoords = area.polygon?.coordinates?.[0]?.length || area.geometry?.coordinates?.[0]?.length || 0;
+
+        for (const pin of pins) {
+          const cleanPin = String(pin).trim();
+          if (!cleanPin) continue;
+
+          const appMatch = rawApproved.find((ap: any) => String(ap.pincode).trim() === cleanPin);
+
+          let isActive = area.isActive !== false;
+          let isIncomeEnabled = true;
+          let isDeliveryAllowed = true;
+          if (appMatch) {
+            if (appMatch.isActive !== undefined) isActive = appMatch.isActive;
+            if (appMatch.isDeliveryAllowed !== undefined) isDeliveryAllowed = appMatch.isDeliveryAllowed;
+            if (appMatch.isIncomeEnabled !== undefined) isIncomeEnabled = appMatch.isIncomeEnabled;
+            isActive = isActive && isDeliveryAllowed;
+          }
+
+          pincodeMap.set(`${cleanPin}_${aId}`, {
+            id: appMatch?._id?.toString() || `${cleanPin}_${aId}`,
+            _id: appMatch?._id?.toString() || `${cleanPin}_${aId}`,
+            pincode: cleanPin,
+            areaId: aId,
+            areaName: area.name,
+            areaCode: area.code,
+            cityName,
+            cityId: area.cityId?.toString(),
+            isActive,
+            isDeliveryAllowed,
+            isIncomeEnabled,
+            polygonCoordsCount: polygonCoords,
+            assignedStoreName,
+            hasActiveStore: areaStores.length > 0,
+            slaMinutes: Number(area.slaMinutes) || 9,
+            centerLat: area.centerLat,
+            centerLng: area.centerLng,
+            allPins: pins,
+          });
+        }
+      }
+
+      // 2. Process approved_pincodes (including Gujarat expansion locations)
+      for (const app of rawApproved) {
+        const cleanPin = String(app.pincode).trim();
+        if (!cleanPin) continue;
+
+        // Check if already mapped with this area or standalone
+        const existingKey = Array.from(pincodeMap.keys()).find(k => k.startsWith(`${cleanPin}_`));
+        if (existingKey) {
+          const existing = pincodeMap.get(existingKey);
+          if (existing) {
+            existing.id = app._id.toString();
+            existing._id = app._id.toString();
+            if (app.isActive !== undefined) existing.isActive = app.isActive;
+            if (app.isDeliveryAllowed !== undefined) existing.isDeliveryAllowed = app.isDeliveryAllowed;
+            if (app.isIncomeEnabled !== undefined) existing.isIncomeEnabled = app.isIncomeEnabled;
+            existing.isActive = existing.isActive && existing.isDeliveryAllowed;
+          }
+        } else {
+          const city = rawCities.find((c: any) =>
+            (c.name && app.cityName && c.name.toLowerCase() === app.cityName.toLowerCase()) ||
+            (c._id?.toString() === app.cityId?.toString())
+          );
+          const store = rawStores.find((s: any) =>
+            (s.city && app.cityName && s.city.toLowerCase() === app.cityName.toLowerCase()) ||
+            (s.pincode && s.pincode === cleanPin)
+          );
+
+          const isActive = app.isActive !== false && app.isDeliveryAllowed !== false;
+
+          pincodeMap.set(`${cleanPin}_standalone`, {
+            id: app._id.toString(),
+            _id: app._id.toString(),
+            pincode: cleanPin,
+            areaId: app.areaId?.toString() || undefined,
+            areaName: app.areaName || cleanPin,
+            areaCode: app.areaCode || `AREA-${cleanPin}`,
+            cityName: app.cityName || city?.name || 'Gujarat',
+            cityId: city?._id?.toString() || app.cityId?.toString(),
+            isActive,
+            isDeliveryAllowed: app.isDeliveryAllowed !== false,
+            isIncomeEnabled: app.isIncomeEnabled !== false,
+            polygonCoordsCount: 0,
+            assignedStoreName: store ? store.name : 'No Store Assigned',
+            hasActiveStore: !!store,
+            slaMinutes: 15,
+            centerLat: app.latitude,
+            centerLng: app.longitude,
+            allPins: [cleanPin],
+          });
+        }
+      }
+
+      let list = Array.from(pincodeMap.values());
+
+      // Filter by status: 'Active' | 'Inactive'
+      if (status && status !== 'all' && status !== 'All') {
+        const s = status.toLowerCase();
+        if (s === 'active') {
+          list = list.filter((item) => item.isActive);
+        } else if (s === 'inactive') {
+          list = list.filter((item) => !item.isActive);
+        }
+      }
+
+      // Filter by search query
+      if (search && search.trim()) {
+        const q = search.toLowerCase().trim();
+        list = list.filter((item) =>
+          item.pincode.toLowerCase().includes(q) ||
+          item.areaName.toLowerCase().includes(q) ||
+          item.cityName.toLowerCase().includes(q) ||
+          (item.areaCode && item.areaCode.toLowerCase().includes(q))
+        );
+      }
+
+      return {
+        success: true,
+        count: list.length,
+        total: list.length,
+        data: list,
+      };
+    } catch (err: any) {
+      return { success: false, message: err?.message, data: [] };
+    }
+  }
+
+  @Patch(['api/v1/admin/pincodes/:id/toggle-status', 'api/admin/pincodes/:id/toggle-status', 'admin/pincodes/:id/toggle-status'])
+  @Post(['api/v1/admin/pincodes/:id/toggle-status', 'api/admin/pincodes/:id/toggle-status'])
+  @ApiOperation({ summary: 'Toggle Active/Inactive status for a PIN code or Area' })
+  async togglePincodeStatus(@Param('id') id: string, @Body() body: any) {
+    try {
+      const db = this.db;
+      if (!db) return { success: false, message: 'Database not connected' };
+
+      const rawIsActive = body.isActive !== undefined ? body.isActive : (body.isDeliveryAllowed !== undefined ? body.isDeliveryAllowed : true);
+      const isActive = Boolean(rawIsActive);
+      const reqPincode = body.pincode ? String(body.pincode).trim() : null;
+      const reqAreaId = body.areaId ? String(body.areaId).trim() : null;
+
+      let targetPincode: string | null = reqPincode;
+      let targetAreaId: string | null = reqAreaId;
+
+      // Check if id is a 6-digit pincode
+      if (/^\d{6}$/.test(id)) {
+        targetPincode = id;
+      } else if (Types.ObjectId.isValid(id)) {
+        const appDoc = await db.collection('approved_pincodes').findOne({ _id: new Types.ObjectId(id) });
+        if (appDoc) {
+          targetPincode = targetPincode || appDoc.pincode;
+          targetAreaId = targetAreaId || (appDoc.areaId ? appDoc.areaId.toString() : null);
+        } else {
+          const areaDoc = await db.collection('areas').findOne({ _id: new Types.ObjectId(id) });
+          if (areaDoc) {
+            targetAreaId = id;
+            if (Array.isArray(areaDoc.pincodes) && areaDoc.pincodes.length > 0) {
+              targetPincode = targetPincode || areaDoc.pincodes[0];
+            }
+          }
+        }
+      }
+
+      // 1. Update approved_pincodes
+      if (targetPincode) {
+        await db.collection('approved_pincodes').updateMany(
+          { pincode: targetPincode },
+          {
+            $set: {
+              isActive,
+              isDeliveryAllowed: isActive,
+              isRegistrationAllowed: isActive,
+              isIncomeEnabled: isActive,
+              updatedAt: new Date(),
+            },
+          },
+          { upsert: true }
+        );
+      } else if (id && Types.ObjectId.isValid(id)) {
+        await db.collection('approved_pincodes').updateOne(
+          { _id: new Types.ObjectId(id) },
+          {
+            $set: {
+              isActive,
+              isDeliveryAllowed: isActive,
+              isRegistrationAllowed: isActive,
+              isIncomeEnabled: isActive,
+              updatedAt: new Date(),
+            },
+          }
+        );
+      }
+
+      // 2. Update areas
+      if (targetAreaId && Types.ObjectId.isValid(targetAreaId)) {
+        await db.collection('areas').updateOne(
+          { _id: new Types.ObjectId(targetAreaId) },
+          { $set: { isActive, updatedAt: new Date() } }
+        );
+      } else if (targetPincode) {
+        await db.collection('areas').updateMany(
+          { pincodes: targetPincode },
+          { $set: { isActive, updatedAt: new Date() } }
+        );
+      }
+
+      // 3. Clear cache and notify WebSocket subscribers
+      clearHomeCache();
+      try {
+        this.trackingGateway?.server?.emit('pincodes:updated', {
+          id,
+          pincode: targetPincode,
+          isActive,
+          isDeliveryAllowed: isActive,
+          isIncomeEnabled: isActive,
+        });
+        this.trackingGateway?.server?.emit('areas:updated', {
+          id: targetAreaId || id,
+          isActive,
+        });
+      } catch (_) {}
+
+      return {
+        success: true,
+        message: `Pincode ${targetPincode || id} is now ${isActive ? 'Active' : 'Inactive'}`,
+        data: {
+          id,
+          pincode: targetPincode,
+          areaId: targetAreaId,
+          isActive,
+          isDeliveryAllowed: isActive,
+          isIncomeEnabled: isActive,
+        },
+      };
+    } catch (err: any) {
+      return { success: false, message: err?.message || 'Failed to update pincode status' };
+    }
+  }
+
+  /**
+   * Add New Pincode (Admin)
+   */
+  @Post(['api/v1/admin/pincodes', 'api/admin/pincodes', 'admin/pincodes'])
+  @ApiOperation({ summary: 'Add a new pincode to serviceability and approved_pincodes' })
+  async createAdminPincode(@Body() body: any) {
+    try {
+      const db = this.db;
+      if (!db) return { success: false, message: 'Database not connected' };
+
+      const rawPincode = body.pincode ? String(body.pincode).trim() : '';
+      if (!rawPincode || !/^\d{6}$/.test(rawPincode)) {
+        return { success: false, message: 'Please provide a valid 6-digit PIN code' };
+      }
+
+      // Check if pincode already exists
+      const existing = await db.collection('approved_pincodes').findOne({ pincode: rawPincode });
+      if (existing) {
+        return { success: false, message: `PIN code ${rawPincode} already exists in serviceability master` };
+      }
+
+      // Resolve City
+      let cityObjId: Types.ObjectId | null = null;
+      let cityName = body.cityName || '';
+      if (body.cityId && Types.ObjectId.isValid(body.cityId)) {
+        cityObjId = new Types.ObjectId(body.cityId);
+        const cityDoc = await db.collection('cities').findOne({ _id: cityObjId });
+        if (cityDoc) cityName = cityDoc.name || cityName;
+      }
+
+      // Resolve Area
+      let areaObjId: Types.ObjectId | null = null;
+      let areaName = body.areaName || '';
+      let areaCode = body.areaCode || '';
+      if (body.areaId && Types.ObjectId.isValid(body.areaId)) {
+        areaObjId = new Types.ObjectId(body.areaId);
+        const areaDoc = await db.collection('areas').findOne({ _id: areaObjId });
+        if (areaDoc) {
+          areaName = areaDoc.name || areaName;
+          areaCode = areaDoc.code || areaCode;
+          if (!cityObjId && areaDoc.cityId) {
+            cityObjId = Types.ObjectId.isValid(areaDoc.cityId) ? new Types.ObjectId(areaDoc.cityId) : null;
+          }
+          if (!cityName) cityName = areaDoc.cityName || areaDoc.city || '';
+        }
+      }
+
+      // Resolve Dark Store
+      let storeObjId: Types.ObjectId | null = null;
+      let storeName = body.storeName || '';
+      if (body.storeId && Types.ObjectId.isValid(body.storeId)) {
+        storeObjId = new Types.ObjectId(body.storeId);
+        const storeDoc = await db.collection('stores').findOne({ _id: storeObjId });
+        if (storeDoc) storeName = storeDoc.name || storeName;
+      }
+
+      const isActive = body.isActive !== false;
+      const isDeliveryAllowed = body.isDeliveryAllowed !== false && isActive;
+      const isIncomeEnabled = body.isIncomeEnabled !== false;
+
+      const newDoc = {
+        pincode: rawPincode,
+        areaId: areaObjId,
+        areaName: areaName || rawPincode,
+        areaCode: areaCode || `AREA-${rawPincode}`,
+        cityId: cityObjId,
+        cityName: cityName || 'Gujarat',
+        storeId: storeObjId,
+        storeName: storeName || (storeObjId ? 'Assigned Dark Store' : 'No Store Assigned'),
+        isActive,
+        isDeliveryAllowed,
+        isIncomeEnabled,
+        isRegistrationAllowed: true,
+        slaMinutes: Number(body.slaMinutes) || 9,
+        centerLat: Number(body.centerLat) || 23.0225,
+        centerLng: Number(body.centerLng) || 72.5714,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const result = await db.collection('approved_pincodes').insertOne(newDoc);
+
+      // Also add to area's pincodes array if area was chosen
+      if (areaObjId) {
+        await db.collection('areas').updateOne(
+          { _id: areaObjId },
+          { $addToSet: { pincodes: rawPincode } }
+        );
+      }
+
+      clearHomeCache();
+      try {
+        this.trackingGateway?.server?.emit('pincodes:created', {
+          id: result.insertedId.toString(),
+          pincode: rawPincode,
+          areaId: areaObjId?.toString(),
+          isActive,
+        });
+      } catch (_) {}
+
+      return {
+        success: true,
+        message: `PIN code ${rawPincode} added successfully`,
+        data: {
+          id: result.insertedId.toString(),
+          _id: result.insertedId.toString(),
+          ...newDoc,
+        },
+      };
+    } catch (err: any) {
+      return { success: false, message: err?.message || 'Failed to create pincode' };
+    }
+  }
+
+  /**
+   * Edit / Update Pincode (Admin)
+   */
+  @Put(['api/v1/admin/pincodes/:id', 'api/admin/pincodes/:id', 'admin/pincodes/:id'])
+  @Patch(['api/v1/admin/pincodes/:id', 'api/admin/pincodes/:id', 'admin/pincodes/:id'])
+  @ApiOperation({ summary: 'Update an existing pincode and its area mapping' })
+  async updateAdminPincode(@Param('id') id: string, @Body() body: any) {
+    try {
+      const db = this.db;
+      if (!db) return { success: false, message: 'Database not connected' };
+
+      let targetDoc: any = null;
+      if (Types.ObjectId.isValid(id)) {
+        targetDoc = await db.collection('approved_pincodes').findOne({ _id: new Types.ObjectId(id) });
+      }
+      if (!targetDoc && /^\d{6}$/.test(id)) {
+        targetDoc = await db.collection('approved_pincodes').findOne({ pincode: id });
+      }
+      if (!targetDoc && id.includes('_')) {
+        const pinPart = id.split('_')[0];
+        targetDoc = await db.collection('approved_pincodes').findOne({ pincode: pinPart });
+      }
+
+      const oldPincode = targetDoc?.pincode || (/^\d{6}$/.test(id) ? id : (body.oldPincode || body.pincode));
+      const newPincode = body.pincode ? String(body.pincode).trim() : oldPincode;
+
+      if (!newPincode || !/^\d{6}$/.test(newPincode)) {
+        return { success: false, message: 'Please provide a valid 6-digit PIN code' };
+      }
+
+      // If pincode changed, check for conflict
+      if (newPincode !== oldPincode) {
+        const conflict = await db.collection('approved_pincodes').findOne({ pincode: newPincode });
+        if (conflict) {
+          return { success: false, message: `PIN code ${newPincode} already exists in database` };
+        }
+      }
+
+      // Resolve City
+      let cityObjId = targetDoc?.cityId || null;
+      let cityName = body.cityName || targetDoc?.cityName || '';
+      if (body.cityId && Types.ObjectId.isValid(body.cityId)) {
+        cityObjId = new Types.ObjectId(body.cityId);
+        const cityDoc = await db.collection('cities').findOne({ _id: cityObjId });
+        if (cityDoc) cityName = cityDoc.name || cityName;
+      }
+
+      // Resolve Area
+      let newAreaObjId = body.areaId && Types.ObjectId.isValid(body.areaId) ? new Types.ObjectId(body.areaId) : targetDoc?.areaId || null;
+      let areaName = body.areaName || targetDoc?.areaName || '';
+      let areaCode = body.areaCode || targetDoc?.areaCode || '';
+      if (body.areaId && Types.ObjectId.isValid(body.areaId)) {
+        const areaDoc = await db.collection('areas').findOne({ _id: newAreaObjId });
+        if (areaDoc) {
+          areaName = areaDoc.name || areaName;
+          areaCode = areaDoc.code || areaCode;
+          if (!cityName) cityName = areaDoc.cityName || areaDoc.city || '';
+        }
+      }
+
+      // Resolve Store
+      let storeObjId = body.storeId && Types.ObjectId.isValid(body.storeId) ? new Types.ObjectId(body.storeId) : targetDoc?.storeId || null;
+      let storeName = body.storeName || targetDoc?.storeName || '';
+      if (body.storeId && Types.ObjectId.isValid(body.storeId)) {
+        const storeDoc = await db.collection('stores').findOne({ _id: storeObjId });
+        if (storeDoc) storeName = storeDoc.name || storeName;
+      }
+
+      const isActive = body.isActive !== undefined ? Boolean(body.isActive) : (targetDoc?.isActive ?? true);
+      const isDeliveryAllowed = body.isDeliveryAllowed !== undefined ? Boolean(body.isDeliveryAllowed) : isActive;
+      const isIncomeEnabled = body.isIncomeEnabled !== undefined ? Boolean(body.isIncomeEnabled) : (targetDoc?.isIncomeEnabled ?? true);
+
+      const updateFields: any = {
+        pincode: newPincode,
+        cityName: cityName || 'Gujarat',
+        areaName: areaName || newPincode,
+        areaCode: areaCode || `AREA-${newPincode}`,
+        storeName: storeName || (storeObjId ? 'Assigned Dark Store' : 'No Store Assigned'),
+        isActive,
+        isDeliveryAllowed,
+        isIncomeEnabled,
+        updatedAt: new Date(),
+      };
+      if (cityObjId) updateFields.cityId = cityObjId;
+      if (newAreaObjId) updateFields.areaId = newAreaObjId;
+      if (storeObjId) updateFields.storeId = storeObjId;
+      if (body.slaMinutes !== undefined) updateFields.slaMinutes = Number(body.slaMinutes) || 9;
+
+      // Update approved_pincodes
+      if (targetDoc?._id) {
+        await db.collection('approved_pincodes').updateOne(
+          { _id: targetDoc._id },
+          { $set: updateFields }
+        );
+      } else {
+        await db.collection('approved_pincodes').updateOne(
+          { pincode: oldPincode },
+          { $set: updateFields },
+          { upsert: true }
+        );
+      }
+
+      // Handle area changes in areas collection
+      const oldAreaId = targetDoc?.areaId ? targetDoc.areaId.toString() : null;
+      const newAreaIdStr = newAreaObjId ? newAreaObjId.toString() : null;
+
+      if (oldAreaId && oldAreaId !== newAreaIdStr) {
+        // Remove from old area
+        await db.collection('areas').updateOne(
+          { _id: new Types.ObjectId(oldAreaId) },
+          { $pull: { pincodes: oldPincode } } as any
+        );
+      }
+
+      if (newAreaObjId) {
+        // Add to new area
+        await db.collection('areas').updateOne(
+          { _id: newAreaObjId },
+          { $addToSet: { pincodes: newPincode } } as any
+        );
+      }
+
+      // If pincode changed without area change, update in area
+      if (oldPincode !== newPincode && oldAreaId === newAreaIdStr && newAreaObjId) {
+        await db.collection('areas').updateOne(
+          { _id: newAreaObjId },
+          { $pull: { pincodes: oldPincode } } as any
+        );
+        await db.collection('areas').updateOne(
+          { _id: newAreaObjId },
+          { $addToSet: { pincodes: newPincode } } as any
+        );
+      }
+
+      clearHomeCache();
+      try {
+        this.trackingGateway?.server?.emit('pincodes:updated', {
+          id,
+          pincode: newPincode,
+          areaId: newAreaIdStr,
+          isActive,
+        });
+      } catch (_) {}
+
+      return {
+        success: true,
+        message: `PIN code ${newPincode} updated successfully`,
+        data: updateFields,
+      };
+    } catch (err: any) {
+      return { success: false, message: err?.message || 'Failed to update pincode' };
+    }
+  }
+
+  /**
+   * Delete Pincode (Admin)
+   */
+  @Delete(['api/v1/admin/pincodes/:id', 'api/admin/pincodes/:id', 'admin/pincodes/:id'])
+  @ApiOperation({ summary: 'Delete a pincode from serviceability and areas' })
+  async deleteAdminPincode(@Param('id') id: string, @Query('pincode') qPincode?: string) {
+    try {
+      const db = this.db;
+      if (!db) return { success: false, message: 'Database not connected' };
+
+      let targetPincode = qPincode ? String(qPincode).trim() : null;
+      let targetObjId: Types.ObjectId | null = null;
+
+      if (Types.ObjectId.isValid(id)) {
+        targetObjId = new Types.ObjectId(id);
+        const doc = await db.collection('approved_pincodes').findOne({ _id: targetObjId });
+        if (doc) targetPincode = targetPincode || doc.pincode;
+      }
+
+      if (!targetPincode) {
+        if (/^\d{6}$/.test(id)) {
+          targetPincode = id;
+        } else if (id.includes('_')) {
+          targetPincode = id.split('_')[0];
+        }
+      }
+
+      if (!targetPincode) {
+        return { success: false, message: 'Could not identify pincode to delete' };
+      }
+
+      // Check for active / pending orders in this pincode
+      const activeOrdersCount = await db.collection('orders').countDocuments({
+        'address.pincode': targetPincode,
+        status: { $in: ['PENDING', 'ACCEPTED', 'PACKED', 'ASSIGNED', 'OUT_FOR_DELIVERY'] },
+      });
+
+      if (activeOrdersCount > 0) {
+        return {
+          success: false,
+          message: `Cannot delete PIN code ${targetPincode}: There are ${activeOrdersCount} active/pending orders in this area. Please complete or cancel them first.`,
+        };
+      }
+
+      // Delete from approved_pincodes
+      if (targetObjId) {
+        await db.collection('approved_pincodes').deleteOne({ _id: targetObjId });
+      }
+      await db.collection('approved_pincodes').deleteMany({ pincode: targetPincode });
+
+      // Remove from any areas pincodes array
+      await db.collection('areas').updateMany(
+        { pincodes: targetPincode },
+        { $pull: { pincodes: targetPincode } } as any
+      );
+
+      clearHomeCache();
+      try {
+        this.trackingGateway?.server?.emit('pincodes:deleted', {
+          id,
+          pincode: targetPincode,
+        });
+      } catch (_) {}
+
+      return {
+        success: true,
+        message: `PIN code ${targetPincode} deleted successfully from serviceability master`,
+        data: { pincode: targetPincode },
+      };
+    } catch (err: any) {
+      return { success: false, message: err?.message || 'Failed to delete pincode' };
+    }
+  }
+
+  /**
    * Cities CRUD
    */
   @Get(['api/admin/cities', 'admin/cities'])

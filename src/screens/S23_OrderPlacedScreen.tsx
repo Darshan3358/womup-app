@@ -18,7 +18,7 @@ import { GradientButton } from '../components/common/GradientButton';
 import { useApp } from '../context/AppContext';
 
 // Resolve video asset for Metro / Web
-const orderVideoAsset = require('../../assets/gemini_generated_video_2981966f.mp4');
+const orderVideoAsset = require('../../assets/order_placed_video.mp4');
 
 const getVideoSourceUrl = () => {
   if (typeof orderVideoAsset === 'string') return orderVideoAsset;
@@ -28,7 +28,7 @@ const getVideoSourceUrl = () => {
     const resolved = Image.resolveAssetSource(orderVideoAsset);
     if (resolved?.uri) return resolved.uri;
   } catch (e) {}
-  return '/assets/assets/gemini_generated_video_2981966f.mp4';
+  return '/assets/assets/order_placed_video.mp4';
 };
 
 const videoSourceUrl = getVideoSourceUrl();

@@ -210,6 +210,7 @@ export const DynamicLiveMap: React.FC<DynamicLiveMapProps> = ({
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; img-src * data: blob: https:;" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
   <style>
@@ -314,16 +315,19 @@ export const DynamicLiveMap: React.FC<DynamicLiveMapProps> = ({
       scrollWheelZoom: false
     }).setView([(storeLat + custLat)/2, (storeLng + custLng)/2], 14);
 
-    // CartoDB Voyager tiles (high-speed, retina, mobile friendly)
-    var cartoTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      subdomains: ['a', 'b', 'c', 'd'],
-      maxZoom: 19
+    // Clean OpenStreetMap tiles (Fast, no API key required, no watermark)
+    var mainTiles = L.tileLayer('https://tile.openstreetmap.de/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    cartoTiles.on('tileerror', function() {
+    mainTiles.on('tileerror', function() {
       if (!window.usedOSMFallback) {
         window.usedOSMFallback = true;
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+          maxZoom: 19,
+          attribution: 'Tiles &copy; Esri'
+        }).addTo(map);
       }
     });
 
@@ -526,7 +530,6 @@ export const DynamicLiveMap: React.FC<DynamicLiveMapProps> = ({
             originWhitelist={['*']}
             source={{
               html: mapHtml,
-              baseUrl: 'https://localhost',
             }}
             style={{ width: '100%', height: '100%', borderRadius: 18 }}
             javaScriptEnabled={true}

@@ -480,7 +480,9 @@ export const VendorRegistrationScreen: React.FC<VendorRegistrationScreenProps> =
       showToast('Registration Successful! 🎉', `Store registered with code ${code}.`, 'success');
       setCurrentStep(6);
     } else {
-      showToast('Registration Failed', res.error || 'Please check your inputs and try again.', 'error');
+      const err = res.error || 'Please check your inputs and try again.';
+      const isConflict = err.includes('already registered') || err.includes('already exists') || err.includes('Customer') || err.includes('Rider') || err.includes('Store');
+      showToast(isConflict ? 'Account Already Exists' : 'Registration Failed', err, 'error');
     }
   };
 

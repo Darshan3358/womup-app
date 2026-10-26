@@ -11,6 +11,7 @@ import {
   Platform,
   Modal,
   Image,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -337,7 +338,11 @@ export const R04_RiderRegistrationScreen: React.FC = () => {
       });
       // Context will set profile and switch authStep to 'AUTHENTICATED'
     } catch (err: any) {
-      setErrorMsg(err.message || 'Registration failed. Please check details and try again.');
+      const msg = err.message || 'Registration failed. Please check details and try again.';
+      setErrorMsg(msg);
+      if (msg.includes('already registered') || msg.includes('already exists') || msg.includes('Customer') || msg.includes('Dark Store') || msg.includes('Vendor')) {
+        Alert.alert('Account Already Exists', msg, [{ text: 'OK' }]);
+      }
     } finally {
       setLoading(false);
     }

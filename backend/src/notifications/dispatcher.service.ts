@@ -66,7 +66,7 @@ export class NotificationDispatcherService {
       ? typeof template.title === 'function'
         ? template.title(vars)
         : template.title
-      : vars.title || 'WormUp Alert';
+      : vars.title || 'WOMART Alert';
 
     const body = template
       ? typeof template.body === 'function'

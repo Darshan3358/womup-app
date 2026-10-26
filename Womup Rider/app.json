@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Womup Delivery Partner",
-    "slug": "womup-rider",
+    "name": "WOMART Rider",
+    "slug": "womart-rider",
     "version": "1.0.0",
     "runtimeVersion": "1.0.0",
     "updates": {
@@ -19,7 +19,10 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.womup.rider"
+      "bundleIdentifier": "com.womup.rider",
+      "infoPlist": {
+        "CFBundleDisplayName": "WOMART Rider"
+      }
     },
     "android": {
       "adaptiveIcon": {

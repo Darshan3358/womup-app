@@ -10,7 +10,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { Info, ShieldCheck, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { CheckCircle2 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../theme/colors';
 import { TYPOGRAPHY } from '../../theme/typography';
@@ -64,7 +64,6 @@ export const BlinkitCartScreen: React.FC = () => {
   const currentDistanceKm = 1.2;
 
   const [couponInput, setCouponInput] = useState('');
-  const [showFeeDetails, setShowFeeDetails] = useState(false);
 
   // Check cached delivery fee synchronously to avoid any 1-frame price flicker
   const initialCachedFee = CartService.getCachedDeliveryFee({
@@ -377,37 +376,11 @@ export const BlinkitCartScreen: React.FC = () => {
             </View>
           )}
 
-          {/* Transparent Dynamic Delivery Partner Fee */}
+          {/* Delivery Partner Fee */}
           <View style={styles.deliveryFeeSection}>
             <View style={styles.billRow}>
               <View style={{ flex: 1, paddingRight: 8 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                  <Text style={styles.billLabel}>Delivery Partner Fee</Text>
-                  {!isCalculatingFee && (
-                    <TouchableOpacity
-                      onPress={() => setShowFeeDetails(!showFeeDetails)}
-                      activeOpacity={0.7}
-                      style={styles.infoTouchBtn}
-                    >
-                      <Info size={12} color="#4F46E5" />
-                      <Text style={styles.infoTouchText}>
-                        {showFeeDetails ? 'Hide math' : 'Why this fee?'}
-                      </Text>
-                      {showFeeDetails ? (
-                        <ChevronUp size={11} color="#4F46E5" />
-                      ) : (
-                        <ChevronDown size={11} color="#4F46E5" />
-                      )}
-                    </TouchableOpacity>
-                  )}
-                </View>
-                <Text style={styles.feeSubText}>
-                  {isCalculatingFee
-                    ? 'Calculating live route fee...'
-                    : `${feeBreakdown?.distanceKm || currentDistanceKm} km · ₹${feeBreakdown?.rateUsed || 12}/km${
-                        feeBreakdown?.floorApplied ? ` (Base: ₹${feeBreakdown?.baseFee || 14.40})` : ''
-                      }`}
-                </Text>
+                <Text style={styles.billLabel}>Delivery Partner Fee</Text>
               </View>
               {isCalculatingFee ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -423,53 +396,7 @@ export const BlinkitCartScreen: React.FC = () => {
               )}
             </View>
 
-            {/* Rider Minimum Guarantee Callout */}
-            {!isCalculatingFee && feeBreakdown?.floorApplied && (
-              <View style={styles.floorNoticeBox}>
-                <ShieldCheck size={14} color="#4338CA" style={{ marginTop: 1 }} />
-                <View style={{ flex: 1, marginLeft: 6 }}>
-                  <Text style={styles.floorNoticeTitle}>
-                    Fair Rider Floor Guarantee Applied
-                  </Text>
-                  <Text style={styles.floorNoticeDesc}>
-                    Base distance fee is ₹{feeBreakdown?.baseFee || 14.40}. A +₹{(Number(feeBreakdown?.minimumPayout || 30) - Number(feeBreakdown?.baseFee || 14.40)).toFixed(2)} top-up is included to guarantee a minimum ₹{feeBreakdown?.minimumPayout || 30} payout for your delivery partner.
-                  </Text>
-                </View>
-              </View>
-            )}
-
-            {/* Expandable Explanation Details */}
-            {!isCalculatingFee && showFeeDetails && (
-              <View style={styles.feeDetailsDrawer}>
-                <Text style={styles.drawerTitle}>Fee Calculation Breakdown</Text>
-                <View style={styles.drawerItem}>
-                  <Text style={styles.drawerDot}>•</Text>
-                  <Text style={styles.drawerText}>
-                    <Text style={{ fontWeight: '700' }}>Route Distance:</Text> {feeBreakdown?.distanceKm || currentDistanceKm} km from {feeBreakdown?.areaName || areaKey} store to your address.
-                  </Text>
-                </View>
-                <View style={styles.drawerItem}>
-                  <Text style={styles.drawerDot}>•</Text>
-                  <Text style={styles.drawerText}>
-                    <Text style={{ fontWeight: '700' }}>Base Math:</Text> {feeBreakdown?.distanceKm || currentDistanceKm} km × ₹{feeBreakdown?.rateUsed || 12}/km = ₹{feeBreakdown?.baseFee || 14.40}.
-                  </Text>
-                </View>
-                <View style={styles.drawerItem}>
-                  <Text style={styles.drawerDot}>•</Text>
-                  <Text style={styles.drawerText}>
-                    <Text style={{ fontWeight: '700' }}>Floor Policy (Min ₹{feeBreakdown?.minimumPayout || 30}):</Text> Guaranteed base pay so riders don't lose money on fuel and wait times.
-                  </Text>
-                </View>
-                <View style={styles.directPassPill}>
-                  <CheckCircle2 size={12} color="#059669" />
-                  <Text style={styles.directPassText}>
-                    100% of this fee goes directly to your delivery partner.
-                  </Text>
-                </View>
-              </View>
-            )}
-
-            {!isCalculatingFee && !showFeeDetails && (
+            {!isCalculatingFee && (
               <View style={styles.directPassRow}>
                 <CheckCircle2 size={11} color="#059669" />
                 <Text style={styles.directPassText}>
