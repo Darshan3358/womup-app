@@ -169,6 +169,177 @@ export const ProductSectionSkeleton: React.FC<{
   );
 };
 
+/**
+ * Cart Screen Skeleton matching BlinkitCartScreen layout
+ */
+export const CartScreenSkeleton: React.FC = () => {
+  return (
+    <View style={skeletonStyles.screenContainer}>
+      {/* Header */}
+      <View style={skeletonStyles.cartHeader}>
+        <Skeleton width={38} height={38} borderRadius={19} />
+        <View style={{ alignItems: 'center', gap: 4 }}>
+          <Skeleton width={90} height={18} borderRadius={4} />
+          <Skeleton width={50} height={12} borderRadius={3} />
+        </View>
+        <View style={{ width: 38 }} />
+      </View>
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={skeletonStyles.screenScroll}>
+        {/* ETA Banner */}
+        <View style={skeletonStyles.etaBannerSkeleton}>
+          <Skeleton width={120} height={16} borderRadius={4} />
+          <Skeleton width={100} height={14} borderRadius={4} />
+        </View>
+
+        {/* Cart Item Cards */}
+        <View style={skeletonStyles.cardBox}>
+          {[1, 2].map((i) => (
+            <View key={i} style={[skeletonStyles.itemRowSkeleton, i > 1 && skeletonStyles.rowBorder]}>
+              <Skeleton width={48} height={48} borderRadius={8} />
+              <View style={{ flex: 1, gap: 5 }}>
+                <Skeleton width="80%" height={14} borderRadius={3} />
+                <Skeleton width="40%" height={11} borderRadius={3} />
+                <Skeleton width="30%" height={16} borderRadius={3} />
+              </View>
+              <Skeleton width={70} height={30} borderRadius={15} />
+            </View>
+          ))}
+        </View>
+
+        {/* Coupons Box */}
+        <View style={skeletonStyles.cardBox}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Skeleton width={120} height={16} borderRadius={4} />
+            <Skeleton width={60} height={30} borderRadius={6} />
+          </View>
+        </View>
+
+        {/* Bill Details Box */}
+        <View style={[skeletonStyles.cardBox, { gap: 12 }]}>
+          <Skeleton width={100} height={16} borderRadius={4} />
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <Skeleton width={90} height={14} borderRadius={3} />
+            <Skeleton width={45} height={14} borderRadius={3} />
+          </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <Skeleton width={110} height={14} borderRadius={3} />
+            <Skeleton width={40} height={14} borderRadius={3} />
+          </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <Skeleton width={80} height={14} borderRadius={3} />
+            <Skeleton width={35} height={14} borderRadius={3} />
+          </View>
+          <View style={{ height: 1, backgroundColor: '#F1F5F9', marginVertical: 4 }} />
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <Skeleton width={90} height={18} borderRadius={4} />
+            <Skeleton width={60} height={18} borderRadius={4} />
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Bottom Sticky Action Bar */}
+      <View style={skeletonStyles.bottomBar}>
+        <View style={{ gap: 4 }}>
+          <Skeleton width={50} height={12} borderRadius={3} />
+          <Skeleton width={70} height={20} borderRadius={4} />
+        </View>
+        <Skeleton width={160} height={44} borderRadius={22} />
+      </View>
+    </View>
+  );
+};
+
+/**
+ * Checkout Screen Skeleton matching BlinkitCheckoutScreen layout
+ */
+export const CheckoutScreenSkeleton: React.FC = () => {
+  return (
+    <View style={skeletonStyles.screenContainer}>
+      {/* Header */}
+      <View style={skeletonStyles.cartHeader}>
+        <Skeleton width={38} height={38} borderRadius={19} />
+        <Skeleton width={130} height={20} borderRadius={4} />
+        <View style={{ width: 38 }} />
+      </View>
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={skeletonStyles.screenScroll}>
+        {/* Address Selection Cards */}
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={[skeletonStyles.cardBox, { flex: 1, gap: 8, padding: 12 }]}>
+            <Skeleton width={70} height={16} borderRadius={4} />
+            <Skeleton width="100%" height={14} borderRadius={3} />
+            <Skeleton width="70%" height={12} borderRadius={3} />
+          </View>
+          <View style={[skeletonStyles.cardBox, { flex: 1, gap: 8, padding: 12 }]}>
+            <Skeleton width={60} height={16} borderRadius={4} />
+            <Skeleton width="100%" height={14} borderRadius={3} />
+            <Skeleton width="60%" height={12} borderRadius={3} />
+          </View>
+        </View>
+
+        {/* Selected Address Details */}
+        <View style={[skeletonStyles.cardBox, { gap: 10 }]}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Skeleton width={110} height={18} borderRadius={4} />
+            <Skeleton width={60} height={20} borderRadius={10} />
+          </View>
+          <Skeleton width="90%" height={14} borderRadius={3} />
+          <Skeleton width="60%" height={12} borderRadius={3} />
+        </View>
+
+        {/* Delivery Time & Slot */}
+        <View style={[skeletonStyles.cardBox, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+          <Skeleton width={140} height={16} borderRadius={4} />
+          <Skeleton width={80} height={24} borderRadius={6} />
+        </View>
+
+        {/* Bill Summary */}
+        <View style={[skeletonStyles.cardBox, { gap: 12 }]}>
+          <Skeleton width={100} height={16} borderRadius={4} />
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <Skeleton width={100} height={14} borderRadius={3} />
+            <Skeleton width={50} height={14} borderRadius={3} />
+          </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <Skeleton width={90} height={14} borderRadius={3} />
+            <Skeleton width={45} height={14} borderRadius={3} />
+          </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <Skeleton width={110} height={14} borderRadius={3} />
+            <Skeleton width={40} height={14} borderRadius={3} />
+          </View>
+          <View style={{ height: 1, backgroundColor: '#F1F5F9', marginVertical: 4 }} />
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <Skeleton width={90} height={18} borderRadius={4} />
+            <Skeleton width={60} height={18} borderRadius={4} />
+          </View>
+        </View>
+
+        {/* Payment Methods */}
+        <View style={[skeletonStyles.cardBox, { gap: 12 }]}>
+          <Skeleton width={120} height={16} borderRadius={4} />
+          {[1, 2, 3].map((p) => (
+            <View key={p} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Skeleton width={24} height={24} borderRadius={12} />
+              <Skeleton width="60%" height={14} borderRadius={3} />
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+
+      {/* Bottom Sticky Action Bar */}
+      <View style={skeletonStyles.bottomBar}>
+        <View style={{ gap: 4 }}>
+          <Skeleton width={50} height={12} borderRadius={3} />
+          <Skeleton width={70} height={20} borderRadius={4} />
+        </View>
+        <Skeleton width={160} height={44} borderRadius={22} />
+      </View>
+    </View>
+  );
+};
+
 const styles = StyleSheet.create({
   skeletonBase: {
     backgroundColor: '#E2E8F0',
@@ -219,5 +390,78 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 8,
     paddingTop: 4,
+  },
+});
+
+const skeletonStyles = StyleSheet.create({
+  screenContainer: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  cartHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  screenScroll: {
+    padding: 16,
+    gap: 12,
+    paddingBottom: 100,
+  },
+  etaBannerSkeleton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  cardBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  itemRowSkeleton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 10,
+  },
+  rowBorder: {
+    borderTopWidth: 1,
+    borderTopColor: '#F8FAFC',
+  },
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 6,
   },
 });

@@ -47,7 +47,7 @@ const ProductSectionComponent: React.FC<ProductSectionProps> = ({
   isLoading = false,
 }) => {
   const { width } = useWindowDimensions();
-  const { getBlinkitQty, updateBlinkitQty, isInWishlist, toggleWishlist, currentAreaName } = useApp();
+  const { blinkitCart, getBlinkitQty, updateBlinkitQty, isInWishlist, toggleWishlist, currentAreaName } = useApp();
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
   const [pickerProduct, setPickerProduct] = useState<BlinkitProduct | null>(null);
 
@@ -288,7 +288,7 @@ const ProductSectionComponent: React.FC<ProductSectionProps> = ({
       </View>
     );
   }, [selectedVariants, cardWidth, isCompact, currentAreaName,
-      getBlinkitQty, updateBlinkitQty, isInWishlist, toggleWishlist,
+      blinkitCart, getBlinkitQty, updateBlinkitQty, isInWishlist, toggleWishlist,
       onOpenProduct, handleSelectVariant]);
 
   const IconComponent = iconConfig?.icon;
@@ -368,6 +368,7 @@ const ProductSectionComponent: React.FC<ProductSectionProps> = ({
       <FlatList
         ref={flatListRef}
         data={products}
+        extraData={blinkitCart}
         horizontal
         keyExtractor={(item) => item.id}
         renderItem={renderCard}

@@ -27,7 +27,7 @@ export interface BlinkitCartEntry {
 }
 
 export const mapProductToBlinkit = (p: Product): BlinkitProduct => ({
-  id: p.id,
+  id: p.id || (p as any)._id || (p as any).productId || '',
   name: p.name,
   brand: p.brand,
   category: p.categoryId,
@@ -2195,30 +2195,52 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return sum + mrp * item.quantity;
   }, 0);
 
-  const getBlinkitQty = (productId: string, variantId?: string): number => {
+  const getBlinkitQty = useCallback((productId: string, variantId?: string): number => {
+    if (!productId) return 0;
+    const cleanPId = String(productId);
+
+    // 1. If variantId provided, check exact variant matches first
     if (variantId) {
-      const key = `${productId}_${variantId}`;
-      if (blinkitCart[key]?.quantity) {
-        return blinkitCart[key].quantity;
+      const varKey = `${cleanPId}_${variantId}`;
+      if (blinkitCart[varKey]?.quantity) {
+        return blinkitCart[varKey].quantity;
       }
       if (
-        blinkitCart[productId]?.quantity &&
-        (blinkitCart[productId]?.product as any)?.selectedVariantId === variantId
+        blinkitCart[cleanPId]?.quantity &&
+        ((blinkitCart[cleanPId]?.product as any)?.selectedVariantId === variantId ||
+         (blinkitCart[cleanPId]?.product as any)?.variantId === variantId)
       ) {
-        return blinkitCart[productId].quantity;
+        return blinkitCart[cleanPId].quantity;
       }
-      return 0;
+      // Search all keys in blinkitCart for matching productId and variantId
+      for (const [k, v] of Object.entries(blinkitCart)) {
+        const itemPId = String(v.product?.id || (v.product as any)?._id || '');
+        const itemVId = String((v.product as any)?.selectedVariantId || (v.product as any)?.variantId || '');
+        if (itemPId === cleanPId && itemVId === String(variantId)) {
+          return v.quantity || 0;
+        }
+      }
     }
+
+    // 2. Direct lookup by cleanPId
+    if (blinkitCart[cleanPId]?.quantity) {
+      return blinkitCart[cleanPId].quantity;
+    }
+
+    // 3. Aggregate any variants or keys starting with cleanPId
     let total = 0;
     for (const [k, v] of Object.entries(blinkitCart)) {
-      if (k === productId || k.startsWith(`${productId}_`)) {
+      const itemPId = String(v.product?.id || (v.product as any)?._id || '');
+      if (k === cleanPId || k.startsWith(`${cleanPId}_`) || itemPId === cleanPId) {
         total += v.quantity || 0;
       }
     }
     if (total > 0) return total;
-    const legacyItem = cart.find((i) => i.product.id === productId);
+
+    // 4. Legacy cart fallback
+    const legacyItem = cart.find((i) => String(i.product.id || (i.product as any)?._id) === cleanPId);
     return legacyItem?.quantity || 0;
-  };
+  }, [blinkitCart, cart]);
 
   const updateBlinkitQty = (product: BlinkitProduct, delta: number, variantId?: string) => {
     if (delta > 0 && !isAuthenticated) {

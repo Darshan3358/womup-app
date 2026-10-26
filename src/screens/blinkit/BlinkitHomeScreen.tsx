@@ -41,6 +41,7 @@ export const BlinkitHomeScreen: React.FC = () => {
     setLocationModalVisible,
     requestLocationPermissionAndDetect,
     catalogVersion,
+    blinkitCart,
   } = useApp();
 
   // Direct app open: Request location permission & detect location once on initial mount
@@ -476,6 +477,7 @@ export const BlinkitHomeScreen: React.FC = () => {
       {/* Virtualised homepage body — only visible sections are mounted */}
       <FlatList
         data={SECTION_DATA}
+        extraData={blinkitCart}
         keyExtractor={(item) => item.type}
         renderItem={renderSection}
         ListHeaderComponent={ListHeader}

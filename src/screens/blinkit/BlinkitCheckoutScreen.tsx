@@ -27,6 +27,7 @@ import { matchAreaByName, AHMEDABAD_AREAS } from '../../data/areas';
 import { LocalShopApi } from '../../local-shop-module/api/localShopApi';
 import { resolveImageThumbnail } from '../../utils/imageUrl';
 import { useApp } from '../../context/AppContext';
+import { CheckoutScreenSkeleton, Skeleton } from '../../components/common/Skeleton';
 
 // Resolve full-screen order celebration video asset
 const orderVideoAsset = require('../../../assets/order_placed_video.mp4');
@@ -1045,6 +1046,10 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     setActiveScreen('C24_OrderTracking');
   };
 
+  if (cartItemCount > 0 && isCalculatingFee && dynamicDeliveryFee === null && !cachedFeeData) {
+    return <CheckoutScreenSkeleton />;
+  }
+
   return (
     <View style={styles.container}>
       {/* Top Header */}
@@ -1706,12 +1711,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
               )}
             </View>
             {isCalculatingFee ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <ActivityIndicator size="small" color="#0C831F" />
-                <Text style={[styles.summaryValue, { color: COLORS.textMuted, fontSize: 12 }]}>
-                  Calculating...
-                </Text>
-              </View>
+              <Skeleton width={60} height={16} borderRadius={4} />
             ) : (
               <Text style={[styles.summaryValue, { fontWeight: '700' }]}>
                 ₹{deliveryFee}
@@ -1760,10 +1760,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
               Amount to Pay
             </Text>
             {isCalculatingFee ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <ActivityIndicator size="small" color="#0C831F" />
-                <Text style={[TYPOGRAPHY.priceLg, { color: COLORS.textMuted, fontSize: 16 }]}>Calculating...</Text>
-              </View>
+              <Skeleton width={80} height={20} borderRadius={4} />
             ) : (
               <Text style={[TYPOGRAPHY.priceLg, styles.finalPayableValue]}>
                 ₹{finalPayable}
@@ -1792,10 +1789,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
       <View style={[styles.stickyBottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <View style={styles.bottomPriceCol}>
           {isCalculatingFee ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <ActivityIndicator size="small" color="#0C831F" />
-              <Text style={[styles.bottomPriceText, { fontSize: 14, color: COLORS.textMuted }]}>Calculating...</Text>
-            </View>
+            <Skeleton width={70} height={20} borderRadius={4} />
           ) : (
             <Text style={styles.bottomPriceText}>₹{finalPayable}</Text>
           )}

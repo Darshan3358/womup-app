@@ -19,6 +19,7 @@ import { useApp } from '../../context/AppContext';
 import { CartService } from '../../services/cartService';
 import { resolveImageThumbnail } from '../../utils/imageUrl';
 import { matchAreaByName } from '../../data/areas';
+import { CartScreenSkeleton, Skeleton } from '../../components/common/Skeleton';
 
 export const BlinkitCartScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -226,6 +227,10 @@ export const BlinkitCartScreen: React.FC = () => {
     );
   }
 
+  if (blinkitCartCount > 0 && isCalculatingFee && dynamicDeliveryFee === null && !initialCachedFee) {
+    return <CartScreenSkeleton />;
+  }
+
   return (
     <View style={styles.container}>
       {/* Top Header */}
@@ -408,12 +413,7 @@ export const BlinkitCartScreen: React.FC = () => {
                 <Text style={styles.billLabel}>Delivery Partner Fee</Text>
               </View>
               {isCalculatingFee ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <ActivityIndicator size="small" color="#0C831F" />
-                  <Text style={[styles.billValue, { color: COLORS.textMuted, fontSize: 13 }]}>
-                    Calculating...
-                  </Text>
-                </View>
+                <Skeleton width={65} height={16} borderRadius={4} />
               ) : (
                 <Text style={[styles.billValue, { fontWeight: '700', fontSize: 14 }]}>
                   ₹{deliveryFee}
@@ -441,10 +441,7 @@ export const BlinkitCartScreen: React.FC = () => {
           <View style={styles.grandTotalRow}>
             <Text style={[TYPOGRAPHY.headingMd, styles.grandTotalLabel]}>To Pay</Text>
             {isCalculatingFee ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <ActivityIndicator size="small" color="#0C831F" />
-                <Text style={[TYPOGRAPHY.priceLg, { color: COLORS.textMuted, fontSize: 16 }]}>Calculating...</Text>
-              </View>
+              <Skeleton width={80} height={20} borderRadius={4} />
             ) : (
               <Text style={[TYPOGRAPHY.priceLg, styles.grandTotalValue]}>₹{grandTotal}</Text>
             )}
@@ -472,10 +469,7 @@ export const BlinkitCartScreen: React.FC = () => {
       <View style={[styles.stickyBottomCheckoutBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <View style={styles.bottomPriceCol}>
           {isCalculatingFee ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <ActivityIndicator size="small" color="#0C831F" />
-              <Text style={[styles.bottomTotalText, { fontSize: 14, color: COLORS.textMuted }]}>Calculating...</Text>
-            </View>
+            <Skeleton width={70} height={20} borderRadius={4} />
           ) : (
             <Text style={styles.bottomTotalText}>₹{grandTotal}</Text>
           )}

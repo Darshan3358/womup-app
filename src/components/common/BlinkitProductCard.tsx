@@ -43,6 +43,7 @@ const BlinkitProductCardComponent: React.FC<BlinkitProductCardProps> = ({
     isInWishlist,
     toggleWishlist,
     isServiceable,
+    blinkitCart,
   } = useApp();
   const isWishlisted = isInWishlist(product.id);
   const [isLoading, setIsLoading] = useState(false);
