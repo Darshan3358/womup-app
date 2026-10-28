@@ -42,7 +42,7 @@ export const useKYCBanner = () => {
         bannerType: 'SUCCESS',
         kycStatus: 2,
         title: 'KYC Verified · Income Unlocked',
-        subtitle: user?.sponsorCode && user?.sponsorCode !== 'WORMUP001' ? '₹20 bonus credited to sponsor' : 'All income features unlocked',
+        subtitle: user?.sponsorCode && !['WOM001', 'WOMUP001', 'WORMUP001'].includes(user.sponsorCode) ? '₹20 bonus credited to sponsor' : 'All income features unlocked',
         ctaText: 'View Wallet',
         ctaAction: 'VIEW_WALLET',
         icon: 'check-circle',

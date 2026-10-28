@@ -206,7 +206,7 @@ export const CustomerKycReviewModal: React.FC<CustomerKycReviewModalProps> = ({
                 <View style={styles.grid}>
                   <InfoItem
                     label="Sponsor ID"
-                    value={customer?.sponsorCode || customer?.sponsor?.referralCode || customer?.sponsorId || 'WORM5871'}
+                    value={customer?.sponsorCode || customer?.sponsor?.referralCode || customer?.sponsorId || 'WOM5871'}
                   />
                   <InfoItem
                     label="Sponsor Name"
@@ -214,7 +214,7 @@ export const CustomerKycReviewModal: React.FC<CustomerKycReviewModalProps> = ({
                   />
                   <InfoItem
                     label="Referred By Code"
-                    value={customer?.customer_refferal_by || customer?.sponsorCode || 'WORM5871'}
+                    value={customer?.customer_refferal_by || customer?.sponsorCode || 'WOM5871'}
                   />
                   <InfoItem
                     label="Joining Date"

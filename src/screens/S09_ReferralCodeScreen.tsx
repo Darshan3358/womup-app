@@ -85,7 +85,7 @@ export const S09_ReferralCodeScreen: React.FC = () => {
             registrationCity: res.user.city || tempRegistration.city || user.preferredCityName,
             registrationPincode: res.user.pincode || tempRegistration.pincode,
             referralCode: res.user.referralCode || res.user.sponsorCode || sponsorCodeToUse,
-            sponsorCode: res.user.sponsorCode || sponsorCodeToUse || 'WORMUP001',
+            sponsorCode: res.user.sponsorCode || sponsorCodeToUse || 'WOM001',
             isCompanySponsored: res.user.isCompanySponsored ?? (!sponsorCodeToUse),
             shoppingCoins: res.user.shoppingCoins ?? 2000,
             pendingIncome: res.user.pendingIncome ?? 0,
@@ -162,7 +162,7 @@ export const S09_ReferralCodeScreen: React.FC = () => {
           <Ionicons name="people-outline" size={20} color={COLORS.textMuted} style={styles.icon} />
           <TextInput
             style={styles.input}
-            placeholder="Sponsor ID (e.g. WORMUP001)"
+            placeholder="Sponsor ID (e.g. WOM12345)"
             placeholderTextColor={COLORS.secondaryText}
             autoCapitalize="characters"
             value={code}
@@ -200,7 +200,7 @@ export const S09_ReferralCodeScreen: React.FC = () => {
         <View style={styles.defaultSponsorNote}>
           <Ionicons name="information-circle-outline" size={16} color={COLORS.navy} />
           <Text style={styles.defaultSponsorNoteText}>
-            💡 If left blank, you will automatically join under <Text style={{ fontWeight: '700' }}>WOMUP Company</Text> (Default Root Sponsor: WOMUP001).
+            💡 If left blank, you will automatically join under <Text style={{ fontWeight: '700' }}>WOMUP Company</Text> (Default Root Sponsor: WOM001).
           </Text>
         </View>
 

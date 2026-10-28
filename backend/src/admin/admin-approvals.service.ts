@@ -286,7 +286,7 @@ export class AdminApprovalsService {
         priority: ageHours > 24 ? 'HIGH' : 'NORMAL',
         details: {
           aadhaarNumber: c.aadharNumber || c.aadhaarNumber || 'Not provided',
-          sponsorCode: c.sponsorCode || c.sponsor_id || 'WORM5871',
+          sponsorCode: c.sponsorCode || c.sponsor_id || 'WOM5871',
           bankName: c.bankName,
           accountNumber: c.accountNumber,
           ifscCode: c.ifscCode,

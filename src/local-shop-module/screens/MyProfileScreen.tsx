@@ -67,7 +67,7 @@ export const MyProfileScreen: React.FC<MyProfileScreenProps> = ({
           <View style={styles.userInfo}>
             <Text style={styles.userName}>{user?.fullName || 'Manish Shah'}</Text>
             <View style={styles.userIdBadge}>
-              <Text style={styles.userIdText}>Sponsor ID : {user?.referralCode || 'WORM5871'}</Text>
+              <Text style={styles.userIdText}>Sponsor ID : {user?.referralCode || 'WOM5871'}</Text>
             </View>
             <Text style={styles.userPhone}>{user?.phoneNumber || '+91 98765 43210'}</Text>
             <Text style={styles.userCity}>📍 Ahmedabad, Gujarat</Text>

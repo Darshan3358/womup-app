@@ -118,12 +118,12 @@ export class RegisterDto {
   @Matches(/^[6-9]\d{9}$/, { message: 'Please enter a valid 10-digit Indian mobile number' })
   phone?: string;
 
-  @ApiProperty({ example: 'WORM50', required: false, description: 'Sponsor / referral code' })
+  @ApiProperty({ example: 'WOM50', required: false, description: 'Sponsor / referral code' })
   @IsString()
   @IsOptional()
   referralCode?: string;
 
-  @ApiProperty({ example: 'WORM1234', required: false, description: 'Sponsor Code (MLM Tree)' })
+  @ApiProperty({ example: 'WOM12345', required: false, description: 'Sponsor Code (MLM Tree)' })
   @IsString()
   @IsOptional()
   sponsorCode?: string;

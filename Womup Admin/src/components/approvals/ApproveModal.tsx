@@ -65,7 +65,7 @@ export const ApproveModal: React.FC<ApproveModalProps> = ({
         return [
           'KYC status updated to Verified (customerKycStatus = 2)',
           'Daily and monthly income features immediately unlocked',
-          `Sponsor ${item.details?.sponsorCode || 'WORM5871'} receives referral reward credit`,
+          `Sponsor ${item.details?.sponsorCode || 'WOM5871'} receives referral reward credit`,
         ];
       case 'RIDER':
         return [

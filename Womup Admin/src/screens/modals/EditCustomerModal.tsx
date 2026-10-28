@@ -102,10 +102,10 @@ export const EditCustomerModal: React.FC = () => {
       setZoneName(selectedCustomer.zoneName || 'Bopal');
       setPincode(selectedCustomer.pincode || '380015');
 
-      setSponsorId(selectedCustomer.sponsorId || selectedCustomer.sponsorCode || 'WORM5871');
+      setSponsorId(selectedCustomer.sponsorId || selectedCustomer.sponsorCode || 'WOM5871');
       setSponsorName(selectedCustomer.sponsorName || 'Darshan T.');
-      setReferralCode(selectedCustomer.sponsorCode || 'WORM5871');
-      setUserCode(selectedCustomer.referralCode || selectedCustomer.userCode || 'WORM1213');
+      setReferralCode(selectedCustomer.sponsorCode || 'WOM5871');
+      setUserCode(selectedCustomer.referralCode || selectedCustomer.userCode || 'WOM1213');
 
       setBankName(selectedCustomer.bankName || '');
       setBranchName(selectedCustomer.branchName || '');
@@ -436,7 +436,7 @@ export const EditCustomerModal: React.FC = () => {
                 <Text style={styles.label}>Sponsor ID</Text>
                 <View style={styles.readOnlyInput}>
                   <Lock size={12} color={COLORS.textMuted} style={{ marginRight: 6, flexShrink: 0 }} />
-                  <Text style={styles.readOnlyText} numberOfLines={1} ellipsizeMode="middle">{sponsorId || 'WORM5871'}</Text>
+                  <Text style={styles.readOnlyText} numberOfLines={1} ellipsizeMode="middle">{sponsorId || 'WOM5871'}</Text>
                 </View>
               </View>
 
@@ -454,7 +454,7 @@ export const EditCustomerModal: React.FC = () => {
                 <Text style={styles.label}>Referral Code (Used to Join)</Text>
                 <View style={styles.readOnlyInput}>
                   <Lock size={12} color={COLORS.textMuted} style={{ marginRight: 6, flexShrink: 0 }} />
-                  <Text style={styles.readOnlyText} numberOfLines={1}>{referralCode || 'WORM5871'}</Text>
+                  <Text style={styles.readOnlyText} numberOfLines={1}>{referralCode || 'WOM5871'}</Text>
                 </View>
               </View>
 
@@ -463,7 +463,7 @@ export const EditCustomerModal: React.FC = () => {
                 <View style={styles.readOnlyInput}>
                   <Lock size={12} color={COLORS.textMuted} style={{ marginRight: 6, flexShrink: 0 }} />
                   <Text style={[styles.readOnlyText, { color: COLORS.purple, fontWeight: '700' }]} numberOfLines={1}>
-                    {userCode || 'WORM1213'}
+                    {userCode || 'WOM1213'}
                   </Text>
                 </View>
               </View>

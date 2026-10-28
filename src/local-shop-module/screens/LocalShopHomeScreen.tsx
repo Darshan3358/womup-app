@@ -326,7 +326,7 @@ export const LocalShopHomeScreen: React.FC = () => {
         {/* 2. Hero Section: User Welcome & My Shopping Coin (2,000) */}
         <UserCoinHero
           userName={user?.fullName || 'Customer'}
-          userId={user?.referralCode || 'WORM5871'}
+          userId={user?.referralCode || 'WOM5871'}
           coinBalance={coinBalance}
           onPressProfile={() => {
             setActiveTab('My Profile');

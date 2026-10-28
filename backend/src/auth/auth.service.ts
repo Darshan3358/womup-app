@@ -640,7 +640,10 @@ export class AuthService {
 
   async getOrCreateCompanyRoot(): Promise<UserDocument> {
     let company = await this.userModel.findOne({
-      $or: [{ isCompanyAccount: true }, { referralCode: 'WORMUP001' }],
+      $or: [
+        { isCompanyAccount: true },
+        { referralCode: { $in: ['WOM001', 'WOMUP001', 'WORMUP001'] } },
+      ],
     });
 
     if (!company) {
@@ -649,8 +652,9 @@ export class AuthService {
         phone: '+910000000000',
         email: 'root@wormup.com',
         role: Role.ADMIN,
-        referralCode: 'WORMUP001',
-        sponsorCode: 'WORMUP001',
+        referralCode: 'WOM001',
+        customerCode: 'WOM001',
+        sponsorCode: 'WOM001',
         isCompanyAccount: true,
         isCompanySponsored: false,
         verificationStatus: 'VERIFIED',
@@ -671,7 +675,7 @@ export class AuthService {
 
   async validateSponsor(sponsorCode?: string) {
     const code = (sponsorCode || '').trim().toUpperCase();
-    if (!code || code === 'WORMUP001' || code === 'WORMUP') {
+    if (!code || ['WOM001', 'WOMUP001', 'WORMUP001', 'WOMUP', 'WORMUP', 'WOM', 'WORM'].includes(code)) {
       const company = await this.getOrCreateCompanyRoot();
       return {
         isValid: true,
@@ -679,14 +683,25 @@ export class AuthService {
         isCompany: true,
         isCompanyRoot: true,
         sponsorName: 'Womup Company Root',
-        referralCode: company.referralCode,
-        sponsorCode: company.referralCode,
+        referralCode: company.referralCode || 'WOM001',
+        sponsorCode: company.referralCode || 'WOM001',
         message: 'Company default sponsor will be assigned',
       };
     }
 
+    const altCode = code.startsWith('WORM')
+      ? code.replace(/^WORM/, 'WOM')
+      : code.startsWith('WOM')
+      ? code.replace(/^WOM/, 'WORM')
+      : code;
+
     const sponsor = await this.userModel.findOne({
-      referralCode: code,
+      $or: [
+        { referralCode: code },
+        { customerCode: code },
+        { referralCode: altCode },
+        { customerCode: altCode },
+      ],
       isActive: true,
     });
 
@@ -854,9 +869,22 @@ export class AuthService {
     let sponsor: UserDocument;
     let isCompanySponsored = false;
 
-    if (rawSponsor && rawSponsor.toUpperCase() !== 'WORMUP001' && rawSponsor.toUpperCase() !== 'WORMUP') {
+    const isRootSponsor = ['WOM001', 'WOMUP001', 'WORMUP001', 'WOMUP', 'WORMUP', 'WOM', 'WORM'].includes(rawSponsor.toUpperCase());
+    if (rawSponsor && !isRootSponsor) {
+      const upperSponsor = rawSponsor.toUpperCase();
+      const altSponsor = upperSponsor.startsWith('WORM')
+        ? upperSponsor.replace(/^WORM/, 'WOM')
+        : upperSponsor.startsWith('WOM')
+        ? upperSponsor.replace(/^WOM/, 'WORM')
+        : upperSponsor;
+
       const found = await this.userModel.findOne({
-        referralCode: rawSponsor.toUpperCase(),
+        $or: [
+          { referralCode: upperSponsor },
+          { customerCode: upperSponsor },
+          { referralCode: altSponsor },
+          { customerCode: altSponsor },
+        ],
         isActive: true,
       });
 
@@ -878,8 +906,13 @@ export class AuthService {
       isCompanySponsored = true;
     }
 
-    // 5. Generate User's own unique referral code
-    const generatedRefCode = `WORM${Math.floor(1000 + Math.random() * 9000)}`;
+    // 5. Generate User's own unique referral code starting with 'WOM' (e.g. WOM12345)
+    let generatedRefCode = `WOM${Math.floor(10000 + Math.random() * 90000)}`;
+    let attempts = 0;
+    while (attempts < 10 && (await this.userModel.exists({ referralCode: generatedRefCode }))) {
+      generatedRefCode = `WOM${Math.floor(10000 + Math.random() * 90000)}`;
+      attempts++;
+    }
 
     let passwordHash: string | undefined = undefined;
     if (dto.password && dto.password.trim()) {
@@ -901,6 +934,7 @@ export class AuthService {
       aadhaarFrontImage: dto.aadhaarFrontImage || undefined,
       aadhaarBackImage: dto.aadhaarBackImage || undefined,
       referralCode: generatedRefCode,
+      customerCode: generatedRefCode,
       sponsorId: sponsor._id,
       sponsorCode: sponsor.referralCode,
       passwordHash,
@@ -983,14 +1017,23 @@ export class AuthService {
     const clean10 = rawId.replace(/\D/g, '').slice(-10);
     const phoneVariants = clean10.length === 10 ? [clean10, `+91${clean10}`, `+91 ${clean10}`] : [];
 
+    const upperId = rawId.toUpperCase();
+    const altCode = upperId.startsWith('WORM')
+      ? upperId.replace(/^WORM/, 'WOM')
+      : upperId.startsWith('WOM')
+      ? upperId.replace(/^WOM/, 'WORM')
+      : upperId;
+
     // Query user by phone, email, or sponsor ID (referralCode / customerCode)
     const user = await this.userModel.findOne({
       $or: [
         { email: rawId.toLowerCase() },
         { phone: rawId },
         ...(phoneVariants.length > 0 ? [{ phone: { $in: phoneVariants } }] : []),
-        { referralCode: rawId.toUpperCase() },
-        { customerCode: rawId.toUpperCase() },
+        { referralCode: upperId },
+        { customerCode: upperId },
+        { referralCode: altCode },
+        { customerCode: altCode },
       ],
     });
 
@@ -1227,6 +1270,12 @@ export class AuthService {
     } else {
       // New user registration via Google
       isNewUser = true;
+      let googleRefCode = `WOM${Math.floor(10000 + Math.random() * 90000)}`;
+      let attempts = 0;
+      while (attempts < 10 && (await this.userModel.exists({ referralCode: googleRefCode }))) {
+        googleRefCode = `WOM${Math.floor(10000 + Math.random() * 90000)}`;
+        attempts++;
+      }
       user = await this.userModel.create({
         name: name || email.split('@')[0],
         email,
@@ -1234,6 +1283,8 @@ export class AuthService {
         avatar: photoUrl || undefined,
         role: Role.CUSTOMER,
         authProvider: 'GOOGLE',
+        referralCode: googleRefCode,
+        customerCode: googleRefCode,
         shoppingCoins: 50, // Welcome reward coins
         isEmailVerified: true,
         isPhoneVerified: false,
@@ -1339,15 +1390,15 @@ export class AuthService {
         success: true,
         message: 'Admin authenticated successfully',
         ...tokens,
-        sponsorId: adminUser.referralCode || 'WORMUP001',
+        sponsorId: adminUser.referralCode || 'WOM001',
         user: {
           id: adminUser._id.toString(),
           name: adminUser.name,
           email: adminUser.email,
           phone: adminUser.phone,
           role: adminUser.role,
-          sponsorId: adminUser.referralCode || 'WORMUP001',
-          referralCode: adminUser.referralCode || 'WORMUP001',
+          sponsorId: adminUser.referralCode || 'WOM001',
+          referralCode: adminUser.referralCode || 'WOM001',
         },
       };
     }
@@ -1361,17 +1412,17 @@ export class AuthService {
 
     return {
       success: true,
-      message: 'Admin authenticated successfully with Master Sponsor ID WORMUP001',
+      message: 'Admin authenticated successfully with Master Sponsor ID WOM001',
       ...tokens,
-      sponsorId: company.referralCode || 'WORMUP001',
+      sponsorId: company.referralCode || 'WOM001',
       user: {
         id: company._id.toString(),
         name: company.name || 'Womup Admin Root',
         email: company.email || 'root@wormup.com',
         phone: company.phone,
         role: Role.ADMIN,
-        sponsorId: company.referralCode || 'WORMUP001',
-        referralCode: company.referralCode || 'WORMUP001',
+        sponsorId: company.referralCode || 'WOM001',
+        referralCode: company.referralCode || 'WOM001',
       },
     };
   }

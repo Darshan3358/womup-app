@@ -43,7 +43,7 @@ export const BlinkitMoneyScreen: React.FC = () => {
   const toast = useToast();
 
   const handleCopyReferralCode = async () => {
-    const code = user.referralCode || (user as any).sponsorCode || 'WORM3405';
+    const code = user.referralCode || (user as any).sponsorCode || 'WOM3405';
     let copiedSuccess = false;
 
     // 1. Try modern navigator.clipboard (Standard Web API)
@@ -715,7 +715,7 @@ export const BlinkitMoneyScreen: React.FC = () => {
             <View style={styles.referralCodeCard}>
               <View style={styles.referralLeftCol}>
                 <Text style={styles.referralHeaderLabel}>MY REFERRAL CODE</Text>
-                <Text style={styles.referralCodeBig}>{user.referralCode || (user as any).sponsorCode || 'WORM3405'}</Text>
+                <Text style={styles.referralCodeBig}>{user.referralCode || (user as any).sponsorCode || 'WOM3405'}</Text>
                 <Text style={styles.referralHelpText}>
                   Share with friends to earn ₹20 Direct App Download Income
                 </Text>

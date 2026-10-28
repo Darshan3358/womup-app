@@ -218,7 +218,7 @@ export class PaymentsService {
       throw new BadRequestException('Payment verification failed: Invalid signature');
     }
     const billAmount = existingOrder.amount / 100;
-    let vendor: VendorDocument | null = null;
+    let vendor: any = null;
     if (existingOrder.vendorId && Types.ObjectId.isValid(existingOrder.vendorId)) {
       vendor = await this.vendorModel.findById(existingOrder.vendorId);
     }
@@ -226,13 +226,33 @@ export class PaymentsService {
       vendor = await this.vendorModel.findOne();
     }
     if (!vendor) {
-      vendor = {
-        _id: new Types.ObjectId(),
-        storeName: 'WormUp Express Store',
-        vendorCode: 'WORMUP01',
-        shoppingCoinPercent: 18,
-        totalCollections: 0,
-      } as any;
+      try {
+        vendor = await this.vendorModel.create({
+          vendorCode: 'WOMUP01',
+          storeName: 'Womup Express Store',
+          ownerName: 'Womup Express',
+          ownerPhone: '9999999999',
+          categoryName: 'General',
+          address: 'Ahmedabad',
+          city: 'Ahmedabad',
+          pincode: '380015',
+          shoppingCoinPercent: 18,
+          totalCollections: 0,
+          walletBalance: 0,
+          totalCommissionPaid: 0,
+          isActive: true,
+        });
+      } catch (err) {
+        vendor = {
+          _id: new Types.ObjectId(),
+          storeName: 'Womup Express Store',
+          vendorCode: 'WOMUP01',
+          shoppingCoinPercent: 18,
+          totalCollections: 0,
+          walletBalance: 0,
+          totalCommissionPaid: 0,
+        };
+      }
     }
 
     // Platform calculations
@@ -280,11 +300,23 @@ export class PaymentsService {
     existingOrder.vendorTransactionId = tx._id;
     await existingOrder.save();
 
-    // Update Vendor balances
-    vendor.totalCollections = (vendor.totalCollections || 0) + billAmount;
-    vendor.walletBalance = (vendor.walletBalance || 0) + vendorPayout;
-    vendor.totalCommissionPaid = (vendor.totalCommissionPaid || 0) + platformCommission;
-    await vendor.save();
+    // Update Vendor balances safely
+    if (vendor) {
+      vendor.totalCollections = (vendor.totalCollections || 0) + billAmount;
+      vendor.walletBalance = (vendor.walletBalance || 0) + vendorPayout;
+      vendor.totalCommissionPaid = (vendor.totalCommissionPaid || 0) + platformCommission;
+      if (typeof vendor.save === 'function') {
+        await vendor.save();
+      } else if (vendor._id && Types.ObjectId.isValid(vendor._id)) {
+        await this.vendorModel.findByIdAndUpdate(vendor._id, {
+          $inc: {
+            totalCollections: billAmount,
+            walletBalance: vendorPayout,
+            totalCommissionPaid: platformCommission,
+          },
+        });
+      }
+    }
 
     // Credit Customer Shopping Coins reward
     let customerName = 'Customer';

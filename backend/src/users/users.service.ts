@@ -550,7 +550,7 @@ export class UsersService {
         bannerType: 'SUCCESS',
         kycStatus: 2,
         title: 'KYC Verified · Income Unlocked',
-        subtitle: user.sponsorCode && user.sponsorCode !== 'WORMUP001' ? '₹20 bonus credited to sponsor' : 'All income features unlocked',
+        subtitle: user.sponsorCode && !['WOM001', 'WOMUP001', 'WORMUP001'].includes(user.sponsorCode) ? '₹20 bonus credited to sponsor' : 'All income features unlocked',
         ctaText: 'View Wallet',
         ctaAction: 'VIEW_WALLET',
         icon: 'check-circle',
@@ -758,15 +758,14 @@ export class UsersService {
     const isAdminAccount = rootUser && (
       rootUser.role === 'ADMIN' ||
       (rootUser as any).isCompanyAccount ||
-      rootUser.referralCode === 'WORMADMIN' ||
-      rootUser.referralCode === 'WORMUP001'
+      ['WOMADMIN', 'WORMADMIN', 'WOM001', 'WOMUP001', 'WORMUP001'].includes(rootUser.referralCode || '')
     );
 
     let currentLevelParentIds = [rootUserId];
     if (isAdminAccount) {
       const adminUsers = await this.userModel.find({
         $or: [
-          { referralCode: { $in: ['WORMUP001', 'WORMADMIN'] } },
+          { referralCode: { $in: ['WOM001', 'WOMUP001', 'WORMUP001', 'WOMADMIN', 'WORMADMIN'] } },
           { role: 'ADMIN' },
           { isCompanyAccount: true },
         ],
@@ -830,7 +829,7 @@ export class UsersService {
         const other = isEligibleForIncome ? Number((m.monthlyOtherPurchase || 0).toFixed(2)) : 0;
         const mIncome = Number(((veg * 0.03) + (other * 0.004)).toFixed(2));
         const isActive = isEligibleForIncome && (m.monthlyPurchaseValue || 0) >= 2000;
-        const memberCode = m.referralCode || m.sponsorCode || (m.phone ? `WORM${m.phone.slice(-4)}` : `WORM${m._id.toString().slice(-4).toUpperCase()}`);
+        const memberCode = m.referralCode || m.sponsorCode || (m.phone ? `WOM${m.phone.slice(-5)}` : `WOM${m._id.toString().slice(-5).toUpperCase()}`);
         return {
           id: m._id.toString(),
           name: m.fullNameAsPerAadhaar || m.name || 'WormUp Member',

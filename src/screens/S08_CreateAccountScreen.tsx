@@ -305,7 +305,7 @@ export const S08_CreateAccountScreen: React.FC = () => {
       return;
     }
 
-    const finalSponsor = cleanSponsor || 'WORMUP001';
+    const finalSponsor = cleanSponsor || 'WOM001';
     const cleanAadhaar = aadhaarNumber.replace(/\D/g, '').trim();
 
     setUser({
@@ -369,7 +369,7 @@ export const S08_CreateAccountScreen: React.FC = () => {
         );
         setIsSubmitting(false);
         if (res.success && res.user) {
-          const assignedSponsor = res.user.referralCode || res.user.sponsorCode || 'WORMUP001';
+          const assignedSponsor = res.user.referralCode || res.user.sponsorCode || 'WOM001';
           const updatedUser = {
             ...user,
             fullName: res.user.name || fullName.trim(),
@@ -381,7 +381,7 @@ export const S08_CreateAccountScreen: React.FC = () => {
             registrationCity: res.user.city || selectedCityName,
             registrationPincode: res.user.pincode || cleanPin,
             referralCode: assignedSponsor,
-            sponsorCode: res.user.sponsorCode || finalSponsor || 'WORMUP001',
+            sponsorCode: res.user.sponsorCode || finalSponsor || 'WOM001',
             isCompanySponsored: res.user.isCompanySponsored ?? (!finalSponsor),
             shoppingCoins: res.user.shoppingCoins ?? 2000,
             pendingIncome: res.user.pendingIncome ?? 0,
@@ -703,7 +703,7 @@ export const S08_CreateAccountScreen: React.FC = () => {
             />
             <TextInput
               style={styles.input}
-              placeholder="Enter sponsor code (e.g. WORM1234)"
+              placeholder="Enter sponsor code (e.g. WOM12345)"
               placeholderTextColor={COLORS.secondaryText}
               autoCapitalize="characters"
               maxLength={10}
