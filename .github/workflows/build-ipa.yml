@@ -71,8 +71,9 @@ jobs:
             CODE_SIGNING_ALLOWED=NO
 
           mkdir -p Payload
-          APP_BUNDLE=$(find build/Build/Products/Release-iphoneos -name "*.app" -maxdepth 1 | head -n 1)
-          cp -r "$APP_BUNDLE" Payload/
+          APP_BUNDLE=$(ls -d build/Build/Products/Release-iphoneos/*.app 2>/dev/null | head -n 1)
+          echo "Found app bundle: $APP_BUNDLE"
+          cp -R "$APP_BUNDLE" Payload/
           zip -r "womup-customer.ipa" Payload
 
       - name: Upload Customer IPA
@@ -140,8 +141,9 @@ jobs:
             CODE_SIGNING_ALLOWED=NO
 
           mkdir -p Payload
-          APP_BUNDLE=$(find build/Build/Products/Release-iphoneos -name "*.app" -maxdepth 1 | head -n 1)
-          cp -r "$APP_BUNDLE" Payload/
+          APP_BUNDLE=$(ls -d build/Build/Products/Release-iphoneos/*.app 2>/dev/null | head -n 1)
+          echo "Found app bundle: $APP_BUNDLE"
+          cp -R "$APP_BUNDLE" Payload/
           zip -r "womup-admin.ipa" Payload
 
       - name: Upload Admin IPA
@@ -209,8 +211,9 @@ jobs:
             CODE_SIGNING_ALLOWED=NO
 
           mkdir -p Payload
-          APP_BUNDLE=$(find build/Build/Products/Release-iphoneos -name "*.app" -maxdepth 1 | head -n 1)
-          cp -r "$APP_BUNDLE" Payload/
+          APP_BUNDLE=$(ls -d build/Build/Products/Release-iphoneos/*.app 2>/dev/null | head -n 1)
+          echo "Found app bundle: $APP_BUNDLE"
+          cp -R "$APP_BUNDLE" Payload/
           zip -r "womup-rider.ipa" Payload
 
       - name: Upload Rider IPA
@@ -278,8 +281,9 @@ jobs:
             CODE_SIGNING_ALLOWED=NO
 
           mkdir -p Payload
-          APP_BUNDLE=$(find build/Build/Products/Release-iphoneos -name "*.app" -maxdepth 1 | head -n 1)
-          cp -r "$APP_BUNDLE" Payload/
+          APP_BUNDLE=$(ls -d build/Build/Products/Release-iphoneos/*.app 2>/dev/null | head -n 1)
+          echo "Found app bundle: $APP_BUNDLE"
+          cp -R "$APP_BUNDLE" Payload/
           zip -r "womup-store.ipa" Payload
 
       - name: Upload Store IPA
@@ -347,8 +351,9 @@ jobs:
             CODE_SIGNING_ALLOWED=NO
 
           mkdir -p Payload
-          APP_BUNDLE=$(find build/Build/Products/Release-iphoneos -name "*.app" -maxdepth 1 | head -n 1)
-          cp -r "$APP_BUNDLE" Payload/
+          APP_BUNDLE=$(ls -d build/Build/Products/Release-iphoneos/*.app 2>/dev/null | head -n 1)
+          echo "Found app bundle: $APP_BUNDLE"
+          cp -R "$APP_BUNDLE" Payload/
           zip -r "womup-vendor.ipa" Payload
 
       - name: Upload Vendor IPA

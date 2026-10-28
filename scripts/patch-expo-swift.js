@@ -546,17 +546,11 @@ function patchAll(baseDir) {
     walkDir(jsiAppleDir);
   }
 
-  // 3. Patch build-xcframework.sh in expo-modules-jsi
-  patchBuildXcframework(baseDir);
-
-  // 4. Ensure xcframework stubs have headers and modulemaps
-  ensureExpoModulesJSIStub(baseDir);
-
   // 5. Stale cache cleanup and xcode.env.local
   cleanStaleCaches(baseDir);
   ensureXcodeEnvLocal(baseDir);
 
-  // 6. Ensure Pods targets do not attempt code signing during archive and disable precompiled modules
+  // 6. Ensure Pods targets do not attempt code signing during archive
   patchPodfile(baseDir);
 
   // 7. Fix Hermes tar extract command for directories containing spaces (e.g. "Womup Admin", "Womup Store")
@@ -594,12 +588,6 @@ function patchPodfile(baseDir) {
   try {
     let content = fs.readFileSync(podfilePath, 'utf8');
     let modified = false;
-
-    // Force precompiled modules off so all Expo modules build from source with the current compiler
-    if (!content.includes("ENV['EXPO_USE_PRECOMPILED_MODULES'] = '0'")) {
-      content = "ENV['EXPO_USE_PRECOMPILED_MODULES'] = '0'\nENV['RCT_USE_PREBUILT_RNCORE'] = '0'\n" + content;
-      modified = true;
-    }
 
     const signingSnippet = `
     # Force Pod targets to disable code signing to avoid conflicts with unsigned archive
