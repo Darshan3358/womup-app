@@ -19,13 +19,14 @@ import { useApp } from '../context/AppContext';
 
 // Resolve video asset for Metro / Web (Cloudinary CDN URL for Native + local asset)
 const CELEBRATION_VIDEO_URL =
-  'https://res.cloudinary.com/dp6ukil0g/video/upload/v1793224018/womup/order_placed_video.mp4';
+  'https://res.cloudinary.com/dp6ukil0g/video/upload/v1793225247/womup/order_placed_video.mp4';
 const orderVideoAsset = require('../../assets/order_placed_video.mp4');
 
 let NativeWebView: any = null;
 if (Platform.OS !== 'web') {
   try {
-    NativeWebView = require('react-native-webview').WebView;
+    const rnw = require('react-native-webview');
+    NativeWebView = rnw?.WebView || rnw?.default || rnw;
   } catch {
     NativeWebView = null;
   }
@@ -165,6 +166,9 @@ export const S23_OrderPlacedScreen: React.FC = () => {
               javaScriptEnabled={true}
               domStorageEnabled={true}
               scrollEnabled={false}
+              androidHardwareAccelerationDisabled={false}
+              androidLayerType="hardware"
+              mixedContentMode="always"
               source={{
                 html: `
                   <!DOCTYPE html>
@@ -173,21 +177,44 @@ export const S23_OrderPlacedScreen: React.FC = () => {
                       <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
                       <style>
                         * { margin: 0; padding: 0; box-sizing: border-box; }
-                        html, body { width: 100%; height: 100%; background: #05052A; overflow: hidden; }
+                        html, body { width: 100%; height: 100%; background: #05052A; overflow: hidden; display: flex; align-items: center; justify-content: center; }
                         video { width: 100vw; height: 100vh; object-fit: cover; }
                       </style>
                     </head>
                     <body>
                       <video
+                        id="celebrationVideo"
                         src="${CELEBRATION_VIDEO_URL}"
                         autoplay
                         playsinline
-                        muted
                         webkit-playsinline
+                        muted
+                        loop
+                        preload="auto"
                       ></video>
+                      <script>
+                        (function() {
+                          var v = document.getElementById('celebrationVideo');
+                          if (!v) return;
+                          function forcePlay() {
+                            v.muted = true;
+                            var p = v.play();
+                            if (p && p.catch) {
+                              p.catch(function(e) {
+                                console.log('retry play:', e);
+                                setTimeout(forcePlay, 200);
+                              });
+                            }
+                          }
+                          document.addEventListener('DOMContentLoaded', forcePlay);
+                          window.onload = forcePlay;
+                          forcePlay();
+                        })();
+                      </script>
                     </body>
                   </html>
                 `,
+                baseUrl: 'https://res.cloudinary.com',
               }}
               style={{
                 width: '100%',
