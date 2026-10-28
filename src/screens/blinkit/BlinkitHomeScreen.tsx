@@ -254,7 +254,6 @@ export const BlinkitHomeScreen: React.FC = () => {
     | { type: 'fast_delivery' }
     | { type: 'banner_veggies' }
     | { type: 'fresh_veggies' }
-    | { type: 'festive_season' }
     | { type: 'bestsellers' }
     | { type: 'banner_dairy' }
     | { type: 'dairy_bread' }
@@ -267,7 +266,6 @@ export const BlinkitHomeScreen: React.FC = () => {
     { type: 'fast_delivery' },
     { type: 'banner_veggies' },
     { type: 'fresh_veggies' },
-    { type: 'festive_season' },
     { type: 'bestsellers' },
     { type: 'banner_dairy' },
     { type: 'dairy_bread' },
@@ -332,16 +330,6 @@ export const BlinkitHomeScreen: React.FC = () => {
             viewAllText="View All"
             isLoading={isLoading}
           />
-        );
-      case 'festive_season':
-        return (
-          <View style={styles.festiveSeasonSectionWrapper}>
-            <WomupFestiveBanners
-              variant="festive"
-              onSelectCategory={handleSelectCategory}
-              onOpenProduct={() => setActiveScreen('C15_ProductListing')}
-            />
-          </View>
         );
       case 'bestsellers':
         return (
@@ -590,9 +578,5 @@ const styles = StyleSheet.create({
   bannerImage: {
     width: '100%',
     height: '100%',
-  },
-  festiveSeasonSectionWrapper: {
-    width: '100%',
-    marginVertical: 4,
   },
 });

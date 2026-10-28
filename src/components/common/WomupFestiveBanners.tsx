@@ -224,28 +224,15 @@ export const WomupFestiveBanners: React.FC<WomupFestiveBannersProps> = ({
             ))}
           </View>
 
-          {/* Decorative Golden Arch & Diyas Header */}
+          {/* Decorative Golden Arch & Diyas Header with Real 3D Blue & Gold Diyas */}
           <View style={styles.diwaliHeaderBox}>
-            {/* Left Diya Ornament */}
+            {/* Left Real Diya */}
             <View style={styles.diyaOrnament}>
-              <Text style={styles.diyaGlowText}>✦</Text>
-              <Svg width={36} height={28} viewBox="0 0 36 28">
-                <Defs>
-                  <SvgLinearGradient id="goldGrad1" x1="0" y1="0" x2="1" y2="1">
-                    <Stop offset="0%" stopColor="#FDE047" />
-                    <Stop offset="50%" stopColor="#EAB308" />
-                    <Stop offset="100%" stopColor="#CA8A04" />
-                  </SvgLinearGradient>
-                </Defs>
-                <Path
-                  d="M18 2 C18 2, 22 8, 22 12 C22 14.5, 20.2 16.5, 18 16.5 C15.8 16.5, 14 14.5, 14 12 C14 8, 18 2, 18 2 Z"
-                  fill="#FEF08A"
-                />
-                <Path
-                  d="M4 16 C6 24, 30 24, 32 16 C30 20, 6 20, 4 16 Z"
-                  fill="url(#goldGrad1)"
-                />
-              </Svg>
+              <Image
+                source={require('../../../assets/festive_products/real_diya.png')}
+                style={styles.headerRealDiyaImage}
+                resizeMode="contain"
+              />
             </View>
 
             {/* Center Titles */}
@@ -257,26 +244,13 @@ export const WomupFestiveBanners: React.FC<WomupFestiveBannersProps> = ({
               </View>
             </View>
 
-            {/* Right Diya Ornament */}
+            {/* Right Real Diya */}
             <View style={styles.diyaOrnament}>
-              <Text style={styles.diyaGlowText}>✦</Text>
-              <Svg width={36} height={28} viewBox="0 0 36 28">
-                <Defs>
-                  <SvgLinearGradient id="goldGrad2" x1="0" y1="0" x2="1" y2="1">
-                    <Stop offset="0%" stopColor="#FDE047" />
-                    <Stop offset="50%" stopColor="#EAB308" />
-                    <Stop offset="100%" stopColor="#CA8A04" />
-                  </SvgLinearGradient>
-                </Defs>
-                <Path
-                  d="M18 2 C18 2, 22 8, 22 12 C22 14.5, 20.2 16.5, 18 16.5 C15.8 16.5, 14 14.5, 14 12 C14 8, 18 2, 18 2 Z"
-                  fill="#FEF08A"
-                />
-                <Path
-                  d="M4 16 C6 24, 30 24, 32 16 C30 20, 6 20, 4 16 Z"
-                  fill="url(#goldGrad2)"
-                />
-              </Svg>
+              <Image
+                source={require('../../../assets/festive_products/real_diya.png')}
+                style={[styles.headerRealDiyaImage, { transform: [{ scaleX: -1 }] }]}
+                resizeMode="contain"
+              />
             </View>
           </View>
 
@@ -344,67 +318,6 @@ export const WomupFestiveBanners: React.FC<WomupFestiveBannersProps> = ({
           </View>
         </View>
       )}
-
-      {/* =========================================================================
-          BANNER 2: FESTIVE SEASON (Deep Navy Blue #28316A with Sapphire Cards)
-         ========================================================================= */}
-      {(variant === 'both' || variant === 'festive') && (
-        <View style={styles.festiveSeasonContainer}>
-          {/* Top Header with Blue Diamond Jewels */}
-          <View style={styles.festiveHeaderBox}>
-            <Text style={styles.festiveSubHeader}>YOUR GO-TO ESSENTIALS FOR THE</Text>
-            <View style={styles.festiveTitleWithJewels}>
-              <Text style={styles.jewelMotif}>❖❖❖</Text>
-              <Text style={styles.festiveMainTitle}>Festive Season</Text>
-              <Text style={styles.jewelMotif}>❖❖❖</Text>
-            </View>
-          </View>
-
-          {/* 4 Vertical Royal Blue Cards */}
-          <View style={styles.festiveCardsRow}>
-            {festiveSeasonCards.map((card) => (
-              <TouchableOpacity
-                key={card.id}
-                activeOpacity={0.88}
-                style={styles.festiveCard}
-                onPress={() => handleCardPress(card)}
-              >
-                {/* Card Top Title in White */}
-                <View style={styles.festiveCardTitleBox}>
-                  <Text style={styles.festiveCardTitle} numberOfLines={2}>
-                    {card.title}
-                  </Text>
-                </View>
-
-                {/* Product Image Stage (Clean transparent cutout) */}
-                <View style={styles.festiveProductStage}>
-                  <Image
-                    source={card.localImage || { uri: card.image }}
-                    style={styles.festiveProductImage}
-                    resizeMode="contain"
-                  />
-                </View>
-
-                <View style={styles.festiveCardSubPill}>
-                  <Text style={styles.festiveCardSubText}>{card.sub}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Powered By Brand Strip */}
-          <View style={styles.poweredByFestiveRow}>
-            <Text style={styles.poweredByFestiveText}>POWERED BY</Text>
-            <View style={styles.brandTagsRow}>
-              <View style={styles.brandBadgeBlue}><Text style={styles.brandBadgeBlueText}>Fortune</Text></View>
-              <View style={styles.brandBadgeBlue}><Text style={styles.brandBadgeBlueText}>Aashirvaad</Text></View>
-              <View style={styles.brandBadgeBlue}><Text style={styles.brandBadgeBlueText}>Real</Text></View>
-              <View style={styles.brandBadgeBlue}><Text style={styles.brandBadgeBlueText}>Bingo!</Text></View>
-              <View style={styles.brandBadgeBlue}><Text style={styles.brandBadgeBlueText}>Tata Salt</Text></View>
-            </View>
-          </View>
-        </View>
-      )}
     </View>
   );
 };
@@ -419,14 +332,14 @@ const styles = StyleSheet.create({
 
   // ── DIWALI READY BANNER STYLES ─────────────────────────────────────────────
   diwaliContainer: {
-    backgroundColor: '#7A0938',
+    backgroundColor: '#28316A',
     borderRadius: 24,
     overflow: 'hidden',
     paddingTop: 8,
     paddingBottom: 12,
     borderWidth: 1.5,
     borderColor: '#F59E0B',
-    shadowColor: '#7A0938',
+    shadowColor: '#28316A',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,
     shadowRadius: 10,
@@ -480,12 +393,12 @@ const styles = StyleSheet.create({
   diyaOrnament: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 44,
+    width: 48,
+    height: 48,
   },
-  diyaGlowText: {
-    color: '#FDE047',
-    fontSize: 16,
-    marginBottom: -4,
+  headerRealDiyaImage: {
+    width: 46,
+    height: 44,
   },
   diwaliTitleCenter: {
     alignItems: 'center',
@@ -509,7 +422,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   diwaliDatePill: {
-    backgroundColor: '#520626',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
     paddingHorizontal: 12,
     paddingVertical: 3,
     borderRadius: 12,
@@ -595,7 +508,7 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   brandBadgePill: {
-    backgroundColor: 'rgba(82, 6, 38, 0.75)',
+    backgroundColor: '##0B1756',
     borderWidth: 1,
     borderColor: '#FDE047',
     paddingHorizontal: 8,
