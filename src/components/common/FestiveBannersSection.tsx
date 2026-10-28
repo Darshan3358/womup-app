@@ -30,7 +30,42 @@ export const FestiveBannersSection: React.FC<FestiveBannersSectionProps> = ({
   const isWebWide = Platform.OS === 'web' && width > 768;
   const containerWidth = Math.min(width - (isWebWide ? 48 : 20), 1360);
 
-  // Blinking Fairy Lights Animation for Native (CSS keyframes used on web)
+  // 1. Inject CSS for Web Blinking Lights
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      const styleId = 'womup-festive-blink-style';
+      if (!document.getElementById(styleId)) {
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = `
+          @keyframes blinkLightGold {
+            0%, 100% { opacity: 1; filter: drop-shadow(0 0 10px #FBBF24); transform: scale(1.1); }
+            50% { opacity: 0.3; filter: drop-shadow(0 0 2px #FBBF24); transform: scale(0.9); }
+          }
+          @keyframes blinkLightPink {
+            0%, 100% { opacity: 0.4; filter: drop-shadow(0 0 2px #F43F5E); transform: scale(0.9); }
+            50% { opacity: 1; filter: drop-shadow(0 0 12px #F43F5E); transform: scale(1.15); }
+          }
+          @keyframes blinkLightGreen {
+            0%, 100% { opacity: 1; filter: drop-shadow(0 0 8px #34D399); transform: scale(1.05); }
+            50% { opacity: 0.35; filter: drop-shadow(0 0 1px #34D399); transform: scale(0.92); }
+          }
+          .blinking-light {
+            animation: blinkLightGold 1.5s infinite ease-in-out !important;
+          }
+          .blinking-light-delay {
+            animation: blinkLightPink 1.5s infinite ease-in-out 0.75s !important;
+          }
+          .blinking-light-alternate {
+            animation: blinkLightGreen 1.3s infinite ease-in-out 0.4s !important;
+          }
+        `;
+        document.head.appendChild(style);
+      }
+    }
+  }, []);
+
+  // 2. Animated values for Native Mobile
   const blinkAnim1 = useRef(new Animated.Value(0.4)).current;
   const blinkAnim2 = useRef(new Animated.Value(1)).current;
   const blinkAnim3 = useRef(new Animated.Value(0.6)).current;
@@ -38,20 +73,20 @@ export const FestiveBannersSection: React.FC<FestiveBannersSectionProps> = ({
   useEffect(() => {
     const loop1 = Animated.loop(
       Animated.sequence([
-        Animated.timing(blinkAnim1, { toValue: 1, duration: 800, useNativeDriver: true }),
-        Animated.timing(blinkAnim1, { toValue: 0.35, duration: 800, useNativeDriver: true }),
+        Animated.timing(blinkAnim1, { toValue: 1, duration: 750, useNativeDriver: true }),
+        Animated.timing(blinkAnim1, { toValue: 0.35, duration: 750, useNativeDriver: true }),
       ])
     );
     const loop2 = Animated.loop(
       Animated.sequence([
-        Animated.timing(blinkAnim2, { toValue: 0.35, duration: 700, useNativeDriver: true }),
-        Animated.timing(blinkAnim2, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(blinkAnim2, { toValue: 0.35, duration: 750, useNativeDriver: true }),
+        Animated.timing(blinkAnim2, { toValue: 1, duration: 750, useNativeDriver: true }),
       ])
     );
     const loop3 = Animated.loop(
       Animated.sequence([
-        Animated.timing(blinkAnim3, { toValue: 1, duration: 900, useNativeDriver: true }),
-        Animated.timing(blinkAnim3, { toValue: 0.4, duration: 900, useNativeDriver: true }),
+        Animated.timing(blinkAnim3, { toValue: 1, duration: 850, useNativeDriver: true }),
+        Animated.timing(blinkAnim3, { toValue: 0.4, duration: 850, useNativeDriver: true }),
       ])
     );
 
@@ -81,11 +116,10 @@ export const FestiveBannersSection: React.FC<FestiveBannersSectionProps> = ({
   const dairyProd = findProd(['paneer', 'milk', 'taza', 'dahi']);
   const snacksProd = findProd(['chips', 'lay', 'snack']);
   const fruitProd = findProd(['apple', 'mango', 'banana', 'fruit']);
-  const sweetProd = findProd(['paneer', 'sweet', 'mithai', 'dahi']);
   const drinkProd = findProd(['tropicana', 'juice', 'beverage']);
   const saltProd = findProd(['salt', 'tata']);
 
-  // DIWALI READY CARDS (8 Items)
+  // SECTION 1: DIWALI READY (WOMART Deep Magenta & Navy Blue Theme)
   const DIWALI_CARDS = [
     {
       id: 'd1',
@@ -98,33 +132,15 @@ export const FestiveBannersSection: React.FC<FestiveBannersSectionProps> = ({
     },
     {
       id: 'd2',
-      title: 'Furnishing,\nDining & Decor',
-      tag: 'Up to 50% OFF',
-      category: 'Household Essentials',
-      catId: 'c7',
-      img: 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=350&q=80',
-      product: null,
-    },
-    {
-      id: 'd3',
-      title: 'Home\nUpgrade',
-      tag: 'Festive Deals',
-      category: 'Electronics',
-      catId: 'c11',
-      img: 'https://images.unsplash.com/photo-1544816155-12df9643f363?w=350&q=80',
-      product: null,
-    },
-    {
-      id: 'd4',
-      title: 'House Party\n& Snacks',
-      tag: 'Flat 20% OFF',
-      category: 'Chips & Namkeen',
+      title: 'Chocolates\n& Hampers',
+      tag: 'Min 25% OFF',
+      category: 'Snacks & Sweets',
       catId: 'c2',
-      img: snacksProd?.imageUrl || 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=350&q=80',
+      img: 'https://images.unsplash.com/photo-1549007994-cb92caebd54b?w=350&q=80',
       product: snacksProd,
     },
     {
-      id: 'd5',
+      id: 'd3',
       title: 'Dry Fruits\n& Sweets',
       tag: 'Pure Ghee',
       category: 'Oil, Ghee & Masala',
@@ -133,51 +149,22 @@ export const FestiveBannersSection: React.FC<FestiveBannersSectionProps> = ({
       product: dairyProd,
     },
     {
-      id: 'd6',
-      title: 'Artisanal\nGift Boxes',
+      id: 'd4',
+      title: 'Festive\nGift Packs',
       tag: 'Under ₹499',
       category: 'Bakery & Biscuits',
       catId: 'c5',
       img: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?w=350&q=80',
       product: fruitProd,
     },
-    {
-      id: 'd7',
-      title: 'Chocolates\n& Hampers',
-      tag: 'Min 25% OFF',
-      category: 'Snacks & Sweets',
-      catId: 'c2',
-      img: 'https://images.unsplash.com/photo-1549007994-cb92caebd54b?w=350&q=80',
-      product: null,
-    },
-    {
-      id: 'd8',
-      title: 'Signature\nGifting',
-      tag: 'Best Combos',
-      category: 'Household Essentials',
-      catId: 'c7',
-      img: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?w=350&q=80',
-      product: null,
-    },
   ];
 
-  // FESTIVE SEASON CARDS (4 Curated Columns)
+  // SECTION 2: FESTIVE SEASON ESSENTIALS (Warm Cream / Off-White Theme)
   const FESTIVE_CARDS = [
     {
       id: 'f1',
-      title: 'Get\nReady',
-      sub: 'Fragrance & Grooming',
-      tag: 'From ₹49',
-      category: 'Personal Care',
-      catId: 'c8',
-      bgColor: '#1E3A8A',
-      img: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400&q=80',
-      product: null,
-    },
-    {
-      id: 'f2',
       title: 'Home\nCleaning',
-      sub: 'Floor & Hygiene Care',
+      sub: 'Harpic & Hygiene',
       tag: 'Up to 40% OFF',
       category: 'Household Essentials',
       catId: 'c7',
@@ -186,26 +173,37 @@ export const FestiveBannersSection: React.FC<FestiveBannersSectionProps> = ({
       product: null,
     },
     {
-      id: 'f3',
+      id: 'f2',
       title: 'Cooking\nEssentials',
-      sub: 'Oil, Atta & Basmati',
+      sub: 'Fortune Oil & Atta',
       tag: 'Starting ₹12',
-      category: 'Oil, Ghee & Masala',
+      category: 'Cooking Essentials',
       catId: 'c4',
       bgColor: '#2563EB',
       img: oilProd?.imageUrl || attaProd?.imageUrl || 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=400&q=80',
       product: oilProd || attaProd,
     },
     {
-      id: 'f4',
-      title: 'House\nParty',
-      sub: 'Juices, Sips & Dips',
+      id: 'f3',
+      title: 'Party\nDrinks',
+      sub: 'Juices & Sips',
       tag: 'Flat 20% OFF',
-      category: 'Chips & Namkeen',
-      catId: 'c2',
+      category: 'Beverages',
+      catId: 'c6',
       bgColor: '#0284C7',
-      img: drinkProd?.imageUrl || snacksProd?.imageUrl || 'https://images.unsplash.com/photo-1613478223719-2ab802602423?w=400&q=80',
-      product: drinkProd || snacksProd,
+      img: drinkProd?.imageUrl || 'https://images.unsplash.com/photo-1613478223719-2ab802602423?w=400&q=80',
+      product: drinkProd,
+    },
+    {
+      id: 'f4',
+      title: 'Personal\nCare',
+      sub: 'Soaps & Grooming',
+      tag: 'From ₹49',
+      category: 'Personal Care',
+      catId: 'c8',
+      bgColor: '#1E3A8A',
+      img: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400&q=80',
+      product: null,
     },
   ];
 
@@ -216,22 +214,19 @@ export const FestiveBannersSection: React.FC<FestiveBannersSectionProps> = ({
     'Ferrero Rocher',
     'Lifelong',
     'Prestige',
-    'IRIS',
-    'myTRIDENT',
-    'BOROSIL',
     'Cadbury',
     'Mangaldeep',
   ];
 
   const FESTIVE_BRANDS = [
-    'McCain',
+    'Fortune',
+    'Aashirvaad',
     'Real',
     'Bingo!',
-    "L'OREAL",
-    'BBLUNT',
-    'aer',
     'Harpic',
-    'Natureland',
+    'Amul',
+    'Dettol',
+    'Tropicana',
   ];
 
   const handleCardPress = (card: any) => {
@@ -245,9 +240,9 @@ export const FestiveBannersSection: React.FC<FestiveBannersSectionProps> = ({
   return (
     <View style={[styles.wrapper, { width: '100%', alignItems: 'center' }]}>
       {/* =========================================================================
-          BANNER 1: DIWALI READY (Royal Maroon / Deep Purple Theme with Glowing Diyas)
+          SECTION 1: "DIWALI READY" (WOMART Magenta & Navy Blue Theme with Blinking Lights)
          ========================================================================= */}
-      <View style={[styles.bannerContainer, { width: containerWidth, backgroundColor: '#470024' }]}>
+      <View style={[styles.bannerContainer, { width: containerWidth, backgroundColor: '#0F172A' }]}>
         {/* Background Image Layer */}
         <Image
           source={DIWALI_BG}
@@ -255,15 +250,19 @@ export const FestiveBannersSection: React.FC<FestiveBannersSectionProps> = ({
           resizeMode="cover"
         />
 
-        {/* Decorative Top Border Garland Fairy Lights (Blinking) */}
+        {/* Top Edge Blinking Fairy Lights */}
         <View style={styles.fairyLightsRow}>
-          {[...Array(isWebWide ? 22 : 12)].map((_, i) => {
+          {[...Array(isWebWide ? 20 : 12)].map((_, i) => {
             const anim = i % 3 === 0 ? blinkAnim1 : i % 3 === 1 ? blinkAnim2 : blinkAnim3;
+            const bulbClass =
+              i % 3 === 0 ? 'blinking-light' : i % 3 === 1 ? 'blinking-light-delay' : 'blinking-light-alternate';
             const colors = ['#FBBF24', '#F43F5E', '#34D399', '#60A5FA', '#F59E0B'];
             const bulbColor = colors[i % colors.length];
             return (
               <Animated.View
                 key={`diwali_bulb_${i}`}
+                // @ts-ignore
+                className={bulbClass}
                 style={[
                   styles.lightBulb,
                   {
@@ -277,48 +276,42 @@ export const FestiveBannersSection: React.FC<FestiveBannersSectionProps> = ({
           })}
         </View>
 
-        {/* Header Section with Arch, Diyas & Date Pill */}
+        {/* Header: MAKE YOUR HOME • Diwali Ready */}
         <View style={styles.diwaliHeaderBox}>
           <Text style={styles.diwaliPreTitle}>MAKE YOUR HOME</Text>
           <View style={styles.diwaliTitleRow}>
-            {/* Glowing Diya Left */}
             <View style={styles.diyaGlowBox}>
               <Text style={styles.diyaEmoji}>🪔</Text>
             </View>
-
             <Text style={styles.diwaliMainTitle}>Diwali Ready</Text>
-
-            {/* Glowing Diya Right */}
             <View style={styles.diyaGlowBox}>
               <Text style={styles.diyaEmoji}>🪔</Text>
             </View>
           </View>
-
-          {/* Date Badge Pill */}
           <View style={styles.dateBadgePill}>
-            <Text style={styles.dateBadgeText}>8TH NOVEMBER, SUNDAY</Text>
+            <Text style={styles.dateBadgeText}>WOMART FESTIVE SPECIAL</Text>
           </View>
         </View>
 
-        {/* 2x4 Grid of Products / Festive Categories */}
-        <View style={styles.diwaliCardsGrid}>
+        {/* 4-Column Product Grid (Clean Cutouts & Real Store Products) */}
+        <View style={styles.gridRow}>
           {DIWALI_CARDS.map((card) => (
             <TouchableOpacity
               key={card.id}
               activeOpacity={0.88}
               onPress={() => handleCardPress(card)}
-              style={styles.diwaliCard}
+              style={styles.gridCard}
             >
-              <View style={styles.diwaliCardTop}>
-                <Text style={styles.diwaliCardTitle} numberOfLines={2}>
+              <View style={styles.cardHeaderBox}>
+                <Text style={styles.cardTitle} numberOfLines={2}>
                   {card.title}
                 </Text>
               </View>
 
-              <View style={styles.diwaliCardImgBox}>
+              <View style={styles.cardImgWrapper}>
                 <Image
                   source={{ uri: card.img }}
-                  style={styles.diwaliCardImg}
+                  style={styles.cardProductImg}
                   resizeMode="contain"
                 />
               </View>
@@ -354,20 +347,15 @@ export const FestiveBannersSection: React.FC<FestiveBannersSectionProps> = ({
             ))}
           </ScrollView>
         </View>
-
-        {/* Decorative Diamond Bottom Trim */}
-        <View style={styles.bottomDiamondTrim}>
-          <Text style={styles.trimText}>❖ ❖ ❖ ❖ ❖ ❖ ❖ ❖ ❖ ❖ ❖ ❖ ❖ ❖ ❖ ❖ ❖</Text>
-        </View>
       </View>
 
-      {/* Spacer between banners */}
+      {/* Spacer between sections */}
       <View style={{ height: 20 }} />
 
       {/* =========================================================================
-          BANNER 2: FESTIVE SEASON (Warm Cream / Soft Gold Light Theme)
+          SECTION 2: "FESTIVE SEASON ESSENTIALS" (Warm Cream / Off-White Theme)
          ========================================================================= */}
-      <View style={[styles.bannerContainer, { width: containerWidth, backgroundColor: '#FFFBF0' }]}>
+      <View style={[styles.bannerContainer, { width: containerWidth, backgroundColor: '#FFF8F3' }]}>
         {/* Background Image Layer */}
         <Image
           source={FESTIVE_BG}
@@ -375,13 +363,16 @@ export const FestiveBannersSection: React.FC<FestiveBannersSectionProps> = ({
           resizeMode="cover"
         />
 
-        {/* Delicate Fairy Lights across top border */}
+        {/* Delicate Golden Fairy Lights across top border */}
         <View style={styles.fairyLightsRow}>
-          {[...Array(isWebWide ? 22 : 12)].map((_, i) => {
+          {[...Array(isWebWide ? 20 : 12)].map((_, i) => {
             const anim = i % 2 === 0 ? blinkAnim1 : blinkAnim2;
+            const bulbClass = i % 2 === 0 ? 'blinking-light' : 'blinking-light-delay';
             return (
               <Animated.View
                 key={`festive_bulb_${i}`}
+                // @ts-ignore
+                className={bulbClass}
                 style={[
                   styles.lightBulb,
                   {
@@ -400,49 +391,47 @@ export const FestiveBannersSection: React.FC<FestiveBannersSectionProps> = ({
           <Text style={styles.festivePreTitle}>YOUR GO-TO ESSENTIALS FOR THE</Text>
           <View style={styles.festiveTitleRow}>
             <Text style={styles.diamondDecor}>❖❖❖</Text>
-            <Text style={styles.festiveMainTitle}>Festive Season</Text>
+            <Text style={styles.festiveMainTitle}>Festive Season Essentials</Text>
             <Text style={styles.diamondDecor}>❖❖❖</Text>
           </View>
         </View>
 
-        {/* 4 Vertical Festive Cards (Get Ready, Home Cleaning, Cooking Essentials, House Party) */}
-        <View style={styles.festiveCardsRow}>
+        {/* 4-Column Festive Cards (Home Cleaning, Cooking Essentials, Party Drinks, Personal Care) */}
+        <View style={styles.gridRow}>
           {FESTIVE_CARDS.map((card) => (
             <TouchableOpacity
               key={card.id}
               activeOpacity={0.88}
               onPress={() => handleCardPress(card)}
-              style={[styles.festiveCard, { backgroundColor: card.bgColor }]}
+              style={[styles.gridCard, { backgroundColor: '#FFFFFF', borderColor: '#FDE68A' }]}
             >
-              <View style={styles.festiveCardHead}>
-                <Text style={styles.festiveCardTitle} numberOfLines={2}>
+              <View style={styles.cardHeaderBox}>
+                <Text style={[styles.cardTitle, { color: '#1E293B' }]} numberOfLines={2}>
                   {card.title}
                 </Text>
-                <Text style={styles.festiveCardSub} numberOfLines={1}>
+                <Text style={styles.cardSubtitle} numberOfLines={1}>
                   {card.sub}
                 </Text>
               </View>
 
-              <View style={styles.festiveCardImgContainer}>
+              <View style={styles.cardImgWrapper}>
                 <Image
                   source={{ uri: card.img }}
-                  style={styles.festiveCardImg}
+                  style={styles.cardProductImg}
                   resizeMode="contain"
                 />
               </View>
 
-              <View style={styles.festiveCardBottom}>
-                {card.product ? (
-                  <View style={styles.festiveProductBadge}>
-                    <Text style={styles.festiveProductPrice}>₹{card.product.sellingPrice}</Text>
-                    <Text style={styles.festiveAddBtnText}>+ ADD</Text>
-                  </View>
-                ) : (
-                  <View style={styles.festiveTagBadge}>
-                    <Text style={styles.festiveTagText}>{card.tag}</Text>
-                  </View>
-                )}
-              </View>
+              {card.product ? (
+                <View style={[styles.pricePill, { backgroundColor: '#0284C7' }]}>
+                  <Text style={styles.pricePillText}>₹{card.product.sellingPrice}</Text>
+                  <Text style={styles.addBtnLabel}>+ ADD</Text>
+                </View>
+              ) : (
+                <View style={[styles.tagPill, { backgroundColor: '#F1F5F9' }]}>
+                  <Text style={[styles.tagPillText, { color: '#0F172A' }]}>{card.tag}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           ))}
         </View>
@@ -476,7 +465,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative',
     paddingTop: 16,
-    paddingBottom: 12,
+    paddingBottom: 14,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 215, 0, 0.25)',
     elevation: 4,
@@ -489,23 +478,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     marginBottom: 8,
   },
   lightBulb: {
-    width: 8,
-    height: 12,
-    borderRadius: 4,
+    width: 9,
+    height: 13,
+    borderRadius: 5,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
+    shadowOpacity: 0.95,
     shadowRadius: 6,
     elevation: 3,
   },
+
   // Diwali Header
   diwaliHeaderBox: {
     alignItems: 'center',
     paddingHorizontal: 16,
-    marginBottom: 14,
+    marginBottom: 16,
   },
   diwaliPreTitle: {
     fontSize: 11,
@@ -557,51 +547,56 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
   },
 
-  // 2x4 Cards Grid
-  diwaliCardsGrid: {
+  // 4-Column Grid
+  gridRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    gap: 8,
+    paddingHorizontal: 14,
+    gap: 10,
   },
-  diwaliCard: {
-    width: '23%',
-    minWidth: 74,
+  gridCard: {
+    flex: 1,
     backgroundColor: '#FEF9C3',
-    borderRadius: 14,
-    padding: 6,
+    borderRadius: 16,
+    padding: 10,
     alignItems: 'center',
     justifyContent: 'space-between',
     borderWidth: 1,
     borderColor: '#FDE047',
-    elevation: 2,
+    elevation: 3,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    marginBottom: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    minHeight: 145,
   },
-  diwaliCardTop: {
-    minHeight: 28,
-    justifyContent: 'center',
+  cardHeaderBox: {
     alignItems: 'center',
+    minHeight: 32,
+    justifyContent: 'center',
   },
-  diwaliCardTitle: {
-    fontSize: 9.5,
+  cardTitle: {
+    fontSize: 11,
     fontWeight: '800',
     color: '#450A0A',
     textAlign: 'center',
-    lineHeight: 12,
+    lineHeight: 14,
   },
-  diwaliCardImgBox: {
-    width: 54,
-    height: 54,
-    marginVertical: 4,
+  cardSubtitle: {
+    fontSize: 8.5,
+    fontWeight: '600',
+    color: '#64748B',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  cardImgWrapper: {
+    width: 64,
+    height: 64,
+    marginVertical: 6,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  diwaliCardImg: {
+  cardProductImg: {
     width: '100%',
     height: '100%',
     borderRadius: 8,
@@ -609,43 +604,53 @@ const styles = StyleSheet.create({
   pricePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'center',
+    gap: 6,
     backgroundColor: '#16A34A',
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    width: '100%',
   },
   pricePillText: {
-    fontSize: 9.5,
+    fontSize: 10,
     fontWeight: '900',
     color: '#FFFFFF',
   },
   mrpCrossText: {
-    fontSize: 8,
+    fontSize: 8.5,
     color: 'rgba(255,255,255,0.7)',
     textDecorationLine: 'line-through',
+  },
+  addBtnLabel: {
+    fontSize: 9.5,
+    fontWeight: '900',
+    color: '#FFFFFF',
   },
   tagPill: {
     backgroundColor: 'rgba(120, 53, 15, 0.1)',
     borderRadius: 6,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    width: '100%',
+    alignItems: 'center',
   },
   tagPillText: {
     fontSize: 8.5,
     fontWeight: '700',
     color: '#92400E',
+    textAlign: 'center',
   },
 
   // Brands Footer
   diwaliBrandsFooter: {
-    marginTop: 14,
+    marginTop: 16,
     paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.12)',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
   },
   poweredByText: {
     fontSize: 9,
@@ -656,7 +661,7 @@ const styles = StyleSheet.create({
   },
   brandsScroll: {
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   brandChip: {
     backgroundColor: 'rgba(255, 255, 255, 0.18)',
@@ -669,22 +674,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#FFFFFF',
   },
-  bottomDiamondTrim: {
-    alignItems: 'center',
-    marginTop: 8,
-    opacity: 0.4,
-  },
-  trimText: {
-    fontSize: 8,
-    color: '#FDE047',
-    letterSpacing: 6,
-  },
 
   // Festive Season Light Banner Styles
   festiveHeaderBox: {
     alignItems: 'center',
     paddingHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 14,
   },
   festivePreTitle: {
     fontSize: 10.5,
@@ -710,88 +705,5 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#3B82F6',
     letterSpacing: 2,
-  },
-  festiveCardsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    gap: 8,
-  },
-  festiveCard: {
-    flex: 1,
-    borderRadius: 16,
-    padding: 8,
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 5,
-    minHeight: 150,
-  },
-  festiveCardHead: {
-    alignItems: 'center',
-  },
-  festiveCardTitle: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    lineHeight: 14,
-  },
-  festiveCardSub: {
-    fontSize: 8,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginTop: 2,
-    textAlign: 'center',
-  },
-  festiveCardImgContainer: {
-    width: 60,
-    height: 60,
-    marginVertical: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  festiveCardImg: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 8,
-  },
-  festiveCardBottom: {
-    width: '100%',
-    alignItems: 'center',
-  },
-  festiveProductBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-  },
-  festiveProductPrice: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#0F172A',
-  },
-  festiveAddBtnText: {
-    fontSize: 9.5,
-    fontWeight: '900',
-    color: '#16A34A',
-  },
-  festiveTagBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  festiveTagText: {
-    fontSize: 8.5,
-    fontWeight: '800',
-    color: '#FFFFFF',
   },
 });

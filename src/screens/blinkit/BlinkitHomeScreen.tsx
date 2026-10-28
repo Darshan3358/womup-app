@@ -417,11 +417,6 @@ export const BlinkitHomeScreen: React.FC = () => {
     <>
       <KYCBanner />
       <HeroBannerCarousel onBannerPress={handleBannerPress} />
-      <FestiveBannersSection
-        products={dbProducts}
-        onSelectCategory={handleSelectCategory}
-        onOpenProduct={handleOpenProductDetail}
-      />
       <WomupCategoryGrid
         onSelectCategory={(name, id) => {
           if (name.toLowerCase().includes('more') || id === 'c12') {
@@ -431,6 +426,11 @@ export const BlinkitHomeScreen: React.FC = () => {
           }
         }}
         onViewAll={() => setActiveScreen('Blinkit_Categories')}
+      />
+      <FestiveBannersSection
+        products={dbProducts}
+        onSelectCategory={handleSelectCategory}
+        onOpenProduct={handleOpenProductDetail}
       />
     </>
   ), [handleBannerPress, handleSelectCategory, handleOpenProductDetail, dbProducts, setActiveScreen]);
