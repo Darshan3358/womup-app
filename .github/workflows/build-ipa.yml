@@ -33,15 +33,17 @@ jobs:
       - name: Install Dependencies
         run: |
           npm ci || npm install --legacy-peer-deps
-          node scripts/patch-expo-swift.js || true
 
       - name: Generate iOS Native Project (Prebuild)
-        run: npx expo prebuild --platform ios --clean
+        run: npx expo prebuild --platform ios --clean --no-install
+
+      - name: Patch Swift & Podfile
+        run: node scripts/patch-expo-swift.js || true
 
       - name: Install CocoaPods
         run: |
           cd ios
-          pod install --repo-update
+          pod install --no-repo-update || pod install
 
       - name: Build and Package IPA
         run: |
@@ -92,12 +94,15 @@ jobs:
       - name: Generate iOS Native Project (Prebuild)
         run: |
           cd "Womup Admin"
-          npx expo prebuild --platform ios --clean
+          npx expo prebuild --platform ios --clean --no-install
+
+      - name: Patch Swift & Podfile
+        run: node scripts/patch-expo-swift.js "Womup Admin" || true
 
       - name: Install CocoaPods
         run: |
           cd "Womup Admin/ios"
-          pod install --repo-update
+          pod install --no-repo-update || pod install
 
       - name: Build and Package IPA
         run: |
@@ -149,12 +154,15 @@ jobs:
       - name: Generate iOS Native Project (Prebuild)
         run: |
           cd "Womup Rider"
-          npx expo prebuild --platform ios --clean
+          npx expo prebuild --platform ios --clean --no-install
+
+      - name: Patch Swift & Podfile
+        run: node scripts/patch-expo-swift.js "Womup Rider" || true
 
       - name: Install CocoaPods
         run: |
           cd "Womup Rider/ios"
-          pod install --repo-update
+          pod install --no-repo-update || pod install
 
       - name: Build and Package IPA
         run: |
@@ -206,12 +214,15 @@ jobs:
       - name: Generate iOS Native Project (Prebuild)
         run: |
           cd "Womup Store"
-          npx expo prebuild --platform ios --clean
+          npx expo prebuild --platform ios --clean --no-install
+
+      - name: Patch Swift & Podfile
+        run: node scripts/patch-expo-swift.js "Womup Store" || true
 
       - name: Install CocoaPods
         run: |
           cd "Womup Store/ios"
-          pod install --repo-update
+          pod install --no-repo-update || pod install
 
       - name: Build and Package IPA
         run: |
@@ -263,12 +274,15 @@ jobs:
       - name: Generate iOS Native Project (Prebuild)
         run: |
           cd "Womup Vendor"
-          npx expo prebuild --platform ios --clean
+          npx expo prebuild --platform ios --clean --no-install
+
+      - name: Patch Swift & Podfile
+        run: node scripts/patch-expo-swift.js "Womup Vendor" || true
 
       - name: Install CocoaPods
         run: |
           cd "Womup Vendor/ios"
-          pod install --repo-update
+          pod install --no-repo-update || pod install
 
       - name: Build and Package IPA
         run: |
