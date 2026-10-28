@@ -747,6 +747,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
 
   const handleRazorpaySuccess = async (orderId: string, paymentId: string, signature: string) => {
     setIsRazorpayVerifying(true);
+    setIsSubmitting(true);
     try {
       const verifyRes = await LocalShopApi.verifyRazorpayPayment({
         razorpayOrderId: orderId,
@@ -755,9 +756,6 @@ export const BlinkitCheckoutScreen: React.FC = () => {
         vendorId: currentStoreId || 'VND001',
         billAmount: finalPayable,
       });
-
-      setIsRazorpayVerifying(false);
-      setIsRazorpayModalOpen(false);
 
       if (verifyRes.success) {
         if (useCoins) {
@@ -770,18 +768,26 @@ export const BlinkitCheckoutScreen: React.FC = () => {
             deliveryInstructions: deliveryInstruction,
             walletDeduction: useWalletBalance ? walletDeduction : 0,
           });
+          setIsRazorpayVerifying(false);
+          setIsSubmitting(false);
+          setIsRazorpayModalOpen(false);
           startCelebrationVideo();
         } catch (orderErr: any) {
+          setIsRazorpayVerifying(false);
+          setIsSubmitting(false);
           Alert.alert(
             'Order Placement Failed',
             orderErr?.message || 'Delivery is currently not available for your address. If amount was deducted, auto-refund will be initiated.'
           );
         }
       } else {
+        setIsRazorpayVerifying(false);
+        setIsSubmitting(false);
         Alert.alert('Payment Verification Failed', verifyRes.message || 'Signature check failed. Please try again.');
       }
     } catch (err: any) {
       setIsRazorpayVerifying(false);
+      setIsSubmitting(false);
       Alert.alert('Payment Verification Failed', err?.message || 'Could not verify payment with backend.');
     }
   };
@@ -792,6 +798,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     if (selectedTestUpi === 'failure@razorpay') {
       Alert.alert('Razorpay Payment Failed', 'Payment was declined by bank (Simulated failure@razorpay).');
       setIsRazorpayModalOpen(false);
+      setIsSubmitting(false);
       return;
     }
 
@@ -876,9 +883,8 @@ export const BlinkitCheckoutScreen: React.FC = () => {
         }
       );
 
-      setIsSubmitting(false);
-
       if (!orderRes.success || !orderRes.data) {
+        setIsSubmitting(false);
         Alert.alert('Payment Order Failed', orderRes.message || 'Could not initiate Razorpay order.');
         return;
       }
@@ -1697,15 +1703,15 @@ export const BlinkitCheckoutScreen: React.FC = () => {
           onPress={handlePlaceOrderClick}
           style={[
             styles.placeOrderBtn,
-            (isSubmitting || isCalculatingFee || !isServiceable || areaDetectionStatus?.isServiceable === false) && {
+            (isSubmitting || isRazorpayVerifying || isCalculatingFee || !isServiceable || areaDetectionStatus?.isServiceable === false) && {
               opacity: 0.6,
               backgroundColor: '#94A3B8',
             },
           ]}
-          disabled={isSubmitting || isCalculatingFee || !isServiceable || areaDetectionStatus?.isServiceable === false}
+          disabled={isSubmitting || isRazorpayVerifying || isCalculatingFee || !isServiceable || areaDetectionStatus?.isServiceable === false}
           accessibilityLabel="Place Order"
         >
-          {isSubmitting ? (
+          {(isSubmitting || isRazorpayVerifying) ? (
             <ActivityIndicator color={COLORS.white} size="small" />
           ) : isCalculatingFee ? (
             <Text style={styles.placeOrderBtnText}>Calculating Total...</Text>
@@ -1897,7 +1903,10 @@ export const BlinkitCheckoutScreen: React.FC = () => {
         transparent
         animationType="slide"
         onRequestClose={() => {
-          if (!isRazorpayVerifying) setIsRazorpayModalOpen(false);
+          if (!isRazorpayVerifying) {
+            setIsRazorpayModalOpen(false);
+            setIsSubmitting(false);
+          }
         }}
       >
         <View style={styles.rzpModalBackdrop}>
@@ -2016,7 +2025,10 @@ export const BlinkitCheckoutScreen: React.FC = () => {
             <View style={styles.rzpActionsRow}>
               <TouchableOpacity
                 style={styles.rzpCancelBtn}
-                onPress={() => setIsRazorpayModalOpen(false)}
+                onPress={() => {
+                  setIsRazorpayModalOpen(false);
+                  setIsSubmitting(false);
+                }}
                 disabled={isRazorpayVerifying}
               >
                 <Text style={styles.rzpCancelBtnText}>Cancel</Text>
