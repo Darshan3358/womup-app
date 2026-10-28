@@ -58,67 +58,75 @@ export const WomupFestiveBanners: React.FC<WomupFestiveBannersProps> = ({
     };
   }, []);
 
-  // 1. DIWALI READY - 8 Featured Cards (Peaked Arch Shape with real WOMART project products)
+  // 1. DIWALI READY - 8 Featured Cards (Peaked Arch Shape with real WOMART project products - Clean Transparent Cutouts)
   const diwaliCards = [
     {
       id: 'd1',
       title: 'Fresh Veggies',
       categoryName: 'Vegetables & Fruits',
       categoryId: 'c1',
-      image: 'https://images.unsplash.com/photo-1546094096-0df4bcaaa337?w=400&q=80', // Fresh Tomatoes & Greens
+      localImage: require('../../../assets/festive_products/veggies_trans.png'),
+      image: 'https://res.cloudinary.com/dp6ukil0g/image/upload/v1793229302/festive_veggies_trans.png',
     },
     {
       id: 'd2',
       title: 'Fresh Fruits',
       categoryName: 'Vegetables & Fruits',
       categoryId: 'c1',
-      image: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=400&q=80', // Himachali Red Apples
+      localImage: require('../../../assets/festive_products/fruits_trans.png'),
+      image: 'https://res.cloudinary.com/dp6ukil0g/image/upload/v1793229293/festive_fruits_trans.png',
     },
     {
       id: 'd3',
       title: 'Milk & Dairy',
       categoryName: 'Dairy, Bread & Eggs',
       categoryId: 'c3',
-      image: 'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&q=80', // Amul Fresh Milk & Dairy
+      localImage: require('../../../assets/festive_products/milk_combo_trans.png'),
+      image: 'https://res.cloudinary.com/dp6ukil0g/image/upload/v1793229295/festive_milk_combo_trans.png',
     },
     {
       id: 'd4',
       title: 'Fortune Oil & Ghee',
       categoryName: 'Atta, Rice & Dal',
       categoryId: 'c2',
-      image: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=400&q=80', // Fortune Oil & Pure Ghee
+      localImage: require('../../../assets/festive_products/oil_trans.png'),
+      image: 'https://res.cloudinary.com/dp6ukil0g/image/upload/v1793229298/festive_oil_trans.png',
     },
     {
       id: 'd5',
       title: 'Lights & Diya',
       categoryName: 'Pooja & Festive',
       categoryId: 'c11',
-      image: 'https://images.unsplash.com/photo-1605629921711-2f6b00c6bbf4?w=400&q=80', // Traditional Brass Diya
+      localImage: require('../../../assets/festive_products/diya_trans.png'),
+      image: 'https://res.cloudinary.com/dp6ukil0g/image/upload/v1793229291/festive_diya_trans.png',
     },
     {
       id: 'd6',
       title: 'Dry Fruits & Sweets',
       categoryName: 'Sweets & Chocolates',
       categoryId: 'c5',
-      image: 'https://images.unsplash.com/photo-1599599810769-bcde5a160d32?w=400&q=80', // Almonds & Cashews
+      localImage: require('../../../assets/festive_products/sweets_trans.png'),
+      image: 'https://res.cloudinary.com/dp6ukil0g/image/upload/v1793229301/festive_sweets_trans.png',
     },
     {
       id: 'd7',
       title: 'Atta & Rice',
       categoryName: 'Atta, Rice & Dal',
       categoryId: 'c2',
-      image: 'https://encrypted-tbn2.gstatic.com/shopping?q=tbn:ANd9GcQeN5miia9n1b945hoeux-OQRSRA1ERKoR9VC9PjGWBOPsJoJxcosEglz-I4jcQwHgvJ5jEVPNx1DpxmCxN9Yu0C7fLFzh6XxOlQrIvoUsGdnqnaZAJ-ZZWyA', // Aashirvaad Atta
+      localImage: require('../../../assets/festive_products/atta_combo_trans.png'),
+      image: 'https://res.cloudinary.com/dp6ukil0g/image/upload/v1793229287/festive_atta_combo_trans.png',
     },
     {
       id: 'd8',
       title: 'Snacks & Juices',
       categoryName: 'Chips & Namkeen',
       categoryId: 'c4',
-      image: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=400&q=80', // Lay's & Drinks
+      localImage: require('../../../assets/festive_products/snacks_trans.png'),
+      image: 'https://res.cloudinary.com/dp6ukil0g/image/upload/v1793229300/festive_snacks_trans.png',
     },
   ];
 
-  // 2. FESTIVE SEASON ESSENTIALS - 4 Vertical Royal Blue Cards (with real WOMART products)
+  // 2. FESTIVE SEASON ESSENTIALS - 4 Vertical Royal Blue Cards (with real WOMART products - Clean Transparent Cutouts)
   const festiveSeasonCards = [
     {
       id: 'f1',
@@ -126,7 +134,8 @@ export const WomupFestiveBanners: React.FC<WomupFestiveBannersProps> = ({
       sub: 'Grooming & Glow',
       categoryName: 'Beauty & Personal Care',
       categoryId: 'c7',
-      image: 'https://images.unsplash.com/photo-1571781926291-c477ebfd024b?w=400&q=80',
+      localImage: require('../../../assets/festive_products/get_ready_trans.png'),
+      image: 'https://res.cloudinary.com/dp6ukil0g/image/upload/v1793229294/festive_get_ready_trans.png',
     },
     {
       id: 'f2',
@@ -134,7 +143,8 @@ export const WomupFestiveBanners: React.FC<WomupFestiveBannersProps> = ({
       sub: 'Floor & Sparkle',
       categoryName: 'Cleaning Essentials',
       categoryId: 'c6',
-      image: 'https://images.unsplash.com/photo-1585421514738-01798e348b17?w=400&q=80',
+      localImage: require('../../../assets/festive_products/cleaning_trans.png'),
+      image: 'https://res.cloudinary.com/dp6ukil0g/image/upload/v1793229290/festive_cleaning_trans.png',
     },
     {
       id: 'f3',
@@ -142,7 +152,8 @@ export const WomupFestiveBanners: React.FC<WomupFestiveBannersProps> = ({
       sub: 'Oil, Atta & Ghee',
       categoryName: 'Atta, Rice & Dal',
       categoryId: 'c2',
-      image: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=400&q=80', // Fortune Oil / Aashirvaad
+      localImage: require('../../../assets/festive_products/cooking_trans.png'),
+      image: 'https://res.cloudinary.com/dp6ukil0g/image/upload/v1793229290/festive_cooking_trans.png',
     },
     {
       id: 'f4',
@@ -150,7 +161,8 @@ export const WomupFestiveBanners: React.FC<WomupFestiveBannersProps> = ({
       sub: 'Drinks & Munchies',
       categoryName: 'Chips & Namkeen',
       categoryId: 'c4',
-      image: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=400&q=80', // Lay's & snacks
+      localImage: require('../../../assets/festive_products/snacks_trans.png'),
+      image: 'https://res.cloudinary.com/dp6ukil0g/image/upload/v1793229300/festive_snacks_trans.png',
     },
   ];
 
@@ -292,10 +304,10 @@ export const WomupFestiveBanners: React.FC<WomupFestiveBannersProps> = ({
                 </Text>
               </View>
 
-              {/* 3D Product Image (Bottom half with soft shadow) */}
+              {/* 3D Product Image (Bottom half with clean transparent float) */}
               <View style={styles.diwaliCardBody}>
                 <Image
-                  source={{ uri: item.image }}
+                  source={item.localImage || { uri: item.image }}
                   style={styles.diwaliCardImage}
                   resizeMode="contain"
                 />
@@ -355,10 +367,10 @@ export const WomupFestiveBanners: React.FC<WomupFestiveBannersProps> = ({
                 </Text>
               </View>
 
-              {/* Product Image Stage */}
+              {/* Product Image Stage (Clean transparent cutout floating directly on sapphire card) */}
               <View style={styles.festiveProductStage}>
                 <Image
-                  source={{ uri: card.image }}
+                  source={card.localImage || { uri: card.image }}
                   style={styles.festiveProductImage}
                   resizeMode="contain"
                 />
@@ -541,9 +553,8 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   diwaliCardImage: {
-    width: '84%',
-    height: '84%',
-    borderRadius: 8,
+    width: '92%',
+    height: '92%',
   },
 
   // Powered By Row
@@ -674,23 +685,16 @@ const styles = StyleSheet.create({
     lineHeight: 13,
   },
   festiveProductStage: {
-    width: '88%',
+    width: '92%',
     height: 78,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 12,
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 2,
+    padding: 2,
   },
   festiveProductImage: {
-    width: '94%',
-    height: '94%',
-    borderRadius: 8,
+    width: '100%',
+    height: '100%',
   },
   festiveCardSubPill: {
     marginTop: 6,
