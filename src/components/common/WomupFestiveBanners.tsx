@@ -346,15 +346,20 @@ export const WomupFestiveBanners: React.FC<WomupFestiveBannersProps> = ({
       )}
 
       {/* =========================================================================
-          BANNER 2: FESTIVE SEASON (Warm Cream & Sapphire Blue Vertical Cards with Custom Background)
+          BANNER 2: FESTIVE SEASON (Deep Navy Blue #28316A with Sapphire Cards)
          ========================================================================= */}
       {(variant === 'both' || variant === 'festive') && (
-        <ImageBackground
-          source={require('../../../assets/banners/festive_banner_bg.png')}
-          style={styles.festiveSeasonContainer}
-          imageStyle={styles.festiveSeasonBgImage}
-          resizeMode="cover"
-        >
+        <View style={styles.festiveSeasonContainer}>
+          {/* Top Header with Blue Diamond Jewels */}
+          <View style={styles.festiveHeaderBox}>
+            <Text style={styles.festiveSubHeader}>YOUR GO-TO ESSENTIALS FOR THE</Text>
+            <View style={styles.festiveTitleWithJewels}>
+              <Text style={styles.jewelMotif}>❖❖❖</Text>
+              <Text style={styles.festiveMainTitle}>Festive Season</Text>
+              <Text style={styles.jewelMotif}>❖❖❖</Text>
+            </View>
+          </View>
+
           {/* 4 Vertical Royal Blue Cards */}
           <View style={styles.festiveCardsRow}>
             {festiveSeasonCards.map((card) => (
@@ -371,7 +376,7 @@ export const WomupFestiveBanners: React.FC<WomupFestiveBannersProps> = ({
                   </Text>
                 </View>
 
-                {/* Product Image Stage (Clean transparent cutout floating directly on sapphire card) */}
+                {/* Product Image Stage (Clean transparent cutout) */}
                 <View style={styles.festiveProductStage}>
                   <Image
                     source={card.localImage || { uri: card.image }}
@@ -386,7 +391,19 @@ export const WomupFestiveBanners: React.FC<WomupFestiveBannersProps> = ({
               </TouchableOpacity>
             ))}
           </View>
-        </ImageBackground>
+
+          {/* Powered By Brand Strip */}
+          <View style={styles.poweredByFestiveRow}>
+            <Text style={styles.poweredByFestiveText}>POWERED BY</Text>
+            <View style={styles.brandTagsRow}>
+              <View style={styles.brandBadgeBlue}><Text style={styles.brandBadgeBlueText}>Fortune</Text></View>
+              <View style={styles.brandBadgeBlue}><Text style={styles.brandBadgeBlueText}>Aashirvaad</Text></View>
+              <View style={styles.brandBadgeBlue}><Text style={styles.brandBadgeBlueText}>Real</Text></View>
+              <View style={styles.brandBadgeBlue}><Text style={styles.brandBadgeBlueText}>Bingo!</Text></View>
+              <View style={styles.brandBadgeBlue}><Text style={styles.brandBadgeBlueText}>Tata Salt</Text></View>
+            </View>
+          </View>
+        </View>
       )}
     </View>
   );
@@ -607,28 +624,24 @@ const styles = StyleSheet.create({
 
   // ── FESTIVE SEASON ESSENTIALS STYLES ───────────────────────────────────────
   festiveSeasonContainer: {
-    borderRadius: 22,
+    backgroundColor: '#28316A',
+    borderRadius: 24,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    paddingTop: 52,
-    paddingBottom: 40,
+    borderColor: '#3B4890',
+    paddingVertical: 14,
     paddingHorizontal: 10,
-    overflow: 'hidden',
     shadowColor: '#1E293B',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 4,
-  },
-  festiveSeasonBgImage: {
-    borderRadius: 22,
   },
   festiveHeaderBox: {
     alignItems: 'center',
     marginBottom: 12,
   },
   festiveSubHeader: {
-    color: '#1E3A8A',
+    color: '#93C5FD',
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 1.5,
@@ -640,12 +653,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   jewelMotif: {
-    color: '#2563EB',
+    color: '#60A5FA',
     fontSize: 13,
     letterSpacing: 2,
   },
   festiveMainTitle: {
-    color: '#1E3A8A',
+    color: '#FFFFFF',
     fontSize: 26,
     fontWeight: '900',
     fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
@@ -720,22 +733,22 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   poweredByFestiveText: {
-    color: '#64748B',
+    color: '#94A3B8',
     fontSize: 9,
     fontWeight: '900',
     letterSpacing: 1,
     marginRight: 4,
   },
   brandBadgeBlue: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
     borderWidth: 0.75,
-    borderColor: '#BFDBFE',
+    borderColor: 'rgba(255, 255, 255, 0.25)',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
   },
   brandBadgeBlueText: {
-    color: '#1D4ED8',
+    color: '#FFFFFF',
     fontSize: 8.5,
     fontWeight: '700',
   },
