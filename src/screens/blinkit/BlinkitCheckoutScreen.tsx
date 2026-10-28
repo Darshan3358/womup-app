@@ -1937,6 +1937,16 @@ export const BlinkitCheckoutScreen: React.FC = () => {
         }}
       >
         <View style={styles.rzpModalBackdrop}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => {
+              if (!isRazorpayVerifying) {
+                setIsRazorpayModalOpen(false);
+                setIsSubmitting(false);
+              }
+            }}
+          />
           <View style={[styles.rzpModalSheet, { paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
             <View style={styles.rzpSheetHandle} />
 
