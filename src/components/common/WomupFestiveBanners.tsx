@@ -58,63 +58,63 @@ export const WomupFestiveBanners: React.FC<WomupFestiveBannersProps> = ({
     };
   }, []);
 
-  // 1. DIWALI READY - 8 Featured Cards (with real WOMART products)
+  // 1. DIWALI READY - 8 Featured Cards (Peaked Arch Shape with real WOMART project products)
   const diwaliCards = [
     {
       id: 'd1',
-      title: 'Lights, Diya & Decor',
-      categoryName: 'Pooja & Festive',
-      categoryId: 'c11',
-      image: 'https://images.unsplash.com/photo-1605629921711-2f6b00c6bbf4?w=400&q=80',
+      title: 'Fresh Veggies',
+      categoryName: 'Vegetables & Fruits',
+      categoryId: 'c1',
+      image: 'https://images.unsplash.com/photo-1546094096-0df4bcaaa337?w=400&q=80', // Fresh Tomatoes & Greens
     },
     {
       id: 'd2',
-      title: 'Furnishing & Dining',
-      categoryName: 'Home & Kitchen',
-      categoryId: 'c9',
-      image: 'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=400&q=80',
+      title: 'Fresh Fruits',
+      categoryName: 'Vegetables & Fruits',
+      categoryId: 'c1',
+      image: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=400&q=80', // Himachali Red Apples
     },
     {
       id: 'd3',
-      title: 'Home Upgrade',
-      categoryName: 'Electronics & Appliances',
-      categoryId: 'c10',
-      image: 'https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?w=400&q=80',
+      title: 'Milk & Dairy',
+      categoryName: 'Dairy, Bread & Eggs',
+      categoryId: 'c3',
+      image: 'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&q=80', // Amul Fresh Milk & Dairy
     },
     {
       id: 'd4',
-      title: 'Festive Party',
-      categoryName: 'Chips & Namkeen',
-      categoryId: 'c4',
-      image: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=400&q=80', // Real Lay's & snacks
+      title: 'Fortune Oil & Ghee',
+      categoryName: 'Atta, Rice & Dal',
+      categoryId: 'c2',
+      image: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=400&q=80', // Fortune Oil & Pure Ghee
     },
     {
       id: 'd5',
+      title: 'Lights & Diya',
+      categoryName: 'Pooja & Festive',
+      categoryId: 'c11',
+      image: 'https://images.unsplash.com/photo-1605629921711-2f6b00c6bbf4?w=400&q=80', // Traditional Brass Diya
+    },
+    {
+      id: 'd6',
       title: 'Dry Fruits & Sweets',
       categoryName: 'Sweets & Chocolates',
       categoryId: 'c5',
       image: 'https://images.unsplash.com/photo-1599599810769-bcde5a160d32?w=400&q=80', // Almonds & Cashews
     },
     {
-      id: 'd6',
-      title: 'Artisanal Gift Boxes',
-      categoryName: 'Sweets & Chocolates',
-      categoryId: 'c5',
-      image: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?w=400&q=80', // Gift Box Hamper
-    },
-    {
       id: 'd7',
-      title: 'Chocolates & Drinks',
-      categoryName: 'Cold Drinks & Juices',
-      categoryId: 'c8',
-      image: 'https://images.unsplash.com/photo-1613478223719-2ab802602423?w=400&q=80', // Real Tropicana / Juices
+      title: 'Atta & Rice',
+      categoryName: 'Atta, Rice & Dal',
+      categoryId: 'c2',
+      image: 'https://encrypted-tbn2.gstatic.com/shopping?q=tbn:ANd9GcQeN5miia9n1b945hoeux-OQRSRA1ERKoR9VC9PjGWBOPsJoJxcosEglz-I4jcQwHgvJ5jEVPNx1DpxmCxN9Yu0C7fLFzh6XxOlQrIvoUsGdnqnaZAJ-ZZWyA', // Aashirvaad Atta
     },
     {
       id: 'd8',
-      title: 'Signature Gifting',
-      categoryName: 'Beauty & Personal Care',
-      categoryId: 'c7',
-      image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=400&q=80', // Luxury Fragrance / Hamper
+      title: 'Snacks & Juices',
+      categoryName: 'Chips & Namkeen',
+      categoryId: 'c4',
+      image: 'https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=400&q=80', // Lay's & Drinks
     },
   ];
 
@@ -264,7 +264,7 @@ export const WomupFestiveBanners: React.FC<WomupFestiveBannersProps> = ({
           </View>
         </View>
 
-        {/* 2x4 Product Grid with Distinct Arched/Shield Cards */}
+        {/* 2x4 Product Grid with Distinct Peaked Arch Cards (matching exact shape) */}
         <View style={styles.diwaliGrid}>
           {diwaliCards.map((item) => (
             <TouchableOpacity
@@ -273,14 +273,26 @@ export const WomupFestiveBanners: React.FC<WomupFestiveBannersProps> = ({
               style={styles.diwaliCard}
               onPress={() => handleCardPress(item)}
             >
-              {/* Arched Top Header (Warm Pale Yellow/Cream) */}
+              {/* Peaked Temple Arch SVG Background (exact match to user screenshot) */}
+              <View style={StyleSheet.absoluteFill}>
+                <Svg width="100%" height="100%" viewBox="0 0 100 135" preserveAspectRatio="none">
+                  <Path
+                    d="M 10 16 L 44 2.5 Q 50 0 56 2.5 L 90 16 Q 100 21 100 32 L 100 118 Q 100 135 84 135 L 16 135 Q 0 135 0 118 L 0 32 Q 0 21 10 16 Z"
+                    fill="#FDF3DA"
+                    stroke="#FDE68A"
+                    strokeWidth={1}
+                  />
+                </Svg>
+              </View>
+
+              {/* Title Section (Upper center under the peak) */}
               <View style={styles.diwaliCardHeader}>
                 <Text style={styles.diwaliCardHeaderText} numberOfLines={2}>
                   {item.title}
                 </Text>
               </View>
 
-              {/* Card Body with Product Image */}
+              {/* 3D Product Image (Bottom half with soft shadow) */}
               <View style={styles.diwaliCardBody}>
                 <Image
                   source={{ uri: item.image }}
@@ -296,12 +308,12 @@ export const WomupFestiveBanners: React.FC<WomupFestiveBannersProps> = ({
         <View style={styles.poweredByDiwaliRow}>
           <Text style={styles.poweredByText}>POWERED BY</Text>
           <View style={styles.brandTagsRow}>
-            <View style={styles.brandBadgeGold}><Text style={styles.brandBadgeText}>Farmley</Text></View>
-            <View style={styles.brandBadgeGold}><Text style={styles.brandBadgeText}>Happilo</Text></View>
-            <View style={styles.brandBadgeGold}><Text style={styles.brandBadgeText}>Amul</Text></View>
-            <View style={styles.brandBadgeGold}><Text style={styles.brandBadgeText}>Prestige</Text></View>
-            <View style={styles.brandBadgeGold}><Text style={styles.brandBadgeText}>Borosil</Text></View>
-            <View style={styles.brandBadgeGold}><Text style={styles.brandBadgeText}>TATA</Text></View>
+            <View style={styles.brandBadgePill}><Text style={styles.brandBadgeText}>Amul</Text></View>
+            <View style={styles.brandBadgePill}><Text style={styles.brandBadgeText}>Fortune Oil</Text></View>
+            <View style={styles.brandBadgePill}><Text style={styles.brandBadgeText}>TATA</Text></View>
+            <View style={styles.brandBadgePill}><Text style={styles.brandBadgeText}>Aashirvaad</Text></View>
+            <View style={styles.brandBadgePill}><Text style={styles.brandBadgeText}>Farmley</Text></View>
+            <View style={styles.brandBadgePill}><Text style={styles.brandBadgeText}>Happilo</Text></View>
           </View>
         </View>
 
@@ -499,46 +511,38 @@ const styles = StyleSheet.create({
   },
   diwaliCard: {
     width: '23%', // 4 columns
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 34,
-    borderTopRightRadius: 34,
-    borderBottomLeftRadius: 22,
-    borderBottomRightRadius: 22,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
-    shadowRadius: 4,
-    elevation: 3,
-    marginBottom: 4,
+    height: 118,
+    position: 'relative',
+    marginBottom: 6,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
   },
   diwaliCardHeader: {
-    backgroundColor: '#FEF3C7', // Pale golden cream
-    paddingVertical: 6,
-    paddingHorizontal: 4,
-    minHeight: 38,
+    paddingTop: 12,
+    paddingHorizontal: 3,
+    minHeight: 36,
     justifyContent: 'center',
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#FDE68A',
+    zIndex: 2,
   },
   diwaliCardHeaderText: {
     fontSize: 9.5,
     fontWeight: '800',
-    color: '#78350F',
+    color: '#2E3A45',
     textAlign: 'center',
     lineHeight: 12,
   },
   diwaliCardBody: {
-    height: 72,
-    backgroundColor: '#FFFDF9',
+    flex: 1,
+    width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 4,
+    paddingBottom: 4,
+    zIndex: 2,
   },
   diwaliCardImage: {
-    width: '92%',
-    height: '92%',
+    width: '84%',
+    height: '84%',
     borderRadius: 8,
   },
 
@@ -548,7 +552,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 10,
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     flexWrap: 'wrap',
     gap: 6,
   },
@@ -563,20 +567,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: 4,
+    gap: 5,
   },
-  brandBadgeGold: {
-    backgroundColor: 'rgba(254, 243, 199, 0.18)',
-    borderWidth: 0.75,
-    borderColor: '#FDE68A',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+  brandBadgePill: {
+    backgroundColor: 'rgba(82, 6, 38, 0.75)',
+    borderWidth: 1,
+    borderColor: '#FDE047',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
   },
   brandBadgeText: {
-    color: '#FEF3C7',
-    fontSize: 8.5,
-    fontWeight: '700',
+    color: '#FEF08A',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
 
   // Bottom Diamond Border
