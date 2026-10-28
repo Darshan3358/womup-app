@@ -229,7 +229,11 @@ export const WomupFestiveBanners: React.FC<WomupFestiveBannersProps> = ({
             {/* Left Real Diya */}
             <View style={styles.diyaOrnament}>
               <Image
-                source={require('../../../assets/festive_products/real_diya.png')}
+                source={
+                  Platform.OS === 'web'
+                    ? require('../../../assets/festive_products/real_diya.png')
+                    : { uri: 'https://res.cloudinary.com/dp6ukil0g/image/upload/v1793230787/festive_real_diya.png' }
+                }
                 style={styles.headerRealDiyaImage}
                 resizeMode="contain"
               />
@@ -247,7 +251,11 @@ export const WomupFestiveBanners: React.FC<WomupFestiveBannersProps> = ({
             {/* Right Real Diya */}
             <View style={styles.diyaOrnament}>
               <Image
-                source={require('../../../assets/festive_products/real_diya.png')}
+                source={
+                  Platform.OS === 'web'
+                    ? require('../../../assets/festive_products/real_diya.png')
+                    : { uri: 'https://res.cloudinary.com/dp6ukil0g/image/upload/v1793230787/festive_real_diya.png' }
+                }
                 style={[styles.headerRealDiyaImage, { transform: [{ scaleX: -1 }] }]}
                 resizeMode="contain"
               />

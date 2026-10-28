@@ -47,6 +47,7 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 }
 
 import { ErrorBoundary } from './src/components/common/ErrorBoundary';
+import * as Updates from 'expo-updates';
 
 export default function App() {
   React.useEffect(() => {
@@ -54,6 +55,21 @@ export default function App() {
       try {
         window.history.replaceState(null, '', '/');
       } catch (e) {}
+    } else {
+      // On native iOS / Android, check for OTA updates and apply automatically
+      (async () => {
+        try {
+          if (!__DEV__) {
+            const update = await Updates.checkForUpdateAsync();
+            if (update.isAvailable) {
+              await Updates.fetchUpdateAsync();
+              await Updates.reloadAsync();
+            }
+          }
+        } catch (e) {
+          // Ignore offline / dev mode errors
+        }
+      })();
     }
   }, []);
 
