@@ -332,14 +332,14 @@ const styles = StyleSheet.create({
 
   // ── DIWALI READY BANNER STYLES ─────────────────────────────────────────────
   diwaliContainer: {
-    backgroundColor: '#28316A',
+    backgroundColor: '#0B1756',
     borderRadius: 24,
     overflow: 'hidden',
     paddingTop: 8,
     paddingBottom: 12,
     borderWidth: 1.5,
     borderColor: '#F59E0B',
-    shadowColor: '#28316A',
+    shadowColor: '#0B1756',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,
     shadowRadius: 10,
