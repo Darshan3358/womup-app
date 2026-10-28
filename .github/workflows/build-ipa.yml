@@ -11,9 +11,10 @@ on:
         options:
           - all
           - customer
-          - store
-          - rider
           - admin
+          - rider
+          - store
+          - vendor
 
 jobs:
   build-customer:
@@ -70,9 +71,9 @@ jobs:
           path: womup-customer.ipa
           retention-days: 14
 
-  build-store:
-    if: inputs.target_app == 'all' || inputs.target_app == 'store'
-    name: Build Store App IPA
+  build-admin:
+    if: inputs.target_app == 'all' || inputs.target_app == 'admin'
+    name: Build Admin App IPA
     runs-on: macos-14
     steps:
       - name: Checkout Code
@@ -85,22 +86,22 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          cd "Womup Store"
+          cd "Womup Admin"
           npm ci || npm install --legacy-peer-deps
 
       - name: Generate iOS Native Project (Prebuild)
         run: |
-          cd "Womup Store"
+          cd "Womup Admin"
           npx expo prebuild --platform ios --clean
 
       - name: Install CocoaPods
         run: |
-          cd "Womup Store/ios"
+          cd "Womup Admin/ios"
           pod install --repo-update
 
       - name: Build and Package IPA
         run: |
-          cd "Womup Store"
+          cd "Womup Admin"
           WORKSPACE=$(find ios -name "*.xcworkspace" -maxdepth 1 | head -n 1)
           SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list | awk '/Schemes:/{flag=1;next}/^[[:space:]]*$/{flag=0}flag{gsub(/^[[:space:]]+/,""); print; exit}')
           echo "Building Scheme: $SCHEME using Workspace: $WORKSPACE"
@@ -118,13 +119,13 @@ jobs:
           mkdir -p Payload
           APP_BUNDLE=$(find build/Build/Products/Release-iphoneos -name "*.app" -maxdepth 1 | head -n 1)
           cp -r "$APP_BUNDLE" Payload/
-          zip -r "womup-store.ipa" Payload
+          zip -r "womup-admin.ipa" Payload
 
-      - name: Upload Store IPA
+      - name: Upload Admin IPA
         uses: actions/upload-artifact@v4
         with:
-          name: womup-store-ipa
-          path: "Womup Store/womup-store.ipa"
+          name: womup-admin-ipa
+          path: "Womup Admin/womup-admin.ipa"
           retention-days: 14
 
   build-rider:
@@ -184,9 +185,9 @@ jobs:
           path: "Womup Rider/womup-rider.ipa"
           retention-days: 14
 
-  build-admin:
-    if: inputs.target_app == 'all' || inputs.target_app == 'admin'
-    name: Build Admin App IPA
+  build-store:
+    if: inputs.target_app == 'all' || inputs.target_app == 'store'
+    name: Build Store App IPA
     runs-on: macos-14
     steps:
       - name: Checkout Code
@@ -199,22 +200,22 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          cd "Womup Admin"
+          cd "Womup Store"
           npm ci || npm install --legacy-peer-deps
 
       - name: Generate iOS Native Project (Prebuild)
         run: |
-          cd "Womup Admin"
+          cd "Womup Store"
           npx expo prebuild --platform ios --clean
 
       - name: Install CocoaPods
         run: |
-          cd "Womup Admin/ios"
+          cd "Womup Store/ios"
           pod install --repo-update
 
       - name: Build and Package IPA
         run: |
-          cd "Womup Admin"
+          cd "Womup Store"
           WORKSPACE=$(find ios -name "*.xcworkspace" -maxdepth 1 | head -n 1)
           SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list | awk '/Schemes:/{flag=1;next}/^[[:space:]]*$/{flag=0}flag{gsub(/^[[:space:]]+/,""); print; exit}')
           echo "Building Scheme: $SCHEME using Workspace: $WORKSPACE"
@@ -232,11 +233,68 @@ jobs:
           mkdir -p Payload
           APP_BUNDLE=$(find build/Build/Products/Release-iphoneos -name "*.app" -maxdepth 1 | head -n 1)
           cp -r "$APP_BUNDLE" Payload/
-          zip -r "womup-admin.ipa" Payload
+          zip -r "womup-store.ipa" Payload
 
-      - name: Upload Admin IPA
+      - name: Upload Store IPA
         uses: actions/upload-artifact@v4
         with:
-          name: womup-admin-ipa
-          path: "Womup Admin/womup-admin.ipa"
+          name: womup-store-ipa
+          path: "Womup Store/womup-store.ipa"
+          retention-days: 14
+
+  build-vendor:
+    if: inputs.target_app == 'all' || inputs.target_app == 'vendor'
+    name: Build Vendor App IPA
+    runs-on: macos-14
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        run: |
+          cd "Womup Vendor"
+          npm ci || npm install --legacy-peer-deps
+
+      - name: Generate iOS Native Project (Prebuild)
+        run: |
+          cd "Womup Vendor"
+          npx expo prebuild --platform ios --clean
+
+      - name: Install CocoaPods
+        run: |
+          cd "Womup Vendor/ios"
+          pod install --repo-update
+
+      - name: Build and Package IPA
+        run: |
+          cd "Womup Vendor"
+          WORKSPACE=$(find ios -name "*.xcworkspace" -maxdepth 1 | head -n 1)
+          SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list | awk '/Schemes:/{flag=1;next}/^[[:space:]]*$/{flag=0}flag{gsub(/^[[:space:]]+/,""); print; exit}')
+          echo "Building Scheme: $SCHEME using Workspace: $WORKSPACE"
+
+          xcodebuild build \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+          mkdir -p Payload
+          APP_BUNDLE=$(find build/Build/Products/Release-iphoneos -name "*.app" -maxdepth 1 | head -n 1)
+          cp -r "$APP_BUNDLE" Payload/
+          zip -r "womup-vendor.ipa" Payload
+
+      - name: Upload Vendor IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: womup-vendor-ipa
+          path: "Womup Vendor/womup-vendor.ipa"
           retention-days: 14
