@@ -4,423 +4,103 @@ on:
   workflow_dispatch:
     inputs:
       target_app:
-        description: 'Which iOS App to build'
+        description: 'Which IPA to build'
         required: true
         default: 'customer'
         type: choice
         options:
           - customer
-          - admin
-          - rider
           - store
-          - all
-      build_mode:
-        description: 'Build method (macOS Runner or EAS Cloud)'
-        required: true
-        default: 'standalone_macos'
-        type: choice
-        options:
-          - standalone_macos
-          - eas_cloud
-      export_method:
-        description: 'Export method (ad-hoc, development, enterprise)'
-        required: true
-        default: 'ad-hoc'
-        type: choice
-        options:
-          - ad-hoc
-          - development
-          - enterprise
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.inputs.target_app }}
-  cancel-in-progress: true
-
-env:
-  NODE_ENV: production
-  EXPO_USE_PRECOMPILED_MODULES: 0
-  RCT_USE_PREBUILT_RNCORE: 0
+          - rider
+          - admin
 
 jobs:
-  # =========================================================================
-  # 1. Customer App IPA
-  # =========================================================================
-  build-customer-ipa:
-    if: inputs.target_app == 'customer' || inputs.target_app == 'all'
-    name: Build Customer App IPA
-    runs-on: macos-15
+  build-ipa:
+    name: Build iOS IPA (${{ inputs.target_app }})
+    runs-on: macos-14
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
-
-      - name: Select Xcode
-        run: |
-          if [ -d "/Applications/Xcode_16.4.app" ]; then
-            sudo xcode-select -s "/Applications/Xcode_16.4.app"
-          elif [ -d "/Applications/Xcode.app" ]; then
-            sudo xcode-select -s "/Applications/Xcode.app"
-          fi
-          echo "DEVELOPER_DIR=$(xcode-select -p)" >> $GITHUB_ENV
-          xcodebuild -version
-          xcrun simctl list devices > /dev/null 2>&1 || true
 
       - name: Install Project Dependencies
         run: |
-          npm ci || npm install --legacy-peer-deps
-          node scripts/patch-expo-swift.js
+          if [ "${{ inputs.target_app }}" == "customer" ]; then
+            npm ci || npm install --legacy-peer-deps
+            node scripts/patch-expo-swift.js || true
+          elif [ "${{ inputs.target_app }}" == "store" ]; then
+            cd "Womup Store"
+            npm ci || npm install --legacy-peer-deps
+          elif [ "${{ inputs.target_app }}" == "rider" ]; then
+            cd "Womup Rider"
+            npm ci || npm install --legacy-peer-deps
+          elif [ "${{ inputs.target_app }}" == "admin" ]; then
+            cd "Womup Admin"
+            npm ci || npm install --legacy-peer-deps
+          fi
 
-      # -----------------------------------------------------------------
-      # Optional: EAS Cloud Build path (if selected and EXPO_TOKEN exists)
-      # -----------------------------------------------------------------
-      - name: Build via EAS Cloud (if selected)
-        if: inputs.build_mode == 'eas_cloud'
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      - name: Generate iOS Native Project (Expo Prebuild)
         run: |
-          npx eas-cli build --platform ios --profile preview --non-interactive --wait --output=WormUp-Customer.ipa
-
-      # -----------------------------------------------------------------
-      # Standalone macOS Runner Build (Default)
-      # -----------------------------------------------------------------
-      - name: Setup Keychain & Certificates (if secrets provided)
-        if: inputs.build_mode == 'standalone_macos' && env.HAS_CERT == 'true'
-        env:
-          HAS_CERT: ${{ secrets.APPLE_CERTIFICATE_BASE64 != '' }}
-          CERT_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
-          CERT_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          PROV_BASE64: ${{ secrets.APPLE_PROVISION_PROFILE_BASE64 }}
-          KEYCHAIN_PWD: ${{ secrets.KEYCHAIN_PASSWORD || 'buildpwd123' }}
-        run: |
-          echo "Setting up temporary build keychain..."
-          KEYCHAIN_PATH=$RUNNER_TEMP/build.keychain
-          security create-keychain -p "$KEYCHAIN_PWD" "$KEYCHAIN_PATH"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-          security unlock-keychain -p "$KEYCHAIN_PWD" "$KEYCHAIN_PATH"
-
-          # Import p12
-          CERT_PATH=$RUNNER_TEMP/cert.p12
-          echo -n "$CERT_BASE64" | base64 --decode -o "$CERT_PATH"
-          security import "$CERT_PATH" -P "$CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
-          security list-keychain -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
-          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PWD" "$KEYCHAIN_PATH"
-
-          # Install mobileprovision
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          echo -n "$PROV_BASE64" | base64 --decode -o ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
-
-      - name: Generate iOS Native Project via Expo Prebuild
-        if: inputs.build_mode == 'standalone_macos'
-        run: |
-          npx expo prebuild --platform ios --clean
-          echo "export NODE_BINARY=$(which node)" > ios/.xcode.env.local
-          node scripts/patch-expo-swift.js
+          if [ "${{ inputs.target_app }}" == "customer" ]; then
+            npx expo prebuild --platform ios --clean
+          elif [ "${{ inputs.target_app }}" == "store" ]; then
+            cd "Womup Store" && npx expo prebuild --platform ios --clean
+          elif [ "${{ inputs.target_app }}" == "rider" ]; then
+            cd "Womup Rider" && npx expo prebuild --platform ios --clean
+          elif [ "${{ inputs.target_app }}" == "admin" ]; then
+            cd "Womup Admin" && npx expo prebuild --platform ios --clean
+          fi
 
       - name: Install CocoaPods
-        if: inputs.build_mode == 'standalone_macos'
         run: |
-          echo "export NODE_BINARY=$(which node)" > ios/.xcode.env.local
-          node scripts/patch-expo-swift.js
-          cd ios
+          TARGET_DIR="."
+          if [ "${{ inputs.target_app }}" == "store" ]; then TARGET_DIR="Womup Store"; fi
+          if [ "${{ inputs.target_app }}" == "rider" ]; then TARGET_DIR="Womup Rider"; fi
+          if [ "${{ inputs.target_app }}" == "admin" ]; then TARGET_DIR="Womup Admin"; fi
+
+          cd "$TARGET_DIR/ios"
           pod install --repo-update
 
-      - name: Build & Archive iOS Project
-        if: inputs.build_mode == 'standalone_macos'
+      - name: Build and Package IPA
         run: |
-          WORKSPACE=$(ls -d ios/*.xcworkspace 2>/dev/null | head -n 1)
-          APP_PROJECT=$(ls -d ios/*.xcodeproj 2>/dev/null | head -n 1)
-          SCHEME=""
-          if [ -n "$APP_PROJECT" ]; then
-            SCHEME=$(basename "$APP_PROJECT" .xcodeproj)
-          fi
-          if [ -z "$SCHEME" ]; then
-            SCHEME="WormUp"
-          fi
-          echo "Selected Workspace: $WORKSPACE"
-          echo "Selected Scheme: $SCHEME"
-          mkdir -p build
+          TARGET_DIR="."
+          APP_NAME="womup-customer"
+          if [ "${{ inputs.target_app }}" == "store" ]; then TARGET_DIR="Womup Store"; APP_NAME="womup-store"; fi
+          if [ "${{ inputs.target_app }}" == "rider" ]; then TARGET_DIR="Womup Rider"; APP_NAME="womup-rider"; fi
+          if [ "${{ inputs.target_app }}" == "admin" ]; then TARGET_DIR="Womup Admin"; APP_NAME="womup-admin"; fi
 
-          # Build archive
-          xcodebuild -workspace "$WORKSPACE" \
+          cd "$TARGET_DIR"
+          WORKSPACE=$(find ios -name "*.xcworkspace" -maxdepth 1 | head -n 1)
+          SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list | awk '/Schemes:/{flag=1;next}/^[[:space:]]*$/{flag=0}flag{gsub(/^[[:space:]]+/,""); print; exit}')
+          
+          echo "Building Scheme: $SCHEME using Workspace: $WORKSPACE"
+
+          xcodebuild build \
+            -workspace "$WORKSPACE" \
             -scheme "$SCHEME" \
             -configuration Release \
-            -destination "generic/platform=iOS" \
-            -archivePath "build/${SCHEME}.xcarchive" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
+            -sdk iphoneos \
+            -derivedDataPath build \
             CODE_SIGN_IDENTITY="" \
-            archive
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
 
-      - name: Package IPA
-        if: inputs.build_mode == 'standalone_macos'
-        run: |
-          mkdir -p build/ipa/Payload
-          APP_PATH=$(find build -name "*.app" -type d | head -n 1)
-          echo "Found app bundle at: $APP_PATH"
-          cp -R "$APP_PATH" build/ipa/Payload/
-          cd build/ipa
-          zip -r "WormUp-Customer-Release.ipa" Payload
-          ls -la WormUp-Customer-Release.ipa
+          # Create IPA package (Payload structure)
+          mkdir -p Payload
+          APP_BUNDLE=$(find build/Build/Products/Release-iphoneos -name "*.app" -maxdepth 1 | head -n 1)
+          cp -r "$APP_BUNDLE" Payload/
+          zip -r "${APP_NAME}.ipa" Payload
+          
+          mkdir -p "$GITHUB_WORKSPACE/output-ipa"
+          mv "${APP_NAME}.ipa" "$GITHUB_WORKSPACE/output-ipa/"
 
-      - name: Upload Customer App IPA
+      - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: WormUp-Customer-iOS-IPA
-          path: |
-            build/ipa/WormUp-Customer-Release.ipa
-            WormUp-Customer.ipa
-          retention-days: 14
-
-  # =========================================================================
-  # 2. Admin App IPA
-  # =========================================================================
-  build-admin-ipa:
-    if: inputs.target_app == 'admin' || inputs.target_app == 'all'
-    name: Build Admin App IPA
-    runs-on: macos-15
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Select Xcode
-        run: |
-          if [ -d "/Applications/Xcode_16.4.app" ]; then
-            sudo xcode-select -s "/Applications/Xcode_16.4.app"
-          elif [ -d "/Applications/Xcode.app" ]; then
-            sudo xcode-select -s "/Applications/Xcode.app"
-          fi
-          echo "DEVELOPER_DIR=$(xcode-select -p)" >> $GITHUB_ENV
-          xcodebuild -version
-          xcrun simctl list devices > /dev/null 2>&1 || true
-
-      - name: Install Admin Dependencies
-        run: |
-          cd "Womup Admin"
-          npm ci || npm install --legacy-peer-deps
-          node ../scripts/patch-expo-swift.js .
-
-      - name: Generate Admin iOS Native Project
-        run: |
-          cd "Womup Admin"
-          npx expo prebuild --platform ios --clean
-          echo "export NODE_BINARY=$(which node)" > ios/.xcode.env.local
-          node ../scripts/patch-expo-swift.js .
-          cd ios
-          pod install --repo-update
-
-      - name: Build & Archive Admin iOS
-        run: |
-          cd "Womup Admin"
-          WORKSPACE=$(ls -d ios/*.xcworkspace 2>/dev/null | head -n 1)
-          APP_PROJECT=$(ls -d ios/*.xcodeproj 2>/dev/null | head -n 1)
-          SCHEME=""
-          if [ -n "$APP_PROJECT" ]; then
-            SCHEME=$(basename "$APP_PROJECT" .xcodeproj)
-          fi
-          if [ -z "$SCHEME" ]; then
-            SCHEME="WomupAdminConsole"
-          fi
-          echo "Selected Workspace: $WORKSPACE"
-          echo "Selected Scheme: $SCHEME"
-          mkdir -p build
-          xcodebuild -workspace "$WORKSPACE" \
-            -scheme "$SCHEME" \
-            -configuration Release \
-            -destination "generic/platform=iOS" \
-            -archivePath "build/Admin.xcarchive" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            archive
-
-      - name: Package Admin IPA
-        run: |
-          cd "Womup Admin"
-          mkdir -p build/ipa/Payload
-          APP_PATH=$(find build -name "*.app" -type d | head -n 1)
-          cp -R "$APP_PATH" build/ipa/Payload/
-          cd build/ipa
-          zip -r "Womup-Admin-Release.ipa" Payload
-
-      - name: Upload Admin App IPA
-        uses: actions/upload-artifact@v4
-        with:
-          name: Womup-Admin-iOS-IPA
-          path: "Womup Admin/build/ipa/Womup-Admin-Release.ipa"
-          retention-days: 14
-
-  # =========================================================================
-  # 3. Rider App IPA
-  # =========================================================================
-  build-rider-ipa:
-    if: inputs.target_app == 'rider' || inputs.target_app == 'all'
-    name: Build Rider App IPA
-    runs-on: macos-15
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Select Xcode
-        run: |
-          if [ -d "/Applications/Xcode_16.4.app" ]; then
-            sudo xcode-select -s "/Applications/Xcode_16.4.app"
-          elif [ -d "/Applications/Xcode.app" ]; then
-            sudo xcode-select -s "/Applications/Xcode.app"
-          fi
-          echo "DEVELOPER_DIR=$(xcode-select -p)" >> $GITHUB_ENV
-          xcodebuild -version
-          xcrun simctl list devices > /dev/null 2>&1 || true
-
-      - name: Install Rider Dependencies
-        run: |
-          cd "Womup Rider"
-          npm ci || npm install --legacy-peer-deps
-          node ../scripts/patch-expo-swift.js .
-
-      - name: Generate Rider iOS Native Project
-        run: |
-          cd "Womup Rider"
-          npx expo prebuild --platform ios --clean
-          echo "export NODE_BINARY=$(which node)" > ios/.xcode.env.local
-          node ../scripts/patch-expo-swift.js .
-          cd ios
-          pod install --repo-update
-
-      - name: Build & Archive Rider iOS
-        run: |
-          cd "Womup Rider"
-          WORKSPACE=$(ls -d ios/*.xcworkspace 2>/dev/null | head -n 1)
-          APP_PROJECT=$(ls -d ios/*.xcodeproj 2>/dev/null | head -n 1)
-          SCHEME=""
-          if [ -n "$APP_PROJECT" ]; then
-            SCHEME=$(basename "$APP_PROJECT" .xcodeproj)
-          fi
-          if [ -z "$SCHEME" ]; then
-            SCHEME="WomupRider"
-          fi
-          echo "Selected Workspace: $WORKSPACE"
-          echo "Selected Scheme: $SCHEME"
-          mkdir -p build
-          xcodebuild -workspace "$WORKSPACE" \
-            -scheme "$SCHEME" \
-            -configuration Release \
-            -destination "generic/platform=iOS" \
-            -archivePath "build/Rider.xcarchive" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            archive
-
-      - name: Package Rider IPA
-        run: |
-          cd "Womup Rider"
-          mkdir -p build/ipa/Payload
-          APP_PATH=$(find build -name "*.app" -type d | head -n 1)
-          cp -R "$APP_PATH" build/ipa/Payload/
-          cd build/ipa
-          zip -r "Womup-Rider-Release.ipa" Payload
-
-      - name: Upload Rider App IPA
-        uses: actions/upload-artifact@v4
-        with:
-          name: Womup-Rider-iOS-IPA
-          path: "Womup Rider/build/ipa/Womup-Rider-Release.ipa"
-          retention-days: 14
-
-  # =========================================================================
-  # 4. Store App IPA
-  # =========================================================================
-  build-store-ipa:
-    if: inputs.target_app == 'store' || inputs.target_app == 'all'
-    name: Build Store App IPA
-    runs-on: macos-15
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Select Xcode
-        run: |
-          if [ -d "/Applications/Xcode_16.4.app" ]; then
-            sudo xcode-select -s "/Applications/Xcode_16.4.app"
-          elif [ -d "/Applications/Xcode.app" ]; then
-            sudo xcode-select -s "/Applications/Xcode.app"
-          fi
-          echo "DEVELOPER_DIR=$(xcode-select -p)" >> $GITHUB_ENV
-          xcodebuild -version
-          xcrun simctl list devices > /dev/null 2>&1 || true
-
-      - name: Install Store Dependencies
-        run: |
-          cd "Womup Store"
-          npm ci || npm install --legacy-peer-deps
-          node ../scripts/patch-expo-swift.js .
-
-      - name: Generate Store iOS Native Project
-        run: |
-          cd "Womup Store"
-          npx expo prebuild --platform ios --clean
-          echo "export NODE_BINARY=$(which node)" > ios/.xcode.env.local
-          node ../scripts/patch-expo-swift.js .
-          cd ios
-          pod install --repo-update
-
-      - name: Build & Archive Store iOS
-        run: |
-          cd "Womup Store"
-          WORKSPACE=$(ls -d ios/*.xcworkspace 2>/dev/null | head -n 1)
-          APP_PROJECT=$(ls -d ios/*.xcodeproj 2>/dev/null | head -n 1)
-          SCHEME=""
-          if [ -n "$APP_PROJECT" ]; then
-            SCHEME=$(basename "$APP_PROJECT" .xcodeproj)
-          fi
-          if [ -z "$SCHEME" ]; then
-            SCHEME="WomupStore"
-          fi
-          echo "Selected Workspace: $WORKSPACE"
-          echo "Selected Scheme: $SCHEME"
-          mkdir -p build
-          xcodebuild -workspace "$WORKSPACE" \
-            -scheme "$SCHEME" \
-            -configuration Release \
-            -destination "generic/platform=iOS" \
-            -archivePath "build/Store.xcarchive" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            archive
-
-      - name: Package Store IPA
-        run: |
-          cd "Womup Store"
-          mkdir -p build/ipa/Payload
-          APP_PATH=$(find build -name "*.app" -type d | head -n 1)
-          cp -R "$APP_PATH" build/ipa/Payload/
-          cd build/ipa
-          zip -r "Womup-Store-Release.ipa" Payload
-
-      - name: Upload Store App IPA
-        uses: actions/upload-artifact@v4
-        with:
-          name: Womup-Store-iOS-IPA
-          path: "Womup Store/build/ipa/Womup-Store-Release.ipa"
+          name: ${{ inputs.target_app }}-ipa
+          path: output-ipa/*.ipa
           retention-days: 14
