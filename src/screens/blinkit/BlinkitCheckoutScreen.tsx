@@ -28,8 +28,19 @@ import { resolveImageThumbnail } from '../../utils/imageUrl';
 import { useApp } from '../../context/AppContext';
 import { CheckoutScreenSkeleton, Skeleton } from '../../components/common/Skeleton';
 
-// Resolve full-screen order celebration video asset
+// Resolve full-screen order celebration video asset (Cloudinary CDN URL for Native + local asset)
+const CELEBRATION_VIDEO_URL =
+  'https://res.cloudinary.com/dp6ukil0g/video/upload/v1793224018/womup/order_placed_video.mp4';
 const orderVideoAsset = require('../../../assets/order_placed_video.mp4');
+
+let NativeWebView: any = null;
+if (Platform.OS !== 'web') {
+  try {
+    NativeWebView = require('react-native-webview').WebView;
+  } catch {
+    NativeWebView = null;
+  }
+}
 
 const getVideoSource = () => {
   if (typeof orderVideoAsset === 'string') return orderVideoAsset;
@@ -39,7 +50,7 @@ const getVideoSource = () => {
     const resolved = Image.resolveAssetSource(orderVideoAsset);
     if (resolved?.uri) return resolved.uri;
   } catch (e) { }
-  return '/assets/assets/order_placed_video.mp4';
+  return CELEBRATION_VIDEO_URL;
 };
 
 const loadRazorpayScript = (): Promise<boolean> => {
@@ -1738,6 +1749,44 @@ export const BlinkitCheckoutScreen: React.FC = () => {
                 width: '100%',
                 height: '100%',
                 objectFit: 'cover',
+                backgroundColor: '#05052A',
+              }}
+            />
+          ) : NativeWebView ? (
+            <NativeWebView
+              originWhitelist={['*']}
+              allowsInlineMediaPlayback={true}
+              mediaPlaybackRequiresUserAction={false}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              scrollEnabled={false}
+              source={{
+                html: `
+                  <!DOCTYPE html>
+                  <html>
+                    <head>
+                      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+                      <style>
+                        * { margin: 0; padding: 0; box-sizing: border-box; }
+                        html, body { width: 100%; height: 100%; background: #05052A; overflow: hidden; }
+                        video { width: 100vw; height: 100vh; object-fit: cover; }
+                      </style>
+                    </head>
+                    <body>
+                      <video
+                        src="${CELEBRATION_VIDEO_URL}"
+                        autoplay
+                        playsinline
+                        muted
+                        webkit-playsinline
+                      ></video>
+                    </body>
+                  </html>
+                `,
+              }}
+              style={{
+                width: '100%',
+                height: '100%',
                 backgroundColor: '#05052A',
               }}
             />
