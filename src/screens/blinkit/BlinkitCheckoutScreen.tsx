@@ -28,20 +28,13 @@ import { resolveImageThumbnail } from '../../utils/imageUrl';
 import { useApp } from '../../context/AppContext';
 import { CheckoutScreenSkeleton, Skeleton } from '../../components/common/Skeleton';
 
-// Resolve full-screen order celebration video asset (Cloudinary CDN URL for Native + local asset)
+// Resolve full-screen order celebration video asset (Cloudinary CDN URL for Web + native animated asset)
 const CELEBRATION_VIDEO_URL =
   'https://res.cloudinary.com/dp6ukil0g/video/upload/v1793225247/womup/order_placed_video.mp4';
+const CELEBRATION_ANIMATION_GIF_URL =
+  'https://res.cloudinary.com/dp6ukil0g/image/upload/v1793225950/womup/order_placed_animation.gif';
 const orderVideoAsset = require('../../../assets/order_placed_video.mp4');
-
-let NativeWebView: any = null;
-if (Platform.OS !== 'web') {
-  try {
-    const rnw = require('react-native-webview');
-    NativeWebView = rnw?.WebView || rnw?.default || rnw;
-  } catch {
-    NativeWebView = null;
-  }
-}
+const orderAnimationAsset = require('../../../assets/order_placed_animation.gif');
 
 const getVideoSource = () => {
   if (typeof orderVideoAsset === 'string') return orderVideoAsset;
@@ -1759,78 +1752,17 @@ export const BlinkitCheckoutScreen: React.FC = () => {
                 backgroundColor: '#05052A',
               }}
             />
-          ) : NativeWebView ? (
-            <NativeWebView
-              originWhitelist={['*']}
-              allowsInlineMediaPlayback={true}
-              mediaPlaybackRequiresUserAction={false}
-              javaScriptEnabled={true}
-              domStorageEnabled={true}
-              scrollEnabled={false}
-              androidHardwareAccelerationDisabled={false}
-              androidLayerType="hardware"
-              mixedContentMode="always"
-              source={{
-                html: `
-                  <!DOCTYPE html>
-                  <html>
-                    <head>
-                      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-                      <style>
-                        * { margin: 0; padding: 0; box-sizing: border-box; }
-                        html, body { width: 100%; height: 100%; background: #05052A; overflow: hidden; display: flex; align-items: center; justify-content: center; }
-                        video { width: 100vw; height: 100vh; object-fit: cover; }
-                      </style>
-                    </head>
-                    <body>
-                      <video
-                        id="celebrationVideo"
-                        src="${CELEBRATION_VIDEO_URL}"
-                        autoplay
-                        playsinline
-                        webkit-playsinline
-                        muted
-                        loop
-                        preload="auto"
-                      ></video>
-                      <script>
-                        (function() {
-                          var v = document.getElementById('celebrationVideo');
-                          if (!v) return;
-                          function forcePlay() {
-                            v.muted = true;
-                            var p = v.play();
-                            if (p && p.catch) {
-                              p.catch(function(e) {
-                                console.log('retry play:', e);
-                                setTimeout(forcePlay, 200);
-                              });
-                            }
-                          }
-                          document.addEventListener('DOMContentLoaded', forcePlay);
-                          window.onload = forcePlay;
-                          forcePlay();
-                        })();
-                      </script>
-                    </body>
-                  </html>
-                `,
-                baseUrl: 'https://res.cloudinary.com',
-              }}
+          ) : (
+            <Image
+              source={orderAnimationAsset}
+              defaultSource={{ uri: CELEBRATION_ANIMATION_GIF_URL }}
               style={{
                 width: '100%',
                 height: '100%',
                 backgroundColor: '#05052A',
               }}
+              resizeMode="cover"
             />
-          ) : (
-            <View style={styles.nativeVideoPlaceholder}>
-              <View style={styles.videoGlowCircle}>
-                <AppIcon name="check" size={48} color={COLORS.white} />
-              </View>
-              <Text style={styles.videoOverlayBrand}>WOM UP</Text>
-              <Text style={styles.videoOverlaySub}>Order Placed Successfully!</Text>
-            </View>
           )}
 
           {/* Top 5-second progress bar */}
