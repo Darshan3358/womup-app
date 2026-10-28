@@ -12,6 +12,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../theme/colors';
 import { BlinkitHeader } from '../../components/common/BlinkitHeader';
 import { HeroBannerCarousel, HeroBannerItem } from '../../components/common/HeroBannerCarousel';
+import { FestiveBannersSection } from '../../components/common/FestiveBannersSection';
 import { WomupCategoryGrid } from '../../components/common/WomupCategoryGrid';
 import { MonthlyBenefitsBanner } from '../../components/common/MonthlyBenefitsBanner';
 import { ProductSection } from '../../components/common/ProductSection';
@@ -416,6 +417,11 @@ export const BlinkitHomeScreen: React.FC = () => {
     <>
       <KYCBanner />
       <HeroBannerCarousel onBannerPress={handleBannerPress} />
+      <FestiveBannersSection
+        products={dbProducts}
+        onSelectCategory={handleSelectCategory}
+        onOpenProduct={handleOpenProductDetail}
+      />
       <WomupCategoryGrid
         onSelectCategory={(name, id) => {
           if (name.toLowerCase().includes('more') || id === 'c12') {
@@ -427,7 +433,7 @@ export const BlinkitHomeScreen: React.FC = () => {
         onViewAll={() => setActiveScreen('Blinkit_Categories')}
       />
     </>
-  ), [handleBannerPress, handleSelectCategory, setActiveScreen]);
+  ), [handleBannerPress, handleSelectCategory, handleOpenProductDetail, dbProducts, setActiveScreen]);
 
   const ListFooter = useMemo(() => (
     <>
