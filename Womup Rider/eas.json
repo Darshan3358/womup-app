@@ -20,6 +20,16 @@
         "EXPO_PUBLIC_API_URL": "https://womup-app-uquz.onrender.com/api/v1"
       }
     },
+    "preview-simulator": {
+      "channel": "preview",
+      "distribution": "internal",
+      "ios": {
+        "simulator": true
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://womup-app-uquz.onrender.com/api/v1"
+      }
+    },
     "production": {
       "channel": "production",
       "android": {

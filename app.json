@@ -44,7 +44,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.wormup.customerapp",
       "infoPlist": {
-        "CFBundleDisplayName": "WOMART by Womup"
+        "CFBundleDisplayName": "WOMART by Womup",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {

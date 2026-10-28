@@ -1,0 +1,19 @@
+# Ignore build artifacts and large files
+android/
+ios/
+release-apks/
+*.aab
+*.apk
+*.pptx
+*.docx
+
+# Ignore sub-projects in workspace
+Womup Admin/
+Womup Rider/
+Womup Store/
+Womup Vendor/
+Z website womup/
+Z website womup /
+backend/
+dist/
+docs/
