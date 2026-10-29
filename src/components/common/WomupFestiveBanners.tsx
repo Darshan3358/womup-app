@@ -193,16 +193,16 @@ export const WomupFestiveBanners: React.FC<WomupFestiveBannersProps> = ({
         <View style={styles.diwaliContainer}>
           {/* Blinking Fairy Lights String across the top with Curved Light-Black Connecting Wire */}
           <View style={styles.fairyLightsRow}>
-            {/* Curved connecting wire in warm cream (#FDF3DB) */}
+            {/* Curved connecting wire in light black */}
             <View style={styles.wireContainer} pointerEvents="none">
               <Svg width="100%" height={18} viewBox="0 0 1000 18" preserveAspectRatio="none">
                 <Path
                   d="M 0 4 Q 35.7 10, 71.4 4 Q 107.1 10, 142.9 4 Q 178.6 10, 214.3 4 Q 250.0 10, 285.7 4 Q 321.4 10, 357.1 4 Q 392.9 10, 428.6 4 Q 464.3 10, 500.0 4 Q 535.7 10, 571.4 4 Q 607.1 10, 642.9 4 Q 678.6 10, 714.3 4 Q 750.0 10, 785.7 4 Q 821.4 10, 857.1 4 Q 892.9 10, 928.6 4 Q 964.3 10, 1000.0 4"
-                  stroke="#FDF3DB"
+                  stroke="#2B2B2B"
                   strokeWidth={1.5}
                   fill="none"
                   strokeLinecap="round"
-                  strokeOpacity={0.95}
+                  strokeOpacity={0.85}
                 />
               </Svg>
             </View>
@@ -293,7 +293,7 @@ export const WomupFestiveBanners: React.FC<WomupFestiveBannersProps> = ({
                 {/* 3D Product Image (Bottom half with clean transparent float) */}
                 <View style={styles.diwaliCardBody}>
                   <Image
-                    source={item.localImage || { uri: item.image }}
+                    source={Platform.OS === 'web' ? (item.localImage || { uri: item.image }) : { uri: item.image }}
                     style={[
                       styles.diwaliCardImage,
                       item.id === 'd1' && styles.tomatoCardImage,
@@ -378,7 +378,7 @@ const styles = StyleSheet.create({
   fairyBulbWire: {
     width: 1.5,
     height: 3,
-    backgroundColor: '#FDF3DB',
+    backgroundColor: '#2B2B2B',
   },
   fairyBulb: {
     width: 6,
@@ -516,7 +516,7 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   brandBadgePill: {
-    backgroundColor: '##0B1756',
+    backgroundColor: '#0B1756',
     borderWidth: 1,
     borderColor: '#FDE047',
     paddingHorizontal: 8,
