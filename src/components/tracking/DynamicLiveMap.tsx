@@ -41,7 +41,7 @@ export interface DynamicLiveMapProps {
   isPartnerAssigned?: boolean;
 }
 
-export const DynamicLiveMap: React.FC<DynamicLiveMapProps> = ({
+const DynamicLiveMapComponent: React.FC<DynamicLiveMapProps> = ({
   storeCoords,
   storeName,
   customerCoords,
@@ -828,3 +828,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+export const DynamicLiveMap = React.memo(DynamicLiveMapComponent);
