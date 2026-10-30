@@ -965,11 +965,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
                 </View>
               </View>
 
-              <Text style={styles.pinDescription}>
-                Share this 4-digit secret PIN with your delivery partner at your door to verify and complete handover.
-              </Text>
-
-              {/* 4 Large Digit Display Boxes */}
+              {/* 4 Large Digit Display Boxes - Positioned above text so always visible without scrolling */}
               <View style={styles.otpBoxesRow}>
                 {pinDigits.map((digit, idx) => (
                   <View key={idx} style={styles.otpBox}>
@@ -977,6 +973,10 @@ export const S24_OrderTrackingScreen: React.FC = () => {
                   </View>
                 ))}
               </View>
+
+              <Text style={styles.pinDescription}>
+                Share this 4-digit secret PIN with your delivery partner at your door to verify and complete handover.
+              </Text>
 
               <View style={styles.pinFooter}>
                 <Ionicons name="alert-circle-outline" size={14} color="#CBD5E1" />
@@ -1500,16 +1500,18 @@ const styles = StyleSheet.create({
     color: '#10B981',
   },
   pinDescription: {
-    fontSize: 12,
-    color: '#E2E8F0',
-    lineHeight: 18,
-    marginBottom: 14,
+    fontSize: 11.5,
+    color: '#CBD5E1',
+    lineHeight: 16,
+    textAlign: 'center',
+    marginBottom: 6,
   },
   otpBoxesRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 12,
-    marginBottom: 12,
+    marginTop: 12,
+    marginBottom: 10,
   },
   otpBox: {
     width: 54,

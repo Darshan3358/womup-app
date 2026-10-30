@@ -125,6 +125,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const toggleSidebar = () => setSidebarOpen((prev) => !prev);
   const [storeUnreadCount, setStoreUnreadCount] = useState<number>(0);
 
+  const currentTabRef = useRef<CurrentTab>(currentTab);
+  currentTabRef.current = currentTab;
+  const subScreenRef = useRef<SubScreen>(subScreen);
+  subScreenRef.current = subScreen;
+
+  const isOrdersViewActive = useCallback(() => {
+    return subScreenRef.current === null && ['Dashboard', 'Incoming', 'Picking', 'Ready'].includes(currentTabRef.current);
+  }, []);
+
 const enrichStore = (rawStore: any): StoreHub | null => {
   if (!rawStore) return null;
   const storeId = (rawStore.id || rawStore._id?.toString() || rawStore._id || '').toString();
@@ -386,34 +395,27 @@ const enrichStore = (rawStore: any): StoreHub | null => {
       }
 
       // Selective queue refresh — maps each status transition to only the affected queues
-      // Stage 1 — Order accepted by store: moves from incoming → picking
-      const incomingToPickingStatuses = ['PLACED', 'ASSIGNED', 'PACKING'];
-      // Stage 2 — Picking complete / item issue: moves within picking or picking → ready
-      const pickingToReadyStatuses = ['PACKED', 'READY_FOR_PICKUP', 'ITEM_OUT_OF_STOCK'];
-      // Stage 3 — Rider approaching: ready queue needs updated rider info
-      const riderApproachStatuses = ['GOING_TO_STORE', 'ARRIVED_AT_STORE'];
-      // Stage 4 — Terminal: order leaves all active queues
-      const terminalStatuses = ['HANDED_OVER', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'];
+      // ONLY trigger HTTP queue refresh if the store staff is actively viewing an orders queue screen
+      if (isOrdersViewActive()) {
+        const incomingToPickingStatuses = ['PLACED', 'ASSIGNED', 'PACKING'];
+        const pickingToReadyStatuses = ['PACKED', 'READY_FOR_PICKUP', 'ITEM_OUT_OF_STOCK'];
+        const riderApproachStatuses = ['GOING_TO_STORE', 'ARRIVED_AT_STORE'];
+        const terminalStatuses = ['HANDED_OVER', 'OUT_FOR_DELIVERY', 'DELIVERED', 'CANCELLED'];
 
-      if (updatedStatus && incomingToPickingStatuses.includes(updatedStatus)) {
-        refreshIncoming();
-        refreshPicking();
-      } else if (updatedStatus && pickingToReadyStatuses.includes(updatedStatus)) {
-        refreshPicking();
-        refreshReady();
-      } else if (updatedStatus && riderApproachStatuses.includes(updatedStatus)) {
-        // Rider info updated on ready queue cards; picking still active
-        refreshPicking();
-        refreshReady();
-      } else if (updatedStatus && terminalStatuses.includes(updatedStatus)) {
-        refreshPicking();
-        refreshReady();
-        refreshCompletedOrders();
-      } else {
-        // Unknown/future status: safe fallback — refresh all active queues but not history
-        refreshIncoming();
-        refreshPicking();
-        refreshReady();
+        if (updatedStatus && incomingToPickingStatuses.includes(updatedStatus)) {
+          refreshIncoming();
+          refreshPicking();
+        } else if (updatedStatus && pickingToReadyStatuses.includes(updatedStatus)) {
+          refreshPicking();
+          refreshReady();
+        } else if (updatedStatus && riderApproachStatuses.includes(updatedStatus)) {
+          refreshPicking();
+          refreshReady();
+        } else if (updatedStatus && terminalStatuses.includes(updatedStatus)) {
+          refreshPicking();
+          refreshReady();
+          refreshCompletedOrders();
+        }
       }
 
     });
@@ -462,42 +464,42 @@ const enrichStore = (rawStore: any): StoreHub | null => {
 
   // Ref to track app active state
   const isAppActiveRef = useRef<boolean>(AppState.currentState === 'active');
+  const lastAppStateSyncRef = useRef<number>(0);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
       const becameActive = nextAppState === 'active';
       isAppActiveRef.current = becameActive;
+      const now = Date.now();
       if (becameActive && authStep === 'AUTHENTICATED') {
         const activeStoreId = store?.id || (store as any)?._id;
         if (activeStoreId) {
           storeSocket.connect(activeStoreId);
         }
-        // App returned to foreground: immediate live sync
-        refreshIncoming();
-        refreshPicking();
+        // App returned to foreground with 30s cooldown to prevent inspector/focus loop
+        if (now - lastAppStateSyncRef.current > 30000 && isOrdersViewActive()) {
+          lastAppStateSyncRef.current = now;
+          refreshIncoming();
+          refreshPicking();
+        }
       }
     });
 
     return () => {
       subscription.remove();
     };
-  }, [authStep, store?.id, refreshIncoming, refreshPicking]);
+  }, [authStep, store?.id, isOrdersViewActive, refreshIncoming, refreshPicking]);
 
-  // Graceful Fallback Polling - ONLY active when WebSocket is disconnected
-  // (Prevents continuous 10s API stampede when real-time socket events are already delivering live orders)
+  // Graceful Fallback Polling - ONLY active when WebSocket is disconnected and user is on an orders queue
   useEffect(() => {
     if (authStep !== 'AUTHENTICATED') return;
 
-    // Load initial data on mount/auth
-    refreshIncoming();
-    refreshPicking();
-
     let pollInterval: ReturnType<typeof setInterval> | null = null;
     const updatePolling = () => {
-      if (!storeSocket.isConnected()) {
+      if (!storeSocket.isConnected() && isOrdersViewActive()) {
         if (!pollInterval) {
           pollInterval = setInterval(() => {
-            if (!isAppActiveRef.current) return;
+            if (!isAppActiveRef.current || !isOrdersViewActive()) return;
             refreshIncoming();
           }, 30000); // 30s calm disconnected fallback
         }
@@ -516,7 +518,7 @@ const enrichStore = (rawStore: any): StoreHub | null => {
       clearInterval(checkTimer);
       if (pollInterval) clearInterval(pollInterval);
     };
-  }, [authStep, store?.id, refreshIncoming, refreshPicking]);
+  }, [authStep, isOrdersViewActive, refreshIncoming]);
 
   const refreshCompletedOrders = useCallback(async () => {
     try {

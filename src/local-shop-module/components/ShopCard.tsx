@@ -9,13 +9,18 @@ interface ShopCardProps {
   onPressPayQR?: (vendor: LocalVendor) => void;
 }
 
-export const formatDistance = (dist?: number) => {
-  if (dist === undefined || dist === null || isNaN(dist)) return 'Nearby';
-  if (dist < 1.0) {
-    const meters = Math.round(dist * 1000);
-    return meters <= 0 ? '50 m' : `${meters} m`;
+export const formatDistance = (dist?: number | string) => {
+  if (dist === undefined || dist === null) return 'Nearby';
+  const num = typeof dist === 'number' ? dist : parseFloat(dist);
+  if (isNaN(num)) return 'Nearby';
+  if (num <= 0.05) {
+    return '50 m';
   }
-  return `${dist.toFixed(1)} km`;
+  if (num < 1.0) {
+    const meters = Math.round(num * 1000);
+    return `${meters} m`;
+  }
+  return `${num.toFixed(1)} km`;
 };
 
 export const ShopCard: React.FC<ShopCardProps> = ({

@@ -17,6 +17,7 @@ import Svg, { Rect, Path } from 'react-native-svg';
 import { LocalCartItem, LocalVendor, LocalTransaction } from '../types/localShop.types';
 import { LocalShopApi } from '../api/localShopApi';
 import { StoreDirectionMapModal } from '../components/StoreDirectionMapModal';
+import { formatDistance } from '../components/ShopCard';
 
 interface ShopDetailScreenProps {
   vendorId?: string;
@@ -276,7 +277,7 @@ export const ShopDetailScreen: React.FC<ShopDetailScreenProps> = ({
           <View style={styles.metricsRow}>
             <View style={styles.metricItem}>
               <Ionicons name="navigate-outline" size={15} color="#64748B" />
-              <Text style={styles.metricText}>{vendor.distanceKm} km away</Text>
+              <Text style={styles.metricText}>{formatDistance(vendor.distanceKm)} away</Text>
             </View>
 
             <View style={styles.metricDivider} />

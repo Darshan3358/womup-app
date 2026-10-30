@@ -11,9 +11,12 @@ class StoreSocketService {
   private currentStoreId: string | null = null;
 
   connect(storeId?: string) {
-    if (this.socket && this.socket.connected) {
+    if (this.socket) {
       if (storeId && storeId !== this.currentStoreId) {
-        this.joinStore(storeId);
+        this.currentStoreId = storeId;
+        if (this.socket.connected) {
+          this.joinStore(storeId);
+        }
       }
       return this.socket;
     }
