@@ -50,7 +50,7 @@ import { AddZoneModal } from './src/screens/modals/AddZoneModal';
 import { AdminLoginScreen } from './src/screens/AdminLoginScreen';
 
 const MainApp: React.FC = () => {
-  const { activeTab, subView, isAdminAuthenticated } = useAdminState();
+  const { activeTab, subView, isAdminAuthenticated, activeModal } = useAdminState();
   const [showSplash, setShowSplash] = useState(true);
 
   if (showSplash) {
@@ -123,23 +123,23 @@ const MainApp: React.FC = () => {
         <BottomNav />
       </View>
 
-      {/* Global Sidebar Drawer & Modal Layer */}
+      {/* Global Sidebar Drawer & Modal Layer (Only mounted when modal is triggered) */}
       <SidebarDrawer />
-      <EditCustomerModal />
-      <AddCustomerModal />
-      <CrossZoneMatrixModal />
-      <BulkPriceAdjustmentModal />
-      <StockDiscrepancyModal />
-      <StaffReassignmentModal />
-      <OrderCancelRefundModal />
-      <CampaignBuilderModal />
-      <PrintLabelModal />
-      <PrintOrderModal />
-      <AddProductModal />
-      <EditProductModal />
-      <PriceHistoryModal />
-      <EditZonePriceModal />
-      <AddZoneModal />
+      {activeModal === 'EditCustomer' && <EditCustomerModal />}
+      {activeModal === 'AddCustomer' && <AddCustomerModal />}
+      {activeModal === 'CrossZoneMatrix' && <CrossZoneMatrixModal />}
+      {activeModal === 'BulkPriceAdjustment' && <BulkPriceAdjustmentModal />}
+      {activeModal === 'StockDiscrepancy' && <StockDiscrepancyModal />}
+      {activeModal === 'StaffReassignment' && <StaffReassignmentModal />}
+      {activeModal === 'OrderCancelRefund' && <OrderCancelRefundModal />}
+      {activeModal === 'CampaignBuilder' && <CampaignBuilderModal />}
+      {activeModal === 'PrintLabel' && <PrintLabelModal />}
+      {activeModal === 'PrintOrderDetails' && <PrintOrderModal />}
+      {activeModal === 'AddProduct' && <AddProductModal />}
+      {activeModal === 'EditProduct' && <EditProductModal />}
+      {activeModal === 'PriceHistory' && <PriceHistoryModal />}
+      {activeModal === 'EditZonePrice' && <EditZonePriceModal />}
+      {activeModal === 'AddZone' && <AddZoneModal />}
     </SafeAreaView>
   );
 };

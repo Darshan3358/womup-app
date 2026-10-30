@@ -11,7 +11,7 @@ interface OrderCardProps {
   ctaColor?: string;
 }
 
-export const OrderCard: React.FC<OrderCardProps> = ({
+const OrderCardComponent: React.FC<OrderCardProps> = ({
   order,
   onPress,
   ctaText = 'START PICKING',
@@ -229,3 +229,5 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 });
+
+export const OrderCard = React.memo(OrderCardComponent);

@@ -23,7 +23,7 @@ import {
 import { COLORS, GRADIENTS } from '../theme';
 import { useVendor } from '../context/VendorAuthContext';
 
-export const DashboardScreen: React.FC = () => {
+const DashboardScreenComponent: React.FC = () => {
   const {
     vendor,
     stats,
@@ -408,3 +408,5 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 });
+
+export const DashboardScreen = React.memo(DashboardScreenComponent);

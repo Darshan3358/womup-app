@@ -56,7 +56,7 @@ interface HeroBannerCarouselProps {
   onBannerPress?: (banner: HeroBannerItem) => void;
 }
 
-export const HeroBannerCarousel: React.FC<HeroBannerCarouselProps> = ({ onBannerPress }) => {
+const HeroBannerCarouselComponent: React.FC<HeroBannerCarouselProps> = ({ onBannerPress }) => {
   const { width } = useWindowDimensions();
   // Ensure the banner container never exceeds viewport width minus 24px padding
   const bannerWidth = Math.min(width - 24, 1400);
@@ -214,3 +214,5 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(16, 26, 77, 0.16)',
   },
 });
+
+export const HeroBannerCarousel = React.memo(HeroBannerCarouselComponent);

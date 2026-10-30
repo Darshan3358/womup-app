@@ -1857,8 +1857,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     StorageService.saveItem(StorageService.KEYS.BLINKIT_CART, blinkitCart);
   }, [blinkitCart]);
 
-  const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
-  const cartSummary = CartService.calculateSummary(cart, appliedCoins, 40);
+  const cartCount = useMemo(() => cart.reduce((total, item) => total + item.quantity, 0), [cart]);
+  const cartSummary = useMemo(() => CartService.calculateSummary(cart, appliedCoins, 40), [cart, appliedCoins]);
 
   const addToCart = (product: Product) => {
     if (!isAuthenticated) {
@@ -2136,18 +2136,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setFilters(DEFAULT_FILTERS);
   };
 
-  // --- Blinkit Cart Operations ---
-  const blinkitCartList = Object.values(blinkitCart).filter((e) => e.quantity > 0);
-  const blinkitCartCount = blinkitCartList.reduce((sum, item) => sum + item.quantity, 0);
-  const blinkitCartTotal = blinkitCartList.reduce((sum, item) => {
+  // --- Blinkit Cart Operations (Memoized) ---
+  const blinkitCartList = useMemo(() => Object.values(blinkitCart).filter((e) => e.quantity > 0), [blinkitCart]);
+  const blinkitCartCount = useMemo(() => blinkitCartList.reduce((sum, item) => sum + item.quantity, 0), [blinkitCartList]);
+  const blinkitCartTotal = useMemo(() => blinkitCartList.reduce((sum, item) => {
     const price = typeof item.product.sellingPrice === 'number' ? item.product.sellingPrice : 0;
     return sum + price * item.quantity;
-  }, 0);
+  }, 0), [blinkitCartList]);
 
-  const blinkitMrpTotal = blinkitCartList.reduce((sum, item) => {
+  const blinkitMrpTotal = useMemo(() => blinkitCartList.reduce((sum, item) => {
     const mrp = typeof item.product.mrp === 'number' ? item.product.mrp : (typeof item.product.sellingPrice === 'number' ? item.product.sellingPrice : 0);
     return sum + mrp * item.quantity;
-  }, 0);
+  }, 0), [blinkitCartList]);
 
   const getBlinkitQty = useCallback((productId: string, variantId?: string): number => {
     if (!productId) return 0;

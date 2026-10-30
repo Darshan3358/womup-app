@@ -32,7 +32,7 @@ interface BlinkitHeaderProps {
   children?: React.ReactNode;
 }
 
-export const BlinkitHeader: React.FC<BlinkitHeaderProps> = ({
+const BlinkitHeaderComponent: React.FC<BlinkitHeaderProps> = ({
   variant = 'gradient',
   etaLabel = 'Delivery in',
   etaTime = '9 minutes',
@@ -591,3 +591,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+export const BlinkitHeader = React.memo(BlinkitHeaderComponent);

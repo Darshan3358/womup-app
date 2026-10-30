@@ -100,7 +100,7 @@ interface WomupCategoryGridProps {
   onViewAll?: () => void;
 }
 
-export const WomupCategoryGrid: React.FC<WomupCategoryGridProps> = ({
+const WomupCategoryGridComponent: React.FC<WomupCategoryGridProps> = ({
   onSelectCategory,
   onViewAll,
 }) => {
@@ -235,3 +235,5 @@ const styles = StyleSheet.create({
     lineHeight: 13,
   },
 });
+
+export const WomupCategoryGrid = React.memo(WomupCategoryGridComponent);

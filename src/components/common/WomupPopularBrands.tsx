@@ -33,7 +33,7 @@ const MULTIPLIED_BRANDS = [
   ...POPULAR_BRANDS,
 ];
 
-export const WomupPopularBrands: React.FC<WomupPopularBrandsProps> = ({
+const WomupPopularBrandsComponent: React.FC<WomupPopularBrandsProps> = ({
   onSelectBrand,
   onViewAll,
 }) => {
@@ -209,3 +209,5 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
 });
+
+export const WomupPopularBrands = React.memo(WomupPopularBrandsComponent);

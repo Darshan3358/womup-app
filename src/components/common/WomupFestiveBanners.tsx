@@ -18,7 +18,7 @@ export interface WomupFestiveBannersProps {
   variant?: 'both' | 'diwali' | 'festive';
 }
 
-export const WomupFestiveBanners: React.FC<WomupFestiveBannersProps> = ({
+const WomupFestiveBannersComponent: React.FC<WomupFestiveBannersProps> = ({
   onSelectCategory,
   onOpenProduct,
   variant = 'both',
@@ -674,4 +674,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+
+export const WomupFestiveBanners = React.memo(WomupFestiveBannersComponent);
 

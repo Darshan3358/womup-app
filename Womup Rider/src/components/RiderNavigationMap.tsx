@@ -24,7 +24,7 @@ export interface RiderNavigationMapProps {
   height?: number;
 }
 
-export const RiderNavigationMap: React.FC<RiderNavigationMapProps> = ({
+const RiderNavigationMapComponent: React.FC<RiderNavigationMapProps> = ({
   mode,
   riderCoords,
   riderHeading = 0,
@@ -519,3 +519,5 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
 });
+
+export const RiderNavigationMap = React.memo(RiderNavigationMapComponent);

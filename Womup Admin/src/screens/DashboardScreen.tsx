@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -59,13 +59,13 @@ export const DashboardScreen: React.FC = () => {
   const [areaSearch, setAreaSearch] = useState('');
 
   // 1. Resolve Active Cities
-  const activeCities = cities.filter((c) => c.status === 'Active' || !c.status);
-  const currentCity = activeCities.find(
+  const activeCities = useMemo(() => cities.filter((c) => c.status === 'Active' || !c.status), [cities]);
+  const currentCity = useMemo(() => activeCities.find(
     (c) => (c.id && c.id === selectedCityId) || (c._id && c._id === selectedCityId)
-  );
+  ), [activeCities, selectedCityId]);
 
   // 2. Resolve Available Areas for Selected City
-  const availableAreas = zones.filter((z) => {
+  const availableAreas = useMemo(() => zones.filter((z) => {
     if (selectedCityId === 'ALL') return true;
     if (!currentCity) return true;
     const currentCityIdStr = currentCity.id || currentCity._id;
@@ -73,14 +73,14 @@ export const DashboardScreen: React.FC = () => {
     if (z.cityName && currentCity.name && z.cityName.toLowerCase() === currentCity.name.toLowerCase()) return true;
     if (z.city && currentCity.name && z.city.toLowerCase() === currentCity.name.toLowerCase()) return true;
     return false;
-  });
+  }), [zones, selectedCityId, currentCity]);
 
-  const currentArea = availableAreas.find(
+  const currentArea = useMemo(() => availableAreas.find(
     (a) => (a.id && a.id === selectedAreaId) || (a._id && a._id === selectedAreaId)
-  );
+  ), [availableAreas, selectedAreaId]);
 
   // Filter Orders by City + Area + Date
-  const filteredOrders = orders.filter((o) => {
+  const filteredOrders = useMemo(() => orders.filter((o) => {
     if (dateFilter === 'Today') {
       const orderDate = new Date(o.timestamp);
       const today = new Date();
@@ -113,10 +113,10 @@ export const DashboardScreen: React.FC = () => {
     }
 
     return true;
-  });
+  }), [orders, dateFilter, zones, selectedCityId, currentCity, selectedAreaId, currentArea]);
 
   // Filter Staff by City + Area
-  const filteredStaff = staff.filter((s) => {
+  const filteredStaff = useMemo(() => staff.filter((s) => {
     const matchedZone = zones.find(
       (z) =>
         (s.areaId && (z.id === s.areaId || z._id === s.areaId)) ||
@@ -140,10 +140,10 @@ export const DashboardScreen: React.FC = () => {
     }
 
     return true;
-  });
+  }), [staff, zones, selectedCityId, currentCity, selectedAreaId, currentArea]);
 
   // Filter Customers by City + Area
-  const filteredCustomers = customers.filter((c) => {
+  const filteredCustomers = useMemo(() => customers.filter((c) => {
     const matchedZone = zones.find(
       (z) =>
         z.name.toLowerCase() === (c.zoneName || '').toLowerCase() ||
@@ -164,16 +164,16 @@ export const DashboardScreen: React.FC = () => {
     }
 
     return true;
-  });
+  }), [customers, zones, selectedCityId, currentCity, selectedAreaId, currentArea]);
 
   // Computed KPIs based on active filters
-  const totalGmv = filteredOrders.reduce((sum, o) => sum + (o.total || 0), 0);
-  const activeOrdersCount = filteredOrders.filter(
+  const totalGmv = useMemo(() => filteredOrders.reduce((sum, o) => sum + (o.total || 0), 0), [filteredOrders]);
+  const activeOrdersCount = useMemo(() => filteredOrders.filter(
     (o) => o.status !== 'Delivered' && o.status !== 'Cancelled'
-  ).length;
-  const pickersCount = filteredStaff.filter((s) => s.role === 'Picker' && s.status === 'On Duty').length;
-  const ridersCount = filteredStaff.filter((s) => s.role === 'Rider' && s.status === 'On Duty').length;
-  const liveFleetCount = pickersCount + ridersCount;
+  ).length, [filteredOrders]);
+  const pickersCount = useMemo(() => filteredStaff.filter((s) => s.role === 'Picker' && s.status === 'On Duty').length, [filteredStaff]);
+  const ridersCount = useMemo(() => filteredStaff.filter((s) => s.role === 'Rider' && s.status === 'On Duty').length, [filteredStaff]);
+  const liveFleetCount = useMemo(() => pickersCount + ridersCount, [pickersCount, ridersCount]);
 
   // Group zones by City for Zone GMV Share & Demand
   const citiesToDisplay =
