@@ -52,8 +52,6 @@ export class LocalShopsService implements OnModuleInit {
 
   async onModuleInit() {
     await this.seedDefaultCategories();
-    // Default vendors auto-seed disabled as requested by user to keep database clean
-    // await this.seedDefaultVendors();
   }
 
   // ── Seed Categories ────────────────────────────────────────────────────────
@@ -75,159 +73,6 @@ export class LocalShopsService implements OnModuleInit {
 
     for (const c of defaultCats) {
       await this.categoryModel.create(c);
-    }
-  }
-
-  // ── Seed Initial Real Vendors in DB ─────────────────────────────────────────
-  private async seedDefaultVendors() {
-    // Ensure primary partner store WOMUP01 has accurate coordinates in Prahlad Nagar, Ahmedabad
-    await this.vendorModel.updateOne(
-      { vendorCode: 'WOMUP01' },
-      {
-        $set: {
-          storeName: 'Womup Express Store',
-          address: 'Near Prahlad Nagar Garden, Ahmedabad',
-          city: 'Ahmedabad',
-          pincode: '380015',
-          coordinates: { type: 'Point', coordinates: [72.5180, 23.0195] },
-          latitude: 23.0195,
-          longitude: 72.5180,
-          isActive: true,
-          isOpenNow: true,
-          isOnline: true,
-          isVerified: true,
-        },
-      },
-    );
-
-    const initialVendors: Partial<Vendor>[] = [
-      {
-        vendorCode: 'VND001',
-        storeName: 'Gokul Vegetables',
-        ownerName: 'Ramesh Patel',
-        ownerPhone: '+91 98250 12345',
-        categoryName: 'Vegetables',
-        address: 'Near Anandnagar Cross Road, Prahlad Nagar, Ahmedabad',
-        city: 'Ahmedabad',
-        pincode: '380015',
-        coordinates: { type: 'Point', coordinates: [72.5150, 23.0160] },
-        shoppingCoinPercent: 18,
-        minCoinPercent: 2,
-        maxCoinPercent: 25,
-        openingTime: '08:00 AM',
-        closingTime: '09:00 PM',
-        isOpenNow: true,
-        imageUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&q=80',
-        rating: 4.8,
-        totalReviews: 128,
-        upiId: 'gokulveg@okaxis',
-        isActive: true,
-        isVerified: true,
-        platformCommissionPercent: 2,
-      },
-      {
-        vendorCode: 'VND002',
-        storeName: 'Shree Kirana Store',
-        ownerName: 'Jayesh Shah',
-        ownerPhone: '+91 98251 23456',
-        categoryName: 'Grocery',
-        address: 'Prahlad Nagar Trade Center, Ahmedabad',
-        city: 'Ahmedabad',
-        pincode: '380015',
-        coordinates: { type: 'Point', coordinates: [72.5195, 23.0210] },
-        shoppingCoinPercent: 6,
-        minCoinPercent: 2,
-        maxCoinPercent: 25,
-        openingTime: '07:30 AM',
-        closingTime: '10:00 PM',
-        isOpenNow: true,
-        imageUrl: 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=600&q=80',
-        rating: 4.6,
-        totalReviews: 84,
-        upiId: 'shreekirana@oksbi',
-        isActive: true,
-        isVerified: true,
-        platformCommissionPercent: 2,
-      },
-      {
-        vendorCode: 'VND003',
-        storeName: 'Jay Medical Store',
-        ownerName: 'Dr. Suresh Varma',
-        ownerPhone: '+91 98252 34567',
-        categoryName: 'Medical',
-        address: 'Satellite Road, Ahmedabad',
-        city: 'Ahmedabad',
-        pincode: '380015',
-        coordinates: { type: 'Point', coordinates: [72.5240, 23.0250] },
-        shoppingCoinPercent: 10,
-        minCoinPercent: 2,
-        maxCoinPercent: 25,
-        openingTime: '08:00 AM',
-        closingTime: '11:00 PM',
-        isOpenNow: true,
-        imageUrl: 'https://images.unsplash.com/photo-1587854692152-cbe660dbde88?w=600&q=80',
-        rating: 4.9,
-        totalReviews: 210,
-        upiId: 'jaymedical@okicici',
-        isActive: true,
-        isVerified: true,
-        platformCommissionPercent: 2,
-      },
-      {
-        vendorCode: 'VND004',
-        storeName: "Royal Men's Salon",
-        ownerName: 'Haresh Barot',
-        ownerPhone: '+91 98253 45678',
-        categoryName: 'Salon',
-        address: 'SG Highway, Opp. Rajpath Club, Ahmedabad',
-        city: 'Ahmedabad',
-        pincode: '380015',
-        coordinates: { type: 'Point', coordinates: [72.5080, 23.0220] },
-        shoppingCoinPercent: 12,
-        minCoinPercent: 2,
-        maxCoinPercent: 25,
-        openingTime: '09:00 AM',
-        closingTime: '09:30 PM',
-        isOpenNow: true,
-        imageUrl: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?w=600&q=80',
-        rating: 4.7,
-        totalReviews: 95,
-        upiId: 'royalsalon@okhdfcbank',
-        isActive: true,
-        isVerified: true,
-        platformCommissionPercent: 2,
-      },
-      {
-        vendorCode: 'VND005',
-        storeName: 'Fashion Hub Garments',
-        ownerName: 'Manoj Prajapati',
-        ownerPhone: '+91 98254 56789',
-        categoryName: 'Garments',
-        address: 'Vastrapur Lake Road, Ahmedabad',
-        city: 'Ahmedabad',
-        pincode: '380015',
-        coordinates: { type: 'Point', coordinates: [72.5310, 23.0180] },
-        shoppingCoinPercent: 8,
-        minCoinPercent: 2,
-        maxCoinPercent: 25,
-        openingTime: '10:00 AM',
-        closingTime: '09:00 PM',
-        isOpenNow: true,
-        imageUrl: 'https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=600&q=80',
-        rating: 4.5,
-        totalReviews: 67,
-        upiId: 'fashionhub@okaxis',
-        isActive: true,
-        isVerified: true,
-        platformCommissionPercent: 2,
-      },
-    ];
-
-    for (const v of initialVendors) {
-      const exists = await this.vendorModel.findOne({ vendorCode: v.vendorCode });
-      if (!exists) {
-        await this.vendorModel.create(v);
-      }
     }
   }
 
@@ -301,8 +146,12 @@ export class LocalShopsService implements OnModuleInit {
       ];
     }
 
-    const userLat = lat ? Number(lat) : 23.1288;
-    const userLng = lng ? Number(lng) : 72.5507;
+    if (lat === undefined || lng === undefined || isNaN(Number(lat)) || isNaN(Number(lng))) {
+      throw new BadRequestException('Valid latitude and longitude are required to find nearby shops');
+    }
+
+    const userLat = Number(lat);
+    const userLng = Number(lng);
     const maxRadiusMeters = (radiusKm || 5) * 1000;
 
     let docs: any[] = [];
@@ -327,67 +176,79 @@ export class LocalShopsService implements OnModuleInit {
       const rawDocs = await this.vendorModel.find(queryFilter).lean();
       docs = rawDocs
         .map((v: any) => {
-          const vLat = v.coordinates?.coordinates?.[1] ?? v.latitude ?? 23.1288;
-          const vLng = v.coordinates?.coordinates?.[0] ?? v.longitude ?? 72.5507;
-          const distKm = this.calculateDistance(userLat, userLng, vLat, vLng);
+          const vLat = v.coordinates?.coordinates?.[1] ?? v.latitude;
+          const vLng = v.coordinates?.coordinates?.[0] ?? v.longitude;
+          if (vLat === undefined || vLng === undefined || isNaN(Number(vLat)) || isNaN(Number(vLng))) {
+            return null;
+          }
+          const distKm = this.calculateDistance(userLat, userLng, Number(vLat), Number(vLng));
           return {
             ...v,
             distanceInMeters: distKm * 1000,
           };
         })
-        .filter((v: any) => v.distanceInMeters <= maxRadiusMeters)
+        .filter((v: any) => v && v.distanceInMeters <= maxRadiusMeters)
         .sort((a: any, b: any) => a.distanceInMeters - b.distanceInMeters);
     }
 
-    const formatted = docs.map((v: any) => {
-      const vLat = v.coordinates?.coordinates?.[1] ?? v.latitude ?? 23.1288;
-      const vLng = v.coordinates?.coordinates?.[0] ?? v.longitude ?? 72.5507;
-      const distance = v.distanceInMeters !== undefined
-        ? Number((v.distanceInMeters / 1000).toFixed(1))
-        : this.calculateDistance(userLat, userLng, vLat, vLng);
-      const styling = this.getCategoryStyling(v.categoryName);
+    const formatted = docs
+      .map((v: any) => {
+        const vLat = v.coordinates?.coordinates?.[1] ?? v.latitude;
+        const vLng = v.coordinates?.coordinates?.[0] ?? v.longitude;
+        if (vLat === undefined || vLng === undefined || isNaN(Number(vLat)) || isNaN(Number(vLng))) {
+          return null;
+        }
+        const latNum = Number(vLat);
+        const lngNum = Number(vLng);
+        const distance = v.distanceInMeters !== undefined
+          ? Number((v.distanceInMeters / 1000).toFixed(1))
+          : this.calculateDistance(userLat, userLng, latNum, lngNum);
+        const styling = this.getCategoryStyling(v.categoryName);
+        const realUpi = v.upiId || null;
+        const realQr = v.qrCodeUrl || (realUpi ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=${realUpi}&pn=${encodeURIComponent(v.storeName || 'Store')}` : null);
 
-      return {
-        id: v._id.toString(),
-        _id: v._id.toString(),
-        vendorCode: v.vendorCode,
-        storeName: v.storeName,
-        name: v.storeName,
-        category: v.categoryName,
-        categoryName: v.categoryName,
-        coinPercentage: v.shoppingCoinPercent,
-        shoppingCoinPercent: v.shoppingCoinPercent,
-        address: v.address,
-        city: v.city,
-        pincode: v.pincode,
-        phone: v.ownerPhone,
-        ownerName: v.ownerName,
-        timings: `${v.openingTime || '8:00 AM'} - ${v.closingTime || '9:00 PM'}`,
-        openingTime: v.openingTime || '8:00 AM',
-        closingTime: v.closingTime || '9:00 PM',
-        isOpenNow: v.isOpenNow ?? true,
-        isOnline: v.isOnline ?? true,
-        latitude: vLat,
-        longitude: vLng,
-        coordinates: v.coordinates || { type: 'Point', coordinates: [vLng, vLat] },
-        distanceKm: distance,
-        distance,
-        rating: v.rating ?? 4.8,
-        reviewCount: v.totalReviews ?? 50,
-        totalReviews: v.totalReviews ?? 50,
-        image: v.imageUrl,
-        imageUrl: v.imageUrl,
-        bannerUrl: v.bannerUrl || v.imageUrl,
-        verified: v.isVerified ?? true,
-        isVerified: v.isVerified ?? true,
-        upiId: v.upiId || `${v.vendorCode?.toLowerCase() || 'vendor'}@okhdfcbank`,
-        qrCodeUrl: v.qrCodeUrl || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=${v.upiId || 'wormup@okaxis'}&pn=${encodeURIComponent(v.storeName || 'Store')}`,
-        ...styling,
-      };
-    });
+        return {
+          id: v._id.toString(),
+          _id: v._id.toString(),
+          vendorCode: v.vendorCode,
+          storeName: v.storeName,
+          name: v.storeName,
+          category: v.categoryName,
+          categoryName: v.categoryName,
+          coinPercentage: v.shoppingCoinPercent ?? 0,
+          shoppingCoinPercent: v.shoppingCoinPercent ?? 0,
+          address: v.address,
+          city: v.city,
+          pincode: v.pincode,
+          phone: v.ownerPhone,
+          ownerName: v.ownerName,
+          timings: `${v.openingTime || '8:00 AM'} - ${v.closingTime || '9:00 PM'}`,
+          openingTime: v.openingTime || '8:00 AM',
+          closingTime: v.closingTime || '9:00 PM',
+          isOpenNow: v.isOpenNow ?? true,
+          isOnline: v.isOnline ?? true,
+          latitude: latNum,
+          longitude: lngNum,
+          coordinates: v.coordinates || { type: 'Point', coordinates: [lngNum, latNum] },
+          distanceKm: distance,
+          distance,
+          rating: v.rating ?? 0,
+          reviewCount: v.totalReviews ?? 0,
+          totalReviews: v.totalReviews ?? 0,
+          image: v.imageUrl,
+          imageUrl: v.imageUrl,
+          bannerUrl: v.bannerUrl || v.imageUrl,
+          verified: v.isVerified ?? false,
+          isVerified: v.isVerified ?? false,
+          upiId: realUpi,
+          qrCodeUrl: realQr,
+          ...styling,
+        };
+      })
+      .filter(Boolean);
 
     // Ensure strict ascending sort by distance
-    formatted.sort((a, b) => a.distanceKm - b.distanceKm);
+    formatted.sort((a: any, b: any) => a.distanceKm - b.distanceKm);
 
     return formatted;
   }
@@ -406,14 +267,22 @@ export class LocalShopsService implements OnModuleInit {
     }
 
     const styling = this.getCategoryStyling(vendor.categoryName);
-    const upi = vendor.upiId || `${vendor.vendorCode.toLowerCase()}@okhdfcbank`;
+    const upi = vendor.upiId || null;
 
-    const vLat = vendor.coordinates?.coordinates?.[1] ?? (vendor as any).latitude ?? 23.0195;
-    const vLng = vendor.coordinates?.coordinates?.[0] ?? (vendor as any).longitude ?? 72.5180;
+    const vLat = vendor.coordinates?.coordinates?.[1] ?? (vendor as any).latitude ?? null;
+    const vLng = vendor.coordinates?.coordinates?.[0] ?? (vendor as any).longitude ?? null;
     const distanceKm =
-      lat !== undefined && lng !== undefined
-        ? this.calculateDistance(lat, lng, vLat, vLng)
-        : (vendor as any).distanceKm || 1.3;
+      lat !== undefined && lng !== undefined && vLat !== null && vLng !== null && !isNaN(Number(vLat)) && !isNaN(Number(vLng))
+        ? this.calculateDistance(Number(lat), Number(lng), Number(vLat), Number(vLng))
+        : null;
+
+    const qrCodeUrl =
+      vendor.qrCodeUrl ||
+      (upi
+        ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=${upi}&pn=${encodeURIComponent(
+            vendor.storeName,
+          )}`
+        : null);
 
     return {
       id: vendor._id.toString(),
@@ -423,8 +292,8 @@ export class LocalShopsService implements OnModuleInit {
       name: vendor.storeName,
       category: vendor.categoryName,
       categoryName: vendor.categoryName,
-      coinPercentage: vendor.shoppingCoinPercent,
-      shoppingCoinPercent: vendor.shoppingCoinPercent,
+      coinPercentage: vendor.shoppingCoinPercent ?? 0,
+      shoppingCoinPercent: vendor.shoppingCoinPercent ?? 0,
       address: vendor.address,
       city: vendor.city,
       pincode: vendor.pincode,
@@ -436,21 +305,17 @@ export class LocalShopsService implements OnModuleInit {
       isOpenNow: vendor.isOpenNow ?? true,
       latitude: vLat,
       longitude: vLng,
-      coordinates: vendor.coordinates || { type: 'Point', coordinates: [vLng, vLat] },
+      coordinates: (vLat !== null && vLng !== null) ? (vendor.coordinates || { type: 'Point', coordinates: [vLng, vLat] }) : null,
       distanceKm,
       distance: distanceKm,
-      rating: vendor.rating,
-      reviewCount: vendor.totalReviews,
+      rating: vendor.rating ?? 0,
+      reviewCount: vendor.totalReviews ?? 0,
       image: vendor.imageUrl,
       imageUrl: vendor.imageUrl,
       bannerUrl: vendor.bannerUrl || vendor.imageUrl,
-      verified: vendor.isVerified,
+      verified: vendor.isVerified ?? false,
       upiId: upi,
-      qrCodeUrl:
-        vendor.qrCodeUrl ||
-        `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=upi://pay?pa=${upi}&pn=${encodeURIComponent(
-          vendor.storeName,
-        )}`,
+      qrCodeUrl,
       ...styling,
     };
   }
@@ -487,10 +352,10 @@ export class LocalShopsService implements OnModuleInit {
     let cashPaid = 0;
     let coinsEarned = 0;
 
-    const commissionPercent = vendor.platformCommissionPercent || 2;
+    const commissionPercent = vendor.platformCommissionPercent ?? 0;
     const platformCommission = Math.round((billAmount * commissionPercent) / 100);
 
-    const benefitRate = vendor.shoppingCoinPercent || 10;
+    const benefitRate = vendor.shoppingCoinPercent ?? 0;
     const coinBenefit = Math.round((billAmount * benefitRate) / 100);
     const payableAmount = Math.max(0, billAmount - coinBenefit);
 
@@ -669,20 +534,20 @@ export class LocalShopsService implements OnModuleInit {
       throw new BadRequestException(`Vendor code ${code} already in use`);
     }
 
-    const coordinates: [number, number] = [
-      dto.longitude ?? 72.5507,
-      dto.latitude ?? 23.1288,
-    ];
+    let coordinates: [number, number] | undefined;
+    if (dto.longitude !== undefined && dto.latitude !== undefined && !isNaN(Number(dto.longitude)) && !isNaN(Number(dto.latitude))) {
+      coordinates = [Number(dto.longitude), Number(dto.latitude)];
+    }
 
     const vendor = await this.vendorModel.create({
       ...dto,
       vendorCode: code,
       categoryName: dto.categoryName || 'General',
-      city: dto.city || 'Ahmedabad',
-      pincode: dto.pincode || '380015',
-      coordinates: { type: 'Point', coordinates },
-      shoppingCoinPercent: dto.shoppingCoinPercent || 10,
-      platformCommissionPercent: dto.platformCommissionPercent || 2,
+      city: dto.city || '',
+      pincode: dto.pincode || '',
+      ...(coordinates ? { coordinates: { type: 'Point', coordinates } } : {}),
+      shoppingCoinPercent: dto.shoppingCoinPercent ?? 0,
+      platformCommissionPercent: dto.platformCommissionPercent ?? 0,
       isActive: false,
       isVerified: false,
       vendorStatus: 1, // Pending Admin Approval
@@ -1013,7 +878,7 @@ export class LocalShopsService implements OnModuleInit {
       storeName: vendor.storeName,
       shoppingCoinPercent: vendor.shoppingCoinPercent,
       qrData,
-      upiId: vendor.upiId || 'womup@okhdfcbank',
+      upiId: vendor.upiId || null,
       label: `WOMUP-PAY-${vendor.vendorCode}`,
     };
   }
@@ -1054,15 +919,15 @@ export class LocalShopsService implements OnModuleInit {
       city: vendor.city,
       pincode: vendor.pincode,
       shoppingCoinPercent: vendor.shoppingCoinPercent,
-      platformCommissionPercent: vendor.platformCommissionPercent || 2,
+      platformCommissionPercent: vendor.platformCommissionPercent ?? 0,
       openingTime: vendor.openingTime || '8:00 AM',
       closingTime: vendor.closingTime || '9:00 PM',
       isOpenNow: vendor.isOpenNow ?? true,
-      rating: vendor.rating || 4.8,
+      rating: vendor.rating || 0,
       totalReviews: vendor.totalReviews || 0,
       totalTransactions: vendor.totalTransactions || 0,
       monthlyRevenue: vendor.monthlyRevenue || 0,
-      upiId: vendor.upiId || 'womup@okhdfcbank',
+      upiId: vendor.upiId || null,
       qrCodeData: `womup://vendor/${vendor.vendorCode}`,
       walletBalance: vendor.walletBalance || 0,
       pendingBalance: vendor.pendingBalance || 0,
@@ -1257,10 +1122,13 @@ export class LocalShopsService implements OnModuleInit {
 
     const passwordHash = dto.password ? await bcrypt.hash(dto.password, 10) : '';
 
-    const coordinates: [number, number] = [
-      dto.longitude ?? 72.5507,
-      dto.latitude ?? 23.1288,
-    ];
+    const hasValidCoords =
+      dto.latitude !== undefined &&
+      dto.longitude !== undefined &&
+      !isNaN(Number(dto.latitude)) &&
+      !isNaN(Number(dto.longitude));
+    const regLat = hasValidCoords ? Number(dto.latitude) : null;
+    const regLng = hasValidCoords ? Number(dto.longitude) : null;
 
     const categoryName = dto.businessCategoryName || dto.businessType || 'General';
 
@@ -1295,15 +1163,17 @@ export class LocalShopsService implements OnModuleInit {
     vendor.stateId = dto.stateId || 'GJ';
     vendor.districtId = dto.districtId || 'Ahmedabad';
     vendor.talukaId = dto.talukaId || 'Daskroi';
-    vendor.city = dto.cityName || dto.city || 'Ahmedabad';
+    vendor.city = dto.cityName || dto.city || '';
     vendor.pincode = dto.pincode;
     vendor.businessPincode = dto.pincode;
-    vendor.latitude = dto.latitude ?? 23.1288;
-    vendor.longitude = dto.longitude ?? 72.5507;
-    vendor.vendorLat = dto.latitude ?? 23.1288;
-    vendor.vendorLong = dto.longitude ?? 72.5507;
-    vendor.coordinates = { type: 'Point', coordinates };
-    vendor.location = { type: 'Point', coordinates };
+    if (regLat !== null && regLng !== null) {
+      vendor.latitude = regLat;
+      vendor.longitude = regLng;
+      vendor.vendorLat = regLat;
+      vendor.vendorLong = regLng;
+      vendor.coordinates = { type: 'Point', coordinates: [regLng, regLat] };
+      vendor.location = { type: 'Point', coordinates: [regLng, regLat] };
+    }
 
     vendor.vendorAadharNo = dto.aadhaarNumber;
     vendor.vendorAadharFrontImage = dto.aadhaarFrontUrl;
@@ -1413,15 +1283,15 @@ export class LocalShopsService implements OnModuleInit {
       city: vendor.city,
       pincode: vendor.pincode,
       shoppingCoinPercent: vendor.shoppingCoinPercent,
-      platformCommissionPercent: vendor.platformCommissionPercent || 2,
+      platformCommissionPercent: vendor.platformCommissionPercent ?? 0,
       openingTime: vendor.openingTime || '8:00 AM',
       closingTime: vendor.closingTime || '9:00 PM',
       isOpenNow: vendor.isOpenNow ?? true,
-      rating: vendor.rating || 4.8,
+      rating: vendor.rating || 0,
       totalReviews: vendor.totalReviews || 0,
       totalTransactions: vendor.totalTransactions || 0,
       monthlyRevenue: vendor.monthlyRevenue || 0,
-      upiId: vendor.upiId || 'gokul@okhdfcbank',
+      upiId: vendor.upiId || '',
       qrCodeData: `womup://vendor/${vendor.vendorCode}`,
       walletBalance: vendor.walletBalance || 0,
       pendingBalance,
@@ -1451,16 +1321,16 @@ export class LocalShopsService implements OnModuleInit {
       stateId: vendor.stateId || '',
       countryId: vendor.countryId || 'IN',
       businessPincode: vendor.businessPincode || vendor.pincode,
-      bankName: vendor.bankName || vendor.bankAccount?.bankName || 'HDFC Bank',
+      bankName: vendor.bankName || vendor.bankAccount?.bankName || '',
       bankBranch: vendor.bankBranch || '',
-      accountHolderName: vendor.accountHolderName || vendor.ownerName,
-      accountNumber: vendor.accountNumber || vendor.bankAccount?.accountNumber || 'XXXX9182',
-      ifscCode: vendor.ifscCode || vendor.bankAccount?.ifscCode || 'HDFC0000123',
-      bankAccount: vendor.bankAccount || {
-        bankName: 'HDFC Bank',
-        accountNumber: 'XXXX9182',
-        ifscCode: 'HDFC0000123',
-      },
+      accountHolderName: vendor.accountHolderName || vendor.ownerName || '',
+      accountNumber: vendor.accountNumber || vendor.bankAccount?.accountNumber || '',
+      ifscCode: vendor.ifscCode || vendor.bankAccount?.ifscCode || '',
+      bankAccount: vendor.bankAccount || (vendor.accountNumber ? {
+        bankName: vendor.bankName || '',
+        accountNumber: vendor.accountNumber,
+        ifscCode: vendor.ifscCode || '',
+      } : null),
     };
   }
 
@@ -1607,11 +1477,11 @@ export class LocalShopsService implements OnModuleInit {
       throw new BadRequestException('Invalid bill amount');
     }
 
-    const platformCommissionPercent = vendor.platformCommissionPercent || 2;
+    const platformCommissionPercent = vendor.platformCommissionPercent ?? 0;
     const platformCommission = Math.round((billAmount * platformCommissionPercent) / 100);
     const vendorPayout = billAmount - platformCommission;
 
-    const benefitRate = vendor.shoppingCoinPercent || 10;
+    const benefitRate = vendor.shoppingCoinPercent ?? 0;
     const coinBenefit = Math.round((billAmount * benefitRate) / 100);
     const payableAmount = Math.max(0, billAmount - coinBenefit);
 
@@ -1646,7 +1516,7 @@ export class LocalShopsService implements OnModuleInit {
       cashToCollect = 0;
       coinsUsed = 0;
       walletUsed = 0;
-      coinsEarned = Math.floor((billAmount * (vendor.shoppingCoinPercent || 10)) / 100);
+      coinsEarned = Math.floor((billAmount * (vendor.shoppingCoinPercent ?? 0)) / 100);
     }
     // 4. Cash at Store: Customer gives full 100% (₹1,000) physical cash to vendor
     else {
@@ -1654,7 +1524,7 @@ export class LocalShopsService implements OnModuleInit {
       coinsUsed = 0;
       walletUsed = 0;
       upiAmount = 0;
-      coinsEarned = Math.floor((billAmount * (vendor.shoppingCoinPercent || 10)) / 100);
+      coinsEarned = Math.floor((billAmount * (vendor.shoppingCoinPercent ?? 0)) / 100);
     }
 
     let customerIdObj: Types.ObjectId | undefined;
@@ -2222,16 +2092,19 @@ export class LocalShopsService implements OnModuleInit {
       .limit(10)
       .lean();
 
+    const rawAccNum = vendor.bankAccount?.accountNumber || vendor.accountNumber;
+    const bankDetails = rawAccNum ? {
+      bankName: vendor.bankAccount?.bankName || vendor.bankName || '',
+      accountMasked: `****${rawAccNum.slice(-4)}`,
+      ifsc: vendor.bankAccount?.ifscCode || vendor.ifscCode || '',
+      isPrimary: true,
+    } : null;
+
     return {
       availableBalance: vendor.walletBalance || 0,
       pendingBalance: pendingSum[0]?.total || 0,
       pendingCount: pendingSum[0]?.count || 0,
-      bankAccount: {
-        bankName: vendor.bankAccount?.bankName || 'HDFC Bank',
-        accountMasked: vendor.bankAccount?.accountNumber ? `****${vendor.bankAccount.accountNumber.slice(-4)}` : '****9182',
-        ifsc: vendor.bankAccount?.ifscCode || 'HDFC0000123',
-        isPrimary: true,
-      },
+      bankAccount: bankDetails,
       recentSettlements: settlements.map((s) => ({
         id: s._id.toString(),
         date: new Date((s as any).createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
@@ -2264,6 +2137,15 @@ export class LocalShopsService implements OnModuleInit {
       throw new BadRequestException(`Insufficient wallet balance. Available: ₹${vendor.walletBalance || 0}`);
     }
 
+    const targetBankName = dto.bankName || vendor.bankAccount?.bankName || vendor.bankName;
+    const targetAcc = vendor.bankAccount?.accountNumber || vendor.accountNumber;
+    const targetAccountMasked = dto.accountMasked || (targetAcc ? `****${targetAcc.slice(-4)}` : null);
+    const targetIfsc = dto.ifsc || vendor.bankAccount?.ifscCode || vendor.ifscCode;
+
+    if (!targetBankName || !targetAccountMasked) {
+      throw new BadRequestException('Please add bank account details before requesting wallet withdrawal');
+    }
+
     vendor.walletBalance = Math.max(0, (vendor.walletBalance || 0) - withdrawAmount);
     await vendor.save();
 
@@ -2271,9 +2153,9 @@ export class LocalShopsService implements OnModuleInit {
     const settlement = await this.settlementModel.create({
       vendorId: vendor._id,
       amount: withdrawAmount,
-      bankName: dto.bankName || vendor.bankAccount?.bankName || 'HDFC Bank',
-      accountMasked: dto.accountMasked || (vendor.bankAccount?.accountNumber ? `****${vendor.bankAccount.accountNumber.slice(-4)}` : '****9182'),
-      ifsc: dto.ifsc || vendor.bankAccount?.ifscCode || 'HDFC0000123',
+      bankName: targetBankName,
+      accountMasked: targetAccountMasked,
+      ifsc: targetIfsc || '',
       status: 'COMPLETED',
       utrNumber,
       initiatedAt: new Date(),
