@@ -41,6 +41,10 @@ export const S25_OrderHistoryScreen: React.FC = () => {
       <View style={styles.tabsContainer}>
         {tabs.map((tab) => {
           const isActive = activeTab === tab.key;
+          const count =
+            tab.key === 'ALL'
+              ? orders.length
+              : OrderService.getOrdersByStatus(tab.key).length;
           return (
             <TouchableOpacity
               key={tab.key}
@@ -51,6 +55,11 @@ export const S25_OrderHistoryScreen: React.FC = () => {
               <Text style={[styles.tabLabel, isActive && styles.activeTabLabel]}>
                 {tab.label}
               </Text>
+              {count > 0 && (
+                <View style={[styles.tabBadge, isActive && styles.tabBadgeActive]}>
+                  <Text style={styles.tabBadgeText}>{count}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           );
         })}
@@ -86,20 +95,47 @@ const styles = StyleSheet.create({
   tabsContainer: {
     flexDirection: 'row',
     paddingHorizontal: SPACING.md,
-    paddingVertical: 10,
+    paddingTop: 10,
+    paddingBottom: 10,
     backgroundColor: COLORS.white,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
-    gap: 8,
+    gap: 10,
+    overflow: 'visible',
   },
   tabButton: {
     paddingVertical: 6,
     paddingHorizontal: 16,
     borderRadius: RADIUS.pill,
     backgroundColor: COLORS.cardBackground,
+    position: 'relative',
   },
   activeTabButton: {
     backgroundColor: COLORS.hotPink,
+  },
+  tabBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -4,
+    backgroundColor: '#EF4444',
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    zIndex: 10,
+    elevation: 4,
+  },
+  tabBadgeActive: {
+    borderColor: COLORS.hotPink,
+  },
+  tabBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
   },
   tabLabel: {
     fontSize: 13,

@@ -249,9 +249,14 @@ export const CurrentDeliveryScreen: React.FC = () => {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
             <Ionicons name={activeTab === 'ACTIVE' ? "flash" : "flash-outline"} size={13} color={activeTab === 'ACTIVE' ? COLORS.white : '#94A3B8'} />
             <Text style={[styles.topTabButtonText, activeTab === 'ACTIVE' && styles.topTabButtonTextActive]}>
-              Active ({hasActiveJob ? '1' : '0'})
+              Active
             </Text>
           </View>
+          {Boolean(hasActiveJob) && (
+            <View style={[styles.tabBadge, activeTab === 'ACTIVE' && styles.tabBadgeActive]}>
+              <Text style={styles.tabBadgeText}>1</Text>
+            </View>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -265,9 +270,14 @@ export const CurrentDeliveryScreen: React.FC = () => {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
             <Ionicons name={activeTab === 'AVAILABLE' ? "cube" : "cube-outline"} size={13} color={activeTab === 'AVAILABLE' ? COLORS.white : '#94A3B8'} />
             <Text style={[styles.topTabButtonText, activeTab === 'AVAILABLE' && styles.topTabButtonTextActive]}>
-              Available ({availableJobs.length})
+              Available
             </Text>
           </View>
+          {availableJobs.length > 0 && (
+            <View style={[styles.tabBadge, activeTab === 'AVAILABLE' && styles.tabBadgeActive]}>
+              <Text style={styles.tabBadgeText}>{availableJobs.length}</Text>
+            </View>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -281,9 +291,14 @@ export const CurrentDeliveryScreen: React.FC = () => {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
             <Ionicons name={activeTab === 'HISTORY' ? "time" : "time-outline"} size={13} color={activeTab === 'HISTORY' ? COLORS.white : '#94A3B8'} />
             <Text style={[styles.topTabButtonText, activeTab === 'HISTORY' && styles.topTabButtonTextActive]}>
-              History ({historyOrders.length})
+              History
             </Text>
           </View>
+          {historyOrders.length > 0 && (
+            <View style={[styles.tabBadge, activeTab === 'HISTORY' && styles.tabBadgeActive]}>
+              <Text style={styles.tabBadgeText}>{historyOrders.length}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -1610,9 +1625,34 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: '#1E293B',
     marginHorizontal: 4,
+    position: 'relative',
   },
   topTabButtonActive: {
     backgroundColor: '#4F46E5',
+  },
+  tabBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -3,
+    backgroundColor: '#EF4444',
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#0F172A',
+    zIndex: 10,
+    elevation: 4,
+  },
+  tabBadgeActive: {
+    borderColor: '#4F46E5',
+  },
+  tabBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
   },
   topTabButtonText: {
     fontSize: 12,

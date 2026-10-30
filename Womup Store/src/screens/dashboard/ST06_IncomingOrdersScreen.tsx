@@ -128,8 +128,13 @@ export const ST06_IncomingOrdersScreen: React.FC = () => {
           activeOpacity={0.8}
         >
           <Text style={[styles.tabText, activeTab === 'NEW' && styles.tabTextActive]}>
-            New ({incomingOrders.length})
+            New
           </Text>
+          {incomingOrders.length > 0 && (
+            <View style={[styles.tabBadge, activeTab === 'NEW' && styles.tabBadgeActive]}>
+              <Text style={styles.tabBadgeText}>{incomingOrders.length}</Text>
+            </View>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -138,8 +143,13 @@ export const ST06_IncomingOrdersScreen: React.FC = () => {
           activeOpacity={0.8}
         >
           <Text style={[styles.tabText, activeTab === 'PICKING' && styles.tabTextActive]}>
-            Picking ({pickingOrders.length})
+            Picking
           </Text>
+          {pickingOrders.length > 0 && (
+            <View style={[styles.tabBadge, activeTab === 'PICKING' && styles.tabBadgeActive]}>
+              <Text style={styles.tabBadgeText}>{pickingOrders.length}</Text>
+            </View>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -148,8 +158,13 @@ export const ST06_IncomingOrdersScreen: React.FC = () => {
           activeOpacity={0.8}
         >
           <Text style={[styles.tabText, activeTab === 'PACKING' && styles.tabTextActive]}>
-            Packing ({readyOrders.length})
+            Packing
           </Text>
+          {readyOrders.length > 0 && (
+            <View style={[styles.tabBadge, activeTab === 'PACKING' && styles.tabBadgeActive]}>
+              <Text style={styles.tabBadgeText}>{readyOrders.length}</Text>
+            </View>
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -158,8 +173,13 @@ export const ST06_IncomingOrdersScreen: React.FC = () => {
           activeOpacity={0.8}
         >
           <Text style={[styles.tabText, activeTab === 'DISPATCHED' && styles.tabTextActive]}>
-            Dispatched ({completedOrders.length || 24})
+            Dispatched
           </Text>
+          {Boolean(completedOrders.length) && (
+            <View style={[styles.tabBadge, activeTab === 'DISPATCHED' && styles.tabBadgeActive]}>
+              <Text style={styles.tabBadgeText}>{completedOrders.length}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -240,10 +260,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 12,
+    paddingTop: 10,
     paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
-    gap: 6,
+    gap: 8,
+    overflow: 'visible',
   },
   tabButton: {
     flex: 1,
@@ -252,9 +274,34 @@ const styles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
   },
   tabButtonActive: {
     backgroundColor: '#FF3B98',
+  },
+  tabBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -4,
+    backgroundColor: '#EF4444',
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    zIndex: 10,
+    elevation: 4,
+  },
+  tabBadgeActive: {
+    borderColor: '#FF3B98',
+  },
+  tabBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
   },
   tabText: {
     fontSize: 11,

@@ -219,36 +219,49 @@ export const OrdersScreen: React.FC = () => {
       <View style={styles.topSection}>
         {/* Main Tab Switcher */}
         <View style={styles.mainTabRow}>
-          <TouchableOpacity
-            style={[styles.mainTab, topTab === 'Live Orders' && styles.activeMainTab]}
-            onPress={() => {
-              setTopTab('Live Orders');
-              setStatusFilter('All');
-            }}
-          >
-            <Text
-              style={[styles.mainTabText, topTab === 'Live Orders' && styles.activeMainTabText]}
-            >
-              Live Orders ({orders.filter((o) => o.status !== 'Delivered' && o.status !== 'Cancelled').length})
-            </Text>
-          </TouchableOpacity>
+          {(() => {
+            const liveCount = orders.filter((o) => o.status !== 'Delivered' && o.status !== 'Cancelled').length;
+            const historyCount = orders.filter((o) => o.status === 'Delivered' || o.status === 'Cancelled').length;
+            const isLive = topTab === 'Live Orders';
+            const isHistory = topTab === 'Order History';
+            return (
+              <>
+                <TouchableOpacity
+                  style={[styles.mainTab, isLive && styles.activeMainTab]}
+                  onPress={() => {
+                    setTopTab('Live Orders');
+                    setStatusFilter('All');
+                  }}
+                >
+                  <Text style={[styles.mainTabText, isLive && styles.activeMainTabText]}>
+                    Live Orders
+                  </Text>
+                  {liveCount > 0 && (
+                    <View style={[styles.tabBadge, isLive && styles.tabBadgeActive]}>
+                      <Text style={styles.tabBadgeText}>{liveCount}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.mainTab, topTab === 'Order History' && styles.activeMainTab]}
-            onPress={() => {
-              setTopTab('Order History');
-              setStatusFilter('All');
-            }}
-          >
-            <Text
-              style={[
-                styles.mainTabText,
-                topTab === 'Order History' && styles.activeMainTabText,
-              ]}
-            >
-              Order History ({orders.filter((o) => o.status === 'Delivered' || o.status === 'Cancelled').length})
-            </Text>
-          </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.mainTab, isHistory && styles.activeMainTab]}
+                  onPress={() => {
+                    setTopTab('Order History');
+                    setStatusFilter('All');
+                  }}
+                >
+                  <Text style={[styles.mainTabText, isHistory && styles.activeMainTabText]}>
+                    Order History
+                  </Text>
+                  {historyCount > 0 && (
+                    <View style={[styles.tabBadge, isHistory && styles.tabBadgeActive]}>
+                      <Text style={styles.tabBadgeText}>{historyCount}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </>
+            );
+          })()}
         </View>
 
         {/* Global Order Search Bar */}
@@ -682,6 +695,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     alignItems: 'center',
     borderRadius: RADIUS.pill,
+    position: 'relative',
   },
   activeMainTab: {
     backgroundColor: COLORS.purple,
@@ -694,6 +708,30 @@ const styles = StyleSheet.create({
   activeMainTabText: {
     color: COLORS.white,
     fontWeight: '700',
+  },
+  tabBadge: {
+    position: 'absolute',
+    top: -5,
+    right: 8,
+    backgroundColor: '#EF4444',
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    zIndex: 10,
+    elevation: 4,
+  },
+  tabBadgeActive: {
+    borderColor: COLORS.purple,
+  },
+  tabBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
   },
   filtersBar: {
     flexDirection: 'row',
