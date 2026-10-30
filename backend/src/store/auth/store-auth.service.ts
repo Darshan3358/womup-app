@@ -1017,4 +1017,94 @@ export class StoreAuthService {
       message: 'Password changed successfully! Please use your new password next time you sign in.',
     };
   }
+
+  async getEarningsSummary(userId?: string, queryStoreId?: string) {
+    let targetStoreId: any = null;
+
+    if (queryStoreId && Types.ObjectId.isValid(queryStoreId)) {
+      targetStoreId = new Types.ObjectId(queryStoreId);
+    } else if (userId && Types.ObjectId.isValid(userId)) {
+      const directStore = await this.storeModel.findById(userId);
+      if (directStore) {
+        targetStoreId = directStore._id;
+      } else {
+        const staff = await this.staffModel.findOne({ userId });
+        if (staff?.storeId) {
+          targetStoreId = staff.storeId;
+        }
+      }
+    }
+
+    if (!targetStoreId) {
+      // Fallback: pick primary active store
+      const primaryStore = await this.storeModel.findOne({ isActive: true });
+      if (primaryStore) {
+        targetStoreId = primaryStore._id;
+      }
+    }
+
+    if (!targetStoreId) {
+      return {
+        totalEarnings: 0,
+        todayEarnings: 0,
+        pendingSettlement: 0,
+        availableForWithdrawal: 0,
+      };
+    }
+
+    const db = this.storeModel.db;
+    const storeIdStr = targetStoreId.toString();
+    const storeIdObj = Types.ObjectId.isValid(storeIdStr) ? new Types.ObjectId(storeIdStr) : targetStoreId;
+
+    // 1. Get store wallet if exists
+    const wallet = await db.collection('store_wallets').findOne({
+      $or: [{ storeId: storeIdObj }, { storeId: storeIdStr }],
+    });
+
+    // 2. Compute today's delivered orders earnings
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const storeQuery = {
+      $or: [
+        { storeId: storeIdObj },
+        { storeId: storeIdStr },
+      ],
+      status: 'DELIVERED',
+    };
+
+    const todayOrders = await db.collection('orders').find({
+      ...storeQuery,
+      $or: [
+        { deliveredAt: { $gte: todayStart } },
+        { createdAt: { $gte: todayStart } },
+      ],
+    }).toArray();
+
+    const todayGross = todayOrders.reduce((sum, o: any) => {
+      const subtotal = Number(o.itemSubtotal) || (o.items || []).reduce((s: number, i: any) => s + (Number(i.unitPrice || i.price || 0) * (i.quantity || 1)), 0);
+      return sum + subtotal;
+    }, 0);
+    const todayEarnings = Math.round(todayGross * 0.90); // 90% store net
+
+    // 3. Compute all delivered orders earnings
+    const allDelivered = await db.collection('orders').find(storeQuery).toArray();
+    const lifetimeGross = allDelivered.reduce((sum, o: any) => {
+      const subtotal = Number(o.itemSubtotal) || (o.items || []).reduce((s: number, i: any) => s + (Number(i.unitPrice || i.price || 0) * (i.quantity || 1)), 0);
+      return sum + subtotal;
+    }, 0);
+    const calculatedLifetime = Math.round(lifetimeGross * 0.90);
+
+    const walletBalance = Number(wallet?.balance) || 0;
+    const totalEarnings = Math.max(calculatedLifetime, walletBalance, Number(wallet?.totalEarned) || 0);
+    const availableForWithdrawal = walletBalance > 0 ? walletBalance : totalEarnings;
+    const pendingSettlement = Number(wallet?.pendingBalance) || Math.round(todayEarnings * 0.5);
+
+    return {
+      totalEarnings,
+      todayEarnings,
+      pendingSettlement,
+      availableForWithdrawal,
+    };
+  }
 }

@@ -205,6 +205,16 @@ export class StoreApiService {
     return this.request<any[]>('/me/history');
   }
 
+  static async getEarningsSummary(storeId?: string) {
+    const qs = storeId ? `?storeId=${storeId}` : '';
+    return this.request<{
+      totalEarnings: number;
+      todayEarnings: number;
+      pendingSettlement: number;
+      availableForWithdrawal: number;
+    }>(`/earnings/summary${qs}`);
+  }
+
   // Order Operations
   static async getIncomingOrders() {
     return this.request<any[]>('/orders/incoming');

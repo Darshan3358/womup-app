@@ -8,10 +8,12 @@ import {
   Alert,
   Modal,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../context/StoreContext';
+import { StoreApiService } from '../../services/storeApi';
 import { COLORS } from '../../theme/colors';
 
 const LANGUAGE_STORAGE_KEY = '@womup_store_language';
@@ -29,9 +31,44 @@ const LANGUAGES: LanguageOption[] = [
 ];
 
 export const ST15_StaffProfileScreen: React.FC = () => {
-  const { staff, store, logout, setSubScreen } = useStore();
+  const { staff, store, logout, setSubScreen, setCurrentTab } = useStore();
   const [selectedLanguage, setSelectedLanguage] = useState<string>('English');
   const [isLangModalOpen, setIsLangModalOpen] = useState<boolean>(false);
+
+  const [earnings, setEarnings] = useState<{
+    totalEarnings: number;
+    todayEarnings: number;
+    pendingSettlement: number;
+    availableForWithdrawal: number;
+  }>({
+    totalEarnings: 0,
+    todayEarnings: 0,
+    pendingSettlement: 0,
+    availableForWithdrawal: 0,
+  });
+  const [earningsLoading, setEarningsLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchEarnings = async () => {
+      try {
+        const storeId = store?.id || (store as any)?._id;
+        const res = await StoreApiService.getEarningsSummary(storeId);
+        if (isMounted && res) {
+          setEarnings(res);
+        }
+      } catch (err) {
+        // non-fatal: fallback to 0
+      } finally {
+        if (isMounted) setEarningsLoading(false);
+      }
+    };
+
+    fetchEarnings();
+    return () => {
+      isMounted = false;
+    };
+  }, [store?.id]);
 
   useEffect(() => {
     const loadLang = async () => {
@@ -101,6 +138,49 @@ export const ST15_StaffProfileScreen: React.FC = () => {
           <Text style={styles.staffRole}>Dark Store Partner</Text>
           <Text style={styles.storeId}>Store ID: {store?.code || 'STORE-01'}</Text>
         </View>
+
+        {/* 0. My Earnings Summary Card */}
+        <TouchableOpacity
+          style={styles.earningsCard}
+          activeOpacity={0.85}
+          onPress={() => {
+            setSubScreen(null);
+            setCurrentTab('History');
+          }}
+          accessibilityLabel="View My Earnings"
+        >
+          <View style={styles.earningsLeft}>
+            <View style={styles.earningsIconCircle}>
+              <Ionicons name="wallet" size={22} color="#10B981" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={styles.earningsTitle}>My Earnings</Text>
+                <View style={styles.settlementBadge}>
+                  <Text style={styles.settlementBadgeText}>Live</Text>
+                </View>
+              </View>
+              <Text style={styles.earningsSubtitle}>
+                {earnings.pendingSettlement > 0
+                  ? `₹${earnings.pendingSettlement.toLocaleString('en-IN')} pending settlement`
+                  : 'Tap to view full earnings & orders'}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.earningsRight}>
+            {earningsLoading ? (
+              <ActivityIndicator size="small" color="#10B981" />
+            ) : (
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={styles.earningsAmount}>
+                  ₹{(earnings.totalEarnings || earnings.availableForWithdrawal || 0).toLocaleString('en-IN')}
+                </Text>
+                <Text style={styles.earningsHint}>Lifetime Total ›</Text>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
 
         {/* Menu List */}
         <View style={styles.menuCard}>
@@ -302,6 +382,74 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#64748B',
     letterSpacing: 0.5,
+  },
+  earningsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  earningsLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  earningsIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#ECFDF5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  earningsTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  settlementBadge: {
+    backgroundColor: '#D1FAE5',
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 6,
+  },
+  settlementBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  earningsSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  earningsRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 10,
+  },
+  earningsAmount: {
+    fontSize: 19,
+    fontWeight: '900',
+    color: '#10B981',
+    letterSpacing: -0.3,
+  },
+  earningsHint: {
+    fontSize: 10.5,
+    color: '#94A3B8',
+    fontWeight: '600',
+    marginTop: 1,
   },
   menuCard: {
     backgroundColor: COLORS.card,

@@ -6,6 +6,7 @@ import {
   Body,
   UseGuards,
   Request,
+  Query,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { StoreAuthService } from './store-auth.service';
@@ -88,5 +89,15 @@ export class StoreAuthController {
   @ApiOperation({ summary: 'Get shift and order picking history' })
   async getHistory(@Request() req: any) {
     return this.storeAuthService.getHistory(req.user.id);
+  }
+
+  @Get('earnings/summary')
+  @ApiOperation({ summary: 'Get store earnings summary: lifetime, today, pending, available' })
+  async getEarningsSummary(
+    @Request() req: any,
+    @Query('storeId') queryStoreId?: string,
+  ) {
+    const userId = req?.user?.id || req?.user?._id;
+    return this.storeAuthService.getEarningsSummary(userId, queryStoreId);
   }
 }
