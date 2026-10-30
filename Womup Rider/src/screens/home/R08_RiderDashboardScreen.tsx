@@ -53,30 +53,18 @@ export const RiderDashboardScreen: React.FC = () => {
     activeDelivery.stepStatus !== 'OFFERED'
   );
 
-  // Duty-state-aware GPS polling (B-02 fix: was unconditional 1-second loop)
-  // • Offline rider  → 30 s  (hub location is stable; no orders to track)
-  // • Online, no job → 10 s  (ready to receive; needs fresh location for dispatch)
-  // • Active delivery →  5 s  (customer and admin need timely ETA updates)
+  // Duty-state-aware GPS detection:
+  // Detects location once upon going online or starting an active delivery.
+  // Continuous GPS streaming during delivery is handled cleanly by RiderContext / LocationTrackerService,
+  // preventing redundant hardware GPS polling loops and unnecessary HTTP requests.
   useEffect(() => {
-    let isMounted = true;
-
-    // When offline, do not poll GPS repeatedly
     if (!isOnline && !isRealDelivery) {
       return;
     }
 
-    const gpsIntervalMs = isRealDelivery ? 5000 : 15000;
-
-    const interval = setInterval(() => {
-      if (isMounted) detectLocation();
-    }, gpsIntervalMs);
-
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  // Re-create interval whenever duty state changes so we always use the right cadence
-  }, [detectLocation, isOnline, isRealDelivery]);
+    // Detect location once on duty state change
+    detectLocation();
+  }, [isOnline, isRealDelivery, detectLocation]);
 
   const [refreshing, setRefreshing] = useState(false);
   const [pendingSettlementRequest, setPendingSettlementRequest] = useState<any | null>(null);

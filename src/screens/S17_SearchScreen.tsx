@@ -56,9 +56,13 @@ export const S17_SearchScreen: React.FC = () => {
     }
   }, [isVoiceSearchActive]);
 
-  // Ensure fresh products are loaded from MongoDB Atlas backend
+  // Use in-memory catalog cache if available; only fetch from backend if empty
   useEffect(() => {
     let isMounted = true;
+    if (products && products.length > 0) {
+      setIsLoading(false);
+      return;
+    }
     ProductService.fetchProducts()
       .then((loaded) => {
         if (isMounted && loaded && loaded.length > 0) {

@@ -483,20 +483,39 @@ const enrichStore = (rawStore: any): StoreHub | null => {
     };
   }, [authStep, store?.id, refreshIncoming, refreshPicking]);
 
-  // Robust Fallback Polling (10 seconds) - Ensures store receives new orders even if WebSocket drops in background
+  // Graceful Fallback Polling - ONLY active when WebSocket is disconnected
+  // (Prevents continuous 10s API stampede when real-time socket events are already delivering live orders)
   useEffect(() => {
     if (authStep !== 'AUTHENTICATED') return;
 
-    // Load immediately on auth
+    // Load initial data on mount/auth
     refreshIncoming();
     refreshPicking();
 
-    const pollInterval = setInterval(() => {
-      if (!isAppActiveRef.current) return;
-      refreshIncoming();
-    }, 10000);
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
+    const updatePolling = () => {
+      if (!storeSocket.isConnected()) {
+        if (!pollInterval) {
+          pollInterval = setInterval(() => {
+            if (!isAppActiveRef.current) return;
+            refreshIncoming();
+          }, 30000); // 30s calm disconnected fallback
+        }
+      } else {
+        if (pollInterval) {
+          clearInterval(pollInterval);
+          pollInterval = null;
+        }
+      }
+    };
 
-    return () => clearInterval(pollInterval);
+    updatePolling();
+    const checkTimer = setInterval(updatePolling, 15000);
+
+    return () => {
+      clearInterval(checkTimer);
+      if (pollInterval) clearInterval(pollInterval);
+    };
   }, [authStep, store?.id, refreshIncoming, refreshPicking]);
 
   const refreshCompletedOrders = useCallback(async () => {

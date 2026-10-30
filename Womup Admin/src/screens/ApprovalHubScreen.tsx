@@ -52,12 +52,7 @@ export const ApprovalHubScreen: React.FC = () => {
   useEffect(() => {
     fetchSummary();
 
-    // Auto-refresh summary every 30 seconds
-    const interval = setInterval(() => {
-      fetchSummary();
-    }, 30000);
-
-    // WebSocket real-time updates
+    // WebSocket real-time updates (replaces redundant HTTP polling)
     let socket: any = null;
     try {
       const socketUrl =
@@ -80,7 +75,6 @@ export const ApprovalHubScreen: React.FC = () => {
     }
 
     return () => {
-      clearInterval(interval);
       if (socket) socket.disconnect();
     };
   }, [fetchSummary]);

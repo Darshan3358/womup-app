@@ -105,8 +105,10 @@ export const CurrentDeliveryScreen: React.FC = () => {
 
   useEffect(() => {
     loadHistory();
-    refreshAvailableJobs();
-  }, [loadHistory, refreshAvailableJobs]);
+    if (!hasActiveJob) {
+      refreshAvailableJobs();
+    }
+  }, [loadHistory, refreshAvailableJobs, hasActiveJob]);
 
   useEffect(() => {
     if (hasActiveJob) {

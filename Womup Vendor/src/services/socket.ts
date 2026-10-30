@@ -77,6 +77,10 @@ class VendorSocketService {
     }
   }
 
+  isConnected(): boolean {
+    return Boolean(this.socket && this.socket.connected);
+  }
+
   disconnect() {
     if (this.socket) {
       if (this.currentVendorId) {

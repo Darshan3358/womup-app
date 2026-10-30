@@ -10,7 +10,16 @@ export interface ServiceabilityResponse {
   message?: string;
 }
 
+let _cachedAddresses: Address[] | null = null;
+let _cachedAddressesTime = 0;
+const ADDRESS_CACHE_TTL = 60 * 1000; // 1 minute in-memory cache
+
 export const AddressService = {
+  clearAddressCache() {
+    _cachedAddresses = null;
+    _cachedAddressesTime = 0;
+  },
+
   async saveAddress(address: {
     type: 'Home' | 'Work' | 'Other' | 'Current';
     fullName: string;
@@ -54,6 +63,9 @@ export const AddressService = {
     };
 
     const res = await api.post<any>('/addresses', payload);
+    if (res.success) {
+      this.clearAddressCache();
+    }
     return res;
   },
 
@@ -82,10 +94,14 @@ export const AddressService = {
     };
   },
 
-  async getAddresses(): Promise<Address[]> {
+  async getAddresses(forceRefresh = false): Promise<Address[]> {
+    if (!forceRefresh && _cachedAddresses && Date.now() - _cachedAddressesTime < ADDRESS_CACHE_TTL) {
+      return _cachedAddresses;
+    }
+
     const res = await api.get<any>('/addresses');
     if (res.success && Array.isArray(res.data)) {
-      return res.data.map((item: any) => ({
+      const mapped = res.data.map((item: any) => ({
         id: item._id,
         type: item.label,
         fullName: item.fullName || 'Customer',
@@ -100,12 +116,18 @@ export const AddressService = {
         latitude: item.location?.coordinates?.[1] !== undefined ? Number(item.location.coordinates[1]) : undefined,
         longitude: item.location?.coordinates?.[0] !== undefined ? Number(item.location.coordinates[0]) : undefined,
       }));
+      _cachedAddresses = mapped;
+      _cachedAddressesTime = Date.now();
+      return mapped;
     }
-    return [];
+    return _cachedAddresses || [];
   },
 
   async deleteAddress(id: string): Promise<{ success: boolean; message?: string }> {
     const res = await api.delete<any>(`/addresses/${id}`);
+    if (res.success) {
+      this.clearAddressCache();
+    }
     return res;
   },
 };

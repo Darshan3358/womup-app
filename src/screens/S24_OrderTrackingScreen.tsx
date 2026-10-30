@@ -525,11 +525,34 @@ export const S24_OrderTrackingScreen: React.FC = () => {
     // Initial immediate fetch to populate assigned partner details & catch latest status
     refreshOrderData();
 
-    // Fallback polling every 2s
-    const pollInterval = setInterval(refreshOrderData, 2000);
+    // Smart fallback polling: ONLY active when WebSocket is disconnected
+    // (Eliminates redundant 2-second HTTP polling loop when real-time socket events are active)
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
+    const startFallbackPoll = () => {
+      if (!pollInterval && liveStatusRef.current !== 'DELIVERED' && liveStatusRef.current !== 'CANCELLED') {
+        pollInterval = setInterval(refreshOrderData, 20000); // 20s graceful fallback
+      }
+    };
+    const stopFallbackPoll = () => {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+    };
+
+    socket.on('connect', () => {
+      stopFallbackPoll();
+    });
+    socket.on('disconnect', () => {
+      startFallbackPoll();
+    });
+
+    if (!socket.connected) {
+      startFallbackPoll();
+    }
 
     return () => {
-      clearInterval(pollInterval);
+      stopFallbackPoll();
       if (orderId) {
         socket.emit('leave_order', { orderId });
       }

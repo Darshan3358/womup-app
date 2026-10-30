@@ -68,10 +68,8 @@ const RiderNavigationMapComponent: React.FC<RiderNavigationMapProps> = ({
     };
 
     fetchRoute();
-    const interval = setInterval(fetchRoute, 30000); // Refresh every 30s
     return () => {
       isMounted = false;
-      clearInterval(interval);
     };
   }, [
     riderCoords?.latitude,

@@ -122,12 +122,32 @@ export const VendorAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   }, [vendor?.vendorCode]);
 
-  // Initial and periodic refresh (every 10 seconds for real-time consistency)
+  // Initial load on login/mount, and fallback sync ONLY when WebSocket is disconnected
+  // (Stops redundant 10-second polling loops while real-time WebSocket events are active)
   useEffect(() => {
     if (isLoggedIn && vendor?.vendorCode) {
       refreshData();
-      const interval = setInterval(refreshData, 10000);
-      return () => clearInterval(interval);
+
+      let pollInterval: ReturnType<typeof setInterval> | null = null;
+      const updatePolling = () => {
+        if (!vendorSocket.isConnected()) {
+          if (!pollInterval) {
+            pollInterval = setInterval(refreshData, 30000); // 30s calm disconnected fallback
+          }
+        } else {
+          if (pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+          }
+        }
+      };
+
+      const checkTimer = setInterval(updatePolling, 15000);
+
+      return () => {
+        clearInterval(checkTimer);
+        if (pollInterval) clearInterval(pollInterval);
+      };
     }
   }, [isLoggedIn, vendor?.vendorCode, refreshData]);
 

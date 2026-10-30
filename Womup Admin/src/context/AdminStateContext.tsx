@@ -874,8 +874,17 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     const startPolling = () => {
       if (syncInterval) clearInterval(syncInterval);
-      syncInterval = setInterval(checkDeltaSync, 20000);
+      // Adaptive sync: when socket is connected, delta polling slows to a 60s heartbeat
+      const intervalMs = socket.connected ? 60000 : 20000;
+      syncInterval = setInterval(checkDeltaSync, intervalMs);
     };
+
+    socket.on('connect', () => {
+      startPolling();
+    });
+    socket.on('disconnect', () => {
+      startPolling();
+    });
 
     const stopPolling = () => {
       if (syncInterval) {

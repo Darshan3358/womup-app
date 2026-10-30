@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { io } from 'socket.io-client';
 import {
   ShieldCheck,
   Users,
@@ -30,8 +31,40 @@ export const PendingApprovalsWidget: React.FC = () => {
 
   useEffect(() => {
     fetchSummary();
-    const interval = setInterval(fetchSummary, 15000);
-    return () => clearInterval(interval);
+
+    // Real-time WebSocket updates (replaces 15-second continuous polling)
+    let socket: any = null;
+    try {
+      const socketUrl =
+        typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+          ? 'http://localhost:5050/tracking'
+          : 'https://womup-app-uquz.onrender.com/tracking';
+
+      socket = io(socketUrl, { transports: ['websocket'] });
+      socket.on('approval_summary_updated', (updatedSummary: any) => {
+        if (updatedSummary) {
+          setCounts({
+            customerKyc: updatedSummary.customerKyc ?? 0,
+            riders: updatedSummary.riders ?? 0,
+            stores: updatedSummary.stores ?? 0,
+            vendors: updatedSummary.vendors ?? 0,
+            withdrawals: updatedSummary.withdrawals ?? 0,
+            staff: updatedSummary.staff ?? 0,
+            orders: updatedSummary.orders ?? 0,
+            rateChanges: updatedSummary.rateChanges ?? 0,
+            total: updatedSummary.totalPending ?? 0,
+          });
+        }
+      });
+    } catch {
+      // quiet fallback
+    }
+
+    return () => {
+      if (socket) {
+        socket.disconnect();
+      }
+    };
   }, []);
 
   const fetchSummary = async () => {

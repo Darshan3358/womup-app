@@ -72,6 +72,10 @@ class StoreSocketService {
     }
   }
 
+  isConnected(): boolean {
+    return Boolean(this.socket && this.socket.connected);
+  }
+
   disconnect() {
     if (this.socket) {
       this.socket.disconnect();
