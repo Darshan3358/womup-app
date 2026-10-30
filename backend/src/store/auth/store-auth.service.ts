@@ -1019,49 +1019,67 @@ export class StoreAuthService {
   }
 
   async getEarningsSummary(userId?: string, queryStoreId?: string) {
-    let targetStoreId: any = null;
+    let store: StoreDocument | null = null;
 
-    if (queryStoreId && Types.ObjectId.isValid(queryStoreId)) {
-      targetStoreId = new Types.ObjectId(queryStoreId);
-    } else if (userId && Types.ObjectId.isValid(userId)) {
-      const directStore = await this.storeModel.findById(userId);
-      if (directStore) {
-        targetStoreId = directStore._id;
-      } else {
-        const staff = await this.staffModel.findOne({ userId });
+    // 1. Resolve store from queryStoreId (ObjectId, Store Code, or Login ID)
+    if (queryStoreId && typeof queryStoreId === 'string' && queryStoreId.trim() !== '') {
+      const cleanStoreId = queryStoreId.trim();
+      if (Types.ObjectId.isValid(cleanStoreId)) {
+        store = await this.storeModel.findById(cleanStoreId);
+      }
+      if (!store) {
+        const normCode = cleanStoreId.replace(/[-_]/g, '[-_]');
+        store = await this.storeModel.findOne({
+          $or: [
+            { code: { $regex: new RegExp(`^${normCode}$`, 'i') } },
+            { loginId: { $regex: new RegExp(`^${normCode}$`, 'i') } },
+            { name: { $regex: new RegExp(`^${cleanStoreId}$`, 'i') } },
+          ],
+        });
+      }
+    }
+
+    // 2. Resolve store from authenticated session (Store Direct ID or Staff Store ID)
+    if (!store && userId && typeof userId === 'string' && userId.trim() !== '') {
+      const cleanUserId = userId.trim();
+      if (Types.ObjectId.isValid(cleanUserId)) {
+        store = await this.storeModel.findById(cleanUserId);
+      }
+      if (!store) {
+        const staff = await this.staffModel.findOne({
+          $or: [
+            { userId: cleanUserId },
+            ...(Types.ObjectId.isValid(cleanUserId) ? [{ userId: new Types.ObjectId(cleanUserId) }] : []),
+          ],
+        });
         if (staff?.storeId) {
-          targetStoreId = staff.storeId;
+          store = await this.storeModel.findById(staff.storeId);
         }
       }
     }
 
-    if (!targetStoreId) {
-      // Fallback: pick primary active store
-      const primaryStore = await this.storeModel.findOne({ isActive: true });
-      if (primaryStore) {
-        targetStoreId = primaryStore._id;
-      }
-    }
-
-    if (!targetStoreId) {
+    // 3. Strict Store Isolation: Never fall back to another store's data
+    if (!store) {
       return {
         totalEarnings: 0,
         todayEarnings: 0,
         pendingSettlement: 0,
         availableForWithdrawal: 0,
+        storeName: '',
+        storeCode: '',
       };
     }
 
     const db = this.storeModel.db;
-    const storeIdStr = targetStoreId.toString();
-    const storeIdObj = Types.ObjectId.isValid(storeIdStr) ? new Types.ObjectId(storeIdStr) : targetStoreId;
+    const storeIdStr = store._id.toString();
+    const storeIdObj = new Types.ObjectId(storeIdStr);
 
-    // 1. Get store wallet if exists
+    // 4. Query store_wallets STRICTLY for THIS specific store
     const wallet = await db.collection('store_wallets').findOne({
       $or: [{ storeId: storeIdObj }, { storeId: storeIdStr }],
     });
 
-    // 2. Compute today's delivered orders earnings
+    // 5. Compute today's delivered orders earnings strictly for THIS specific store
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
@@ -1069,8 +1087,10 @@ export class StoreAuthService {
       $or: [
         { storeId: storeIdObj },
         { storeId: storeIdStr },
+        { 'store.id': storeIdStr },
+        { 'store._id': storeIdStr },
       ],
-      status: 'DELIVERED',
+      status: { $in: ['DELIVERED', 'COMPLETED'] },
     };
 
     const todayOrders = await db.collection('orders').find({
@@ -1087,7 +1107,7 @@ export class StoreAuthService {
     }, 0);
     const todayEarnings = Math.round(todayGross * 0.90); // 90% store net
 
-    // 3. Compute all delivered orders earnings
+    // 6. Compute all delivered orders earnings strictly for THIS specific store
     const allDelivered = await db.collection('orders').find(storeQuery).toArray();
     const lifetimeGross = allDelivered.reduce((sum, o: any) => {
       const subtotal = Number(o.itemSubtotal) || (o.items || []).reduce((s: number, i: any) => s + (Number(i.unitPrice || i.price || 0) * (i.quantity || 1)), 0);
@@ -1096,15 +1116,18 @@ export class StoreAuthService {
     const calculatedLifetime = Math.round(lifetimeGross * 0.90);
 
     const walletBalance = Number(wallet?.balance) || 0;
-    const totalEarnings = Math.max(calculatedLifetime, walletBalance, Number(wallet?.totalEarned) || 0);
-    const availableForWithdrawal = walletBalance > 0 ? walletBalance : totalEarnings;
-    const pendingSettlement = Number(wallet?.pendingBalance) || Math.round(todayEarnings * 0.5);
+    const walletTotalEarned = Number(wallet?.totalEarned) || 0;
+    const totalEarnings = Math.max(calculatedLifetime, walletTotalEarned, walletBalance);
+    const availableForWithdrawal = walletBalance;
+    const pendingSettlement = Number(wallet?.pendingBalance) || 0;
 
     return {
       totalEarnings,
       todayEarnings,
       pendingSettlement,
       availableForWithdrawal,
+      storeName: store.name,
+      storeCode: store.code,
     };
   }
 }

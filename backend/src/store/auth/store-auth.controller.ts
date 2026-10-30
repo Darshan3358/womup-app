@@ -97,7 +97,8 @@ export class StoreAuthController {
     @Request() req: any,
     @Query('storeId') queryStoreId?: string,
   ) {
-    const userId = req?.user?.id || req?.user?._id;
-    return this.storeAuthService.getEarningsSummary(userId, queryStoreId);
+    const userId = req?.user?.id || req?.user?._id || req?.user?.sub;
+    const effectiveStoreId = queryStoreId || req?.user?.storeId || req?.headers?.['x-store-id'];
+    return this.storeAuthService.getEarningsSummary(userId, effectiveStoreId);
   }
 }

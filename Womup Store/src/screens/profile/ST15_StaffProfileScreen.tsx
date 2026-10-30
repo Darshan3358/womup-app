@@ -52,7 +52,9 @@ export const ST15_StaffProfileScreen: React.FC = () => {
     let isMounted = true;
     const fetchEarnings = async () => {
       try {
-        const storeId = store?.id || (store as any)?._id;
+        const storeId = store?.id || (store as any)?._id || store?.code;
+        if (!storeId) return;
+        setEarningsLoading(true);
         const res = await StoreApiService.getEarningsSummary(storeId);
         if (isMounted && res) {
           setEarnings(res);
@@ -68,7 +70,7 @@ export const ST15_StaffProfileScreen: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [store?.id]);
+  }, [store?.id, (store as any)?._id, store?.code]);
 
   useEffect(() => {
     const loadLang = async () => {
