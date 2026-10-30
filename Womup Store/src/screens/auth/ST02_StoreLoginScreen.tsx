@@ -22,19 +22,30 @@ export const ST02_StoreLoginScreen: React.FC = () => {
   const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
 
   const handleLogin = async () => {
-    if (!loginId.trim() || !password) {
-      Alert.alert('Missing fields', 'Please enter both Store ID and Password.');
+    setLocalError(null);
+    if (!loginId.trim()) {
+      setLocalError('Please enter your Store ID or Mobile Number.');
+      return;
+    }
+    if (!password) {
+      setLocalError('Please enter your Password.');
       return;
     }
 
-    const success = await loginWithStoreCredentials(loginId.trim(), password);
-    if (!success) {
-      Alert.alert(
-        'Login Failed',
-        error || 'Invalid Store ID or Password. Please check with your store manager.'
-      );
+    try {
+      const success = await loginWithStoreCredentials(loginId.trim(), password);
+      if (!success) {
+        const failureMsg = error || 'Invalid Store ID or Password. Please check credentials.';
+        setLocalError(failureMsg);
+        if (Platform.OS !== 'web') {
+          Alert.alert('Login Failed', failureMsg);
+        }
+      }
+    } catch (err: any) {
+      setLocalError(err?.message || 'Login failed. Please check credentials.');
     }
   };
 
@@ -90,7 +101,10 @@ export const ST02_StoreLoginScreen: React.FC = () => {
             <TextInput
               style={styles.input}
               value={loginId}
-              onChangeText={setLoginId}
+              onChangeText={(text) => {
+                setLoginId(text);
+                setLocalError(null);
+              }}
               placeholder="e.g. 9876543210 or womupTragad"
               placeholderTextColor="#94A3B8"
               autoCapitalize="none"
@@ -107,7 +121,10 @@ export const ST02_StoreLoginScreen: React.FC = () => {
             <TextInput
               style={styles.input}
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(text) => {
+                setPassword(text);
+                setLocalError(null);
+              }}
               placeholder="••••••••"
               placeholderTextColor="#94A3B8"
               secureTextEntry={!showPassword}
@@ -127,6 +144,14 @@ export const ST02_StoreLoginScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
 
+          {/* Inline Error Banner */}
+          {Boolean(localError || error) && (
+            <View style={styles.errorBox}>
+              <Ionicons name="alert-circle" size={18} color="#DC2626" style={{ marginRight: 6 }} />
+              <Text style={styles.errorText}>{localError || error}</Text>
+            </View>
+          )}
+
           {/* Forgot Password Link */}
           <TouchableOpacity
             onPress={handleForgotPassword}
@@ -140,10 +165,10 @@ export const ST02_StoreLoginScreen: React.FC = () => {
           <TouchableOpacity
             style={[
               styles.loginBtnWrapper,
-              (!loginId.trim() || !password || isLoading) && styles.disabledBtn,
+              isLoading && styles.disabledBtn,
             ]}
             onPress={handleLogin}
-            disabled={!loginId.trim() || !password || isLoading}
+            disabled={isLoading}
             activeOpacity={0.88}
           >
             <LinearGradient
@@ -282,6 +307,24 @@ const styles = StyleSheet.create({
   },
   eyeBtn: {
     padding: 6,
+  },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 6,
+    marginBottom: 6,
+  },
+  errorText: {
+    color: '#DC2626',
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
   },
   forgotBtn: {
     alignSelf: 'flex-end',

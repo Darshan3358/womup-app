@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Alert,
   Modal,
+  Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
@@ -54,6 +55,17 @@ export const ST15_StaffProfileScreen: React.FC = () => {
   };
 
   const handleLogoutConfirm = () => {
+    if (Platform.OS === 'web') {
+      const confirmed =
+        typeof window !== 'undefined'
+          ? window.confirm(`Are you sure you want to log out of ${store?.name || 'this Dark Store'}?`)
+          : true;
+      if (confirmed) {
+        logout();
+      }
+      return;
+    }
+
     Alert.alert(
       'Sign Out Terminal',
       `Are you sure you want to log out of ${store?.name || 'this Dark Store'}?\n\nActive picking session will be closed.`,
