@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../context/StoreContext';
+import { StoreApiService } from '../../services/storeApi';
 import { COLORS } from '../../theme/colors';
 
 export const ST17_OrderHistoryScreen: React.FC = () => {
@@ -18,9 +19,51 @@ export const ST17_OrderHistoryScreen: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
+  const [earningsSummary, setEarningsSummary] = useState<{
+    totalGrossSales: number;
+    totalPlatformCommission: number;
+    netSettlementAmount: number;
+    pendingSettlement: number;
+    alreadyPaid: number;
+    commissionPercent: number;
+  }>({
+    totalGrossSales: 0,
+    totalPlatformCommission: 0,
+    netSettlementAmount: 0,
+    pendingSettlement: 0,
+    alreadyPaid: 0,
+    commissionPercent: 10,
+  });
+
+  const fetchEarnings = async () => {
+    try {
+      const storeId = store?.id || (store as any)?._id || store?.code;
+      if (!storeId) return;
+      const res = await StoreApiService.getEarningsSummary(storeId);
+      if (res) {
+        setEarningsSummary({
+          totalGrossSales: res.totalGrossSales || 0,
+          totalPlatformCommission: res.totalPlatformCommission || 0,
+          netSettlementAmount: res.netSettlementAmount || 0,
+          pendingSettlement: res.pendingSettlement || 0,
+          alreadyPaid: res.alreadyPaid || 0,
+          commissionPercent: res.commissionPercent || 10,
+        });
+      }
+    } catch (_) {}
+  };
+
   useEffect(() => {
     refreshCompletedOrders();
-  }, [refreshCompletedOrders]);
+    fetchEarnings();
+  }, [refreshCompletedOrders, store?.id, store?.code]);
+
+  const handleFullRefresh = async () => {
+    await Promise.all([
+      refreshCompletedOrders(),
+      fetchEarnings(),
+    ]);
+  };
 
   const areaName =
     store?.areaName ||
@@ -142,10 +185,81 @@ export const ST17_OrderHistoryScreen: React.FC = () => {
         data={filteredOrders}
         keyExtractor={(item) => item.orderId}
         contentContainerStyle={styles.listContent}
+        ListHeaderComponent={
+          <View style={styles.settlementSummaryCard}>
+            <View style={styles.settleTopRow}>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="wallet" size={18} color="#10B981" />
+                  <Text style={styles.settleCardHeading}>Settlement Breakdown</Text>
+                  <View style={styles.settleLiveTag}>
+                    <Text style={styles.settleLiveTagText}>Live Ledger</Text>
+                  </View>
+                </View>
+                <Text style={styles.settleStoreName}>{store?.name || 'Dark Store Hub'}</Text>
+              </View>
+              <View style={styles.cycleBadge}>
+                <Ionicons name="calendar-outline" size={11} color="#4F46E5" />
+                <Text style={styles.cycleBadgeText}>Weekly Cycle</Text>
+              </View>
+            </View>
+
+            {/* 3 Pillars: Total Sales (Gross), Platform Comm (-10%), Net Payable to You */}
+            <View style={styles.threePillarsRow}>
+              {/* 1. Total Sales (Gross) */}
+              <View style={styles.pillarBox}>
+                <Text style={styles.pillarLabel} numberOfLines={1}>Total Sales (Gross)</Text>
+                <Text style={styles.pillarGrossAmount}>
+                  ₹{earningsSummary.totalGrossSales.toLocaleString('en-IN')}
+                </Text>
+                <Text style={styles.pillarSub}>Item Subtotals</Text>
+              </View>
+
+              {/* 2. Platform Commission (Admin ka hissa, 10%) */}
+              <View style={[styles.pillarBox, styles.pillarBoxComm]}>
+                <Text style={styles.pillarLabelComm} numberOfLines={1}>Platform Comm. (10%)</Text>
+                <Text style={styles.pillarCommAmount}>
+                  -₹{earningsSummary.totalPlatformCommission.toLocaleString('en-IN')}
+                </Text>
+                <Text style={styles.pillarSubComm}>Admin ko dena hai</Text>
+              </View>
+
+              {/* 3. Net Payable to You (Store ka hissa) */}
+              <View style={[styles.pillarBox, styles.pillarBoxNet]}>
+                <Text style={styles.pillarLabelNet} numberOfLines={1}>Net Payable to You</Text>
+                <Text style={styles.pillarNetAmount}>
+                  ₹{earningsSummary.netSettlementAmount.toLocaleString('en-IN')}
+                </Text>
+                <Text style={styles.pillarSubNet}>Admin se lena hai</Text>
+              </View>
+            </View>
+
+            {/* Payout Status Banner Row */}
+            <View style={styles.payoutStatusRow}>
+              <View style={styles.payoutStatusItem}>
+                <View style={[styles.statusIconDot, { backgroundColor: '#F59E0B' }]} />
+                <Text style={styles.payoutStatusLabel}>Pending Settlement:</Text>
+                <Text style={styles.payoutPendingValue}>
+                  ₹{earningsSummary.pendingSettlement.toLocaleString('en-IN')}
+                </Text>
+              </View>
+
+              <View style={styles.payoutStatusDivider} />
+
+              <View style={styles.payoutStatusItem}>
+                <View style={[styles.statusIconDot, { backgroundColor: '#10B981' }]} />
+                <Text style={styles.payoutStatusLabel}>Already Settled:</Text>
+                <Text style={styles.payoutSettledValue}>
+                  ₹{earningsSummary.alreadyPaid.toLocaleString('en-IN')}
+                </Text>
+              </View>
+            </View>
+          </View>
+        }
         refreshControl={
           <RefreshControl
             refreshing={isLoading}
-            onRefresh={refreshCompletedOrders}
+            onRefresh={handleFullRefresh}
             tintColor={COLORS.primary}
           />
         }
@@ -244,6 +358,58 @@ export const ST17_OrderHistoryScreen: React.FC = () => {
                     </Text>
                   )}
                 </View>
+
+                {/* Store Financial Breakdown Ledger */}
+                {(() => {
+                  const gross = Math.max(
+                    0,
+                    Number(item.itemSubtotal) ||
+                      (item.items || []).reduce(
+                        (s: number, p: any) => s + Number(p.unitPrice || p.price || 0) * (p.quantity || 1),
+                        0
+                      ) ||
+                      Number(item.totalAmount) ||
+                      0
+                  );
+                  const commission = Math.round(gross * 0.10);
+                  const net = Math.max(0, gross - commission);
+                  const isSettled = isDelivered && item.settlementStatus === 'SETTLED';
+
+                  return (
+                    <View style={styles.orderLedgerCard}>
+                      <View style={styles.ledgerHeader}>
+                        <Text style={styles.ledgerTitle}>FINANCIAL SETTLEMENT BREAKDOWN</Text>
+                        <View style={[styles.settlePill, isSettled ? styles.settlePillPaid : styles.settlePillPending]}>
+                          <Ionicons
+                            name={isSettled ? 'checkmark-circle' : 'time-outline'}
+                            size={11}
+                            color={isSettled ? '#059669' : '#D97706'}
+                          />
+                          <Text style={[styles.settlePillText, isSettled ? styles.settlePillTextPaid : styles.settlePillTextPending]}>
+                            {isSettled ? 'SETTLED' : 'PENDING'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.ledgerMetricsRow}>
+                        <View style={styles.ledgerMetricItem}>
+                          <Text style={styles.ledgerLabel}>Gross Sale</Text>
+                          <Text style={styles.ledgerGrossVal}>₹{gross}</Text>
+                        </View>
+                        <Text style={styles.ledgerOperator}>−</Text>
+                        <View style={styles.ledgerMetricItem}>
+                          <Text style={styles.ledgerLabel}>Admin Comm. (10%)</Text>
+                          <Text style={styles.ledgerCommVal}>-₹{commission}</Text>
+                        </View>
+                        <Text style={styles.ledgerOperator}>=</Text>
+                        <View style={styles.ledgerMetricItem}>
+                          <Text style={styles.ledgerLabel}>Your Net Payout</Text>
+                          <Text style={styles.ledgerNetVal}>₹{net}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })()}
 
               {/* Card Footer: Rider info & View Detail CTA */}
               <View style={styles.cardFooterRow}>
@@ -631,5 +797,270 @@ const styles = StyleSheet.create({
     fontSize: 9.5,
     fontWeight: '600',
     fontFamily: 'monospace',
+  },
+  // Settlement Summary Card Styles
+  settlementSummaryCard: {
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 14,
+    backgroundColor: COLORS.surfaceCard || '#1E293B',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border || '#334155',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  settleTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  settleCardHeading: {
+    color: COLORS.textPrimary || '#F8FAFC',
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  settleLiveTag: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 0.5,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  settleLiveTagText: {
+    color: '#10B981',
+    fontSize: 9,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  settleStoreName: {
+    color: COLORS.textSecondary || '#94A3B8',
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  cycleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.25)',
+  },
+  cycleBadgeText: {
+    color: '#10B981',
+    fontSize: 10.5,
+    fontWeight: '700',
+  },
+  threePillarsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  pillarBox: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border || '#334155',
+    alignItems: 'center',
+  },
+  pillarBoxComm: {
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    borderColor: 'rgba(239, 68, 68, 0.25)',
+  },
+  pillarBoxNet: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderColor: 'rgba(16, 185, 129, 0.35)',
+  },
+  pillarLabel: {
+    color: COLORS.textSecondary || '#94A3B8',
+    fontSize: 9.5,
+    fontWeight: '600',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  pillarLabelComm: {
+    color: '#EF4444',
+    fontSize: 9.5,
+    fontWeight: '700',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  pillarLabelNet: {
+    color: '#10B981',
+    fontSize: 9.5,
+    fontWeight: '800',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  pillarGrossAmount: {
+    color: COLORS.textPrimary || '#F8FAFC',
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  pillarCommAmount: {
+    color: '#EF4444',
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  pillarNetAmount: {
+    color: '#10B981',
+    fontSize: 15,
+    fontWeight: '900',
+    marginBottom: 2,
+  },
+  pillarSub: {
+    color: COLORS.textMuted || '#64748B',
+    fontSize: 8.5,
+    fontWeight: '500',
+  },
+  pillarSubComm: {
+    color: 'rgba(239, 68, 68, 0.8)',
+    fontSize: 8.5,
+    fontWeight: '600',
+  },
+  pillarSubNet: {
+    color: '#059669',
+    fontSize: 8.5,
+    fontWeight: '700',
+  },
+  payoutStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderWidth: 0.5,
+    borderColor: COLORS.border || '#334155',
+  },
+  payoutStatusItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flex: 1,
+  },
+  statusIconDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  payoutStatusLabel: {
+    color: COLORS.textSecondary || '#94A3B8',
+    fontSize: 10,
+    fontWeight: '500',
+  },
+  payoutPendingValue: {
+    color: '#F59E0B',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  payoutSettledValue: {
+    color: '#10B981',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  payoutStatusDivider: {
+    width: 1,
+    height: 14,
+    backgroundColor: COLORS.border || '#334155',
+    marginHorizontal: 6,
+  },
+  // Order Level Ledger Breakdown
+  orderLedgerCard: {
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    borderRadius: 8,
+    padding: 10,
+    marginVertical: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(51, 65, 85, 0.7)',
+  },
+  ledgerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  ledgerTitle: {
+    color: COLORS.textMuted || '#94A3B8',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+  },
+  settlePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  settlePillPaid: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+  },
+  settlePillPending: {
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+  },
+  settlePillText: {
+    fontSize: 8.5,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  settlePillTextPaid: {
+    color: '#10B981',
+  },
+  settlePillTextPending: {
+    color: '#F59E0B',
+  },
+  ledgerMetricsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  ledgerMetricItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  ledgerLabel: {
+    color: COLORS.textSecondary || '#94A3B8',
+    fontSize: 9,
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  ledgerGrossVal: {
+    color: COLORS.textPrimary || '#F8FAFC',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  ledgerOperator: {
+    color: COLORS.textMuted || '#64748B',
+    fontSize: 13,
+    fontWeight: '700',
+    paddingHorizontal: 4,
+  },
+  ledgerCommVal: {
+    color: '#EF4444',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  ledgerNetVal: {
+    color: '#10B981',
+    fontSize: 12.5,
+    fontWeight: '900',
   },
 });

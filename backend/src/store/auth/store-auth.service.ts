@@ -1117,15 +1117,32 @@ export class StoreAuthService {
 
     const walletBalance = Number(wallet?.balance) || 0;
     const walletTotalEarned = Number(wallet?.totalEarned) || 0;
-    const totalEarnings = Math.max(calculatedLifetime, walletTotalEarned, walletBalance);
-    const availableForWithdrawal = walletBalance;
-    const pendingSettlement = Number(wallet?.pendingBalance) || 0;
+    const walletCommission = Number(wallet?.totalCommission) || 0;
+
+    const commissionRate = 0.10; // 10% standard Dark Store platform commission
+    const calculatedCommission = Math.round(lifetimeGross * commissionRate);
+    const totalPlatformCommission = Math.max(walletCommission, calculatedCommission);
+
+    const totalGrossSales = Math.max(lifetimeGross, walletTotalEarned, (walletTotalEarned > 0 ? walletTotalEarned : lifetimeGross));
+    const netSettlementAmount = Math.max(0, totalGrossSales - totalPlatformCommission);
+
+    const alreadyPaid = Math.max(0, netSettlementAmount - walletBalance);
+    const pendingSettlement = walletBalance > 0 ? walletBalance : (Number(wallet?.pendingBalance) || 0);
 
     return {
-      totalEarnings,
+      totalGrossSales,
+      grossSales: totalGrossSales,
+      totalPlatformCommission,
+      adminCommission: totalPlatformCommission,
+      netSettlementAmount,
+      netEarnings: netSettlementAmount,
+      totalEarnings: netSettlementAmount,
       todayEarnings,
+      alreadyPaid,
       pendingSettlement,
-      availableForWithdrawal,
+      pendingSettlements: pendingSettlement,
+      availableForWithdrawal: walletBalance,
+      commissionPercent: 10,
       storeName: store.name,
       storeCode: store.code,
     };

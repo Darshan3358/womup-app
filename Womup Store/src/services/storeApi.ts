@@ -208,10 +208,20 @@ export class StoreApiService {
   static async getEarningsSummary(storeId?: string) {
     const qs = storeId ? `?storeId=${storeId}` : '';
     return this.request<{
+      totalGrossSales: number;
+      grossSales: number;
+      totalPlatformCommission: number;
+      adminCommission: number;
+      netSettlementAmount: number;
+      netEarnings: number;
       totalEarnings: number;
       todayEarnings: number;
+      alreadyPaid: number;
       pendingSettlement: number;
       availableForWithdrawal: number;
+      commissionPercent: number;
+      storeName: string;
+      storeCode: string;
     }>(`/earnings/summary${qs}`);
   }
 
