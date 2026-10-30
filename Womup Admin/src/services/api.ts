@@ -1906,6 +1906,55 @@ export const ApiService = {
     }
   },
 
+  // 42d. STORE MANUAL UPI SETTLEMENT REQUESTS
+  async getStoreSettlementRequests(
+    status?: string,
+    storeId?: string
+  ): Promise<{ success: boolean; count?: number; data?: any[]; error?: string }> {
+    try {
+      const params = new URLSearchParams();
+      if (status && status !== 'ALL') params.append('status', status);
+      if (storeId) params.append('storeId', storeId);
+      const queryStr = params.toString() ? `?${params.toString()}` : '';
+      const res = await fetch(`${API_BASE_URL}/api/finance/store-settlements${queryStr}`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed fetching store settlements' };
+    }
+  },
+
+  async approveStoreSettlementRequest(
+    requestId: string,
+    adminRemarks?: string
+  ): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/finance/store-settlements/${requestId}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminRemarks }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed approving store settlement' };
+    }
+  },
+
+  async rejectStoreSettlementRequest(
+    requestId: string,
+    reason?: string
+  ): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/finance/store-settlements/${requestId}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed rejecting store settlement' };
+    }
+  },
+
   async getCompanyUpiSettings(): Promise<{ success: boolean; data?: { adminUpiId: string; adminUpiName: string; supportPhone: string; qrCodeUrl: string }; error?: string }> {
     try {
       const res = await fetch(`${API_BASE_URL}/api/finance/settings/upi`);

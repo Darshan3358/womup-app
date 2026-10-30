@@ -18,6 +18,10 @@ import {
   StaffShift,
   StaffStatus,
 } from '../schemas/store-staff.schema';
+import {
+  StoreSettlement,
+  StoreSettlementDocument,
+} from '../schemas/store-settlement.schema';
 import { Store, StoreDocument } from '../../stores/schemas/store.schema';
 import { Area, AreaDocument } from '../../areas/schemas/area.schema';
 import { City, CityDocument } from '../../areas/schemas/city.schema';
@@ -45,6 +49,8 @@ export class StoreAuthService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(StoreStaff.name)
     private staffModel: Model<StoreStaffDocument>,
+    @InjectModel(StoreSettlement.name)
+    private storeSettlementModel: Model<StoreSettlementDocument>,
     @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
     @InjectModel(Area.name) private areaModel: Model<AreaDocument>,
     @InjectModel(City.name) private cityModel: Model<CityDocument>,
@@ -1145,6 +1151,110 @@ export class StoreAuthService {
       commissionPercent: 10,
       storeName: store.name,
       storeCode: store.code,
+    };
+  }
+
+  async createSettlementRequest(data: {
+    storeId?: string;
+    amount: number;
+    utrNumber: string;
+    notes?: string;
+    requestedBy?: string;
+  }) {
+    const rawId = (data.storeId || '').trim();
+    if (!rawId) {
+      throw new BadRequestException('Store identifier is required');
+    }
+
+    let store: any = null;
+    if (Types.ObjectId.isValid(rawId)) {
+      store = await this.storeModel.findById(rawId);
+    }
+    if (!store) {
+      const codeRegex = new RegExp(`^${rawId.replace(/[-_]/g, '[-_]?')}$`, 'i');
+      store = await this.storeModel.findOne({
+        $or: [{ code: codeRegex }, { loginId: rawId }, { name: codeRegex }],
+      });
+    }
+
+    if (!store) {
+      throw new BadRequestException('Store not found');
+    }
+
+    const amt = Number(data.amount);
+    if (!amt || isNaN(amt) || amt <= 0) {
+      throw new BadRequestException('Invalid settlement amount. Must be greater than 0.');
+    }
+
+    const utr = (data.utrNumber || '').trim();
+    if (!utr || utr.length < 6) {
+      throw new BadRequestException(
+        'Please provide a valid UTR or Transaction Reference number (minimum 6 characters).',
+      );
+    }
+
+    // Check for existing pending request with exact UTR
+    const duplicateUtr = await this.storeSettlementModel.findOne({
+      utrNumber: utr,
+      status: 'PENDING',
+    });
+    if (duplicateUtr) {
+      throw new BadRequestException(
+        `A pending settlement request already exists with UTR: ${utr}. Please wait for Admin approval.`,
+      );
+    }
+
+    const newRequest = await this.storeSettlementModel.create({
+      storeId: store._id,
+      storeName: store.name || 'Dark Store Hub',
+      storeCode: store.code || '',
+      storeCity: store.city || '',
+      storeArea: store.area || '',
+      amount: amt,
+      utrNumber: utr,
+      paymentMethod: 'UPI',
+      status: 'PENDING',
+      notes: (data.notes || '').trim(),
+      requestedBy: data.requestedBy || 'Store Owner',
+      requestedAt: new Date(),
+    });
+
+    return {
+      success: true,
+      message: `Settlement request of ₹${amt} with UTR ${utr} submitted successfully. Admin will verify and approve shortly.`,
+      data: newRequest,
+    };
+  }
+
+  async getStoreSettlementRequests(storeId: string) {
+    let store: any = null;
+    const rawId = (storeId || '').trim();
+    if (Types.ObjectId.isValid(rawId)) {
+      store = await this.storeModel.findById(rawId);
+    }
+    if (!store) {
+      const codeRegex = new RegExp(`^${rawId.replace(/[-_]/g, '[-_]?')}$`, 'i');
+      store = await this.storeModel.findOne({
+        $or: [{ code: codeRegex }, { loginId: rawId }, { name: codeRegex }],
+      });
+    }
+
+    const query: any = {};
+    if (store) {
+      query.$or = [{ storeId: store._id }, { storeCode: store.code }];
+    } else if (rawId) {
+      query.storeCode = rawId;
+    }
+
+    const list = await this.storeSettlementModel
+      .find(query)
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return {
+      success: true,
+      count: list.length,
+      data: list,
     };
   }
 }

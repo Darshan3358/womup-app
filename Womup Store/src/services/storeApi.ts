@@ -506,5 +506,68 @@ export class StoreApiService {
       return false;
     }
   }
+
+  // =========================================================================
+  // MANUAL UPI SETTLEMENT (STORE <-> ADMIN)
+  // =========================================================================
+  static async submitSettlementRequest(data: {
+    storeId: string;
+    amount: number;
+    utrNumber: string;
+    notes?: string;
+  }): Promise<{ success: boolean; message: string; data?: any; error?: string }> {
+    try {
+      const headers = await this.getHeaders();
+      const res = await fetch(`${API_BASE_URL}/settlement/request`, {
+        method: 'POST',
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+          'x-store-id': data.storeId,
+        },
+        body: JSON.stringify(data),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        return {
+          success: false,
+          message: result.message || 'Failed to submit settlement request',
+          error: result.message,
+        };
+      }
+      return result;
+    } catch (e: any) {
+      return {
+        success: false,
+        message: e?.message || 'Network error submitting settlement request',
+        error: e?.message,
+      };
+    }
+  }
+
+  static async getMySettlementRequests(storeId: string): Promise<{
+    success: boolean;
+    data?: any[];
+    error?: string;
+  }> {
+    try {
+      const headers = await this.getHeaders();
+      const res = await fetch(`${API_BASE_URL}/settlement/my-requests?storeId=${storeId}`, {
+        method: 'GET',
+        headers: {
+          ...headers,
+          'x-store-id': storeId,
+        },
+      });
+      const result = await res.json();
+      return result;
+    } catch (e: any) {
+      return {
+        success: false,
+        data: [],
+        error: e?.message || 'Failed fetching settlement requests',
+      };
+    }
+  }
 }
 

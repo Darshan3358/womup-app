@@ -101,4 +101,27 @@ export class StoreAuthController {
     const effectiveStoreId = queryStoreId || req?.user?.storeId || req?.headers?.['x-store-id'];
     return this.storeAuthService.getEarningsSummary(userId, effectiveStoreId);
   }
+
+  @Post('settlement/request')
+  @ApiOperation({ summary: 'Submit manual UPI settlement payment proof (UTR) for store payout / clearance' })
+  async createSettlementRequest(
+    @Request() req: any,
+    @Body() body: { storeId?: string; amount: number; utrNumber: string; notes?: string; requestedBy?: string },
+  ) {
+    const effectiveStoreId = body.storeId || req?.user?.storeId || req?.headers?.['x-store-id'];
+    return this.storeAuthService.createSettlementRequest({
+      ...body,
+      storeId: effectiveStoreId,
+    });
+  }
+
+  @Get('settlement/my-requests')
+  @ApiOperation({ summary: 'Get list of settlement requests submitted by this dark store' })
+  async getMySettlementRequests(
+    @Request() req: any,
+    @Query('storeId') queryStoreId?: string,
+  ) {
+    const effectiveStoreId = queryStoreId || req?.user?.storeId || req?.headers?.['x-store-id'];
+    return this.storeAuthService.getStoreSettlementRequests(effectiveStoreId);
+  }
 }

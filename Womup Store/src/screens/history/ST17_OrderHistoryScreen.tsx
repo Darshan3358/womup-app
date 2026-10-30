@@ -7,6 +7,10 @@ import {
   TouchableOpacity,
   RefreshControl,
   TextInput,
+  Modal,
+  Alert,
+  ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../context/StoreContext';
@@ -35,6 +39,15 @@ export const ST17_OrderHistoryScreen: React.FC = () => {
     commissionPercent: 10,
   });
 
+  // UTR Settlement Request Modal State
+  const [showUtrModal, setShowUtrModal] = useState(false);
+  const [utrInput, setUtrInput] = useState('');
+  const [settlementAmountInput, setSettlementAmountInput] = useState('');
+  const [settlementNotesInput, setSettlementNotesInput] = useState('');
+  const [isSubmittingUtr, setIsSubmittingUtr] = useState(false);
+  const [pastSettlementRequests, setPastSettlementRequests] = useState<any[]>([]);
+  const [loadingPastRequests, setLoadingPastRequests] = useState(false);
+
   const fetchEarnings = async () => {
     try {
       const storeId = store?.id || (store as any)?._id || store?.code;
@@ -53,16 +66,88 @@ export const ST17_OrderHistoryScreen: React.FC = () => {
     } catch (_) {}
   };
 
+  const fetchSettlementRequests = async () => {
+    try {
+      const storeId = store?.id || (store as any)?._id || store?.code;
+      if (!storeId) return;
+      setLoadingPastRequests(true);
+      const res = await StoreApiService.getMySettlementRequests(storeId);
+      if (res?.success && Array.isArray(res.data)) {
+        setPastSettlementRequests(res.data);
+      }
+    } catch (_) {
+    } finally {
+      setLoadingPastRequests(false);
+    }
+  };
+
   useEffect(() => {
     refreshCompletedOrders();
     fetchEarnings();
+    fetchSettlementRequests();
   }, [refreshCompletedOrders, store?.id, store?.code]);
 
   const handleFullRefresh = async () => {
     await Promise.all([
       refreshCompletedOrders(),
       fetchEarnings(),
+      fetchSettlementRequests(),
     ]);
+  };
+
+  const openSettlementModal = () => {
+    const defaultAmount =
+      earningsSummary.pendingSettlement > 0
+        ? earningsSummary.pendingSettlement
+        : earningsSummary.netSettlementAmount;
+    setSettlementAmountInput(defaultAmount > 0 ? String(defaultAmount) : '');
+    setShowUtrModal(true);
+    fetchSettlementRequests();
+  };
+
+  const handleSubmitSettlement = async () => {
+    const storeId = store?.id || (store as any)?._id || store?.code;
+    if (!storeId) {
+      Alert.alert('Error', 'Store information not loaded yet');
+      return;
+    }
+    const amt = parseFloat(settlementAmountInput);
+    if (isNaN(amt) || amt <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid settlement amount greater than 0');
+      return;
+    }
+    const cleanUtr = utrInput.trim();
+    if (!cleanUtr || cleanUtr.length < 6) {
+      Alert.alert('Invalid UTR', 'Please enter a valid 12-digit UTR / Reference number (min 6 characters)');
+      return;
+    }
+
+    try {
+      setIsSubmittingUtr(true);
+      const res = await StoreApiService.submitSettlementRequest({
+        storeId,
+        amount: amt,
+        utrNumber: cleanUtr,
+        notes: settlementNotesInput.trim(),
+      });
+
+      if (res.success) {
+        Alert.alert(
+          'Request Submitted! ✅',
+          `Your settlement request of ₹${amt} with UTR ${cleanUtr} has been sent to Admin for verification.`,
+          [{ text: 'OK', onPress: () => setShowUtrModal(false) }]
+        );
+        setUtrInput('');
+        setSettlementNotesInput('');
+        await Promise.all([fetchEarnings(), fetchSettlementRequests()]);
+      } else {
+        Alert.alert('Submission Failed', res.message || res.error || 'Could not submit request');
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Something went wrong');
+    } finally {
+      setIsSubmittingUtr(false);
+    }
   };
 
   const areaName =
@@ -254,6 +339,27 @@ export const ST17_OrderHistoryScreen: React.FC = () => {
                 </Text>
               </View>
             </View>
+
+            {/* Request Payout / Submit UTR Button */}
+            <TouchableOpacity
+              style={styles.requestPayoutBtn}
+              onPress={openSettlementModal}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="card-outline" size={15} color="#FFF" />
+              <Text style={styles.requestPayoutBtnText}>SUBMIT UTR / REQUEST PAYOUT</Text>
+              <Ionicons name="arrow-forward" size={14} color="#FFF" />
+            </TouchableOpacity>
+
+            {/* Pending Requests Notice Banner if any */}
+            {pastSettlementRequests.some((r) => r.status === 'PENDING') && (
+              <View style={styles.pendingRequestNotice}>
+                <Ionicons name="time-outline" size={13} color="#D97706" />
+                <Text style={styles.pendingRequestNoticeText} numberOfLines={1}>
+                  Pending Admin Approval: ₹{pastSettlementRequests.find((r) => r.status === 'PENDING')?.amount} (UTR: {pastSettlementRequests.find((r) => r.status === 'PENDING')?.utrNumber})
+                </Text>
+              </View>
+            )}
           </View>
         }
         refreshControl={
@@ -452,6 +558,147 @@ export const ST17_OrderHistoryScreen: React.FC = () => {
           </View>
         }
       />
+
+      {/* Manual UPI Settlement & UTR Submission Modal */}
+      <Modal
+        visible={showUtrModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowUtrModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContentCard}>
+            {/* Modal Header */}
+            <View style={styles.modalHeaderRow}>
+              <View>
+                <Text style={styles.modalTitle}>Store UPI Settlement</Text>
+                <Text style={styles.modalSubtitle}>Submit UTR for Admin Verification</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setShowUtrModal(false)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="close" size={20} color={COLORS.textPrimary || '#FFF'} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+              {/* Admin Receiving UPI Details Box */}
+              <View style={styles.adminUpiBox}>
+                <View style={styles.adminUpiTop}>
+                  <Ionicons name="shield-checkmark" size={18} color="#10B981" />
+                  <Text style={styles.adminUpiHeading}>Official Admin Settlement UPI</Text>
+                </View>
+                <View style={styles.adminUpiDetailRow}>
+                  <Text style={styles.adminUpiLabel}>UPI ID:</Text>
+                  <Text style={styles.adminUpiValue} selectable>wormup@okicici</Text>
+                </View>
+                <View style={styles.adminUpiDetailRow}>
+                  <Text style={styles.adminUpiLabel}>Name:</Text>
+                  <Text style={styles.adminUpiName}>Womup Technologies Pvt Ltd</Text>
+                </View>
+                <Text style={styles.adminUpiHelpText}>
+                  Please send payout amount or commission dues to the above UPI, then enter the 12-digit UTR below for immediate ledger clearance.
+                </Text>
+              </View>
+
+              {/* Settlement Form */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputFieldLabel}>Settlement Amount (₹) *</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="Enter Amount"
+                  placeholderTextColor="#64748B"
+                  keyboardType="numeric"
+                  value={settlementAmountInput}
+                  onChangeText={setSettlementAmountInput}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputFieldLabel}>12-Digit UTR / Transaction ID *</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="e.g. 423512345678"
+                  placeholderTextColor="#64748B"
+                  autoCapitalize="characters"
+                  value={utrInput}
+                  onChangeText={setUtrInput}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputFieldLabel}>Notes / Remarks (Optional)</Text>
+                <TextInput
+                  style={[styles.formInput, { height: 42 }]}
+                  placeholder="e.g. Weekly net payout settlement"
+                  placeholderTextColor="#64748B"
+                  value={settlementNotesInput}
+                  onChangeText={setSettlementNotesInput}
+                />
+              </View>
+
+              {/* Submit CTA */}
+              <TouchableOpacity
+                style={[styles.submitSettlementBtn, isSubmittingUtr && { opacity: 0.7 }]}
+                onPress={handleSubmitSettlement}
+                disabled={isSubmittingUtr}
+                activeOpacity={0.85}
+              >
+                {isSubmittingUtr ? (
+                  <ActivityIndicator color="#FFF" size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="paper-plane" size={16} color="#FFF" />
+                    <Text style={styles.submitSettlementBtnText}>SUBMIT SETTLEMENT REQUEST</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              {/* Past Requests History Section */}
+              <View style={styles.pastRequestsSection}>
+                <View style={styles.pastRequestsHeader}>
+                  <Text style={styles.pastRequestsTitle}>Past Settlement Requests</Text>
+                  {loadingPastRequests && <ActivityIndicator size="small" color="#10B981" />}
+                </View>
+
+                {pastSettlementRequests.length === 0 ? (
+                  <Text style={styles.noPastRequestsText}>No settlement requests submitted yet.</Text>
+                ) : (
+                  pastSettlementRequests.map((req, idx) => {
+                    const st = String(req.status || 'PENDING').toUpperCase();
+                    const isApproved = st === 'APPROVED';
+                    const isRejected = st === 'REJECTED';
+                    const pillBg = isApproved ? 'rgba(16, 185, 129, 0.15)' : isRejected ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)';
+                    const pillColor = isApproved ? '#10B981' : isRejected ? '#EF4444' : '#F59E0B';
+
+                    return (
+                      <View key={req._id || req.id || idx} style={styles.pastRequestItemCard}>
+                        <View style={styles.pastReqTop}>
+                          <Text style={styles.pastReqAmount}>₹{Number(req.amount).toLocaleString('en-IN')}</Text>
+                          <View style={[styles.statusPillBadge, { backgroundColor: pillBg }]}>
+                            <Text style={[styles.statusPillText, { color: pillColor }]}>{st}</Text>
+                          </View>
+                        </View>
+                        <View style={styles.pastReqDetailRow}>
+                          <Text style={styles.pastReqUtr}>UTR: {req.utrNumber}</Text>
+                          <Text style={styles.pastReqDate}>
+                            {req.requestedAt ? new Date(req.requestedAt).toLocaleDateString('en-IN') : ''}
+                          </Text>
+                        </View>
+                        {Boolean(req.adminRemarks) && (
+                          <Text style={styles.adminRemarkText}>Admin: {req.adminRemarks}</Text>
+                        )}
+                      </View>
+                    );
+                  })
+                )}
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -1062,5 +1309,239 @@ const styles = StyleSheet.create({
     color: '#10B981',
     fontSize: 12.5,
     fontWeight: '900',
+  },
+  // Request Payout & Modal Styles
+  requestPayoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#10B981',
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 12,
+  },
+  requestPayoutBtnText: {
+    color: '#FFF',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  pendingRequestNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.25)',
+  },
+  pendingRequestNoticeText: {
+    color: '#D97706',
+    fontSize: 10.5,
+    fontWeight: '600',
+    flex: 1,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalContentCard: {
+    backgroundColor: COLORS.surfaceCard || '#1E293B',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    maxHeight: '88%',
+    borderWidth: 1,
+    borderColor: COLORS.border || '#334155',
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border || '#334155',
+  },
+  modalTitle: {
+    color: COLORS.textPrimary || '#F8FAFC',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  modalSubtitle: {
+    color: COLORS.textSecondary || '#94A3B8',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  modalCloseBtn: {
+    padding: 6,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  adminUpiBox: {
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 14,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.25)',
+  },
+  adminUpiTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  adminUpiHeading: {
+    color: '#10B981',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  adminUpiDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginVertical: 2,
+  },
+  adminUpiLabel: {
+    color: COLORS.textSecondary || '#94A3B8',
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  adminUpiValue: {
+    color: '#10B981',
+    fontSize: 13,
+    fontWeight: '800',
+    fontFamily: 'monospace',
+  },
+  adminUpiName: {
+    color: COLORS.textPrimary || '#F8FAFC',
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
+  adminUpiHelpText: {
+    color: COLORS.textMuted || '#64748B',
+    fontSize: 10,
+    marginTop: 6,
+    lineHeight: 14,
+  },
+  inputGroup: {
+    marginBottom: 12,
+  },
+  inputFieldLabel: {
+    color: COLORS.textSecondary || '#94A3B8',
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  formInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border || '#334155',
+    color: COLORS.textPrimary || '#F8FAFC',
+    paddingHorizontal: 12,
+    height: 42,
+    fontSize: 13,
+  },
+  submitSettlementBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#10B981',
+    borderRadius: 10,
+    paddingVertical: 12,
+    marginTop: 6,
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  submitSettlementBtnText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  pastRequestsSection: {
+    marginTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border || '#334155',
+    paddingTop: 14,
+  },
+  pastRequestsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  pastRequestsTitle: {
+    color: COLORS.textPrimary || '#F8FAFC',
+    fontSize: 12.5,
+    fontWeight: '800',
+  },
+  noPastRequestsText: {
+    color: COLORS.textMuted || '#64748B',
+    fontSize: 11,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginVertical: 10,
+  },
+  pastRequestItemCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: 8,
+    padding: 10,
+    marginVertical: 5,
+    borderWidth: 1,
+    borderColor: COLORS.border || '#334155',
+  },
+  pastReqTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  pastReqAmount: {
+    color: COLORS.textPrimary || '#F8FAFC',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  statusPillBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  statusPillText: {
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  pastReqDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  pastReqUtr: {
+    color: COLORS.textSecondary || '#94A3B8',
+    fontSize: 10.5,
+    fontFamily: 'monospace',
+  },
+  pastReqDate: {
+    color: COLORS.textMuted || '#64748B',
+    fontSize: 10,
+  },
+  adminRemarkText: {
+    color: '#EF4444',
+    fontSize: 9.5,
+    marginTop: 4,
+    fontStyle: 'italic',
   },
 });

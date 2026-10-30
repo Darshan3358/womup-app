@@ -3041,6 +3041,186 @@ export class AdminRealtimeController {
       return { success: false, error: err.message };
     }
   }
+
+  // =========================================================================
+  // STORE MANUAL UPI SETTLEMENTS (STORE <-> ADMIN)
+  // =========================================================================
+  @Get([
+    'api/finance/store-settlements',
+    'finance/store-settlements',
+    'api/v1/admin/store-settlements',
+    'admin/store-settlements',
+  ])
+  async getStoreSettlementRequests(
+    @Query('status') status?: string,
+    @Query('storeId') storeId?: string,
+  ) {
+    try {
+      const db = this.db;
+      const query: any = {};
+      if (status && status !== 'ALL') {
+        query.status = status;
+      }
+      if (storeId) {
+        if (Types.ObjectId.isValid(storeId)) {
+          query.$or = [{ storeId: new Types.ObjectId(storeId) }, { storeCode: storeId }];
+        } else {
+          query.storeCode = storeId;
+        }
+      }
+
+      const requests = await db
+        .collection('store_settlement_requests')
+        .find(query)
+        .sort({ createdAt: -1 })
+        .toArray();
+
+      return {
+        success: true,
+        count: requests.length,
+        data: requests.map((r: any) => ({
+          id: r._id.toString(),
+          ...r,
+          _id: r._id.toString(),
+        })),
+      };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  @Post([
+    'api/finance/store-settlements/:id/approve',
+    'finance/store-settlements/:id/approve',
+    'api/v1/admin/store-settlements/:id/approve',
+    'admin/store-settlements/:id/approve',
+  ])
+  @Patch([
+    'api/finance/store-settlements/:id/approve',
+    'api/v1/admin/store-settlements/:id/approve',
+    'admin/store-settlements/:id/approve',
+  ])
+  async approveStoreSettlementRequest(@Param('id') requestId: string, @Body() body: any) {
+    try {
+      const db = this.db;
+      let q: any = { _id: requestId };
+      if (Types.ObjectId.isValid(requestId)) q = { _id: new Types.ObjectId(requestId) };
+
+      const req = await db.collection('store_settlement_requests').findOne(q);
+      if (!req) return { success: false, error: 'Settlement request not found' };
+
+      const approvedAt = new Date();
+      await db.collection('store_settlement_requests').updateOne(q, {
+        $set: {
+          status: 'APPROVED',
+          adminRemarks: body.adminRemarks || 'Settlement verified and approved by Admin',
+          approvedAt: approvedAt.toISOString(),
+        },
+      });
+
+      // Update store wallet
+      if (req.storeId) {
+        let storeQuery: any = { storeId: req.storeId };
+        if (Types.ObjectId.isValid(req.storeId)) {
+          storeQuery = {
+            $or: [{ storeId: new Types.ObjectId(req.storeId) }, { storeId: req.storeId.toString() }],
+          };
+        }
+
+        const wallet = await db.collection('store_wallets').findOne(storeQuery);
+        const currentBalance = Number(wallet?.balance) || 0;
+        const currentPaid = Number(wallet?.alreadyPaid) || 0;
+        const newBalance = Math.max(0, currentBalance - (req.amount || 0));
+        const newPaid = currentPaid + (req.amount || 0);
+
+        await db.collection('store_wallets').updateOne(
+          storeQuery,
+          {
+            $set: {
+              balance: newBalance,
+              alreadyPaid: newPaid,
+              lastSettlementAt: approvedAt,
+              updatedAt: approvedAt,
+            },
+          },
+          { upsert: true }
+        );
+
+        // Record in ledger
+        await db.collection('wallet_transactions').insertOne({
+          walletType: 'STORE',
+          storeId: req.storeId,
+          storeName: req.storeName || 'Dark Store',
+          type: 'SETTLEMENT',
+          direction: 'CREDIT',
+          amount: req.amount,
+          utrNumber: req.utrNumber,
+          description: `Store settlement approved via UPI (UTR: ${req.utrNumber})`,
+          status: 'COMPLETED',
+          createdAt: approvedAt,
+        });
+
+        // Mark completed orders as SETTLED
+        await db.collection('orders').updateMany(
+          {
+            $or: [
+              { storeId: req.storeId },
+              { 'store.id': req.storeId.toString() },
+              { 'store._id': req.storeId.toString() },
+            ],
+            status: { $in: ['DELIVERED', 'COMPLETED'] },
+            settlementStatus: { $ne: 'SETTLED' },
+          },
+          {
+            $set: {
+              settlementStatus: 'SETTLED',
+              settledAt: approvedAt,
+              settlementUtr: req.utrNumber,
+            },
+          }
+        );
+      }
+
+      return {
+        success: true,
+        message: `Settlement request for ${req.storeName} (₹${req.amount}) approved successfully.`,
+      };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  @Post([
+    'api/finance/store-settlements/:id/reject',
+    'finance/store-settlements/:id/reject',
+    'api/v1/admin/store-settlements/:id/reject',
+    'admin/store-settlements/:id/reject',
+  ])
+  @Patch([
+    'api/finance/store-settlements/:id/reject',
+    'api/v1/admin/store-settlements/:id/reject',
+    'admin/store-settlements/:id/reject',
+  ])
+  async rejectStoreSettlementRequest(@Param('id') requestId: string, @Body() body: any) {
+    try {
+      const db = this.db;
+      let q: any = { _id: requestId };
+      if (Types.ObjectId.isValid(requestId)) q = { _id: new Types.ObjectId(requestId) };
+
+      const rejectedAt = new Date();
+      await db.collection('store_settlement_requests').updateOne(q, {
+        $set: {
+          status: 'REJECTED',
+          adminRemarks: body.adminRemarks || body.reason || 'Payment UTR verification failed / Not received in bank account',
+          rejectedAt: rejectedAt.toISOString(),
+        },
+      });
+
+      return { success: true, message: 'Settlement request rejected.' };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  }
 }
 
 

@@ -6,6 +6,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { StoreStaff, StoreStaffSchema } from './schemas/store-staff.schema';
 import { PickList, PickListSchema } from './schemas/pick-list.schema';
 import { InventoryLog, InventoryLogSchema } from './schemas/inventory-log.schema';
+import { StoreSettlement, StoreSettlementSchema } from './schemas/store-settlement.schema';
 
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { Store, StoreSchema } from '../stores/schemas/store.schema';
@@ -36,6 +37,7 @@ import { StoreInventoryService } from './inventory/store-inventory.service';
       { name: StoreStaff.name, schema: StoreStaffSchema },
       { name: PickList.name, schema: PickListSchema },
       { name: InventoryLog.name, schema: InventoryLogSchema },
+      { name: StoreSettlement.name, schema: StoreSettlementSchema },
       { name: User.name, schema: UserSchema },
       { name: Store.name, schema: StoreSchema },
       { name: Order.name, schema: OrderSchema },

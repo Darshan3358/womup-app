@@ -131,6 +131,13 @@ export const WalletsRevenueScreen: React.FC = () => {
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [copiedUtrId, setCopiedUtrId] = useState<string | null>(null);
 
+  // Store Manual UPI Settlement Requests State
+  const [settlementEntityTab, setSettlementEntityTab] = useState<'RIDERS' | 'STORES'>('STORES');
+  const [storeSettlementRequests, setStoreSettlementRequests] = useState<any[]>([]);
+  const [storeRequestsFilter, setStoreRequestsFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
+  const [actionStoreLoadingId, setActionStoreLoadingId] = useState<string | null>(null);
+  const [copiedStoreUtrId, setCopiedStoreUtrId] = useState<string | null>(null);
+
   const storeBalanceTotal = useMemo(() => {
     if (walletsSummary?.stores?.totalBalance !== undefined) return walletsSummary.stores.totalBalance;
     return storeWallets.reduce((sum, s) => sum + (s.balance || 0), 0);
@@ -160,12 +167,13 @@ export const WalletsRevenueScreen: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [summaryRes, storesRes, ridersRes, txRes, settleReqRes, upiRes] = await Promise.all([
+      const [summaryRes, storesRes, ridersRes, txRes, settleReqRes, storeSettleReqRes, upiRes] = await Promise.all([
         ApiService.getWalletsSummary(),
         ApiService.getStoreWallets(),
         ApiService.getRiderWallets(),
         ApiService.getWalletTransactions({ limit: 50 }),
         ApiService.getRiderSettlementRequests(),
+        ApiService.getStoreSettlementRequests(),
         ApiService.getCompanyUpiSettings(),
       ]);
       if (summaryRes?.success && summaryRes.data) {
@@ -183,6 +191,9 @@ export const WalletsRevenueScreen: React.FC = () => {
       if (settleReqRes?.success && Array.isArray(settleReqRes.data)) {
         setSettlementRequests(settleReqRes.data);
       }
+      if (storeSettleReqRes?.success && Array.isArray(storeSettleReqRes.data)) {
+        setStoreSettlementRequests(storeSettleReqRes.data);
+      }
       if (upiRes?.success && upiRes.data) {
         if (upiRes.data.adminUpiId) setCompanyUpiId(upiRes.data.adminUpiId);
         if (upiRes.data.adminUpiName) setCompanyUpiName(upiRes.data.adminUpiName);
@@ -193,6 +204,40 @@ export const WalletsRevenueScreen: React.FC = () => {
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  const handleApproveStoreSettlement = async (requestId: string, storeName: string) => {
+    setActionStoreLoadingId(requestId);
+    try {
+      const res = await ApiService.approveStoreSettlementRequest(requestId, 'Settlement verified and approved by Admin');
+      if (res.success) {
+        Alert.alert('Store Settlement Approved! ✅', res.message || `Settlement approved for ${storeName}. Ledger and wallet updated.`);
+        await loadData();
+      } else {
+        Alert.alert('Approval Failed', res.error || 'Could not approve request');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed approving store settlement');
+    } finally {
+      setActionStoreLoadingId(null);
+    }
+  };
+
+  const handleRejectStoreSettlement = async (requestId: string, storeName: string) => {
+    setActionStoreLoadingId(requestId);
+    try {
+      const res = await ApiService.rejectStoreSettlementRequest(requestId, 'Payment UTR verification failed / Not received in bank account');
+      if (res.success) {
+        Alert.alert('Store Settlement Rejected', `Request for ${storeName} has been rejected.`);
+        await loadData();
+      } else {
+        Alert.alert('Rejection Failed', res.error || 'Could not reject request');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed rejecting store settlement');
+    } finally {
+      setActionStoreLoadingId(null);
     }
   };
 
@@ -497,10 +542,12 @@ export const WalletsRevenueScreen: React.FC = () => {
       >
         {(['OVERVIEW', 'STORES', 'RIDERS', 'UPI_SETTLEMENTS', 'PLATFORM', 'LEDGER'] as const).map((tab) => {
           const isSelected = activeSubTab === tab;
-          const pendingCount = settlementRequests.filter((r) => r.status === 'PENDING').length;
+          const pendingRiders = settlementRequests.filter((r) => r.status === 'PENDING').length;
+          const pendingStores = storeSettlementRequests.filter((r) => r.status === 'PENDING').length;
+          const totalPending = pendingRiders + pendingStores;
           let label = tab as string;
           if (tab === 'UPI_SETTLEMENTS') {
-            label = `UPI SETTLEMENTS ${pendingCount > 0 ? `(${pendingCount})` : ''}`;
+            label = `UPI SETTLEMENTS ${totalPending > 0 ? `(${totalPending})` : ''}`;
           }
 
           return (
@@ -509,7 +556,7 @@ export const WalletsRevenueScreen: React.FC = () => {
               style={[
                 styles.subTabPill,
                 isSelected && styles.subTabPillActive,
-                tab === 'UPI_SETTLEMENTS' && pendingCount > 0 && { borderColor: '#F59E0B' },
+                tab === 'UPI_SETTLEMENTS' && totalPending > 0 && { borderColor: '#F59E0B' },
               ]}
               onPress={() => {
                 setActiveSubTab(tab);
@@ -521,7 +568,7 @@ export const WalletsRevenueScreen: React.FC = () => {
                 style={[
                   styles.subTabPillText,
                   isSelected && styles.subTabPillTextActive,
-                  tab === 'UPI_SETTLEMENTS' && !isSelected && pendingCount > 0 && { color: '#D97706', fontWeight: '800' },
+                  tab === 'UPI_SETTLEMENTS' && !isSelected && totalPending > 0 && { color: '#D97706', fontWeight: '800' },
                 ]}
               >
                 {label}
@@ -898,24 +945,30 @@ export const WalletsRevenueScreen: React.FC = () => {
       {/* ===============================================================
           SUB-TAB: RIDER UPI SETTLEMENT REQUESTS (12-DIGIT UTR PROOFS)
       =============================================================== */}
+      {/* ===============================================================
+          SUB-TAB: MANUAL UPI SETTLEMENT REQUESTS (STORES & RIDERS)
+      =============================================================== */}
       {activeSubTab === 'UPI_SETTLEMENTS' && (
         <View style={styles.subTabContentCard}>
+          {/* Header Row */}
           <View style={styles.khataHeaderRow}>
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Text style={styles.subTabContentTitle}>
-                  Rider UPI Settlement Requests ({settlementRequests.length})
+                  Manual UPI Settlement Center
                 </Text>
-                {settlementRequests.filter((r) => r.status === 'PENDING').length > 0 && (
+                {storeSettlementRequests.filter((r) => r.status === 'PENDING').length +
+                  settlementRequests.filter((r) => r.status === 'PENDING').length > 0 && (
                   <View style={styles.pendingBadgeMini}>
                     <Text style={styles.pendingBadgeMiniText}>
-                      {settlementRequests.filter((r) => r.status === 'PENDING').length} PENDING
+                      {storeSettlementRequests.filter((r) => r.status === 'PENDING').length +
+                        settlementRequests.filter((r) => r.status === 'PENDING').length} PENDING
                     </Text>
                   </View>
                 )}
               </View>
               <Text style={styles.khataHeaderSubtitle}>
-                Review 12-digit UTR payment proofs submitted by riders to automatically clear COD liability and unlock accounts.
+                Verify 12-digit UTR payment proofs submitted by Dark Stores and Riders to clear ledgers and process payouts.
               </Text>
             </View>
 
@@ -929,188 +982,508 @@ export const WalletsRevenueScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Quick Stats Grid */}
-          <View style={styles.settlementKpiGrid}>
-            <View style={[styles.settleKpiCard, { borderColor: '#F59E0B' }]}>
-              <Text style={styles.settleKpiLabel}>PENDING VERIFICATION</Text>
-              <Text style={[styles.settleKpiVal, { color: '#D97706' }]}>
-                {settlementRequests.filter((r) => r.status === 'PENDING').length}
-              </Text>
-              <Text style={styles.settleKpiSub}>
-                ₹{settlementRequests.filter((r) => r.status === 'PENDING').reduce((acc, r) => acc + (Number(r.amount) || 0), 0)} to approve
-              </Text>
-            </View>
-
-            <View style={[styles.settleKpiCard, { borderColor: '#10B981' }]}>
-              <Text style={styles.settleKpiLabel}>APPROVED PROOFS</Text>
-              <Text style={[styles.settleKpiVal, { color: '#059669' }]}>
-                {settlementRequests.filter((r) => r.status === 'APPROVED').length}
-              </Text>
-              <Text style={styles.settleKpiSub}>Riders unblocked</Text>
-            </View>
-
-            <View style={[styles.settleKpiCard, { borderColor: '#3B82F6' }]}>
-              <Text style={styles.settleKpiLabel}>RECEIVING UPI ID</Text>
-              <Text style={[styles.settleKpiVal, { color: '#1E40AF', fontSize: 14 }]} numberOfLines={1}>
-                {companyUpiId}
-              </Text>
-              <Text style={styles.settleKpiSub} numberOfLines={1}>{companyUpiName}</Text>
-            </View>
-          </View>
-
-          {/* Filter Pills */}
-          <View style={styles.filterPillsRow}>
-            {(['ALL', 'PENDING', 'APPROVED', 'REJECTED'] as const).map((f) => (
-              <TouchableOpacity
-                key={f}
-                style={[styles.filterPill, requestsFilter === f && styles.filterPillActive]}
-                onPress={() => setRequestsFilter(f)}
-                activeOpacity={0.8}
+          {/* Entity Segmented Switch: STORES vs RIDERS */}
+          <View style={styles.settleEntitySwitchRow}>
+            <TouchableOpacity
+              style={[
+                styles.settleEntityBtn,
+                settlementEntityTab === 'STORES' && styles.settleEntityBtnActive,
+              ]}
+              onPress={() => setSettlementEntityTab('STORES')}
+              activeOpacity={0.8}
+            >
+              <Store size={15} color={settlementEntityTab === 'STORES' ? '#FFFFFF' : '#071B52'} />
+              <Text
+                style={[
+                  styles.settleEntityBtnText,
+                  settlementEntityTab === 'STORES' && styles.settleEntityBtnTextActive,
+                ]}
               >
-                <Text style={[styles.filterPillText, requestsFilter === f && styles.filterPillTextActive]}>
-                  {f} {f !== 'ALL' ? `(${settlementRequests.filter((r) => r.status === f).length})` : `(${settlementRequests.length})`}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                Store Settlements ({storeSettlementRequests.length})
+              </Text>
+              {storeSettlementRequests.filter((r) => r.status === 'PENDING').length > 0 && (
+                <View style={styles.pendingEntityBadge}>
+                  <Text style={styles.pendingEntityBadgeText}>
+                    {storeSettlementRequests.filter((r) => r.status === 'PENDING').length}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.settleEntityBtn,
+                settlementEntityTab === 'RIDERS' && styles.settleEntityBtnActive,
+              ]}
+              onPress={() => setSettlementEntityTab('RIDERS')}
+              activeOpacity={0.8}
+            >
+              <Bike size={15} color={settlementEntityTab === 'RIDERS' ? '#FFFFFF' : '#071B52'} />
+              <Text
+                style={[
+                  styles.settleEntityBtnText,
+                  settlementEntityTab === 'RIDERS' && styles.settleEntityBtnTextActive,
+                ]}
+              >
+                Rider Settlements ({settlementRequests.length})
+              </Text>
+              {settlementRequests.filter((r) => r.status === 'PENDING').length > 0 && (
+                <View style={styles.pendingEntityBadge}>
+                  <Text style={styles.pendingEntityBadgeText}>
+                    {settlementRequests.filter((r) => r.status === 'PENDING').length}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
           </View>
 
-          {/* List of Requests */}
-          {settlementRequests.filter((r) => requestsFilter === 'ALL' || r.status === requestsFilter).length === 0 ? (
-            <View style={styles.emptyRequestsBox}>
-              <Receipt size={36} color="#94A3B8" />
-              <Text style={styles.emptyRequestsTitle}>No Settlement Requests Found</Text>
-              <Text style={styles.emptyRequestsSubtitle}>
-                {requestsFilter === 'PENDING'
-                  ? 'All rider settlement proofs have been reviewed! New requests will appear here.'
-                  : 'No requests matching the selected filter.'}
-              </Text>
-            </View>
-          ) : (
-            settlementRequests
-              .filter((r) => requestsFilter === 'ALL' || r.status === requestsFilter)
-              .map((req) => {
-                const isPending = req.status === 'PENDING';
-                const isApproved = req.status === 'APPROVED';
-                const isRejected = req.status === 'REJECTED';
-                const isActionLoading = actionLoadingId === req.id;
+          {/* ===============================================================
+              VIEW A: STORE SETTLEMENT REQUESTS
+          =============================================================== */}
+          {settlementEntityTab === 'STORES' && (
+            <>
+              {/* Quick Stats Grid for Stores */}
+              <View style={styles.settlementKpiGrid}>
+                <View style={[styles.settleKpiCard, { borderColor: '#F59E0B' }]}>
+                  <Text style={styles.settleKpiLabel}>PENDING VERIFICATION</Text>
+                  <Text style={[styles.settleKpiVal, { color: '#D97706' }]}>
+                    {storeSettlementRequests.filter((r) => r.status === 'PENDING').length}
+                  </Text>
+                  <Text style={styles.settleKpiSub}>
+                    ₹{storeSettlementRequests
+                      .filter((r) => r.status === 'PENDING')
+                      .reduce((acc, r) => acc + (Number(r.amount) || 0), 0)
+                      .toLocaleString('en-IN')}{' '}
+                    to approve
+                  </Text>
+                </View>
 
-                return (
-                  <View
-                    key={req.id}
-                    style={[
-                      styles.requestCard,
-                      isPending && styles.requestCardPending,
-                      isApproved && styles.requestCardApproved,
-                    ]}
+                <View style={[styles.settleKpiCard, { borderColor: '#10B981' }]}>
+                  <Text style={styles.settleKpiLabel}>APPROVED SETTLEMENTS</Text>
+                  <Text style={[styles.settleKpiVal, { color: '#059669' }]}>
+                    {storeSettlementRequests.filter((r) => r.status === 'APPROVED').length}
+                  </Text>
+                  <Text style={styles.settleKpiSub}>Ledger cleared</Text>
+                </View>
+
+                <View style={[styles.settleKpiCard, { borderColor: '#3B82F6' }]}>
+                  <Text style={styles.settleKpiLabel}>COMPANY UPI</Text>
+                  <Text style={[styles.settleKpiVal, { color: '#1E40AF', fontSize: 14 }]} numberOfLines={1}>
+                    {companyUpiId}
+                  </Text>
+                  <Text style={styles.settleKpiSub} numberOfLines={1}>
+                    {companyUpiName}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Filter Pills */}
+              <View style={styles.filterPillsRow}>
+                {(['ALL', 'PENDING', 'APPROVED', 'REJECTED'] as const).map((f) => (
+                  <TouchableOpacity
+                    key={f}
+                    style={[styles.filterPill, storeRequestsFilter === f && styles.filterPillActive]}
+                    onPress={() => setStoreRequestsFilter(f)}
+                    activeOpacity={0.8}
                   >
-                    <View style={styles.requestCardTop}>
-                      <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <Bike size={16} color="#071B52" />
-                          <Text style={styles.requestRiderName}>{req.riderName}</Text>
-                        </View>
-                        <Text style={styles.requestRiderPhone}>
-                          {req.riderPhone ? `Phone: ${req.riderPhone}` : 'Delivery Partner'}
-                        </Text>
-                      </View>
+                    <Text
+                      style={[
+                        styles.filterPillText,
+                        storeRequestsFilter === f && styles.filterPillTextActive,
+                      ]}
+                    >
+                      {f}{' '}
+                      {f !== 'ALL'
+                        ? `(${storeSettlementRequests.filter((r) => r.status === f).length})`
+                        : `(${storeSettlementRequests.length})`}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
 
-                      <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={styles.requestAmount}>₹{req.amount}</Text>
-                        <View
-                          style={[
-                            styles.statusBadge,
-                            isPending && styles.statusBadgePending,
-                            isApproved && styles.statusBadgeApproved,
-                            isRejected && styles.statusBadgeRejected,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.statusBadgeText,
-                              isPending && styles.statusBadgeTextPending,
-                              isApproved && styles.statusBadgeTextApproved,
-                              isRejected && styles.statusBadgeTextRejected,
-                            ]}
-                          >
-                            {req.status}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
+              {/* Store Requests List */}
+              {storeSettlementRequests.filter(
+                (r) => storeRequestsFilter === 'ALL' || r.status === storeRequestsFilter
+              ).length === 0 ? (
+                <View style={styles.emptyRequestsBox}>
+                  <Receipt size={36} color="#94A3B8" />
+                  <Text style={styles.emptyRequestsTitle}>No Store Settlements Found</Text>
+                  <Text style={styles.emptyRequestsSubtitle}>
+                    {storeRequestsFilter === 'PENDING'
+                      ? 'All store settlement UTR proofs have been reviewed! New requests will appear here.'
+                      : 'No store requests matching the selected filter.'}
+                  </Text>
+                </View>
+              ) : (
+                storeSettlementRequests
+                  .filter(
+                    (r) => storeRequestsFilter === 'ALL' || r.status === storeRequestsFilter
+                  )
+                  .map((req) => {
+                    const isPending = req.status === 'PENDING';
+                    const isApproved = req.status === 'APPROVED';
+                    const isRejected = req.status === 'REJECTED';
+                    const isActionLoading = actionStoreLoadingId === req.id;
 
-                    {/* UTR & Timestamp Box */}
-                    <View style={styles.utrBox}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.utrLabel}>12-DIGIT TRANSACTION UTR / REF ID</Text>
-                        <Text style={styles.utrValue}>{req.utrNumber}</Text>
-                      </View>
-                      <TouchableOpacity
-                        style={styles.utrCopyBtn}
-                        onPress={() => copyUtr(req.utrNumber, req.id)}
-                        activeOpacity={0.7}
+                    return (
+                      <View
+                        key={req.id}
+                        style={[
+                          styles.requestCard,
+                          isPending && styles.requestCardPending,
+                          isApproved && styles.requestCardApproved,
+                        ]}
                       >
-                        <Copy size={12} color="#071B52" />
-                        <Text style={styles.utrCopyText}>
-                          {copiedUtrId === req.id ? 'Copied!' : 'Copy'}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
+                        <View style={styles.requestCardTop}>
+                          <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <Store size={16} color="#071B52" />
+                              <Text style={styles.requestRiderName}>{req.storeName}</Text>
+                            </View>
+                            <Text style={styles.requestRiderPhone}>
+                              Code: {req.storeCode || 'DARK_STORE'} {req.storeCity ? `· ${req.storeCity}` : ''}
+                            </Text>
+                          </View>
 
-                    <View style={styles.requestFooterRow}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                        <Clock size={12} color="#64748B" />
-                        <Text style={styles.requestDate}>
-                          Submitted: {req.requestedAt ? new Date(req.requestedAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Recent'}
-                        </Text>
-                      </View>
-
-                      {isApproved && (
-                        <Text style={styles.remarksText}>
-                          ✅ {req.adminRemarks || 'Verified & Unblocked'}
-                        </Text>
-                      )}
-                      {isRejected && (
-                        <Text style={[styles.remarksText, { color: '#DC2626' }]}>
-                          ❌ {req.adminRemarks || 'Rejected'}
-                        </Text>
-                      )}
-                    </View>
-
-                    {/* Actions if Pending */}
-                    {isPending && (
-                      <View style={styles.requestActionsRow}>
-                        <TouchableOpacity
-                          style={styles.rejectBtn}
-                          onPress={() => handleRejectSettlement(req.id, req.riderName)}
-                          disabled={isActionLoading}
-                          activeOpacity={0.8}
-                        >
-                          <X size={14} color="#DC2626" />
-                          <Text style={styles.rejectBtnText}>Reject</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={styles.approveBtn}
-                          onPress={() => handleApproveSettlement(req.id, req.riderName)}
-                          disabled={isActionLoading}
-                          activeOpacity={0.85}
-                        >
-                          {isActionLoading ? (
-                            <ActivityIndicator size="small" color="#FFFFFF" />
-                          ) : (
-                            <>
-                              <CheckCircle2 size={14} color="#FFFFFF" />
-                              <Text style={styles.approveBtnText}>
-                                Verify & Instant Unlock
+                          <View style={{ alignItems: 'flex-end' }}>
+                            <Text style={[styles.requestAmount, { color: '#059669' }]}>
+                              ₹{Number(req.amount).toLocaleString('en-IN')}
+                            </Text>
+                            <View
+                              style={[
+                                styles.statusBadge,
+                                isPending && styles.statusBadgePending,
+                                isApproved && styles.statusBadgeApproved,
+                                isRejected && styles.statusBadgeRejected,
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.statusBadgeText,
+                                  isPending && styles.statusBadgeTextPending,
+                                  isApproved && styles.statusBadgeTextApproved,
+                                  isRejected && styles.statusBadgeTextRejected,
+                                ]}
+                              >
+                                {req.status}
                               </Text>
-                            </>
+                            </View>
+                          </View>
+                        </View>
+
+                        {/* UTR & Reference Box */}
+                        <View style={styles.utrBox}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.utrLabel}>12-DIGIT TRANSACTION UTR / REF ID</Text>
+                            <Text style={styles.utrValue}>{req.utrNumber}</Text>
+                          </View>
+                          <TouchableOpacity
+                            style={styles.utrCopyBtn}
+                            onPress={() => {
+                              if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                                navigator.clipboard.writeText(req.utrNumber);
+                              }
+                              setCopiedStoreUtrId(req.id);
+                              setTimeout(() => setCopiedStoreUtrId(null), 2000);
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <Copy size={12} color="#071B52" />
+                            <Text style={styles.utrCopyText}>
+                              {copiedStoreUtrId === req.id ? 'Copied!' : 'Copy'}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+
+                        {/* Optional Notes */}
+                        {Boolean(req.notes) && (
+                          <View style={{ backgroundColor: '#F8FAFC', padding: 8, borderRadius: 6 }}>
+                            <Text style={{ fontSize: 11, color: '#475569' }}>
+                              📝 Note: {req.notes}
+                            </Text>
+                          </View>
+                        )}
+
+                        <View style={styles.requestFooterRow}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Clock size={12} color="#64748B" />
+                            <Text style={styles.requestDate}>
+                              Submitted:{' '}
+                              {req.requestedAt
+                                ? new Date(req.requestedAt).toLocaleString('en-IN', {
+                                    day: '2-digit',
+                                    month: 'short',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })
+                                : 'Recent'}
+                            </Text>
+                          </View>
+
+                          {isApproved && (
+                            <Text style={styles.remarksText}>
+                              ✅ {req.adminRemarks || 'Verified & Settled'}
+                            </Text>
                           )}
-                        </TouchableOpacity>
+                          {isRejected && (
+                            <Text style={[styles.remarksText, { color: '#DC2626' }]}>
+                              ❌ {req.adminRemarks || 'Rejected'}
+                            </Text>
+                          )}
+                        </View>
+
+                        {/* Actions if Pending */}
+                        {isPending && (
+                          <View style={styles.requestActionsRow}>
+                            <TouchableOpacity
+                              style={styles.rejectBtn}
+                              onPress={() => handleRejectStoreSettlement(req.id, req.storeName)}
+                              disabled={isActionLoading}
+                              activeOpacity={0.8}
+                            >
+                              <X size={14} color="#DC2626" />
+                              <Text style={styles.rejectBtnText}>Reject</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              style={[styles.approveBtn, { backgroundColor: '#059669' }]}
+                              onPress={() => handleApproveStoreSettlement(req.id, req.storeName)}
+                              disabled={isActionLoading}
+                              activeOpacity={0.85}
+                            >
+                              {isActionLoading ? (
+                                <ActivityIndicator size="small" color="#FFFFFF" />
+                              ) : (
+                                <>
+                                  <CheckCircle2 size={14} color="#FFFFFF" />
+                                  <Text style={styles.approveBtnText}>
+                                    Verify & Settle Payout
+                                  </Text>
+                                </>
+                              )}
+                            </TouchableOpacity>
+                          </View>
+                        )}
                       </View>
-                    )}
-                  </View>
-                );
-              })
+                    );
+                  })
+              )}
+            </>
+          )}
+
+          {/* ===============================================================
+              VIEW B: RIDER SETTLEMENT REQUESTS
+          =============================================================== */}
+          {settlementEntityTab === 'RIDERS' && (
+            <>
+              {/* Quick Stats Grid for Riders */}
+              <View style={styles.settlementKpiGrid}>
+                <View style={[styles.settleKpiCard, { borderColor: '#F59E0B' }]}>
+                  <Text style={styles.settleKpiLabel}>PENDING VERIFICATION</Text>
+                  <Text style={[styles.settleKpiVal, { color: '#D97706' }]}>
+                    {settlementRequests.filter((r) => r.status === 'PENDING').length}
+                  </Text>
+                  <Text style={styles.settleKpiSub}>
+                    ₹{settlementRequests
+                      .filter((r) => r.status === 'PENDING')
+                      .reduce((acc, r) => acc + (Number(r.amount) || 0), 0)
+                      .toLocaleString('en-IN')}{' '}
+                    to approve
+                  </Text>
+                </View>
+
+                <View style={[styles.settleKpiCard, { borderColor: '#10B981' }]}>
+                  <Text style={styles.settleKpiLabel}>APPROVED PROOFS</Text>
+                  <Text style={[styles.settleKpiVal, { color: '#059669' }]}>
+                    {settlementRequests.filter((r) => r.status === 'APPROVED').length}
+                  </Text>
+                  <Text style={styles.settleKpiSub}>Riders unblocked</Text>
+                </View>
+
+                <View style={[styles.settleKpiCard, { borderColor: '#3B82F6' }]}>
+                  <Text style={styles.settleKpiLabel}>RECEIVING UPI ID</Text>
+                  <Text style={[styles.settleKpiVal, { color: '#1E40AF', fontSize: 14 }]} numberOfLines={1}>
+                    {companyUpiId}
+                  </Text>
+                  <Text style={styles.settleKpiSub} numberOfLines={1}>
+                    {companyUpiName}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Filter Pills */}
+              <View style={styles.filterPillsRow}>
+                {(['ALL', 'PENDING', 'APPROVED', 'REJECTED'] as const).map((f) => (
+                  <TouchableOpacity
+                    key={f}
+                    style={[styles.filterPill, requestsFilter === f && styles.filterPillActive]}
+                    onPress={() => setRequestsFilter(f)}
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      style={[
+                        styles.filterPillText,
+                        requestsFilter === f && styles.filterPillTextActive,
+                      ]}
+                    >
+                      {f}{' '}
+                      {f !== 'ALL'
+                        ? `(${settlementRequests.filter((r) => r.status === f).length})`
+                        : `(${settlementRequests.length})`}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* List of Rider Requests */}
+              {settlementRequests.filter(
+                (r) => requestsFilter === 'ALL' || r.status === requestsFilter
+              ).length === 0 ? (
+                <View style={styles.emptyRequestsBox}>
+                  <Receipt size={36} color="#94A3B8" />
+                  <Text style={styles.emptyRequestsTitle}>No Rider Settlements Found</Text>
+                  <Text style={styles.emptyRequestsSubtitle}>
+                    {requestsFilter === 'PENDING'
+                      ? 'All rider settlement proofs have been reviewed! New requests will appear here.'
+                      : 'No requests matching the selected filter.'}
+                  </Text>
+                </View>
+              ) : (
+                settlementRequests
+                  .filter((r) => requestsFilter === 'ALL' || r.status === requestsFilter)
+                  .map((req) => {
+                    const isPending = req.status === 'PENDING';
+                    const isApproved = req.status === 'APPROVED';
+                    const isRejected = req.status === 'REJECTED';
+                    const isActionLoading = actionLoadingId === req.id;
+
+                    return (
+                      <View
+                        key={req.id}
+                        style={[
+                          styles.requestCard,
+                          isPending && styles.requestCardPending,
+                          isApproved && styles.requestCardApproved,
+                        ]}
+                      >
+                        <View style={styles.requestCardTop}>
+                          <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <Bike size={16} color="#071B52" />
+                              <Text style={styles.requestRiderName}>{req.riderName}</Text>
+                            </View>
+                            <Text style={styles.requestRiderPhone}>
+                              {req.riderPhone ? `Phone: ${req.riderPhone}` : 'Delivery Partner'}
+                            </Text>
+                          </View>
+
+                          <View style={{ alignItems: 'flex-end' }}>
+                            <Text style={styles.requestAmount}>₹{req.amount}</Text>
+                            <View
+                              style={[
+                                styles.statusBadge,
+                                isPending && styles.statusBadgePending,
+                                isApproved && styles.statusBadgeApproved,
+                                isRejected && styles.statusBadgeRejected,
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.statusBadgeText,
+                                  isPending && styles.statusBadgeTextPending,
+                                  isApproved && styles.statusBadgeTextApproved,
+                                  isRejected && styles.statusBadgeTextRejected,
+                                ]}
+                              >
+                                {req.status}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+
+                        {/* UTR & Timestamp Box */}
+                        <View style={styles.utrBox}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.utrLabel}>12-DIGIT TRANSACTION UTR / REF ID</Text>
+                            <Text style={styles.utrValue}>{req.utrNumber}</Text>
+                          </View>
+                          <TouchableOpacity
+                            style={styles.utrCopyBtn}
+                            onPress={() => copyUtr(req.utrNumber, req.id)}
+                            activeOpacity={0.7}
+                          >
+                            <Copy size={12} color="#071B52" />
+                            <Text style={styles.utrCopyText}>
+                              {copiedUtrId === req.id ? 'Copied!' : 'Copy'}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.requestFooterRow}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Clock size={12} color="#64748B" />
+                            <Text style={styles.requestDate}>
+                              Submitted:{' '}
+                              {req.requestedAt
+                                ? new Date(req.requestedAt).toLocaleString('en-IN', {
+                                    day: '2-digit',
+                                    month: 'short',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })
+                                : 'Recent'}
+                            </Text>
+                          </View>
+
+                          {isApproved && (
+                            <Text style={styles.remarksText}>
+                              ✅ {req.adminRemarks || 'Verified & Unblocked'}
+                            </Text>
+                          )}
+                          {isRejected && (
+                            <Text style={[styles.remarksText, { color: '#DC2626' }]}>
+                              ❌ {req.adminRemarks || 'Rejected'}
+                            </Text>
+                          )}
+                        </View>
+
+                        {/* Actions if Pending */}
+                        {isPending && (
+                          <View style={styles.requestActionsRow}>
+                            <TouchableOpacity
+                              style={styles.rejectBtn}
+                              onPress={() => handleRejectSettlement(req.id, req.riderName)}
+                              disabled={isActionLoading}
+                              activeOpacity={0.8}
+                            >
+                              <X size={14} color="#DC2626" />
+                              <Text style={styles.rejectBtnText}>Reject</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              style={styles.approveBtn}
+                              onPress={() => handleApproveSettlement(req.id, req.riderName)}
+                              disabled={isActionLoading}
+                              activeOpacity={0.85}
+                            >
+                              {isActionLoading ? (
+                                <ActivityIndicator size="small" color="#FFFFFF" />
+                              ) : (
+                                <>
+                                  <CheckCircle2 size={14} color="#FFFFFF" />
+                                  <Text style={styles.approveBtnText}>
+                                    Verify & Instant Unlock
+                                  </Text>
+                                </>
+                              )}
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })
+              )}
+            </>
           )}
         </View>
       )}
@@ -3093,5 +3466,51 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#64748B',
     marginTop: 4,
+  },
+  settleEntitySwitchRow: {
+    flexDirection: 'row',
+    gap: 10,
+    backgroundColor: '#F1F5F9',
+    padding: 4,
+    borderRadius: 10,
+    marginVertical: 14,
+  },
+  settleEntityBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  settleEntityBtnActive: {
+    backgroundColor: '#071B52',
+    shadowColor: '#071B52',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  settleEntityBtnText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#071B52',
+  },
+  settleEntityBtnTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+  pendingEntityBadge: {
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 10,
+  },
+  pendingEntityBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
   },
 });
