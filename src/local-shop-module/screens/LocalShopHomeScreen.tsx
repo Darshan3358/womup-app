@@ -23,6 +23,7 @@ import { CategoryHScroll } from '../components/CategoryHScroll';
 import { ShopCard } from '../components/ShopCard';
 import { LocalBottomNav, LocalTabKey } from '../components/LocalBottomNav';
 import { QRScannerModal } from '../components/QRScannerModal';
+import { StoreDirectionMapModal } from '../components/StoreDirectionMapModal';
 
 // Sub-screens
 import { ShopDetailScreen } from './ShopDetailScreen';
@@ -42,6 +43,7 @@ export const LocalShopHomeScreen: React.FC = () => {
   const {
     setActiveScreen,
     user,
+    selectedAddress,
     currentCityName,
     currentAreaName,
     setCurrentCityName,
@@ -64,9 +66,10 @@ export const LocalShopHomeScreen: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [vendors, setVendors] = useState<LocalVendor[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // Default to Prahlad Nagar, Ahmedabad coordinates
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number }>({
-    lat: 23.1288,
-    lng: 72.5507,
+    lat: 23.0125,
+    lng: 72.5082,
   });
   const [coinBalance, setCoinBalance] = useState(2000);
   const [refreshing, setRefreshing] = useState(false);
@@ -75,11 +78,29 @@ export const LocalShopHomeScreen: React.FC = () => {
 
   // QR Modal State
   const [isQRModalOpen, setIsQRModalOpen] = useState(false);
+  const [isOverviewMapVisible, setIsOverviewMapVisible] = useState(false);
 
-  // Obtain user's GPS coords on mount
+  // Determine effective user location: prioritize selectedAddress, then device GPS, then default
+  const effectiveLat =
+    typeof selectedAddress?.latitude === 'number' && selectedAddress.latitude !== 0
+      ? selectedAddress.latitude
+      : userLocation.lat;
+  const effectiveLng =
+    typeof selectedAddress?.longitude === 'number' && selectedAddress.longitude !== 0
+      ? selectedAddress.longitude
+      : userLocation.lng;
+
+  // Obtain user's GPS coords on mount if address coordinates not already present
   useEffect(() => {
     (async () => {
       try {
+        if (selectedAddress?.latitude && selectedAddress?.longitude) {
+          setUserLocation({
+            lat: selectedAddress.latitude,
+            lng: selectedAddress.longitude,
+          });
+          return;
+        }
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status === 'granted') {
           const loc = await Location.getCurrentPositionAsync({
@@ -91,20 +112,20 @@ export const LocalShopHomeScreen: React.FC = () => {
           });
         }
       } catch {
-        // Fallback to default (Ahmedabad)
+        // Fallback to default (Prahlad Nagar, Ahmedabad)
       }
     })();
-  }, []);
+  }, [selectedAddress?.latitude, selectedAddress?.longitude]);
 
-  // Load live vendors from MongoDB within 5km radius
+  // Load live vendors from MongoDB within 5km radius with real distance calculation
   const loadVendors = async () => {
     setIsLoading(true);
     try {
       const data = await LocalShopApi.getNearbyShops(
         selectedCategory,
         searchQuery,
-        userLocation.lat,
-        userLocation.lng,
+        effectiveLat,
+        effectiveLng,
         5 // 🚨 Strict 5km Radius
       );
       setVendors(data);
@@ -122,7 +143,7 @@ export const LocalShopHomeScreen: React.FC = () => {
 
   useEffect(() => {
     loadVendors();
-  }, [selectedCategory, searchQuery, userLocation]);
+  }, [selectedCategory, searchQuery, effectiveLat, effectiveLng]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -200,6 +221,13 @@ export const LocalShopHomeScreen: React.FC = () => {
     return (
       <ShopDetailScreen
         vendorId={selectedVendor.id}
+        initialVendor={selectedVendor}
+        customerCoords={{ latitude: effectiveLat, longitude: effectiveLng }}
+        customerAddress={
+          selectedAddress?.houseFlat
+            ? `${selectedAddress.houseFlat}, ${selectedAddress.city}`
+            : currentAreaName || 'Your Location'
+        }
         onGoBack={() => setCurrentSubScreen('none')}
         onOpenCart={handleOpenCart}
         onScanCounterQR={() => {
@@ -367,10 +395,15 @@ export const LocalShopHomeScreen: React.FC = () => {
             style={styles.viewOnMapBtn}
             activeOpacity={0.8}
             onPress={() => {
-              Alert.alert(
-                'Map View',
-                `Interactive Map loaded for ${currentCityName || 'Ahmedabad'} with live partner locations.`
-              );
+              if (vendors.length > 0) {
+                setSelectedVendor(vendors[0]);
+                setIsOverviewMapVisible(true);
+              } else {
+                Alert.alert(
+                  'Nearby Stores',
+                  `No active partner stores found in ${currentAreaName || currentCityName || 'your area'} within 5km.`
+                );
+              }
             }}
           >
             <Ionicons name="map-outline" size={14} color="#FFFFFF" style={{ marginRight: 4 }} />
@@ -461,6 +494,26 @@ export const LocalShopHomeScreen: React.FC = () => {
           loadVendors();
         }}
       />
+      {/* In-App Store Directions Map Modal */}
+      {selectedVendor && (
+        <StoreDirectionMapModal
+          visible={isOverviewMapVisible}
+          onClose={() => setIsOverviewMapVisible(false)}
+          storeName={selectedVendor.name || selectedVendor.storeName || 'Partner Store'}
+          storeAddress={selectedVendor.address}
+          storeCoords={{
+            latitude: selectedVendor.latitude || (selectedVendor.coordinates?.coordinates?.[1] ?? 23.0195),
+            longitude: selectedVendor.longitude || (selectedVendor.coordinates?.coordinates?.[0] ?? 72.5180),
+          }}
+          customerCoords={{ latitude: effectiveLat, longitude: effectiveLng }}
+          customerAddress={
+            selectedAddress?.houseFlat
+              ? `${selectedAddress.houseFlat}, ${selectedAddress.city}`
+              : currentAreaName || 'Your Location'
+          }
+          distanceKm={selectedVendor.distanceKm}
+        />
+      )}
     </View>
   );
 };

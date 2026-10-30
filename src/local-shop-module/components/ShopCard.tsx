@@ -9,6 +9,15 @@ interface ShopCardProps {
   onPressPayQR?: (vendor: LocalVendor) => void;
 }
 
+export const formatDistance = (dist?: number) => {
+  if (dist === undefined || dist === null || isNaN(dist)) return 'Nearby';
+  if (dist < 1.0) {
+    const meters = Math.round(dist * 1000);
+    return meters <= 0 ? '50 m' : `${meters} m`;
+  }
+  return `${dist.toFixed(1)} km`;
+};
+
 export const ShopCard: React.FC<ShopCardProps> = ({
   vendor,
   onPressShop,
@@ -42,7 +51,7 @@ export const ShopCard: React.FC<ShopCardProps> = ({
           {/* Distance Pill */}
           <View style={styles.distancePill}>
             <Ionicons name="location-sharp" size={12} color="#E11D48" />
-            <Text style={styles.distanceText}>{vendor.distanceKm} km</Text>
+            <Text style={styles.distanceText}>{formatDistance(vendor.distanceKm)}</Text>
           </View>
         </View>
 

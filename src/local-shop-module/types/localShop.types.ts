@@ -13,6 +13,9 @@ export interface LocalVendor {
   phone?: string;
   timings?: string;
   distanceKm: number;
+  latitude?: number;
+  longitude?: number;
+  coordinates?: { type: string; coordinates: [number, number] };
   rating: number;
   reviewCount?: number;
   image: string;

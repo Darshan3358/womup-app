@@ -72,9 +72,10 @@ export const LocalShopApi = {
   },
 
   // 3. Fetch single vendor detail from DB
-  async getShopDetail(vendorId: string): Promise<LocalVendor | undefined> {
+  async getShopDetail(vendorId: string, lat?: number, lng?: number): Promise<LocalVendor | undefined> {
     try {
-      const res = await api.get<any>(`/local-shops/${vendorId}`);
+      const qs = lat !== undefined && lng !== undefined ? `?lat=${lat}&lng=${lng}` : '';
+      const res = await api.get<any>(`/local-shops/${vendorId}${qs}`);
       if (res.success && res.data) {
         return res.data;
       }

@@ -80,8 +80,25 @@ export class LocalShopsService implements OnModuleInit {
 
   // ── Seed Initial Real Vendors in DB ─────────────────────────────────────────
   private async seedDefaultVendors() {
-    const count = await this.vendorModel.countDocuments();
-    if (count > 0) return;
+    // Ensure primary partner store WOMUP01 has accurate coordinates in Prahlad Nagar, Ahmedabad
+    await this.vendorModel.updateOne(
+      { vendorCode: 'WOMUP01' },
+      {
+        $set: {
+          storeName: 'Womup Express Store',
+          address: 'Near Prahlad Nagar Garden, Ahmedabad',
+          city: 'Ahmedabad',
+          pincode: '380015',
+          coordinates: { type: 'Point', coordinates: [72.5180, 23.0195] },
+          latitude: 23.0195,
+          longitude: 72.5180,
+          isActive: true,
+          isOpenNow: true,
+          isOnline: true,
+          isVerified: true,
+        },
+      },
+    );
 
     const initialVendors: Partial<Vendor>[] = [
       {
@@ -90,11 +107,11 @@ export class LocalShopsService implements OnModuleInit {
         ownerName: 'Ramesh Patel',
         ownerPhone: '+91 98250 12345',
         categoryName: 'Vegetables',
-        address: 'Near Nandanvan Society, Mahesana',
+        address: 'Near Anandnagar Cross Road, Prahlad Nagar, Ahmedabad',
         city: 'Ahmedabad',
         pincode: '380015',
-        coordinates: { type: 'Point', coordinates: [72.5507, 23.1288] },
-        shoppingCoinPercent: 18, // 18% Shopping Coin Benefit per SRS
+        coordinates: { type: 'Point', coordinates: [72.5150, 23.0160] },
+        shoppingCoinPercent: 18,
         minCoinPercent: 2,
         maxCoinPercent: 25,
         openingTime: '08:00 AM',
@@ -114,11 +131,11 @@ export class LocalShopsService implements OnModuleInit {
         ownerName: 'Jayesh Shah',
         ownerPhone: '+91 98251 23456',
         categoryName: 'Grocery',
-        address: 'Near Sardar Chowk, Mahesana',
+        address: 'Prahlad Nagar Trade Center, Ahmedabad',
         city: 'Ahmedabad',
         pincode: '380015',
-        coordinates: { type: 'Point', coordinates: [72.5540, 23.1310] },
-        shoppingCoinPercent: 6, // 6% Coin as per Notebook
+        coordinates: { type: 'Point', coordinates: [72.5195, 23.0210] },
+        shoppingCoinPercent: 6,
         minCoinPercent: 2,
         maxCoinPercent: 25,
         openingTime: '07:30 AM',
@@ -138,11 +155,11 @@ export class LocalShopsService implements OnModuleInit {
         ownerName: 'Dr. Suresh Varma',
         ownerPhone: '+91 98252 34567',
         categoryName: 'Medical',
-        address: 'Near City Point, Mahesana',
+        address: 'Satellite Road, Ahmedabad',
         city: 'Ahmedabad',
         pincode: '380015',
-        coordinates: { type: 'Point', coordinates: [72.5570, 23.1340] },
-        shoppingCoinPercent: 10, // 10% Coin as per Notebook
+        coordinates: { type: 'Point', coordinates: [72.5240, 23.0250] },
+        shoppingCoinPercent: 10,
         minCoinPercent: 2,
         maxCoinPercent: 25,
         openingTime: '08:00 AM',
@@ -162,10 +179,10 @@ export class LocalShopsService implements OnModuleInit {
         ownerName: 'Haresh Barot',
         ownerPhone: '+91 98253 45678',
         categoryName: 'Salon',
-        address: 'Highway Cross Road, Mahesana',
+        address: 'SG Highway, Opp. Rajpath Club, Ahmedabad',
         city: 'Ahmedabad',
         pincode: '380015',
-        coordinates: { type: 'Point', coordinates: [72.5600, 23.1380] },
+        coordinates: { type: 'Point', coordinates: [72.5080, 23.0220] },
         shoppingCoinPercent: 12,
         minCoinPercent: 2,
         maxCoinPercent: 25,
@@ -186,10 +203,10 @@ export class LocalShopsService implements OnModuleInit {
         ownerName: 'Manoj Prajapati',
         ownerPhone: '+91 98254 56789',
         categoryName: 'Garments',
-        address: 'Opp. Radhanpur Chokdi, Mahesana',
+        address: 'Vastrapur Lake Road, Ahmedabad',
         city: 'Ahmedabad',
         pincode: '380015',
-        coordinates: { type: 'Point', coordinates: [72.5630, 23.1410] },
+        coordinates: { type: 'Point', coordinates: [72.5310, 23.0180] },
         shoppingCoinPercent: 8,
         minCoinPercent: 2,
         maxCoinPercent: 25,
@@ -207,7 +224,10 @@ export class LocalShopsService implements OnModuleInit {
     ];
 
     for (const v of initialVendors) {
-      await this.vendorModel.create(v);
+      const exists = await this.vendorModel.findOne({ vendorCode: v.vendorCode });
+      if (!exists) {
+        await this.vendorModel.create(v);
+      }
     }
   }
 
@@ -347,6 +367,9 @@ export class LocalShopsService implements OnModuleInit {
         closingTime: v.closingTime || '9:00 PM',
         isOpenNow: v.isOpenNow ?? true,
         isOnline: v.isOnline ?? true,
+        latitude: vLat,
+        longitude: vLng,
+        coordinates: v.coordinates || { type: 'Point', coordinates: [vLng, vLat] },
         distanceKm: distance,
         distance,
         rating: v.rating ?? 4.8,
@@ -370,7 +393,7 @@ export class LocalShopsService implements OnModuleInit {
   }
 
   // ── Public API 2: Single Vendor Detail ─────────────────────────────────────
-  async getVendorDetails(vendorId: string) {
+  async getVendorDetails(vendorId: string, lat?: number, lng?: number) {
     let vendor: VendorDocument | null = null;
     if (Types.ObjectId.isValid(vendorId)) {
       vendor = await this.vendorModel.findById(vendorId);
@@ -384,6 +407,13 @@ export class LocalShopsService implements OnModuleInit {
 
     const styling = this.getCategoryStyling(vendor.categoryName);
     const upi = vendor.upiId || `${vendor.vendorCode.toLowerCase()}@okhdfcbank`;
+
+    const vLat = vendor.coordinates?.coordinates?.[1] ?? (vendor as any).latitude ?? 23.0195;
+    const vLng = vendor.coordinates?.coordinates?.[0] ?? (vendor as any).longitude ?? 72.5180;
+    const distanceKm =
+      lat !== undefined && lng !== undefined
+        ? this.calculateDistance(lat, lng, vLat, vLng)
+        : (vendor as any).distanceKm || 1.3;
 
     return {
       id: vendor._id.toString(),
@@ -404,6 +434,11 @@ export class LocalShopsService implements OnModuleInit {
       openingTime: vendor.openingTime,
       closingTime: vendor.closingTime,
       isOpenNow: vendor.isOpenNow ?? true,
+      latitude: vLat,
+      longitude: vLng,
+      coordinates: vendor.coordinates || { type: 'Point', coordinates: [vLng, vLat] },
+      distanceKm,
+      distance: distanceKm,
       rating: vendor.rating,
       reviewCount: vendor.totalReviews,
       image: vendor.imageUrl,

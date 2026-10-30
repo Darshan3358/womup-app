@@ -16,9 +16,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Rect, Path } from 'react-native-svg';
 import { LocalCartItem, LocalVendor, LocalTransaction } from '../types/localShop.types';
 import { LocalShopApi } from '../api/localShopApi';
+import { StoreDirectionMapModal } from '../components/StoreDirectionMapModal';
 
 interface ShopDetailScreenProps {
   vendorId?: string;
+  initialVendor?: LocalVendor;
+  customerCoords?: { latitude: number; longitude: number };
+  customerAddress?: string;
   onGoBack: () => void;
   onOpenCart?: (cart: LocalCartItem[]) => void;
   onScanCounterQR: () => void;
@@ -98,12 +102,16 @@ const qrStyles = StyleSheet.create({
 
 export const ShopDetailScreen: React.FC<ShopDetailScreenProps> = ({
   vendorId = '',
+  initialVendor,
+  customerCoords,
+  customerAddress,
   onGoBack,
   onScanCounterQR,
 }) => {
   const insets = useSafeAreaInsets();
-  const [vendor, setVendor] = useState<LocalVendor | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [vendor, setVendor] = useState<LocalVendor | null>(initialVendor || null);
+  const [isLoading, setIsLoading] = useState(!initialVendor && Boolean(vendorId));
+  const [isMapModalVisible, setIsMapModalVisible] = useState(false);
 
   // User Rating State (1 to 5 stars)
   const [userRating, setUserRating] = useState<number>(0);
@@ -111,10 +119,13 @@ export const ShopDetailScreen: React.FC<ShopDetailScreenProps> = ({
 
   useEffect(() => {
     (async () => {
-      setIsLoading(true);
       try {
         if (vendorId) {
-          const fetched = await LocalShopApi.getShopDetail(vendorId);
+          const fetched = await LocalShopApi.getShopDetail(
+            vendorId,
+            customerCoords?.latitude,
+            customerCoords?.longitude,
+          );
           if (fetched) {
             setVendor(fetched);
           }
@@ -125,7 +136,7 @@ export const ShopDetailScreen: React.FC<ShopDetailScreenProps> = ({
         setIsLoading(false);
       }
     })();
-  }, [vendorId]);
+  }, [vendorId, customerCoords?.latitude, customerCoords?.longitude]);
 
   if (isLoading) {
     return (
@@ -158,13 +169,9 @@ export const ShopDetailScreen: React.FC<ShopDetailScreenProps> = ({
   const cleanId = (vendor.id || 'SHOP').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
   const shopQrCodeText = `WOMUP-PAY-${cleanId}-001`;
 
-  // Handle "Get Directions" via Maps app or web
+  // Handle "Get Directions" via In-App Map Modal
   const handleGetDirections = () => {
-    const query = encodeURIComponent(`${vendor.name}, ${vendor.address}`);
-    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${query}`;
-    Linking.openURL(mapsUrl).catch(() => {
-      Alert.alert('Directions', `Location:\n${vendor.name}\n${vendor.address}`);
-    });
+    setIsMapModalVisible(true);
   };
 
   // Handle direct phone call
@@ -445,6 +452,23 @@ export const ShopDetailScreen: React.FC<ShopDetailScreenProps> = ({
         {/* Space at the bottom */}
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* In-App Store Directions Map Modal */}
+      {vendor && (
+        <StoreDirectionMapModal
+          visible={isMapModalVisible}
+          onClose={() => setIsMapModalVisible(false)}
+          storeName={vendor.name || vendor.storeName || 'Partner Store'}
+          storeAddress={vendor.address}
+          storeCoords={{
+            latitude: vendor.latitude || (vendor.coordinates?.coordinates?.[1] ?? 23.0195),
+            longitude: vendor.longitude || (vendor.coordinates?.coordinates?.[0] ?? 72.5180),
+          }}
+          customerCoords={customerCoords}
+          customerAddress={customerAddress}
+          distanceKm={vendor.distanceKm}
+        />
+      )}
     </View>
   );
 };

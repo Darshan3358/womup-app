@@ -105,8 +105,16 @@ export class LocalShopsController {
 
   @Get(['local-shops/:vendorId', 'local/shops/:vendorId'])
   @ApiOperation({ summary: 'Get vendor details, QR code, and UPI info' })
-  async getShopDetail(@Param('vendorId') vendorId: string) {
-    const data = await this.localShopsService.getVendorDetails(vendorId);
+  async getShopDetail(
+    @Param('vendorId') vendorId: string,
+    @Query('lat') lat?: number,
+    @Query('lng') lng?: number,
+  ) {
+    const data = await this.localShopsService.getVendorDetails(
+      vendorId,
+      lat ? Number(lat) : undefined,
+      lng ? Number(lng) : undefined,
+    );
     return { success: true, data };
   }
 
