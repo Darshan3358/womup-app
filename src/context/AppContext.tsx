@@ -2024,14 +2024,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setWalletBalance((prev) => Math.max(0, prev - options.walletDeduction!));
     }
 
-    // Deduct coins & optimistic rewards
-    setUser((prev) => ({
-      ...prev,
-      shoppingCoins:
-        prev.shoppingCoins -
-        (!isBlinkit ? cartSummary.shoppingCoinDiscount : appliedCoins) +
-        (!isBlinkit ? cartSummary.totalCoinsEarnable : 10),
-    }));
+    // Deduct coins if redeemed (strictly NO coins earned on order placement)
+    const coinsToDeduct = !isBlinkit ? cartSummary.shoppingCoinDiscount : appliedCoins;
+    if (coinsToDeduct > 0) {
+      setUser((prev) => ({
+        ...prev,
+        shoppingCoins: Math.max(0, prev.shoppingCoins - coinsToDeduct),
+      }));
+    }
 
     let liveOrder: Order | null = null;
     try {

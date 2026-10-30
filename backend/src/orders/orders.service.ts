@@ -870,21 +870,7 @@ export class OrdersService {
       notes: 'Order placed by customer',
     });
 
-    // 8. Reward 10% Shopping Coins on the purchase
-    const earnedCoins = Math.max(5, Math.floor(itemSubtotal * 0.1));
-    user.shoppingCoins += earnedCoins;
-    await user.save();
-
-    await this.coinTxModel.create({
-      userId: uId,
-      type: 'EARN',
-      coins: earnedCoins,
-      balanceBefore: user.shoppingCoins - earnedCoins,
-      balanceAfter: user.shoppingCoins,
-      referenceType: 'ORDER',
-      referenceId: order._id.toString(),
-      description: `Earned 10% Shopping Coins reward on Order #${orderNumber}`,
-    });
+    // 8. Order reward coins disabled — customer does not earn shopping coins on order placement.
 
     // 9. Multi-Store FCFS Bidding: Rider dispatch is deferred until a dark store accepts the order.
     this.logger.log(`[Order Broadcast] Broadcasted Order #${orderNumber} to ${broadcastStoreIds.length} candidate stores in ${matchedArea?.name || 'area'} for FCFS acceptance.`);
