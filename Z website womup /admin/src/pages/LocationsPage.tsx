@@ -1002,31 +1002,63 @@ export const LocationsPage: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Metrics Row: SLA, Radius, Pincode */}
+                  {/* Geofence & GPS Coordinates Pill */}
                   <div
                     style={{
+                      background: '#EFF6FF',
+                      border: '1px solid #BFDBFE',
+                      borderRadius: '10px',
+                      padding: '8px 12px',
+                      marginBottom: '10px',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '16px',
-                      fontSize: '0.78rem',
-                      color: '#64748B',
-                      marginBottom: '14px',
+                      justifyContent: 'space-between',
                       flexWrap: 'wrap',
+                      gap: '8px',
+                      fontSize: '0.78rem',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                      <Clock size={14} color="#64748B" />
-                      <span>{area.defaultDeliveryMinutes || 9} min SLA</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#1E40AF', fontWeight: 700 }}>
+                      <MapPin size={14} color="#2563EB" />
+                      <span>Geofence GPS:</span>
+                      <span style={{ fontFamily: 'monospace', color: '#1E3A8A' }}>
+                        {(area as any).latitude || '23.0225'}° N, {(area as any).longitude || '72.5714'}° E
+                      </span>
                     </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                      <Zap size={14} color="#64748B" />
-                      <span>{area.radiusKm || 3.5} km radius</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1E40AF', fontWeight: 700 }}>
+                      <span style={{ background: '#DBEAFE', padding: '2px 8px', borderRadius: '6px' }}>
+                        ⭕ {area.radiusKm || 3.5} km Radius
+                      </span>
+                      <span style={{ background: '#DCFCE7', color: '#166534', padding: '2px 8px', borderRadius: '6px' }}>
+                        ⚡ {area.defaultDeliveryMinutes || 9} min SLA
+                      </span>
                     </div>
+                  </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                      <Layers size={14} color="#64748B" />
-                      <span>{area.pincodes && area.pincodes.length > 0 ? area.pincodes[0] : '380015'}</span>
+                  {/* Covered Pincodes List */}
+                  <div style={{ marginBottom: '14px' }}>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Layers size={13} color="#64748B" />
+                      <span>Serviceable Pincodes ({(area.pincodes && area.pincodes.length > 0) ? area.pincodes.length : 1}):</span>
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {(area.pincodes && area.pincodes.length > 0 ? area.pincodes : ['380015']).map((pin) => (
+                        <span
+                          key={pin}
+                          style={{
+                            background: '#F1F5F9',
+                            color: '#0F172A',
+                            border: '1px solid #CBD5E1',
+                            borderRadius: '6px',
+                            padding: '3px 8px',
+                            fontSize: '0.76rem',
+                            fontWeight: 800,
+                            letterSpacing: '0.5px',
+                          }}
+                        >
+                          📮 {pin}
+                        </span>
+                      ))}
                     </div>
                   </div>
 
