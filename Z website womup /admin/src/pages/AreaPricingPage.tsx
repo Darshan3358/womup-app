@@ -134,10 +134,14 @@ export const AreaPricingPage: React.FC = () => {
   const storesInSelectedArea = useMemo(() => {
     if (!currentArea) return stores;
     const aId = currentArea.id || currentArea._id;
+    const aName = (currentArea.name || '').toLowerCase();
     return stores.filter((s) => {
       if (s.areaId && aId && String(s.areaId) === String(aId)) return true;
-      if (s.areaName && currentArea.name && s.areaName.toLowerCase() === currentArea.name.toLowerCase()) return true;
-      if (s.name.toLowerCase().includes(currentArea.name.toLowerCase())) return true;
+      const sAreaName = (s.areaName || (s as any).area || '').toLowerCase();
+      const sStoreName = (s.name || '').toLowerCase();
+      if (sAreaName && (sAreaName.includes(aName) || aName.includes(sAreaName))) return true;
+      if (aName.includes('tragad') && (sStoreName.includes('tragad') || sAreaName.includes('tragad'))) return true;
+      if (aName.includes('chandlodi') && (sStoreName.includes('chandlodi') || sAreaName.includes('chandlodi'))) return true;
       return false;
     });
   }, [stores, currentArea]);
