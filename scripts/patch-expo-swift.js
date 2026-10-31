@@ -190,8 +190,24 @@ void releaseRuntimeScheduler(expo::RuntimeScheduler *scheduler);
     }
 
     // 3. Provide createRuntimeScheduler helper
-    if (!content.includes('createRuntimeScheduler')) {
+    if (content.includes('createRuntimeScheduler')) {
+      if (!content.includes('#ifndef SWIFT_RETURNS_RETAINED')) {
+        content = content.replace(
+          'inline SWIFT_RETURNS_RETAINED RuntimeScheduler * _Nonnull createRuntimeScheduler()',
+          `#ifndef SWIFT_RETURNS_RETAINED\n#if __has_attribute(swift_returns_retained)\n#define SWIFT_RETURNS_RETAINED __attribute__((swift_returns_retained))\n#else\n#define SWIFT_RETURNS_RETAINED\n#endif\n#endif\n\ninline SWIFT_RETURNS_RETAINED RuntimeScheduler * _Nonnull createRuntimeScheduler()`
+        );
+        modified = true;
+      }
+    } else {
       const helper = `
+#ifndef SWIFT_RETURNS_RETAINED
+#if __has_attribute(swift_returns_retained)
+#define SWIFT_RETURNS_RETAINED __attribute__((swift_returns_retained))
+#else
+#define SWIFT_RETURNS_RETAINED
+#endif
+#endif
+
 inline SWIFT_RETURNS_RETAINED RuntimeScheduler * _Nonnull createRuntimeScheduler() {
   return new RuntimeScheduler();
 }
