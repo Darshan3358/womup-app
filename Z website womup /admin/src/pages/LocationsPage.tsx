@@ -19,7 +19,24 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { useAdmin } from '../context/AdminContext';
-import { CityItem, AreaItem } from '../types/admin';
+import { CityItem, AreaItem, DarkStoreItem } from '../types/admin';
+
+export const getStoresForArea = (area: AreaItem, stores: DarkStoreItem[]) => {
+  const aId = area.id || area._id;
+  const aName = (area.name || '').toLowerCase().trim();
+  const cleanWords = aName.replace(/[-_]/g, ' ').split(/\s+/).filter((w) => w.length > 2);
+
+  return stores.filter((s) => {
+    if (s.areaId && aId && String(s.areaId) === String(aId)) return true;
+    const sArea = (s.areaName || '').toLowerCase().trim();
+    const sName = (s.name || '').toLowerCase().trim();
+    const sCode = (s.code || (s as any).hubCode || '').toLowerCase().trim();
+    if (sArea && (sArea === aName || sArea.includes(aName) || aName.includes(sArea))) return true;
+    if (sName && (sName.includes(aName) || aName.includes(sName))) return true;
+    if (cleanWords.some((w) => sName.includes(w) || sArea.includes(w) || sCode.includes(w))) return true;
+    return false;
+  });
+};
 
 export const LocationsPage: React.FC = () => {
   const {
@@ -96,11 +113,7 @@ export const LocationsPage: React.FC = () => {
   const filteredAreas = useMemo(() => {
     return areas.filter((a) => {
       const aId = a.id || a._id;
-      const matchingStores = stores.filter((s) => {
-        if (s.areaId && aId && String(s.areaId) === String(aId)) return true;
-        if (s.areaName && a.name && s.areaName.toLowerCase() === a.name.toLowerCase()) return true;
-        return false;
-      });
+      const matchingStores = getStoresForArea(a, stores);
 
       const currentCount = matchingStores.length;
       const isAssigned = currentCount > 0;
@@ -772,11 +785,7 @@ export const LocationsPage: React.FC = () => {
           ) : (
             filteredAreas.map((area) => {
               const aId = area.id || area._id;
-              const matchingStores = stores.filter((s) => {
-                if (s.areaId && aId && String(s.areaId) === String(aId)) return true;
-                if (s.areaName && area.name && s.areaName.toLowerCase() === area.name.toLowerCase()) return true;
-                return false;
-              });
+              const matchingStores = getStoresForArea(area, stores);
 
               const maxStores = Number(area.maxStores) || 1;
               const currentCount = matchingStores.length;

@@ -87,11 +87,19 @@ export const StoresPage: React.FC = () => {
       const matchedArea = areas.find(
         (a) => a.name.toLowerCase() === areaFilter.toLowerCase() || a.id === areaFilter || a._id === areaFilter
       );
-      const targetAreaName = matchedArea ? matchedArea.name.toLowerCase() : areaFilter.toLowerCase();
+      const targetAreaName = (matchedArea ? matchedArea.name : areaFilter).toLowerCase().trim();
       const targetAreaId = matchedArea ? String(matchedArea.id || matchedArea._id) : '';
-      const storeArea = (s.areaName || '').toLowerCase();
+      const storeArea = (s.areaName || '').toLowerCase().trim();
       const storeAreaId = s.areaId ? String(s.areaId) : '';
-      matchesArea = (targetAreaId && storeAreaId === targetAreaId) || (storeArea && storeArea === targetAreaName);
+      const storeName = (s.name || '').toLowerCase().trim();
+      const storeCode = (s.code || (s as any).hubCode || '').toLowerCase().trim();
+      const cleanTargetWords = targetAreaName.replace(/[-_]/g, ' ').split(/\s+/).filter((w) => w.length > 2);
+
+      matchesArea =
+        Boolean(targetAreaId && storeAreaId === targetAreaId) ||
+        (storeArea && (storeArea === targetAreaName || storeArea.includes(targetAreaName) || targetAreaName.includes(storeArea))) ||
+        (storeName && (storeName.includes(targetAreaName) || targetAreaName.includes(storeName))) ||
+        cleanTargetWords.some((w) => storeName.includes(w) || storeArea.includes(w) || storeCode.includes(w));
     }
 
     const matchesStatus =

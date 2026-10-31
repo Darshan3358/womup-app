@@ -147,14 +147,26 @@ export const InventoryPage: React.FC = () => {
       );
     }
     const aId = currentArea.id || currentArea._id;
-    const aName = (currentArea.name || '').toLowerCase();
+    const aName = (currentArea.name || '').toLowerCase().trim();
+    const cleanWords = aName.replace(/[-_]/g, ' ').split(/\s+/).filter((w) => w.length > 2);
+
     return stores.filter((s) => {
+      // 1. Direct ID match
       if (s.areaId && aId && String(s.areaId) === String(aId)) return true;
-      const sAreaName = (s.areaName || (s as any).area || '').toLowerCase();
-      const sStoreName = (s.name || '').toLowerCase();
-      if (sAreaName && (sAreaName.includes(aName) || aName.includes(sAreaName))) return true;
-      if (aName.includes('tragad') && (sStoreName.includes('tragad') || sAreaName.includes('tragad'))) return true;
-      if (aName.includes('chandlodi') && (sStoreName.includes('chandlodi') || sAreaName.includes('chandlodi'))) return true;
+
+      const sArea = (s.areaName || '').toLowerCase().trim();
+      const sName = (s.name || '').toLowerCase().trim();
+      const sCode = (s.code || (s as any).hubCode || '').toLowerCase().trim();
+
+      // 2. Direct Area Name substring / equality match
+      if (sArea && (sArea === aName || sArea.includes(aName) || aName.includes(sArea))) return true;
+
+      // 3. Store name includes area (e.g. 'Wom Up Chandlodiya - Tragad Dark Store' includes 'Tragad')
+      if (sName && (sName.includes(aName) || aName.includes(sName))) return true;
+
+      // 4. Clean keywords overlap (e.g. 'tragad' in 'STR-AREACHANDLODIYATRAGAD' or store name)
+      if (cleanWords.some((w) => sName.includes(w) || sArea.includes(w) || sCode.includes(w))) return true;
+
       return false;
     });
   }, [stores, selectedAreaId, currentArea, currentCity]);
