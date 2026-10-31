@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { NEST_API_BASE_URL } from '../../services/api';
 import {
   Search,
   RefreshCw,
@@ -47,7 +48,7 @@ export const TopNavbar: React.FC = () => {
   React.useEffect(() => {
     const fetchCounts = async () => {
       try {
-        const res = await fetch('http://localhost:5050/api/v1/admin/approvals/summary');
+        const res = await fetch(`${NEST_API_BASE_URL}/admin/approvals/summary`);
         if (res.ok) {
           const json = await res.json();
           if (json?.data) {
@@ -287,9 +288,25 @@ export const TopNavbar: React.FC = () => {
                   borderBottom: '1px solid #E2E8F0',
                 }}
               >
-                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#071B52' }}>
-                  🔔 Approvals Queue ({approvalsCount.total})
-                </span>
+                <button
+                  onClick={() => {
+                    setActiveTab('ApprovalHub');
+                    setShowBellDropdown(false);
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    fontSize: '0.85rem',
+                    fontWeight: 800,
+                    color: '#071B52',
+                    textDecoration: 'underline',
+                  }}
+                >
+                  🔔 Open Approval Hub ({approvalsCount.total})
+                </button>
                 <span style={{ fontSize: '0.70rem', color: '#10B981', fontWeight: 700 }}>
                   Live Real-Time
                 </span>

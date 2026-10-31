@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Wallet,
   TrendingUp,
@@ -7,6 +7,7 @@ import {
   ArrowDownLeft,
   Warehouse,
   Bike,
+  Store,
   Search,
   Filter,
   CheckCircle2,
@@ -18,10 +19,17 @@ import {
   X,
   RefreshCw,
   Clock,
+  Check,
+  XCircle,
+  Copy,
+  ExternalLink,
+  QrCode,
+  Settings,
 } from 'lucide-react';
 import { useAdmin } from '../context/AdminContext';
+import { AdminApiService } from '../services/api';
 
-type ActiveSubTab = 'OVERVIEW' | 'STORES' | 'RIDERS' | 'PLATFORM' | 'LEDGER';
+type ActiveSubTab = 'OVERVIEW' | 'STORES' | 'RIDERS' | 'UPI_SETTLEMENTS' | 'PLATFORM' | 'LEDGER';
 
 export const WalletsPage: React.FC = () => {
   const { stores, riders, orders, settleStoreWallet, payoutRiderWallet, refreshData } = useAdmin();
@@ -41,6 +49,145 @@ export const WalletsPage: React.FC = () => {
   const [payoutRiderAmount, setPayoutRiderAmount] = useState<string>('');
   const [payoutRiderNotes, setPayoutRiderNotes] = useState<string>('Daily Instant IMPS Payout');
   const [riderPayoutSubmitting, setRiderPayoutSubmitting] = useState(false);
+
+  // ── UPI Settlements Sub-Tab State ──
+  const [settlementEntityTab, setSettlementEntityTab] = useState<'STORES' | 'RIDERS'>('STORES');
+  const [storeSettlements, setStoreSettlements] = useState<any[]>([]);
+  const [riderSettlements, setRiderSettlements] = useState<any[]>([]);
+  const [settlementFilter, setSettlementFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING');
+  const [loadingSettlements, setLoadingSettlements] = useState(false);
+  const [actionSettlementId, setActionSettlementId] = useState<string | null>(null);
+  const [copiedUtr, setCopiedUtr] = useState<string | null>(null);
+
+  // Company UPI Settings Modal
+  const [showUpiModal, setShowUpiModal] = useState(false);
+  const [companyUpiId, setCompanyUpiId] = useState('womup@okicici');
+  const [companyUpiName, setCompanyUpiName] = useState('Womup Technologies Pvt Ltd');
+  const [savingUpi, setSavingUpi] = useState(false);
+
+  const fetchSettlements = async () => {
+    setLoadingSettlements(true);
+    try {
+      const [sRes, rRes, upiRes] = await Promise.all([
+        AdminApiService.getStoreSettlementRequests(),
+        AdminApiService.getRiderSettlementRequests(),
+        AdminApiService.getCompanyUpiSettings(),
+      ]);
+      if (sRes?.success && Array.isArray(sRes.data)) {
+        setStoreSettlements(sRes.data);
+      }
+      if (rRes?.success && Array.isArray(rRes.data)) {
+        setRiderSettlements(rRes.data);
+      }
+      if (upiRes?.success && upiRes.data) {
+        if (upiRes.data.adminUpiId) setCompanyUpiId(upiRes.data.adminUpiId);
+        if (upiRes.data.adminUpiName) setCompanyUpiName(upiRes.data.adminUpiName);
+      }
+    } catch (e) {
+      console.error('Error fetching settlements:', e);
+    } finally {
+      setLoadingSettlements(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSettlements();
+  }, []);
+
+  const handleApproveStoreSettlement = async (id: string) => {
+    setActionSettlementId(id);
+    try {
+      const res = await AdminApiService.approveStoreSettlementRequest(id);
+      if (res?.success) {
+        setStoreSettlements((prev) =>
+          prev.map((item) => (item.id === id || item._id === id ? { ...item, status: 'APPROVED' } : item))
+        );
+      } else {
+        alert(res?.error || 'Failed approving store settlement');
+      }
+    } catch (e: any) {
+      alert(e.message || 'Approval error');
+    } finally {
+      setActionSettlementId(null);
+    }
+  };
+
+  const handleRejectStoreSettlement = async (id: string) => {
+    const reason = prompt('Please enter rejection reason:');
+    if (!reason) return;
+    setActionSettlementId(id);
+    try {
+      const res = await AdminApiService.rejectStoreSettlementRequest(id, reason);
+      if (res?.success) {
+        setStoreSettlements((prev) =>
+          prev.map((item) => (item.id === id || item._id === id ? { ...item, status: 'REJECTED', reason } : item))
+        );
+      } else {
+        alert(res?.error || 'Failed rejecting store settlement');
+      }
+    } catch (e: any) {
+      alert(e.message || 'Rejection error');
+    } finally {
+      setActionSettlementId(null);
+    }
+  };
+
+  const handleApproveRiderSettlement = async (id: string) => {
+    setActionSettlementId(id);
+    try {
+      const res = await AdminApiService.approveRiderSettlementRequest(id);
+      if (res?.success) {
+        setRiderSettlements((prev) =>
+          prev.map((item) => (item.id === id || item._id === id ? { ...item, status: 'APPROVED' } : item))
+        );
+      } else {
+        alert(res?.error || 'Failed approving rider settlement');
+      }
+    } catch (e: any) {
+      alert(e.message || 'Approval error');
+    } finally {
+      setActionSettlementId(null);
+    }
+  };
+
+  const handleRejectRiderSettlement = async (id: string) => {
+    const reason = prompt('Please enter rejection reason:');
+    if (!reason) return;
+    setActionSettlementId(id);
+    try {
+      const res = await AdminApiService.rejectRiderSettlementRequest(id, reason);
+      if (res?.success) {
+        setRiderSettlements((prev) =>
+          prev.map((item) => (item.id === id || item._id === id ? { ...item, status: 'REJECTED', reason } : item))
+        );
+      } else {
+        alert(res?.error || 'Failed rejecting rider settlement');
+      }
+    } catch (e: any) {
+      alert(e.message || 'Rejection error');
+    } finally {
+      setActionSettlementId(null);
+    }
+  };
+
+  const handleSaveUpi = async () => {
+    setSavingUpi(true);
+    try {
+      await AdminApiService.updateCompanyUpiSettings({
+        adminUpiId: companyUpiId,
+        adminUpiName: companyUpiName,
+      });
+      setShowUpiModal(false);
+      alert('Company UPI Settings updated successfully!');
+    } catch (e: any) {
+      alert('Error updating UPI: ' + e.message);
+    } finally {
+      setSavingUpi(false);
+    }
+  };
+
+  const pendingStoresCount = storeSettlements.filter((s) => s.status === 'PENDING').length;
+  const pendingRidersCount = riderSettlements.filter((r) => r.status === 'PENDING').length;
 
   // Financial calculations
   const totalGMV = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
@@ -197,8 +344,9 @@ export const WalletsPage: React.FC = () => {
           width: 'fit-content',
         }}
       >
-        {(['OVERVIEW', 'STORES', 'RIDERS', 'PLATFORM', 'LEDGER'] as const).map((tab) => {
+        {(['OVERVIEW', 'STORES', 'RIDERS', 'UPI_SETTLEMENTS', 'PLATFORM', 'LEDGER'] as const).map((tab) => {
           const isSelected = activeSubTab === tab;
+          const totalPendingSettlements = pendingStoresCount + pendingRidersCount;
           return (
             <button
               key={tab}
@@ -216,9 +364,26 @@ export const WalletsPage: React.FC = () => {
                 fontSize: '0.84rem',
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
               }}
             >
-              {tab}
+              <span>{tab === 'UPI_SETTLEMENTS' ? 'UPI SETTLEMENTS' : tab}</span>
+              {tab === 'UPI_SETTLEMENTS' && totalPendingSettlements > 0 && (
+                <span
+                  style={{
+                    backgroundColor: isSelected ? '#FF3B98' : '#EF4444',
+                    color: '#FFFFFF',
+                    fontSize: '0.70rem',
+                    padding: '2px 7px',
+                    borderRadius: '12px',
+                    fontWeight: 900,
+                  }}
+                >
+                  {totalPendingSettlements}
+                </span>
+              )}
             </button>
           );
         })}
@@ -499,6 +664,376 @@ export const WalletsPage: React.FC = () => {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* SUB-TAB 3.5: UPI SETTLEMENTS (STORE & RIDER) */}
+      {activeSubTab === 'UPI_SETTLEMENTS' && (
+        <div>
+          {/* Top Control Bar */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              backgroundColor: '#FFFFFF',
+              padding: '16px 20px',
+              borderRadius: '14px',
+              border: '1px solid #E2E8F0',
+              marginBottom: '20px',
+            }}
+          >
+            {/* Entity Switcher */}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => setSettlementEntityTab('STORES')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '9px 18px',
+                  borderRadius: '10px',
+                  border: settlementEntityTab === 'STORES' ? 'none' : '1px solid #E2E8F0',
+                  backgroundColor: settlementEntityTab === 'STORES' ? '#071B52' : '#F8FAFC',
+                  color: settlementEntityTab === 'STORES' ? '#FFFFFF' : '#64748B',
+                  fontWeight: 800,
+                  fontSize: '0.86rem',
+                  cursor: 'pointer',
+                }}
+              >
+                <Store size={16} />
+                <span>Dark Store Settlements ({storeSettlements.length})</span>
+                {pendingStoresCount > 0 && (
+                  <span style={{ backgroundColor: '#EF4444', color: '#FFF', fontSize: '0.72rem', padding: '2px 6px', borderRadius: '10px' }}>
+                    {pendingStoresCount}
+                  </span>
+                )}
+              </button>
+
+              <button
+                onClick={() => setSettlementEntityTab('RIDERS')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '9px 18px',
+                  borderRadius: '10px',
+                  border: settlementEntityTab === 'RIDERS' ? 'none' : '1px solid #E2E8F0',
+                  backgroundColor: settlementEntityTab === 'RIDERS' ? '#071B52' : '#F8FAFC',
+                  color: settlementEntityTab === 'RIDERS' ? '#FFFFFF' : '#64748B',
+                  fontWeight: 800,
+                  fontSize: '0.86rem',
+                  cursor: 'pointer',
+                }}
+              >
+                <Bike size={16} />
+                <span>Rider Settlements ({riderSettlements.length})</span>
+                {pendingRidersCount > 0 && (
+                  <span style={{ backgroundColor: '#EF4444', color: '#FFF', fontSize: '0.72rem', padding: '2px 6px', borderRadius: '10px' }}>
+                    {pendingRidersCount}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* Actions: Filter & UPI Config */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ display: 'flex', gap: '4px', background: '#F1F5F9', padding: '3px', borderRadius: '8px' }}>
+                {(['ALL', 'PENDING', 'APPROVED', 'REJECTED'] as const).map((st) => (
+                  <button
+                    key={st}
+                    onClick={() => setSettlementFilter(st)}
+                    style={{
+                      padding: '5px 12px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      backgroundColor: settlementFilter === st ? '#FFFFFF' : 'transparent',
+                      color: settlementFilter === st ? '#071B52' : '#64748B',
+                      fontSize: '0.78rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      boxShadow: settlementFilter === st ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    }}
+                  >
+                    {st}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={() => setShowUpiModal(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 14px',
+                  backgroundColor: '#EFF6FF',
+                  border: '1px solid #BFDBFE',
+                  borderRadius: '8px',
+                  color: '#1D4ED8',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                <QrCode size={15} />
+                <span>Company UPI ({companyUpiId})</span>
+              </button>
+
+              <button
+                onClick={fetchSettlements}
+                disabled={loadingSettlements}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 12px',
+                  backgroundColor: '#FFFFFF',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '8px',
+                  color: '#475569',
+                  fontSize: '0.82rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                <RefreshCw size={14} className={loadingSettlements ? 'animate-spin' : ''} />
+              </button>
+            </div>
+          </div>
+
+          {/* List of Requests */}
+          {(() => {
+            const list = settlementEntityTab === 'STORES' ? storeSettlements : riderSettlements;
+            const filtered = list.filter((item) => settlementFilter === 'ALL' || item.status === settlementFilter);
+
+            if (loadingSettlements) {
+              return (
+                <div style={{ padding: '60px 0', textAlign: 'center', color: '#64748B' }}>
+                  <RefreshCw size={28} className="animate-spin" style={{ margin: '0 auto 12px' }} />
+                  <p style={{ fontWeight: 600 }}>Loading UPI settlement requests...</p>
+                </div>
+              );
+            }
+
+            if (filtered.length === 0) {
+              return (
+                <div style={{ backgroundColor: '#FFFFFF', borderRadius: '16px', padding: '60px 20px', textAlign: 'center', border: '1px solid #E2E8F0' }}>
+                  <CheckCircle2 size={44} color="#10B981" style={{ margin: '0 auto 12px' }} />
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#071B52', margin: 0 }}>
+                    No {settlementFilter} Settlement Requests
+                  </h3>
+                  <p style={{ fontSize: '0.85rem', color: '#64748B', marginTop: '6px' }}>
+                    {settlementEntityTab === 'STORES' ? 'All store UTR payout proofs have been reviewed.' : 'All rider settlement requests are clear.'}
+                  </p>
+                </div>
+              );
+            }
+
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: '18px' }}>
+                {filtered.map((item) => {
+                  const itemId = item.id || item._id;
+                  const isAction = actionSettlementId === itemId;
+                  const isPending = item.status === 'PENDING';
+                  const isApproved = item.status === 'APPROVED';
+
+                  return (
+                    <div
+                      key={itemId}
+                      style={{
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: '14px',
+                        border: isPending ? '2px solid #F59E0B' : '1px solid #E2E8F0',
+                        padding: '20px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        boxShadow: '0 4px 14px rgba(0,0,0,0.03)',
+                      }}
+                    >
+                      <div>
+                        {/* Header */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              {settlementEntityTab === 'STORES' ? <Store size={18} color="#071B52" /> : <Bike size={18} color="#071B52" />}
+                              <h4 style={{ fontSize: '1rem', fontWeight: 800, color: '#071B52', margin: 0 }}>
+                                {item.storeName || item.riderName || 'Partner'}
+                              </h4>
+                            </div>
+                            <span style={{ fontSize: '0.78rem', color: '#64748B' }}>
+                              ID: {item.storeCode || item.partnerCode || itemId.slice(-8)}
+                            </span>
+                          </div>
+
+                          <span
+                            style={{
+                              fontSize: '0.76rem',
+                              fontWeight: 900,
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              backgroundColor: isPending ? '#FEF3C7' : isApproved ? '#ECFDF5' : '#FEE2E2',
+                              color: isPending ? '#B45309' : isApproved ? '#059669' : '#DC2626',
+                            }}
+                          >
+                            {item.status}
+                          </span>
+                        </div>
+
+                        {/* Amount & UTR Details */}
+                        <div style={{ background: '#F8FAFC', borderRadius: '10px', padding: '14px', marginBottom: '14px', border: '1px solid #F1F5F9' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px' }}>
+                            <span style={{ fontSize: '0.82rem', color: '#64748B', fontWeight: 600 }}>Settlement Amount:</span>
+                            <strong style={{ fontSize: '1.25rem', color: '#071B52', fontWeight: 900 }}>
+                              ₹{(item.amount || item.netPayable || 0).toLocaleString()}
+                            </strong>
+                          </div>
+
+                          {item.utrNumber && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', background: '#FFFFFF', padding: '8px 10px', borderRadius: '6px', border: '1px solid #E2E8F0' }}>
+                              <div>
+                                <span style={{ fontSize: '0.72rem', color: '#64748B', textTransform: 'uppercase', fontWeight: 700 }}>
+                                  Bank UTR / Transaction ID
+                                </span>
+                                <div style={{ fontSize: '0.90rem', fontWeight: 800, color: '#0F172A', fontFamily: 'monospace' }}>
+                                  {item.utrNumber}
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(item.utrNumber);
+                                  setCopiedUtr(itemId);
+                                  setTimeout(() => setCopiedUtr(null), 2000);
+                                }}
+                                style={{
+                                  padding: '5px 10px',
+                                  borderRadius: '6px',
+                                  border: '1px solid #CBD5E1',
+                                  backgroundColor: '#F8FAFC',
+                                  fontSize: '0.74rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                }}
+                              >
+                                {copiedUtr === itemId ? <Check size={12} color="#10B981" /> : <Copy size={12} />}
+                                <span>{copiedUtr === itemId ? 'Copied' : 'Copy UTR'}</span>
+                              </button>
+                            </div>
+                          )}
+
+                          {item.notes && (
+                            <div style={{ fontSize: '0.80rem', color: '#64748B', marginTop: '8px' }}>
+                              <em>Notes: {item.notes}</em>
+                            </div>
+                          )}
+                          {item.createdAt && (
+                            <div style={{ fontSize: '0.74rem', color: '#94A3B8', marginTop: '6px' }}>
+                              Submitted on: {new Date(item.createdAt).toLocaleString()}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      {isPending && (
+                        <div style={{ display: 'flex', gap: '10px', borderTop: '1px solid #E2E8F0', paddingTop: '14px' }}>
+                          <button
+                            onClick={() => (settlementEntityTab === 'STORES' ? handleRejectStoreSettlement(itemId) : handleRejectRiderSettlement(itemId))}
+                            disabled={isAction}
+                            style={{
+                              flex: 1,
+                              padding: '9px',
+                              borderRadius: '8px',
+                              border: '1px solid #FCA5A5',
+                              backgroundColor: '#FFF',
+                              color: '#DC2626',
+                              fontSize: '0.84rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Reject UTR
+                          </button>
+                          <button
+                            onClick={() => (settlementEntityTab === 'STORES' ? handleApproveStoreSettlement(itemId) : handleApproveRiderSettlement(itemId))}
+                            disabled={isAction}
+                            style={{
+                              flex: 2,
+                              padding: '9px',
+                              borderRadius: '8px',
+                              border: 'none',
+                              backgroundColor: '#10B981',
+                              color: '#FFF',
+                              fontSize: '0.84rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {isAction ? 'Verifying...' : '✓ Approve & Settle'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* UPI Settings Modal */}
+      {showUpiModal && (
+        <div className="modal-backdrop">
+          <div className="modal-card" style={{ maxWidth: '440px' }}>
+            <div className="modal-header">
+              <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#071B52', fontWeight: 800 }}>
+                Company UPI Settlement Details
+              </h3>
+              <button onClick={() => setShowUpiModal(false)} className="modal-close-btn">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: '0.84rem', color: '#64748B', marginBottom: '14px' }}>
+                Stores and Riders transfer COD cash or balance to this official company UPI address.
+              </p>
+
+              <div className="form-group">
+                <label className="form-label">Company Official VPA / UPI ID *</label>
+                <input
+                  type="text"
+                  value={companyUpiId}
+                  onChange={(e) => setCompanyUpiId(e.target.value)}
+                  className="form-input"
+                  placeholder="e.g. womup@okicici"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Account Beneficiary Name *</label>
+                <input
+                  type="text"
+                  value={companyUpiName}
+                  onChange={(e) => setCompanyUpiName(e.target.value)}
+                  className="form-input"
+                  placeholder="e.g. WOMUP ENTERPRISE PVT LTD"
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button onClick={() => setShowUpiModal(false)} className="btn btn-secondary">
+                Cancel
+              </button>
+              <button onClick={handleSaveUpi} disabled={savingUpi} className="btn btn-navy">
+                {savingUpi ? 'Saving...' : 'Save UPI Settings'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

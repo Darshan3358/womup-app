@@ -917,4 +917,160 @@ export const AdminApiService = {
       return { success: false, error: e.message };
     }
   },
+
+  // 19. STORE & RIDER MANUAL UPI SETTLEMENTS
+  async getStoreSettlementRequests(status?: string, storeId?: string): Promise<{ success: boolean; count?: number; data?: any[]; error?: string }> {
+    try {
+      const params = new URLSearchParams();
+      if (status && status !== 'ALL') params.append('status', status);
+      if (storeId) params.append('storeId', storeId);
+      const queryStr = params.toString() ? `?${params.toString()}` : '';
+      const res = await fetch(`${API_BASE_URL}/api/finance/store-settlements${queryStr}`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed fetching store settlements' };
+    }
+  },
+
+  async approveStoreSettlementRequest(requestId: string, adminRemarks?: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/finance/store-settlements/${requestId}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminRemarks }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed approving store settlement' };
+    }
+  },
+
+  async rejectStoreSettlementRequest(requestId: string, reason?: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/finance/store-settlements/${requestId}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed rejecting store settlement' };
+    }
+  },
+
+  async getRiderSettlementRequests(status?: string): Promise<{ success: boolean; data?: any[]; error?: string }> {
+    try {
+      const params = new URLSearchParams();
+      if (status && status !== 'ALL') params.append('status', status);
+      const queryStr = params.toString() ? `?${params.toString()}` : '';
+      const res = await fetch(`${API_BASE_URL}/api/finance/rider-settlements${queryStr}`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed fetching rider settlements' };
+    }
+  },
+
+  async approveRiderSettlementRequest(requestId: string, adminRemarks?: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/finance/rider-settlements/${requestId}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminRemarks }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed approving rider settlement' };
+    }
+  },
+
+  async rejectRiderSettlementRequest(requestId: string, reason?: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/finance/rider-settlements/${requestId}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed rejecting rider settlement' };
+    }
+  },
+
+  async getCompanyUpiSettings(): Promise<{ success: boolean; data?: { adminUpiId: string; adminUpiName: string; supportPhone: string; qrCodeUrl: string }; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/finance/settings/upi`);
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed fetching company UPI' };
+    }
+  },
+
+  async updateCompanyUpiSettings(payload: { adminUpiId: string; adminUpiName?: string; supportPhone?: string; qrCodeUrl?: string }): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/finance/settings/upi`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed updating company UPI' };
+    }
+  },
+
+  // 20. APPROVAL HUB QUEUE
+  async getApprovalSummary(): Promise<any> {
+    try {
+      const res = await fetch(`${NEST_API_BASE_URL}/admin/approvals/summary`);
+      return await res.json();
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  async getApprovalQueue(category: string, query: any = {}): Promise<any> {
+    try {
+      const params = new URLSearchParams(query);
+      const res = await fetch(`${NEST_API_BASE_URL}/admin/approvals/${category}?${params.toString()}`);
+      return await res.json();
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  async approveApprovalItem(category: string, id: string, body: any = {}): Promise<any> {
+    try {
+      const res = await fetch(`${NEST_API_BASE_URL}/admin/approvals/${category}/${id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  async rejectApprovalItem(category: string, id: string, body: any = {}): Promise<any> {
+    try {
+      const res = await fetch(`${NEST_API_BASE_URL}/admin/approvals/${category}/${id}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return await res.json();
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  // 21. CUSTOMER 7-LEVEL TEAM DASHBOARD
+  async getCustomerTeamDashboard(customerId: string): Promise<any> {
+    try {
+      const res = await fetch(`${NEST_API_BASE_URL}/admin/customers/${customerId}/team-dashboard`);
+      return await res.json();
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  },
 };

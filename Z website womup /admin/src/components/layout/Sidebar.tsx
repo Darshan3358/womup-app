@@ -45,6 +45,12 @@ export const Sidebar: React.FC = () => {
       items: [
         { id: 'Dashboard', label: 'Dashboard', icon: LayoutDashboard },
         {
+          id: 'ApprovalHub',
+          label: 'Approval Hub',
+          icon: ShieldCheck,
+          badgeColor: '#EF4444',
+        },
+        {
           id: 'Orders',
           label: 'Live Orders',
           icon: ShoppingBag,

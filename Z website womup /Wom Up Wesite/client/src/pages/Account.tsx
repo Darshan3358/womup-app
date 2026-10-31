@@ -23,13 +23,27 @@ import {
   Check,
   Calendar,
   Download,
+  Users,
+  ArrowUpRight,
+  RefreshCw,
+  Share2,
+  Layers,
+  Award,
+  X,
 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useNavigation, AHMEDABAD_AREAS } from '../context/NavigationContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import { OrderTrackingModal } from '../components/OrderTrackingModal';
-import { AddressApi, type SavedAddressItem, TRACKING_WS_URL } from '../services/api';
+import {
+  AddressApi,
+  type SavedAddressItem,
+  TRACKING_WS_URL,
+  getCustomerTeamDashboard,
+  submitCustomerWithdrawal,
+  type CustomerTeamDashboardResponse,
+} from '../services/api';
 import {
   SettingsApi,
   type UserSettingsData,
@@ -105,6 +119,82 @@ export const Account: React.FC = () => {
   const [isVerifyingAadhaar, setIsVerifyingAadhaar] = useState(false);
   const [aadhaarError, setAadhaarError] = useState<string | null>(null);
   const [aadhaarSuccess, setAadhaarSuccess] = useState<string | null>(null);
+
+  // 7-Level MLM Team States
+  const [teamDashboard, setTeamDashboard] = useState<CustomerTeamDashboardResponse | null>(null);
+  const [isLoadingTeam, setIsLoadingTeam] = useState<boolean>(false);
+  const [teamError, setTeamError] = useState<string | null>(null);
+  const [referralCopied, setReferralCopied] = useState<boolean>(false);
+
+  // Income Withdrawal States
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState<boolean>(false);
+  const [withdrawAmount, setWithdrawAmount] = useState<string>('');
+  const [withdrawBankInput, setWithdrawBankInput] = useState<string>('');
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
+  const [withdrawSuccess, setWithdrawSuccess] = useState<string | null>(null);
+  const [isSubmittingWithdraw, setIsSubmittingWithdraw] = useState<boolean>(false);
+
+  const loadTeamData = async () => {
+    setIsLoadingTeam(true);
+    setTeamError(null);
+    try {
+      const res = await getCustomerTeamDashboard();
+      if (res.success && res.data) {
+        setTeamDashboard(res.data);
+      } else {
+        setTeamError(res.message || 'Unable to load downline data.');
+      }
+    } catch (e: any) {
+      setTeamError(e.message || 'Error loading team data');
+    } finally {
+      setIsLoadingTeam(false);
+    }
+  };
+
+  useEffect(() => {
+    if (accountActiveTab === 'team' && isAuthenticated) {
+      loadTeamData();
+    }
+  }, [accountActiveTab, isAuthenticated]);
+
+  const handleWithdrawSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amt = parseFloat(withdrawAmount);
+    const available = Number(user?.availableIncome ?? 0);
+    if (isNaN(amt) || amt < 600) {
+      setWithdrawError('Minimum withdrawal amount is ₹600 as per policy.');
+      return;
+    }
+    if (amt > available) {
+      setWithdrawError(`Insufficient available balance. You have ₹${available.toLocaleString('en-IN')}.`);
+      return;
+    }
+    if (!withdrawBankInput.trim()) {
+      setWithdrawError('Please enter a valid Bank Account / IFSC or UPI ID.');
+      return;
+    }
+
+    setIsSubmittingWithdraw(true);
+    setWithdrawError(null);
+    try {
+      const res = await submitCustomerWithdrawal(amt, { upiId: withdrawBankInput.trim(), notes: 'Customer Web withdrawal' });
+      if (res.success) {
+        setWithdrawSuccess(res.message || 'Withdrawal request submitted successfully! Admin will review and credit shortly.');
+        setTimeout(() => {
+          setIsWithdrawModalOpen(false);
+          setWithdrawSuccess(null);
+          setWithdrawAmount('');
+          setWithdrawBankInput('');
+        }, 2200);
+      } else {
+        setWithdrawError(res.message || 'Withdrawal submission failed.');
+      }
+    } catch (err: any) {
+      setWithdrawError(err.message || 'Error submitting withdrawal');
+    } finally {
+      setIsSubmittingWithdraw(false);
+    }
+  };
 
   // Sync live settings across all 6 features
   useEffect(() => {
@@ -366,6 +456,7 @@ export const Account: React.FC = () => {
                 { id: 'orders', label: 'My Orders', icon: Package, badge: orders.length > 0 ? `${orders.length}` : undefined },
                 { id: 'wishlist', label: 'My Wishlist', icon: Heart, badge: totalWishlistItems > 0 ? `${totalWishlistItems}` : undefined, onClick: () => navigateTo('wishlist') },
                 { id: 'wallet', label: 'WormUp Coins Wallet', icon: Wallet, badge: `${effectiveCoins} Coins` },
+                { id: 'team', label: '7-Level MLM & Team', icon: Users, badge: teamDashboard?.teamSummary?.totalTeamSize !== undefined ? `${teamDashboard.teamSummary.totalTeamSize}` : 'Downline' },
                 { id: 'profile', label: 'Profile Information', icon: User },
                 { id: 'addresses', label: 'Saved Addresses', icon: MapPin },
                 { id: 'notifications', label: 'Notifications', icon: Bell },
@@ -1107,8 +1198,36 @@ export const Account: React.FC = () => {
                         ₹{user?.availableIncome ?? 0}
                       </div>
                     </div>
-                    <div style={{ fontSize: '0.78rem', color: '#065F46', marginTop: '10px', fontWeight: 600 }}>
-                      Ready to spend on grocery orders!
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                      <div style={{ fontSize: '0.78rem', color: '#065F46', fontWeight: 600 }}>
+                        Ready to spend or withdraw!
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setWithdrawAmount('');
+                          setWithdrawBankInput('');
+                          setWithdrawError(null);
+                          setWithdrawSuccess(null);
+                          setIsWithdrawModalOpen(true);
+                        }}
+                        style={{
+                          background: Number(user?.availableIncome ?? 0) >= 600 ? '#059669' : '#94A3B8',
+                          color: '#FFFFFF',
+                          border: 'none',
+                          borderRadius: '8px',
+                          padding: '6px 12px',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          cursor: Number(user?.availableIncome ?? 0) >= 600 ? 'pointer' : 'not-allowed',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <span>Withdraw (Min ₹600)</span>
+                        <ArrowUpRight size={14} />
+                      </button>
                     </div>
                   </div>
 
@@ -1327,6 +1446,423 @@ export const Account: React.FC = () => {
                     ))}
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* TAB: 7-LEVEL MLM & TEAM DOWNLINE */}
+            {accountActiveTab === 'team' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                {/* Header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                  <div>
+                    <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#071B52', margin: 0 }}>
+                      7-Level Team & MLM Downline 🌳
+                    </h2>
+                    <p style={{ fontSize: '0.88rem', color: '#64748B', margin: '4px 0 0' }}>
+                      Monitor your 7-level sponsor tree, vegetable GMV performance, and monthly level commission status.
+                    </p>
+                  </div>
+                  <button
+                    onClick={loadTeamData}
+                    disabled={isLoadingTeam}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '10px 18px',
+                      borderRadius: '12px',
+                      border: '1.5px solid #E2E8F0',
+                      backgroundColor: '#FFFFFF',
+                      fontSize: '0.88rem',
+                      fontWeight: 700,
+                      color: '#071B52',
+                      cursor: isLoadingTeam ? 'not-allowed' : 'pointer',
+                      boxShadow: '0 2px 8px rgba(7, 27, 82, 0.04)',
+                    }}
+                  >
+                    <RefreshCw size={16} className={isLoadingTeam ? 'animate-spin' : ''} />
+                    <span>{isLoadingTeam ? 'Refreshing...' : 'Refresh Team'}</span>
+                  </button>
+                </div>
+
+                {/* Referral Link & Share Box */}
+                {(() => {
+                  const refCode = (user as any)?.referralCode || (user as any)?.referralId || (user as any)?.myReferralCode || (user?.phone ? `WOMUP${String(user.phone).slice(-6)}` : 'WOMUP2026');
+                  const shareUrl = `https://womup.shop/?ref=${refCode}`;
+                  const waText = encodeURIComponent(`Join WormUp Quick Commerce using my code ${refCode} and get 2,000 Free Shopping Coins! 🥬🚀 ${shareUrl}`);
+
+                  const monthlySpend = Number(teamDashboard?.personalStatus?.monthlyPurchaseValue ?? (user as any)?.monthlyPurchaseValue ?? 0);
+                  const isSpendQualified = monthlySpend >= 2000;
+                  const directActiveCount = Number(teamDashboard?.personalStatus?.direct5ActiveCount ?? (user as any)?.direct5ActiveCount ?? 0);
+                  const isDirectQualified = directActiveCount >= 5;
+                  const isOverallQualified = Boolean(teamDashboard?.personalStatus?.isQualified ?? (isSpendQualified && isDirectQualified));
+
+                  const teamSummary = teamDashboard?.teamSummary || {
+                    totalTeamSize: 0,
+                    totalActiveMembers: 0,
+                    totalVegGmv: 0,
+                    totalOtherGmv: 0,
+                    estimatedMonthlyLevelIncome: 0,
+                  };
+
+                  const defaultLevels = [
+                    { level: 1, percentage: 5.0 },
+                    { level: 2, percentage: 3.0 },
+                    { level: 3, percentage: 2.0 },
+                    { level: 4, percentage: 1.0 },
+                    { level: 5, percentage: 1.0 },
+                    { level: 6, percentage: 0.5 },
+                    { level: 7, percentage: 0.5 },
+                  ];
+
+                  const levelRows = teamDashboard?.levelBreakdown && teamDashboard.levelBreakdown.length > 0
+                    ? teamDashboard.levelBreakdown
+                    : defaultLevels.map((dl) => ({
+                        level: dl.level,
+                        totalMembers: 0,
+                        activeMembers: 0,
+                        vegGmv: 0,
+                        otherGmv: 0,
+                        percentage: dl.percentage,
+                        potentialIncome: 0,
+                      }));
+
+                  return (
+                    <>
+                      {/* Hero Referral Card */}
+                      <div
+                        style={{
+                          background: 'linear-gradient(135deg, #071B52 0%, #172554 100%)',
+                          borderRadius: '24px',
+                          padding: '28px',
+                          color: '#FFFFFF',
+                          boxShadow: '0 12px 36px rgba(7, 27, 82, 0.18)',
+                          position: 'relative',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
+                          <div>
+                            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#93C5FD', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                              Your Unique Referral Sponsor Code
+                            </span>
+                            <div style={{ fontSize: '2.4rem', fontWeight: 900, letterSpacing: '2px', color: '#FCD34D', margin: '4px 0' }}>
+                              {refCode}
+                            </div>
+                            <p style={{ fontSize: '0.86rem', color: '#CBD5E1', margin: 0, maxWidth: '480px' }}>
+                              Share your invite link. When friends sign up and shop fresh vegetables & groceries, they earn ₹2,000 coins and you unlock 7 levels of monthly residual income!
+                            </p>
+                          </div>
+
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', minWidth: '220px' }}>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(shareUrl);
+                                setReferralCopied(true);
+                                setTimeout(() => setReferralCopied(false), 2200);
+                              }}
+                              style={{
+                                background: referralCopied ? '#16A34A' : '#FF3B98',
+                                color: '#FFFFFF',
+                                border: 'none',
+                                borderRadius: '12px',
+                                padding: '12px 20px',
+                                fontSize: '0.92rem',
+                                fontWeight: 800,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                boxShadow: '0 6px 20px rgba(255, 59, 152, 0.35)',
+                              }}
+                            >
+                              {referralCopied ? <Check size={18} /> : <Copy size={18} />}
+                              <span>{referralCopied ? 'Link Copied!' : 'Copy Invite Link'}</span>
+                            </button>
+
+                            <a
+                              href={`https://api.whatsapp.com/send?text=${waText}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                background: '#25D366',
+                                color: '#FFFFFF',
+                                textDecoration: 'none',
+                                borderRadius: '12px',
+                                padding: '12px 20px',
+                                fontSize: '0.92rem',
+                                fontWeight: 800,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                boxShadow: '0 6px 20px rgba(37, 211, 102, 0.35)',
+                              }}
+                            >
+                              <Share2 size={18} />
+                              <span>Share on WhatsApp</span>
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Qualification Criteria Cards (2 Core Rules) */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '18px' }}>
+                        {/* Rule 1: Monthly Personal Purchase */}
+                        <div
+                          style={{
+                            background: '#FFFFFF',
+                            borderRadius: '20px',
+                            border: `1.5px solid ${isSpendQualified ? '#86EFAC' : '#FCD34D'}`,
+                            padding: '22px',
+                            boxShadow: '0 4px 16px rgba(7, 27, 82, 0.04)',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>
+                              Rule 1: Monthly Personal Purchase
+                            </span>
+                            <span
+                              style={{
+                                background: isSpendQualified ? '#DCFCE7' : '#FEF3C7',
+                                color: isSpendQualified ? '#15803D' : '#B45309',
+                                fontSize: '0.75rem',
+                                fontWeight: 800,
+                                padding: '3px 10px',
+                                borderRadius: '20px',
+                              }}
+                            >
+                              {isSpendQualified ? '✅ Qualified' : '❌ Need ₹2,000'}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '1.7rem', fontWeight: 900, color: isSpendQualified ? '#15803D' : '#071B52' }}>
+                            ₹{monthlySpend.toLocaleString('en-IN')} <span style={{ fontSize: '0.95rem', color: '#64748B', fontWeight: 600 }}>/ ₹2,000</span>
+                          </div>
+                          {/* Progress bar */}
+                          <div style={{ width: '100%', height: '8px', background: '#F1F5F9', borderRadius: '4px', overflow: 'hidden', margin: '12px 0 8px' }}>
+                            <div
+                              style={{
+                                width: `${Math.min(100, Math.round((monthlySpend / 2000) * 100))}%`,
+                                height: '100%',
+                                background: isSpendQualified ? '#16A34A' : '#F59E0B',
+                                borderRadius: '4px',
+                                transition: 'width 0.3s ease',
+                              }}
+                            />
+                          </div>
+                          <p style={{ fontSize: '0.78rem', color: '#64748B', margin: 0, lineHeight: 1.4 }}>
+                            {isSpendQualified
+                              ? 'Your personal grocery/veg orders meet the minimum monthly requirement!'
+                              : `Shop for ₹${Math.max(0, 2000 - monthlySpend).toLocaleString('en-IN')} more this month to activate your level income eligibility.`}
+                          </p>
+                        </div>
+
+                        {/* Rule 2: Minimum 5 Direct Active */}
+                        <div
+                          style={{
+                            background: '#FFFFFF',
+                            borderRadius: '20px',
+                            border: `1.5px solid ${isDirectQualified ? '#86EFAC' : '#FCD34D'}`,
+                            padding: '22px',
+                            boxShadow: '0 4px 16px rgba(7, 27, 82, 0.04)',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>
+                              Rule 2: Direct Active Downline
+                            </span>
+                            <span
+                              style={{
+                                background: isDirectQualified ? '#DCFCE7' : '#FEF3C7',
+                                color: isDirectQualified ? '#15803D' : '#B45309',
+                                fontSize: '0.75rem',
+                                fontWeight: 800,
+                                padding: '3px 10px',
+                                borderRadius: '20px',
+                              }}
+                            >
+                              {isDirectQualified ? '✅ Qualified' : `❌ ${directActiveCount}/5 Members`}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '1.7rem', fontWeight: 900, color: isDirectQualified ? '#15803D' : '#071B52' }}>
+                            {directActiveCount} <span style={{ fontSize: '0.95rem', color: '#64748B', fontWeight: 600 }}>/ 5 Active Directs</span>
+                          </div>
+                          {/* Progress bar */}
+                          <div style={{ width: '100%', height: '8px', background: '#F1F5F9', borderRadius: '4px', overflow: 'hidden', margin: '12px 0 8px' }}>
+                            <div
+                              style={{
+                                width: `${Math.min(100, Math.round((directActiveCount / 5) * 100))}%`,
+                                height: '100%',
+                                background: isDirectQualified ? '#16A34A' : '#F59E0B',
+                                borderRadius: '4px',
+                                transition: 'width 0.3s ease',
+                              }}
+                            />
+                          </div>
+                          <p style={{ fontSize: '0.78rem', color: '#64748B', margin: 0, lineHeight: 1.4 }}>
+                            {isDirectQualified
+                              ? 'You have 5 or more active direct team members placing monthly orders!'
+                              : `Refer ${Math.max(0, 5 - directActiveCount)} more active friends to unlock all 7 downline commission levels.`}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Overall Status Banner */}
+                      <div
+                        style={{
+                          background: isOverallQualified ? '#F0FDF4' : '#FFFBEB',
+                          border: `1.5px solid ${isOverallQualified ? '#BBF7D0' : '#FDE68A'}`,
+                          borderRadius: '16px',
+                          padding: '16px 20px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                        }}
+                      >
+                        <span style={{ fontSize: '1.5rem' }}>{isOverallQualified ? '🏆' : '💡'}</span>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 800, fontSize: '0.92rem', color: isOverallQualified ? '#166534' : '#92400E' }}>
+                            {isOverallQualified
+                              ? '100% Qualified for Downline Income Payouts!'
+                              : 'Level Qualification Notice'}
+                          </div>
+                          <div style={{ fontSize: '0.8rem', color: isOverallQualified ? '#15803D' : '#78350F', marginTop: '2px' }}>
+                            {isOverallQualified
+                              ? 'Both personal spend (≥ ₹2k) and 5 direct active requirements are fulfilled. Your daily level earnings are credited to your Available Wallet automatically.'
+                              : 'To withdraw or spend downline commissions, please ensure your monthly purchases reach ₹2,000 and you have at least 5 active direct referrals.'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* KPI Summary Grid */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+                        <div style={{ background: '#FFFFFF', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '18px' }}>
+                          <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>Total Downline Team</div>
+                          <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#071B52', margin: '6px 0 2px' }}>
+                            {(teamSummary.totalTeamSize ?? 0).toLocaleString('en-IN')}
+                          </div>
+                          <div style={{ fontSize: '0.76rem', color: '#16A34A', fontWeight: 700 }}>Across 7 Levels</div>
+                        </div>
+
+                        <div style={{ background: '#FFFFFF', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '18px' }}>
+                          <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>Active Members</div>
+                          <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#15803D', margin: '6px 0 2px' }}>
+                            {(teamSummary.totalActiveMembers ?? 0).toLocaleString('en-IN')}
+                          </div>
+                          <div style={{ fontSize: '0.76rem', color: '#64748B', fontWeight: 600 }}>Shopping this month</div>
+                        </div>
+
+                        <div style={{ background: '#FFFFFF', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '18px' }}>
+                          <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>Vegetable GMV 🥬</div>
+                          <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#0284C7', margin: '6px 0 2px' }}>
+                            ₹{(teamSummary.totalVegGmv ?? 0).toLocaleString('en-IN')}
+                          </div>
+                          <div style={{ fontSize: '0.76rem', color: '#0284C7', fontWeight: 700 }}>Fresh Produce Turnover</div>
+                        </div>
+
+                        <div style={{ background: '#FFFFFF', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '18px' }}>
+                          <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>Est. Monthly Income</div>
+                          <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#7C3AED', margin: '6px 0 2px' }}>
+                            ₹{(teamSummary.estimatedMonthlyLevelIncome ?? 0).toLocaleString('en-IN')}
+                          </div>
+                          <div style={{ fontSize: '0.76rem', color: '#7C3AED', fontWeight: 700 }}>Calculated from GMV</div>
+                        </div>
+                      </div>
+
+                      {/* 7-Level Downline Breakdown Table */}
+                      <div style={{ background: '#FFFFFF', borderRadius: '20px', border: '1px solid #E2E8F0', overflow: 'hidden' }}>
+                        <div style={{ padding: '20px 24px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#071B52', margin: 0 }}>
+                              7-Level Hierarchy Breakdown
+                            </h3>
+                            <p style={{ fontSize: '0.8rem', color: '#64748B', margin: '2px 0 0' }}>
+                              Level percentages are applied to vegetable GMV and other product turnover
+                            </p>
+                          </div>
+                          <span style={{ fontSize: '0.78rem', background: '#EFF6FF', color: '#1D4ED8', padding: '4px 10px', borderRadius: '12px', fontWeight: 700 }}>
+                            7 Levels Active
+                          </span>
+                        </div>
+
+                        <div style={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
+                            <thead>
+                              <tr style={{ background: '#F8FAFC', color: '#475569', fontWeight: 800, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                <th style={{ padding: '14px 20px' }}>Level</th>
+                                <th style={{ padding: '14px 16px' }}>Total Members</th>
+                                <th style={{ padding: '14px 16px' }}>Active Shoppers</th>
+                                <th style={{ padding: '14px 16px' }}>Veg GMV 🥬</th>
+                                <th style={{ padding: '14px 16px' }}>Other GMV 🛒</th>
+                                <th style={{ padding: '14px 16px' }}>Commission %</th>
+                                <th style={{ padding: '14px 20px', textAlign: 'right' }}>Est. Income</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {levelRows.map((lvl, idx) => (
+                                <tr
+                                  key={lvl.level || idx + 1}
+                                  style={{
+                                    borderBottom: idx === levelRows.length - 1 ? 'none' : '1px solid #F1F5F9',
+                                    transition: 'background 0.15s ease',
+                                  }}
+                                >
+                                  <td style={{ padding: '14px 20px', fontWeight: 800, color: '#071B52' }}>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                      <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#EFF6FF', color: '#1D4ED8', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 900 }}>
+                                        {lvl.level || idx + 1}
+                                      </span>
+                                      <span>Level {lvl.level || idx + 1}</span>
+                                    </span>
+                                  </td>
+                                  <td style={{ padding: '14px 16px', color: '#1E293B', fontWeight: 700 }}>
+                                    {(lvl.totalMembers ?? 0).toLocaleString('en-IN')}
+                                  </td>
+                                  <td style={{ padding: '14px 16px' }}>
+                                    <span style={{ color: (lvl.activeMembers ?? 0) > 0 ? '#15803D' : '#94A3B8', fontWeight: 700 }}>
+                                      {(lvl.activeMembers ?? 0).toLocaleString('en-IN')}
+                                    </span>
+                                  </td>
+                                  <td style={{ padding: '14px 16px', color: '#0284C7', fontWeight: 700 }}>
+                                    ₹{(lvl.vegGmv ?? 0).toLocaleString('en-IN')}
+                                  </td>
+                                  <td style={{ padding: '14px 16px', color: '#475569', fontWeight: 600 }}>
+                                    ₹{(lvl.otherGmv ?? 0).toLocaleString('en-IN')}
+                                  </td>
+                                  <td style={{ padding: '14px 16px' }}>
+                                    <span style={{ background: '#FDF2F8', color: '#BE185D', padding: '3px 8px', borderRadius: '8px', fontWeight: 800, fontSize: '0.78rem' }}>
+                                      {lvl.percentage ?? (idx === 0 ? 5 : idx === 1 ? 3 : idx === 2 ? 2 : idx < 5 ? 1 : 0.5)}%
+                                    </span>
+                                  </td>
+                                  <td style={{ padding: '14px 20px', textAlign: 'right', fontWeight: 900, color: (lvl.potentialIncome ?? 0) > 0 ? '#15803D' : '#64748B' }}>
+                                    ₹{(lvl.potentialIncome ?? 0).toLocaleString('en-IN')}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* Transparent Policy Footer */}
+                      <div style={{ background: '#F8FAFC', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '18px 22px', fontSize: '0.8rem', color: '#64748B', lineHeight: 1.5 }}>
+                        <div style={{ fontWeight: 800, color: '#071B52', marginBottom: '4px' }}>
+                          📌 Important SRS Compensation Rules
+                        </div>
+                        <div>
+                          • All level calculations settle daily at midnight based on delivered customer orders.
+                        </div>
+                        <div>
+                          • To receive downline commissions for any calendar month, the customer must maintain at least ₹2,000 in personal monthly spend (including fresh produce) and have 5 direct active customers.
+                        </div>
+                        <div>
+                          • Withdrawals can be requested once your Available Income reaches ₹600 or more.
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             )}
 
@@ -1829,6 +2365,171 @@ export const Account: React.FC = () => {
                   }}
                 >
                   {isVerifyingAadhaar ? 'Verifying with Government Records...' : 'Verify & Unlock Benefits'}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Income Withdrawal Modal */}
+      {isWithdrawModalOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(7, 27, 82, 0.65)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 99999,
+            padding: '20px',
+          }}
+        >
+          <div
+            style={{
+              background: '#FFFFFF',
+              borderRadius: '24px',
+              padding: '32px',
+              maxWidth: '480px',
+              width: '100%',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.25)',
+              position: 'relative',
+            }}
+          >
+            <button
+              onClick={() => setIsWithdrawModalOpen(false)}
+              style={{
+                position: 'absolute',
+                top: '20px',
+                right: '20px',
+                background: '#F1F5F9',
+                border: 'none',
+                borderRadius: '50%',
+                width: '36px',
+                height: '36px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              <X size={18} color="#64748B" />
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: '#DCFCE7', color: '#15803D', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Wallet size={24} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '1.3rem', fontWeight: 900, color: '#071B52', margin: 0 }}>
+                  Withdraw Available Balance
+                </h3>
+                <p style={{ fontSize: '0.82rem', color: '#64748B', margin: 0 }}>
+                  Direct payout to your verified Bank Account or UPI
+                </p>
+              </div>
+            </div>
+
+            <div style={{ background: '#F8FAFC', borderRadius: '16px', padding: '14px 18px', border: '1px solid #E2E8F0', marginBottom: '18px' }}>
+              <div style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: 700, textTransform: 'uppercase' }}>
+                Available For Withdrawal
+              </div>
+              <div style={{ fontSize: '1.8rem', fontWeight: 900, color: '#047857' }}>
+                ₹{Number(user?.availableIncome ?? 0).toLocaleString('en-IN')}
+              </div>
+              <div style={{ fontSize: '0.74rem', color: '#64748B', marginTop: '2px' }}>
+                Policy: Minimum payout request is ₹600.
+              </div>
+            </div>
+
+            {withdrawSuccess ? (
+              <div style={{ textAlign: 'center', padding: '20px 10px' }}>
+                <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>🎉</div>
+                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#15803D', marginBottom: '6px' }}>
+                  Request Submitted Successfully!
+                </div>
+                <p style={{ fontSize: '0.84rem', color: '#64748B', margin: 0 }}>
+                  {withdrawSuccess}
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={handleWithdrawSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: '#071B52', marginBottom: '6px', textTransform: 'uppercase' }}>
+                    Withdrawal Amount (₹) *
+                  </label>
+                  <input
+                    type="number"
+                    min="600"
+                    max={Number(user?.availableIncome ?? 0)}
+                    step="1"
+                    placeholder="e.g. 1000 (Min ₹600)"
+                    value={withdrawAmount}
+                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      borderRadius: '12px',
+                      border: '1.5px solid #CBD5E1',
+                      fontSize: '1rem',
+                      fontWeight: 700,
+                      outline: 'none',
+                    }}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 800, color: '#071B52', marginBottom: '6px', textTransform: 'uppercase' }}>
+                    Bank Account / IFSC or UPI ID *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. yourname@okhdfcbank or 1234567890 (HDFC0001234)"
+                    value={withdrawBankInput}
+                    onChange={(e) => setWithdrawBankInput(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      borderRadius: '12px',
+                      border: '1.5px solid #CBD5E1',
+                      fontSize: '0.92rem',
+                      fontWeight: 600,
+                      outline: 'none',
+                    }}
+                    required
+                  />
+                </div>
+
+                {withdrawError && (
+                  <div style={{ padding: '10px 14px', borderRadius: '10px', background: '#FEF2F2', border: '1px solid #FCA5A5', color: '#DC2626', fontSize: '0.82rem', fontWeight: 700 }}>
+                    {withdrawError}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isSubmittingWithdraw || !withdrawAmount || !withdrawBankInput}
+                  style={{
+                    background: isSubmittingWithdraw ? '#94A3B8' : 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '14px',
+                    padding: '14px',
+                    fontWeight: 800,
+                    fontSize: '0.96rem',
+                    cursor: isSubmittingWithdraw ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 6px 20px rgba(5, 150, 105, 0.35)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                  }}
+                >
+                  {isSubmittingWithdraw && <Loader2 size={18} className="animate-spin" />}
+                  <span>{isSubmittingWithdraw ? 'Submitting Request...' : 'Submit Withdrawal Request'}</span>
                 </button>
               </form>
             )}

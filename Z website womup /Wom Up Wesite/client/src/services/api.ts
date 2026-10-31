@@ -1104,3 +1104,47 @@ export const AddressApi = {
   },
 };
 
+export interface TeamLevelStat {
+  level: number;
+  totalMembers: number;
+  activeMembers: number;
+  vegGmv: number;
+  otherGmv: number;
+  percentage: number;
+  potentialIncome: number;
+}
+
+export interface CustomerTeamDashboardResponse {
+  personalStatus?: {
+    monthlyPurchaseValue?: number;
+    direct5ActiveCount?: number;
+    isQualified?: boolean;
+    qualificationSummary?: string;
+  };
+  teamSummary?: {
+    totalTeamSize?: number;
+    totalActiveMembers?: number;
+    totalGmv?: number;
+    totalVegGmv?: number;
+    totalOtherGmv?: number;
+    estimatedMonthlyLevelIncome?: number;
+  };
+  levelBreakdown?: TeamLevelStat[];
+}
+
+export const getCustomerTeamDashboard = async (): Promise<{
+  success: boolean;
+  data?: CustomerTeamDashboardResponse;
+  message?: string;
+}> => {
+  return api.get<CustomerTeamDashboardResponse>('/users/team-dashboard');
+};
+
+export const submitCustomerWithdrawal = async (
+  amount: number,
+  destination: { bankAccount?: string; ifsc?: string; upiId?: string; notes?: string }
+): Promise<{ success: boolean; data?: any; message?: string }> => {
+  return api.post('/users/withdraw-income', { amount, ...destination });
+};
+
+

@@ -23,6 +23,8 @@ import {
   X,
   Plus,
   FileText,
+  Layers,
+  RefreshCw,
   Eye,
 } from 'lucide-react';
 import { useAdmin } from '../context/AdminContext';
@@ -56,7 +58,10 @@ export const CustomersPage: React.FC = () => {
 
   // Customer Profile & Edit Modal State (100% App Parity with EditCustomerModal)
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [customerProfileTab, setCustomerProfileTab] = useState<'OVERVIEW' | 'KYC'>('OVERVIEW');
+  const [customerProfileTab, setCustomerProfileTab] = useState<'OVERVIEW' | 'KYC' | 'TEAM_MLM'>('OVERVIEW');
+  const [teamDashboardData, setTeamDashboardData] = useState<any>(null);
+  const [loadingTeam, setLoadingTeam] = useState(false);
+  const [expandedLevels, setExpandedLevels] = useState<{ [key: number]: boolean }>({ 1: true });
   const [showCustomerEditModal, setShowCustomerEditModal] = useState(false);
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
   const [editCustName, setEditCustName] = useState('');
@@ -252,7 +257,7 @@ export const CustomersPage: React.FC = () => {
     setIsEditingRider(false);
   };
 
-  const handleOpenCustomerModal = (c: Customer, tab: 'OVERVIEW' | 'KYC' = 'OVERVIEW') => {
+  const handleOpenCustomerModal = async (c: Customer, tab: 'OVERVIEW' | 'KYC' | 'TEAM_MLM' = 'OVERVIEW') => {
     setSelectedCustomer(c);
     setCustomerProfileTab(tab);
     setIsEditingCustomer(false);
@@ -261,6 +266,25 @@ export const CustomersPage: React.FC = () => {
     setEditCustZone(c.zoneName || 'Prahlad Nagar');
     setEditCustAddress(c.address || '');
     setEditCustStatus(c.status === 'Blocked' ? 'Blocked' : 'Active');
+
+    if (tab === 'TEAM_MLM') {
+      fetchCustomerTeam(c.id || (c as any)._id);
+    }
+  };
+
+  const fetchCustomerTeam = async (customerId: string) => {
+    setLoadingTeam(true);
+    setTeamDashboardData(null);
+    try {
+      const res = await AdminApiService.getCustomerTeamDashboard(customerId);
+      if (res?.success && res.data) {
+        setTeamDashboardData(res.data);
+      }
+    } catch (e) {
+      console.error('Error fetching team dashboard:', e);
+    } finally {
+      setLoadingTeam(false);
+    }
   };
 
   const handleSaveCustomerEdit = async () => {
@@ -681,6 +705,15 @@ export const CustomersPage: React.FC = () => {
                             <span>Profile</span>
                           </button>
                           <button
+                            onClick={() => handleOpenCustomerModal(c, 'TEAM_MLM')}
+                            className="btn btn-secondary btn-sm"
+                            title="Inspect 7-Level MLM Team & GMV"
+                            style={{ color: '#4F46E5', fontWeight: 800 }}
+                          >
+                            <Layers size={13} style={{ marginRight: '3px' }} />
+                            <span>Team</span>
+                          </button>
+                          <button
                             onClick={() => handleOpenCustomerModal(c, 'KYC')}
                             className="btn btn-secondary btn-sm"
                             title="Review Aadhaar KYC Documents"
@@ -985,6 +1018,30 @@ export const CustomersPage: React.FC = () => {
                   {selectedCustomer.kycStatus || 'Pending'}
                 </span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setCustomerProfileTab('TEAM_MLM');
+                  fetchCustomerTeam(selectedCustomer.id || (selectedCustomer as any)._id);
+                }}
+                style={{
+                  padding: '12px 16px',
+                  background: 'none',
+                  border: 'none',
+                  borderBottom: customerProfileTab === 'TEAM_MLM' ? '3px solid #1D4ED8' : '3px solid transparent',
+                  color: customerProfileTab === 'TEAM_MLM' ? '#1D4ED8' : '#64748B',
+                  fontWeight: 800,
+                  fontSize: '0.84rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <Layers size={15} color="#4F46E5" />
+                <span>7-Level MLM Downline</span>
+              </button>
             </div>
 
             {/* MODAL BODY */}
@@ -1119,7 +1176,7 @@ export const CustomersPage: React.FC = () => {
                     </button>
                   </div>
                 </div>
-              ) : (
+              ) : customerProfileTab === 'KYC' ? (
                 /* KYC TAB CONTENT WITH AADHAAR IMAGES & ACTIONS */
                 <KYCTab
                   customer={selectedCustomer}
@@ -1131,6 +1188,93 @@ export const CustomersPage: React.FC = () => {
                     refreshData();
                   }}
                 />
+              ) : (
+                /* ── 7-LEVEL MLM TEAM DASHBOARD CONTENT ── */
+                <div>
+                  {loadingTeam ? (
+                    <div style={{ padding: '50px 0', textAlign: 'center', color: '#64748B' }}>
+                      <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 10px' }} />
+                      <p style={{ fontSize: '0.86rem', fontWeight: 600 }}>Calculating 7-level GMV & qualifications...</p>
+                    </div>
+                  ) : !teamDashboardData ? (
+                    <div style={{ padding: '40px 0', textAlign: 'center', color: '#64748B' }}>
+                      <Layers size={36} color="#94A3B8" style={{ margin: '0 auto 10px' }} />
+                      <p style={{ fontWeight: 600 }}>No downline network records found for this customer.</p>
+                    </div>
+                  ) : (
+                    <div>
+                      {/* Qualification Banner */}
+                      <div
+                        style={{
+                          padding: '14px 18px',
+                          borderRadius: '12px',
+                          marginBottom: '16px',
+                          backgroundColor: teamDashboardData.personalStatus?.isEligibleForTeamIncome ? '#ECFDF5' : '#FEF2F2',
+                          border: `1px solid ${teamDashboardData.personalStatus?.isEligibleForTeamIncome ? '#A7F3D0' : '#FECACA'}`,
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <div>
+                          <strong style={{ color: teamDashboardData.personalStatus?.isEligibleForTeamIncome ? '#065F46' : '#991B1B', fontSize: '0.90rem' }}>
+                            {teamDashboardData.personalStatus?.isEligibleForTeamIncome ? '✅ 7-Level Income Eligible' : '⚠️ Not Eligible for Team Income'}
+                          </strong>
+                          <div style={{ fontSize: '0.78rem', color: '#64748B', marginTop: '2px' }}>
+                            Rule: Personal Purchase ≥ ₹2,000 & 5 Direct Active members required each month.
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <span style={{ fontSize: '0.74rem', color: '#64748B' }}>Total Downline:</span>
+                          <strong style={{ display: 'block', fontSize: '1.1rem', color: '#071B52' }}>
+                            {teamDashboardData.teamSummary?.totalTeamMembers || 0} Members
+                          </strong>
+                        </div>
+                      </div>
+
+                      {/* Level by Level Breakdown Table */}
+                      <div className="admin-table-container">
+                        <table className="admin-table">
+                          <thead>
+                            <tr>
+                              <th>Level</th>
+                              <th>Total Members</th>
+                              <th>Active (≥₹2k)</th>
+                              <th>Vegetable GMV</th>
+                              <th>Other GMV</th>
+                              <th>Potential Earnings</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(teamDashboardData.levelBreakdown || [1, 2, 3, 4, 5, 6, 7].map((lvl: number) => ({
+                              level: lvl,
+                              memberCount: 0,
+                              activeMemberCount: 0,
+                              vegetableGMV: 0,
+                              otherGMV: 0,
+                              incomeEarned: 0,
+                            }))).map((row: any) => (
+                              <tr key={row.level}>
+                                <td style={{ fontWeight: 800, color: '#4F46E5' }}>L{row.level}</td>
+                                <td>{row.memberCount}</td>
+                                <td>
+                                  <span className={`badge ${row.activeMemberCount > 0 ? 'badge-emerald' : 'badge-navy'}`}>
+                                    {row.activeMemberCount}
+                                  </span>
+                                </td>
+                                <td>₹{(row.vegetableGMV || 0).toLocaleString()}</td>
+                                <td>₹{(row.otherGMV || 0).toLocaleString()}</td>
+                                <td style={{ fontWeight: 800, color: '#059669' }}>
+                                  ₹{(row.incomeEarned || 0).toLocaleString()}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 

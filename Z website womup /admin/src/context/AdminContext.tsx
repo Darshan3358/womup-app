@@ -18,6 +18,7 @@ import { AdminApiService, LiveDbData } from '../services/api';
 
 export type AdminTab =
   | 'Dashboard'
+  | 'ApprovalHub'
   | 'Orders'
   | 'Stores'
   | 'Vendors'

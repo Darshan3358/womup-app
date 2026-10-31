@@ -5,6 +5,7 @@ import { TopNavbar } from './components/layout/TopNavbar';
 
 // Pages
 import { DashboardPage } from './pages/DashboardPage';
+import { ApprovalHubPage } from './pages/ApprovalHubPage';
 import { StoresPage } from './pages/StoresPage';
 import { OrdersPage } from './pages/OrdersPage';
 import { InventoryPage } from './pages/InventoryPage';
@@ -32,6 +33,8 @@ const AdminPortalContent: React.FC = () => {
     switch (activeTab) {
       case 'Dashboard':
         return <DashboardPage />;
+      case 'ApprovalHub':
+        return <ApprovalHubPage />;
       case 'Vendors':
         return <VendorsPage />;
       case 'Stores':

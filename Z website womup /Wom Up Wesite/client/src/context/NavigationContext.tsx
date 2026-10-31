@@ -43,14 +43,14 @@ interface NavigationContextType {
   currentPage: PageRoute;
   selectedCategorySlug: string;
   selectedProduct: Product | null;
-  accountActiveTab: 'profile' | 'orders' | 'wallet' | 'addresses' | 'coins' | 'notifications' | 'settings';
-  setAccountActiveTab: (tab: 'profile' | 'orders' | 'wallet' | 'addresses' | 'coins' | 'notifications' | 'settings') => void;
+  accountActiveTab: 'profile' | 'orders' | 'wallet' | 'addresses' | 'coins' | 'notifications' | 'settings' | 'team';
+  setAccountActiveTab: (tab: 'profile' | 'orders' | 'wallet' | 'addresses' | 'coins' | 'notifications' | 'settings' | 'team') => void;
   navigateTo: (
     page: PageRoute,
     params?: {
       categorySlug?: string;
       product?: Product;
-      accountTab?: 'profile' | 'orders' | 'wallet' | 'addresses' | 'coins' | 'notifications' | 'settings';
+      accountTab?: 'profile' | 'orders' | 'wallet' | 'addresses' | 'coins' | 'notifications' | 'settings' | 'team';
     }
   ) => void;
   searchQuery: string;
@@ -99,7 +99,7 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [selectedCategorySlug, setSelectedCategorySlug] = useState<string>('all');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [accountActiveTab, setAccountActiveTab] = useState<
-    'profile' | 'orders' | 'wallet' | 'addresses' | 'coins' | 'notifications' | 'settings'
+    'profile' | 'orders' | 'wallet' | 'addresses' | 'coins' | 'notifications' | 'settings' | 'team'
   >('orders');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -438,7 +438,7 @@ export const NavigationProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     params?: {
       categorySlug?: string;
       product?: Product;
-      accountTab?: 'profile' | 'orders' | 'wallet' | 'addresses' | 'coins' | 'notifications' | 'settings';
+      accountTab?: 'profile' | 'orders' | 'wallet' | 'addresses' | 'coins' | 'notifications' | 'settings' | 'team';
     }
   ) => {
     setCurrentPage(page);
