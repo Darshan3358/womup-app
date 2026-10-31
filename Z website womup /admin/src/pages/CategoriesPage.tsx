@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useAdmin } from '../context/AdminContext';
 import { CategoryItem } from '../types/admin';
+import { API_BASE_URL } from '../services/api';
 
 // Curated high-res grocery category images for quick 1-click presets
 const IMAGE_PRESETS = [
@@ -190,7 +191,7 @@ export const CategoriesPage: React.FC = () => {
     setSubmittingSub(true);
     try {
       const catId = selectedCatForSub.id || selectedCatForSub._id;
-      await fetch(`http://localhost:5001/api/categories/${catId}/subcategories`, {
+      await fetch(`${API_BASE_URL}/api/categories/${catId}/subcategories`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -212,7 +213,7 @@ export const CategoriesPage: React.FC = () => {
     if (!window.confirm(`Delete subcategory "${subName}" from ${cat.name}?`)) return;
     try {
       const catId = cat.id || cat._id;
-      await fetch(`http://localhost:5001/api/categories/${catId}/subcategories/${subId}`, {
+      await fetch(`${API_BASE_URL}/api/categories/${catId}/subcategories/${subId}`, {
         method: 'DELETE',
       });
       await refreshData();

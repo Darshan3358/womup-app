@@ -13,7 +13,7 @@ import {
   Image as ImageIcon,
 } from 'lucide-react';
 import { useAdmin } from '../../context/AdminContext';
-import { AdminApiService } from '../../services/api';
+import { AdminApiService, API_BASE_URL } from '../../services/api';
 
 interface FormVariant {
   id: string;
@@ -182,7 +182,7 @@ export const EditProductModal: React.FC = () => {
       setErrorMsg(null);
       const formData = new FormData();
       formData.append('file', file);
-      const uploadRes = await fetch('http://localhost:5001/api/media/upload?folder=wormup/products', {
+      const uploadRes = await fetch(`${API_BASE_URL}/api/media/upload?folder=wormup/products`, {
         method: 'POST',
         body: formData,
       });

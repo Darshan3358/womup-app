@@ -1,18 +1,11 @@
 import type { Product, Category, HeroBanner, HomeSection, ResolvedLocation, Order, ProductVariant, CartItem } from '../types';
 import { io, Socket } from 'socket.io-client';
 
-// Detect whether running in localhost browser
-const isLocal =
-  typeof window !== 'undefined' &&
-  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-
 export const API_BASE =
-  (import.meta.env.VITE_API_BASE as string) ||
-  (isLocal ? 'http://localhost:5050/api/v1' : 'https://womup-app-uquz.onrender.com/api/v1');
+  (import.meta.env.VITE_API_BASE as string) || 'https://womup-app-uquz.onrender.com/api/v1';
 
 export const TRACKING_WS_URL =
-  (import.meta.env.VITE_TRACKING_WS as string) ||
-  (isLocal ? 'http://localhost:5050/tracking' : 'https://womup-app-uquz.onrender.com/tracking');
+  (import.meta.env.VITE_TRACKING_WS as string) || 'https://womup-app-uquz.onrender.com/tracking';
 
 let tokenRefreshPromise: Promise<string | null> | null = null;
 

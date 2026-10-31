@@ -20,8 +20,7 @@ import {
   Check,
 } from 'lucide-react';
 import { VendorAdminItem, VendorCategoryItem } from '../types/admin';
-
-const NEST_API_BASE_URL = 'http://localhost:5050/api/v1';
+import { NEST_API_BASE_URL } from '../services/api';
 
 export const VendorsPage: React.FC = () => {
   const [vendors, setVendors] = useState<VendorAdminItem[]>([]);

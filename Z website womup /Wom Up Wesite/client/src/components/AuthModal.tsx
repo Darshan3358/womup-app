@@ -13,6 +13,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { useAuth, type CityItem } from '../context/AuthContext';
+import { API_BASE } from '../services/api';
 
 export const AuthModal: React.FC = () => {
   const {
@@ -92,7 +93,7 @@ export const AuthModal: React.FC = () => {
       setCustomGoogleName('');
 
       // Check Registration Timing (6 AM to 10 PM IST)
-      fetch('http://localhost:5050/api/v1/auth/registration-timing')
+      fetch(`${API_BASE}/auth/registration-timing`)
         .then((res) => res.json())
         .then((data) => {
           if (data?.data && data.data.allowed === false) {
@@ -142,7 +143,7 @@ export const AuthModal: React.FC = () => {
     setPincodeStatus((prev) => ({ ...prev, isChecking: true }));
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`http://localhost:5050/api/v1/auth/check-pincode?pin=${cleanPin}`);
+        const res = await fetch(`${API_BASE}/auth/check-pincode?pin=${cleanPin}`);
         const data = await res.json();
         if (data?.data?.isAvailable) {
           setPincodeStatus({
@@ -177,7 +178,7 @@ export const AuthModal: React.FC = () => {
     setSponsorValidation({ isChecking: true, isValid: null });
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`http://localhost:5050/api/v1/auth/validate-sponsor?code=${clean}`);
+        const res = await fetch(`${API_BASE}/auth/validate-sponsor?code=${clean}`);
         const data = await res.json();
         if (data?.data?.isValid) {
           setSponsorValidation({

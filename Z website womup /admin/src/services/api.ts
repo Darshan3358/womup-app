@@ -16,25 +16,13 @@ import type {
 } from '../types/admin';
 
 const getApiBaseUrl = () => {
-  if (typeof window !== 'undefined' && window.location) {
-    const host = window.location.hostname;
-    if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') {
-      return 'http://localhost:5001';
-    }
-  }
-  return 'https://womup-admin-backend.onrender.com';
+  return (import.meta.env.VITE_ADMIN_API_BASE as string) || 'https://womup-app-uquz.onrender.com';
 };
 
 export const API_BASE_URL = getApiBaseUrl();
 
 const getNestApiBaseUrl = () => {
-  if (typeof window !== 'undefined' && window.location) {
-    const host = window.location.hostname;
-    if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') {
-      return 'http://localhost:5050/api/v1';
-    }
-  }
-  return 'https://womup-app-uquz.onrender.com/api/v1';
+  return (import.meta.env.VITE_NEST_API_BASE as string) || 'https://womup-app-uquz.onrender.com/api/v1';
 };
 
 export const NEST_API_BASE_URL = getNestApiBaseUrl();

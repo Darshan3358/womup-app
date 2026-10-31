@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Star, Heart, CheckCircle2 } from 'lucide-react';
+import { API_BASE } from '../services/api';
 
 export interface RiderInfo {
   id: string;
@@ -57,7 +58,7 @@ export const RiderReviewModal: React.FC<RiderReviewModalProps> = ({
     setIsSubmitting(true);
     try {
       const res = await fetch(
-        `http://localhost:5050/api/v1/orders/${encodeURIComponent(orderId)}/rate-rider`,
+        `${API_BASE}/orders/${encodeURIComponent(orderId)}/rate-rider`,
         {
           method: 'POST',
           headers: {
