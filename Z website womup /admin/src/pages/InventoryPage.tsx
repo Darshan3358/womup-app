@@ -40,6 +40,8 @@ export const InventoryPage: React.FC = () => {
     setSelectedCityFilter: setSelectedCityId,
     selectedAreaFilter: selectedAreaId,
     setSelectedAreaFilter: setSelectedAreaId,
+    selectedStoreFilter,
+    setSelectedStoreFilter,
   } = useAdmin();
 
   // Tabs: All Items, Low Stock, Expired / Out of Stock
@@ -133,19 +135,42 @@ export const InventoryPage: React.FC = () => {
     };
   };
 
-  // 3. Auto-Resolve the ONE 1:1 Dark Store assigned to this area
-  const resolvedStore =
-    stores.find((s) => {
-      if (selectedAreaId !== 'ALL' && currentArea) {
-        if (s.areaId && (s.areaId === currentArea.id || s.areaId === currentArea._id)) return true;
-        if (s.areaName && s.areaName.toLowerCase() === currentArea.name.toLowerCase()) return true;
-      }
+  // 3. Resolve all stores operating in the selected area
+  const storesInSelectedArea = React.useMemo(() => {
+    if (selectedAreaId === 'ALL' || !currentArea) {
+      if (!currentCity) return stores;
+      return stores.filter(
+        (s) =>
+          s.cityName?.toLowerCase() === currentCity.name.toLowerCase() ||
+          s.cityId === currentCity.id ||
+          s.cityId === currentCity._id
+      );
+    }
+    const aId = currentArea.id || currentArea._id;
+    return stores.filter((s) => {
+      if (s.areaId && aId && String(s.areaId) === String(aId)) return true;
+      if (s.areaName && currentArea.name && s.areaName.toLowerCase() === currentArea.name.toLowerCase()) return true;
       return false;
-    }) ||
-    stores.find((s) => s.cityName?.toLowerCase() === currentCity?.name?.toLowerCase()) ||
-    stores[0];
+    });
+  }, [stores, selectedAreaId, currentArea, currentCity]);
 
-  const currentStoreName = resolvedStore ? resolvedStore.name : 'Wom Up Ahmedabad Central Dark Store';
+  // Active Store: If user selected a specific store in the dropdown, lock to that store
+  const resolvedStore = React.useMemo(() => {
+    if (selectedStoreFilter && selectedStoreFilter !== 'ALL') {
+      const found = storesInSelectedArea.find(
+        (s) => (s.id || s._id) === selectedStoreFilter || s.name === selectedStoreFilter
+      );
+      if (found) return found;
+    }
+    return storesInSelectedArea[0] || stores[0];
+  }, [storesInSelectedArea, selectedStoreFilter, stores]);
+
+  const currentStoreName =
+    selectedStoreFilter === 'ALL' && storesInSelectedArea.length > 1
+      ? `All Stores in ${currentArea?.name || 'Area'} (${storesInSelectedArea.length} Hubs)`
+      : resolvedStore
+      ? resolvedStore.name
+      : 'Wom Up Central Dark Store';
 
   // Stock calculations
   const totalStockKg = products.reduce((sum, p) => {
@@ -333,7 +358,7 @@ export const InventoryPage: React.FC = () => {
           gap: '14px',
         }}
       >
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px' }}>
           {/* STEP 1: CITY */}
           <div>
             <label
@@ -356,6 +381,7 @@ export const InventoryPage: React.FC = () => {
               onChange={(e) => {
                 setSelectedCityId(e.target.value);
                 setSelectedAreaId('ALL');
+                setSelectedStoreFilter('ALL');
               }}
               className="form-select"
               style={{ fontWeight: 700, color: '#071B52' }}
@@ -383,11 +409,14 @@ export const InventoryPage: React.FC = () => {
               }}
             >
               <Navigation size={13} color="#0D9488" />
-              <span>STEP 2: SELECT AREA (1:1 STORE LOCK)</span>
+              <span>STEP 2: SELECT AREA / ZONE</span>
             </label>
             <select
               value={selectedAreaId}
-              onChange={(e) => setSelectedAreaId(e.target.value)}
+              onChange={(e) => {
+                setSelectedAreaId(e.target.value);
+                setSelectedStoreFilter('ALL');
+              }}
               className="form-select"
               style={{ fontWeight: 700, color: '#071B52' }}
             >
@@ -395,6 +424,42 @@ export const InventoryPage: React.FC = () => {
               {availableAreas.map((a) => (
                 <option key={a.id || a._id} value={a.name}>
                   {a.name} • {a.code || 'ZONE'}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* STEP 3: STORE IN AREA */}
+          <div>
+            <label
+              style={{
+                fontSize: '0.72rem',
+                fontWeight: 800,
+                color: '#64748B',
+                textTransform: 'uppercase',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                marginBottom: '6px',
+              }}
+            >
+              <Warehouse size={13} color="#FF3B98" />
+              <span>
+                STEP 3: SELECT STORE ({storesInSelectedArea.length} IN {currentArea ? currentArea.name.toUpperCase() : 'ZONE'})
+              </span>
+            </label>
+            <select
+              value={selectedStoreFilter}
+              onChange={(e) => setSelectedStoreFilter(e.target.value)}
+              className="form-select"
+              style={{ fontWeight: 700, color: '#071B52' }}
+            >
+              <option value="ALL">
+                All Stores in {currentArea ? currentArea.name : 'Area'} ({storesInSelectedArea.length})
+              </option>
+              {storesInSelectedArea.map((st) => (
+                <option key={st.id || st._id} value={st.id || st._id}>
+                  {st.name} {st.code ? `(${st.code})` : ''} {st.isActive === false ? '[OFFLINE]' : ''}
                 </option>
               ))}
             </select>
@@ -429,7 +494,7 @@ export const InventoryPage: React.FC = () => {
               <Warehouse size={20} />
             </div>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                 <strong style={{ fontSize: '0.94rem', color: '#071B52' }}>
                   {currentStoreName}
                 </strong>
@@ -440,23 +505,42 @@ export const InventoryPage: React.FC = () => {
                     gap: '4px',
                     fontSize: '0.68rem',
                     fontWeight: 800,
-                    color: '#047857',
-                    background: '#ECFDF5',
+                    color: selectedStoreFilter !== 'ALL' ? '#047857' : '#4F46E5',
+                    background: selectedStoreFilter !== 'ALL' ? '#ECFDF5' : '#EEF2FF',
                     padding: '2px 7px',
                     borderRadius: '6px',
-                    border: '1px solid #A7F3D0',
+                    border: `1px solid ${selectedStoreFilter !== 'ALL' ? '#A7F3D0' : '#C7D2FE'}`,
                   }}
                 >
                   <Lock size={10} />
-                  <span>1:1 AREA LOCKED</span>
+                  <span>
+                    {selectedStoreFilter !== 'ALL'
+                      ? 'LOCKED TO SELECTED STORE'
+                      : storesInSelectedArea.length > 1
+                      ? `MULTI-STORE ZONE (${storesInSelectedArea.length} STORES)`
+                      : '1:1 AREA LOCKED'}
+                  </span>
                 </span>
               </div>
               <p style={{ margin: '2px 0 0', fontSize: '0.74rem', color: '#64748B' }}>
                 📍 Area: <strong style={{ color: '#071B52' }}>{currentArea?.name || 'All Areas'}</strong> • City:{' '}
-                <strong style={{ color: '#071B52' }}>{currentCity?.name}</strong> • Hub Code:{' '}
-                <strong style={{ color: '#FF3B98', fontFamily: 'var(--font-mono)' }}>
-                  {resolvedStore?.code || 'AMD-HUB-01'}
-                </strong>
+                <strong style={{ color: '#071B52' }}>{currentCity?.name}</strong>
+                {resolvedStore && (
+                  <>
+                    {' '}• Hub Code:{' '}
+                    <strong style={{ color: '#FF3B98', fontFamily: 'var(--font-mono)' }}>
+                      {resolvedStore.code || (resolvedStore as any).hubCode || 'AMD-HUB-01'}
+                    </strong>
+                    {selectedStoreFilter !== 'ALL' && (
+                      <>
+                        {' '}• Status:{' '}
+                        <span style={{ color: resolvedStore.isActive !== false ? '#15803D' : '#DC2626', fontWeight: 800 }}>
+                          {resolvedStore.isActive !== false ? '● ACTIVE ON-SHIFT' : '○ OFFLINE'}
+                        </span>
+                      </>
+                    )}
+                  </>
+                )}
               </p>
             </div>
           </div>

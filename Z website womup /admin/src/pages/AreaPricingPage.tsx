@@ -51,6 +51,9 @@ export const AreaPricingPage: React.FC = () => {
   // Step 2: Selected Area
   const [selectedAreaId, setSelectedAreaId] = useState<string>('');
 
+  // Step 3: Selected Store in Area
+  const [selectedStoreId, setSelectedStoreId] = useState<string>('ALL');
+
   // Category Filter
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
 
@@ -127,22 +130,26 @@ export const AreaPricingPage: React.FC = () => {
     );
   }, [availableAreas, selectedAreaId]);
 
-  // 3. Auto-Select the ONE Dark Store assigned to this area (1-store-per-area rule)
-  const resolvedStore = useMemo(() => {
-    if (!currentArea) return stores[0] || null;
-    const areaIdStr = currentArea.id || currentArea._id;
-    return (
-      stores.find((s) => {
-        if (s.areaId && areaIdStr && String(s.areaId) === String(areaIdStr)) return true;
-        if (s.areaName && currentArea.name && s.areaName.toLowerCase() === currentArea.name.toLowerCase()) return true;
-        if (s.name.toLowerCase().includes(currentArea.name.toLowerCase())) return true;
-        return false;
-      }) ||
-      stores.find((s) => (s.cityName || s.city || '').toLowerCase() === (currentArea.cityName || '').toLowerCase()) ||
-      stores[0] ||
-      null
-    );
+  // 3. Resolve all stores operating in this area
+  const storesInSelectedArea = useMemo(() => {
+    if (!currentArea) return stores;
+    const aId = currentArea.id || currentArea._id;
+    return stores.filter((s) => {
+      if (s.areaId && aId && String(s.areaId) === String(aId)) return true;
+      if (s.areaName && currentArea.name && s.areaName.toLowerCase() === currentArea.name.toLowerCase()) return true;
+      if (s.name.toLowerCase().includes(currentArea.name.toLowerCase())) return true;
+      return false;
+    });
   }, [stores, currentArea]);
+
+  // Active Store: If specific store is selected in dropdown, lock to that store
+  const resolvedStore = useMemo(() => {
+    if (selectedStoreId !== 'ALL') {
+      const found = storesInSelectedArea.find((s) => (s.id || s._id) === selectedStoreId || s.name === selectedStoreId);
+      if (found) return found;
+    }
+    return storesInSelectedArea[0] || stores[0] || null;
+  }, [storesInSelectedArea, selectedStoreId, stores]);
 
   // Fast Area Pricing lookup map: variantId -> areaId -> price
   const areaPricingMap = useMemo(() => {
@@ -546,7 +553,7 @@ export const AreaPricingPage: React.FC = () => {
                     marginBottom: '6px',
                   }}
                 >
-                  STEP 2: SELECT AREA
+                  STEP 2: SELECT AREA / ZONE
                 </label>
                 <div style={{ position: 'relative' }}>
                   <MapPin
@@ -556,7 +563,10 @@ export const AreaPricingPage: React.FC = () => {
                   />
                   <select
                     value={currentArea?.id || currentArea?._id || currentArea?.name || ''}
-                    onChange={(e) => setSelectedAreaId(e.target.value)}
+                    onChange={(e) => {
+                      setSelectedAreaId(e.target.value);
+                      setSelectedStoreId('ALL');
+                    }}
                     style={{
                       width: '100%',
                       padding: '10px 14px 10px 36px',
@@ -578,9 +588,58 @@ export const AreaPricingPage: React.FC = () => {
                   </select>
                 </div>
               </div>
+
+              {/* STEP 3: SELECT STORE IN AREA */}
+              <div>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    color: '#64748B',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    marginBottom: '6px',
+                  }}
+                >
+                  STEP 3: SELECT STORE ({storesInSelectedArea.length} IN {currentArea?.name.toUpperCase() || 'ZONE'})
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <Store
+                    size={16}
+                    color="#6366F1"
+                    style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+                  />
+                  <select
+                    value={selectedStoreId}
+                    onChange={(e) => setSelectedStoreId(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px 10px 36px',
+                      borderRadius: '10px',
+                      border: '1px solid #CBD5E1',
+                      backgroundColor: '#FFFFFF',
+                      fontSize: '0.90rem',
+                      fontWeight: 700,
+                      color: '#071B52',
+                      outline: 'none',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <option value="ALL">
+                      All Stores in {currentArea?.name || 'Area'} ({storesInSelectedArea.length})
+                    </option>
+                    {storesInSelectedArea.map((st) => (
+                      <option key={st.id || st._id} value={st.id || st._id}>
+                        {st.name} {st.code ? `(${st.code})` : ''} {st.isActive === false ? '[OFFLINE]' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
             </div>
 
-            {/* FULFILLING STORE BANNER (Auto-Selected 1:1 Area Lock) */}
+            {/* FULFILLING STORE BANNER */}
             <div
               style={{
                 backgroundColor: '#FDF2F8',
@@ -611,9 +670,11 @@ export const AreaPricingPage: React.FC = () => {
                   <Store size={22} />
                 </div>
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '0.96rem', fontWeight: 800, color: '#071B52' }}>
-                      {resolvedStore?.name || `Wom Up ${currentArea?.name} Dark Store`}
+                      {selectedStoreId === 'ALL' && storesInSelectedArea.length > 1
+                        ? `All Stores in ${currentArea?.name || 'Area'} (${storesInSelectedArea.length} Hubs)`
+                        : resolvedStore?.name || `Wom Up ${currentArea?.name} Dark Store`}
                     </span>
                     <span
                       style={{
@@ -630,11 +691,18 @@ export const AreaPricingPage: React.FC = () => {
                       }}
                     >
                       <Lock size={10} />
-                      <span>1:1 AREA LOCKED · {currentCity?.name}</span>
+                      <span>
+                        {selectedStoreId !== 'ALL'
+                          ? `STORE LOCKED · ${resolvedStore?.code || 'ACTIVE'}`
+                          : storesInSelectedArea.length > 1
+                          ? `MULTI-STORE ZONE (${storesInSelectedArea.length} STORES)`
+                          : `1:1 AREA LOCKED · ${currentCity?.name}`}
+                      </span>
                     </span>
                   </div>
                   <div style={{ fontSize: '0.78rem', color: '#64748B', marginTop: '2px' }}>
                     Bound to area: <strong style={{ color: '#071B52' }}>{currentArea?.name}</strong> ({currentCity?.name}) ·{' '}
+                    Hub Code: <strong style={{ color: '#DB2777' }}>{resolvedStore?.code || (resolvedStore as any)?.hubCode || 'AMD-HUB'}</strong> ·{' '}
                     SLA: {resolvedStore?.estimatedDeliveryMinutes || 9} min delivery
                   </div>
                 </div>

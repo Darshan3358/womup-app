@@ -20,6 +20,8 @@ export const TopNavbar: React.FC = () => {
     setActiveTab,
     selectedStoreFilter,
     setSelectedStoreFilter,
+    setSelectedCityFilter,
+    setSelectedAreaFilter,
     searchQuery,
     setSearchQuery,
     stores,
@@ -119,7 +121,19 @@ export const TopNavbar: React.FC = () => {
         <div style={{ position: 'relative' }}>
           <select
             value={selectedStoreFilter}
-            onChange={(e) => setSelectedStoreFilter(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setSelectedStoreFilter(val);
+              if (val !== 'ALL') {
+                const matched = stores.find((s) => (s.id || s._id) === val);
+                if (matched?.areaName) {
+                  setSelectedAreaFilter(matched.areaName);
+                }
+                if (matched?.cityName || matched?.city) {
+                  setSelectedCityFilter(matched.cityName || matched.city || 'Ahmedabad');
+                }
+              }
+            }}
             style={{
               padding: '7px 28px 7px 12px',
               borderRadius: '10px',
