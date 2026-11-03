@@ -13,8 +13,8 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/WOMARTCUSTOMER.png",
-      "resizeMode": "cover",
+      "image": "./assets/womart_splash_logo.png",
+      "resizeMode": "contain",
       "backgroundColor": "#FED2EB"
     },
     "plugins": [
