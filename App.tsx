@@ -16,7 +16,7 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
     style.id = styleId;
     style.textContent = `
       html, body {
-        width: 100% !important;
+        width: 100% !important; 
         height: 100% !important;
         max-width: 100vw !important;
         overflow-x: hidden !important;
