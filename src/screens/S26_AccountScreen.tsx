@@ -15,6 +15,7 @@ import { COLORS, GRADIENTS } from '../theme/colors';
 import { SPACING, RADIUS } from '../theme/spacing';
 import { Header } from '../components/common/Header';
 import { useApp } from '../context/AppContext';
+import { normalizeKycStatus } from '../services/kycService';
 
 export const S26_AccountScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -44,6 +45,24 @@ export const S26_AccountScreen: React.FC = () => {
     }
   };
 
+  const normKyc = normalizeKycStatus((user as any)?.customerKycStatus, user);
+  const kycBadge =
+    normKyc === 'VERIFIED'
+      ? 'Verified'
+      : normKyc === 'PENDING'
+      ? 'Under Review'
+      : normKyc === 'REJECTED'
+      ? 'Rejected'
+      : 'Verify';
+  const kycSubtitle =
+    normKyc === 'VERIFIED'
+      ? 'Aadhaar & Bank Account Verified'
+      : normKyc === 'PENDING'
+      ? 'Documents submitted, under verification'
+      : normKyc === 'REJECTED'
+      ? 'Verification rejected, tap to resubmit'
+      : 'Aadhaar front/back, bank details & payouts';
+
   const menuItems = [
     {
       title: 'My Addresses',
@@ -54,10 +73,33 @@ export const S26_AccountScreen: React.FC = () => {
     },
     {
       title: 'KYC & Bank Verification',
-      subtitle: 'Aadhaar front/back, bank details & payouts',
-      badge: 'Verify',
+      subtitle: kycSubtitle,
+      badge: kycBadge,
+      badgeColor:
+        normKyc === 'VERIFIED'
+          ? '#059669'
+          : normKyc === 'REJECTED'
+          ? '#DC2626'
+          : normKyc === 'PENDING'
+          ? '#D97706'
+          : COLORS.hotPink,
+      badgeBg:
+        normKyc === 'VERIFIED'
+          ? '#DCFCE7'
+          : normKyc === 'REJECTED'
+          ? '#FEE2E2'
+          : normKyc === 'PENDING'
+          ? '#FEF3C7'
+          : '#FFF0F7',
       icon: 'shield-checkmark-outline',
-      color: '#059669',
+      color:
+        normKyc === 'VERIFIED'
+          ? '#059669'
+          : normKyc === 'REJECTED'
+          ? '#DC2626'
+          : normKyc === 'PENDING'
+          ? '#D97706'
+          : '#2563EB',
       action: () => setActiveScreen('KYC'),
     },
     {
@@ -175,8 +217,20 @@ export const S26_AccountScreen: React.FC = () => {
               </View>
 
               {item.badge ? (
-                <View style={styles.menuBadge}>
-                  <Text style={styles.menuBadgeText}>{item.badge}</Text>
+                <View
+                  style={[
+                    styles.menuBadge,
+                    (item as any).badgeBg && { backgroundColor: (item as any).badgeBg },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.menuBadgeText,
+                      (item as any).badgeColor && { color: (item as any).badgeColor },
+                    ]}
+                  >
+                    {item.badge}
+                  </Text>
                 </View>
               ) : (
                 <Ionicons name="chevron-forward" size={18} color={COLORS.border} />

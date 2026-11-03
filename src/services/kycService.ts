@@ -18,9 +18,12 @@ export interface CustomerKycPayload {
   bankProofImage?: string;
 }
 
+export type NormalizedKycStatus = 'NOT_SUBMITTED' | 'PENDING' | 'VERIFIED' | 'REJECTED';
+
 export interface CustomerKycStatusResponse {
-  kycStatus: 'pending' | 'verified' | 'rejected' | 'none' | any;
+  kycStatus: number | 'pending' | 'verified' | 'rejected' | 'none' | any;
   statusLabel?: string;
+  isVerified?: boolean;
   rejectionReason?: string;
   fullNameAsPerAadhaar?: string;
   aadharNumber?: string;
@@ -46,6 +49,47 @@ export interface CustomerKycStatusResponse {
     upiId?: string;
     bankProofUrl?: string;
   };
+}
+
+export function normalizeKycStatus(rawStatus: any, rawData?: any): NormalizedKycStatus {
+  // If explicitly verified flags are true
+  if (
+    rawData?.isVerified === true ||
+    rawData?.customerIsVerify === 1 ||
+    rawData?.aadhaarVerified === true
+  ) {
+    return 'VERIFIED';
+  }
+
+  // Check numeric status: 0=NotSubmitted, 1=Pending, 2=Verified, 3=Rejected
+  const num =
+    typeof rawStatus === 'number'
+      ? rawStatus
+      : rawStatus !== undefined && rawStatus !== null && rawStatus !== '' && !isNaN(Number(rawStatus))
+      ? Number(rawStatus)
+      : null;
+
+  if (num === 2) return 'VERIFIED';
+  if (num === 1) return 'PENDING';
+  if (num === 3) return 'REJECTED';
+  if (num === 0) return 'NOT_SUBMITTED';
+
+  // Check string status
+  const str = String(
+    rawStatus ??
+      rawData?.statusLabel ??
+      rawData?.kycStatus ??
+      rawData?.verificationStatus ??
+      ''
+  )
+    .toUpperCase()
+    .trim();
+
+  if (str === 'VERIFIED' || str === 'APPROVED') return 'VERIFIED';
+  if (str === 'PENDING' || str === 'UNDER_REVIEW' || str === 'UNDER_VERIFICATION') return 'PENDING';
+  if (str === 'REJECTED') return 'REJECTED';
+
+  return 'NOT_SUBMITTED';
 }
 
 export const KycService = {

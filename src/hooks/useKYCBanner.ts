@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { api, API_BASE_URL } from '../services/api';
 import io, { Socket } from 'socket.io-client';
+import { normalizeKycStatus } from '../services/kycService';
 
 export type BannerVariant = 'WARNING' | 'INFO' | 'SUCCESS' | 'ERROR';
 
@@ -34,17 +35,19 @@ export const useKYCBanner = () => {
 
   // Derive initial banner from local user state
   const deriveFromUser = useCallback((): KYCBannerData => {
-    const kycStatus = (user as any)?.customerKycStatus ?? (user?.aadhaarVerified ? 2 : (user?.verificationStatus === 'PENDING' ? 1 : 0));
-    const isVerified = (user as any)?.customerIsVerify === 1 || user?.aadhaarVerified || kycStatus === 2;
+    const normalized = normalizeKycStatus((user as any)?.customerKycStatus, user);
 
-    if (isVerified) {
+    if (normalized === 'VERIFIED') {
       return {
         bannerType: 'SUCCESS',
         kycStatus: 2,
         title: 'KYC Verified · Income Unlocked',
-        subtitle: user?.sponsorCode && !['WOM001', 'WOMUP001', 'WORMUP001'].includes(user.sponsorCode) ? '₹20 bonus credited to sponsor' : 'All income features unlocked',
-        ctaText: 'View Wallet',
-        ctaAction: 'VIEW_WALLET',
+        subtitle:
+          user?.sponsorCode && !['WOM001', 'WOMUP001', 'WORMUP001'].includes(user.sponsorCode)
+            ? '₹20 bonus credited to sponsor'
+            : 'All income features unlocked',
+        ctaText: 'View Details',
+        ctaAction: 'VIEW_STATUS',
         icon: 'check-circle',
         backgroundColor: '#DCFCE7',
         borderColor: '#86EFAC',
@@ -53,7 +56,7 @@ export const useKYCBanner = () => {
       };
     }
 
-    if (kycStatus === 1 || user?.verificationStatus === 'PENDING') {
+    if (normalized === 'PENDING') {
       return {
         bannerType: 'INFO',
         kycStatus: 1,
@@ -69,12 +72,12 @@ export const useKYCBanner = () => {
       };
     }
 
-    if (kycStatus === 3 || user?.verificationStatus === 'REJECTED') {
+    if (normalized === 'REJECTED') {
       return {
         bannerType: 'ERROR',
         kycStatus: 3,
         title: 'KYC Rejected · Resubmit',
-        subtitle: `Reason: ${(user as any)?.customerAadharRejectionReason || 'Document not clear'}`,
+        subtitle: `Reason: ${(user as any)?.customerAadharRejectionReason || (user as any)?.kycRejectReason || 'Document not clear'}`,
         ctaText: 'Resubmit',
         ctaAction: 'RESUBMIT',
         icon: 'x-circle',
@@ -114,10 +117,16 @@ export const useKYCBanner = () => {
       setLoading(true);
       const res = await api.get<any>('/users/dashboard-banner');
       if (res.success && res.data) {
-        setBannerData(res.data);
+        const norm = normalizeKycStatus(res.data.kycStatus, res.data);
+        const resolvedData: KYCBannerData = {
+          ...res.data,
+          ctaText: norm === 'VERIFIED' ? (res.data.ctaText || 'View Details') : res.data.ctaText,
+          ctaAction: norm === 'VERIFIED' ? 'VIEW_STATUS' : res.data.ctaAction,
+        };
+        setBannerData(resolvedData);
 
         // Check 3-day auto hide for verified status
-        if (res.data.bannerType === 'SUCCESS' && res.data.approvedAt) {
+        if (norm === 'VERIFIED' && res.data.approvedAt) {
           const approvedTime = new Date(res.data.approvedAt).getTime();
           const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
           if (Date.now() - approvedTime > threeDaysMs) {
