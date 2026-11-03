@@ -249,6 +249,13 @@ export const S26_AccountScreen: React.FC = () => {
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
 
+        {/* In-App Branding */}
+        <View style={styles.appBrandingContainer}>
+          <Text style={styles.appBrandingTitle}>WOMART by Womup</Text>
+          <Text style={styles.appBrandingTagline}>Empowerment • Shopping • Revolutions</Text>
+          <Text style={styles.appBrandingVersion}>Version 1.0.0 (Production Build)</Text>
+        </View>
+
         <View style={{ height: 40 }} />
       </ScrollView>
     </View>
@@ -421,5 +428,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: COLORS.error,
+  },
+  appBrandingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 24,
+    paddingVertical: 12,
+  },
+  appBrandingTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.navy,
+    letterSpacing: -0.3,
+  },
+  appBrandingTagline: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textMuted,
+    marginTop: 3,
+  },
+  appBrandingVersion: {
+    fontSize: 11,
+    color: COLORS.secondaryText,
+    marginTop: 2,
   },
 });

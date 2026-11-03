@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "WOMART by Womup",
+    "name": "WOMART",
     "slug": "womup-customer",
     "version": "1.0.0",
     "runtimeVersion": "1.0.0",
@@ -44,7 +44,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.wormup.customerapp",
       "infoPlist": {
-        "CFBundleDisplayName": "WOMART by Womup",
+        "CFBundleDisplayName": "WOMART",
         "ITSAppUsesNonExemptEncryption": false
       }
     },

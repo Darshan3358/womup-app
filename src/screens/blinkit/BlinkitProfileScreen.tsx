@@ -682,6 +682,10 @@ export const BlinkitProfileScreen: React.FC = () => {
                   <Text style={styles.sponsorPillText}>Sponsor: {user.sponsorCode.replace(/^WORMUP/i, 'WOMUP')}</Text>
                 </View>
               ) : null}
+
+              <View style={styles.womartBrandPill}>
+                <Text style={styles.womartBrandPillText}>WOMART by Womup</Text>
+              </View>
             </View>
           </View>
         </LinearGradient>
@@ -833,10 +837,10 @@ export const BlinkitProfileScreen: React.FC = () => {
           <View style={styles.footerSection}>
             <View style={styles.footerBrandRow}>
               <View style={styles.footerDot} />
-              <Text style={styles.footerWordmark}>womup</Text>
+              <Text style={styles.footerWordmark}>WOMART by Womup</Text>
             </View>
-            <Text style={styles.footerTagline}>Groceries & Documents in 9 Minutes</Text>
-            <Text style={styles.footerVersion}>v2.4.0 (Build 2026.09)</Text>
+            <Text style={styles.footerTagline}>Empowerment • Shopping • Revolutions</Text>
+            <Text style={styles.footerVersion}>v1.0.0 (Production Build)</Text>
           </View>
         </View>
       </ScrollView>
@@ -1913,6 +1917,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#FFFFFF',
     fontWeight: '600',
+  },
+  womartBrandPill: {
+    backgroundColor: '#FFE4F2',
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#FBCFE8',
+  },
+  womartBrandPillText: {
+    fontSize: 11,
+    color: '#BE185D',
+    fontWeight: '700',
   },
   bodyContent: {
     paddingHorizontal: 16,
