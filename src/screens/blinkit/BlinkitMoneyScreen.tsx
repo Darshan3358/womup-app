@@ -32,6 +32,7 @@ import {
 } from '../../components/blinkit/BlinkitMoneyIllustrations';
 import { FileUploadField } from '../../components/common/FileUploadField';
 import { resolveImageUrl } from '../../utils/imageUrl';
+import { evaluateIncomeEligibility } from '../../utils/incomeEligibility';
 
 export const BlinkitMoneyScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -130,6 +131,13 @@ export const BlinkitMoneyScreen: React.FC = () => {
       [level]: !prev[level],
     }));
   };
+
+  // ── SRS Income Eligibility Evaluation (4 Income Types) ──
+  const incomeEligibility = evaluateIncomeEligibility(
+    user.customerKycStatus ?? (user.aadhaarVerified ? 2 : (user.verificationStatus === 'PENDING' ? 1 : 0)),
+    user,
+    teamDashboardData?.personalStatus
+  );
 
   // ── Income History Modal State ──
   const [isIncomeHistoryVisible, setIsIncomeHistoryVisible] = useState(false);
@@ -492,10 +500,14 @@ export const BlinkitMoneyScreen: React.FC = () => {
             {/* 1. Shopping Coins Card */}
             <View style={styles.balanceCardDark}>
               <View style={styles.balanceCardTop}>
-                <View style={styles.badgeRow}>
+                <View style={[styles.badgeRow, { flexWrap: 'wrap', gap: 6 }]}>
                   <Text style={styles.balanceBadgeDark}>SHOPPING COINS</Text>
                   <View style={styles.bonusTag}>
                     <Text style={styles.bonusTagText}>WELCOME BONUS</Text>
+                  </View>
+                  <View style={styles.noKycPill}>
+                    <Ionicons name="checkmark-circle" size={11} color="#059669" />
+                    <Text style={styles.noKycPillText}>No KYC Required</Text>
                   </View>
                 </View>
                 <TouchableOpacity
@@ -511,7 +523,7 @@ export const BlinkitMoneyScreen: React.FC = () => {
               <Text style={styles.balanceValueDark}>{user.shoppingCoins ?? 2000}</Text>
               <View style={styles.coinBottomRow}>
                 <Text style={styles.balanceSubDark}>
-                  Worth ₹{user.shoppingCoins ?? 2000} • 1 Coin = ₹1 Discount on grocery orders
+                  Worth ₹{user.shoppingCoins ?? 2000} • 1 Coin = ₹1 Discount on grocery orders • No KYC Required
                 </Text>
                 <TouchableOpacity
                   style={styles.tokenHistoryLinkBtn}
@@ -581,30 +593,97 @@ export const BlinkitMoneyScreen: React.FC = () => {
               </View>
             </View>
 
+            {/* Download Income Eligibility Strip (SRS FR-01) */}
+            <View
+              style={[
+                styles.downloadEligibilityBar,
+                incomeEligibility.isDownloadIncomeEligible
+                  ? styles.eligibilityBarSuccess
+                  : styles.eligibilityBarWarning,
+              ]}
+            >
+              <Ionicons
+                name={incomeEligibility.isDownloadIncomeEligible ? 'shield-checkmark' : 'alert-circle'}
+                size={16}
+                color={incomeEligibility.isDownloadIncomeEligible ? '#059669' : '#D97706'}
+              />
+              <Text
+                style={[
+                  styles.downloadEligibilityText,
+                  { color: incomeEligibility.isDownloadIncomeEligible ? '#065F46' : '#92400E' },
+                ]}
+              >
+                App Download Income (₹20/₹10/₹5): {incomeEligibility.messages.downloadIncome}
+                {!incomeEligibility.isDownloadIncomeEligible && ' (Active User not required)'}
+              </Text>
+            </View>
+
             {/* 4. Real Income & 7-Level Team Status Card */}
             <View style={styles.teamStatusCard}>
               <View style={styles.teamCardHeader}>
                 <View style={styles.teamBadgeRow}>
-                  <Text style={styles.teamCardBadge}>REAL INCOME QUALIFICATION</Text>
+                  <Text style={styles.teamCardBadge}>MONTHLY LEVEL INCOME QUALIFICATION</Text>
                   <Text style={styles.teamCardIcon}>👥</Text>
                 </View>
                 <Text style={styles.teamCardTitle}>7-Level Team Performance</Text>
               </View>
 
               <View style={styles.teamStatsGrid}>
+                {/* Condition 1: KYC Status */}
                 <View style={styles.teamStatItem}>
-                  <Text style={styles.teamStatLabel}>Personal Active</Text>
-                  <Text style={[styles.teamStatVal, { color: (teamDashboardData?.personalStatus?.monthlyPurchaseValue ?? user.monthlyPurchaseValue ?? 0) >= 2000 ? '#059669' : '#DC2626' }]}>
-                    {(teamDashboardData?.personalStatus?.monthlyPurchaseValue ?? user.monthlyPurchaseValue ?? 0) >= 2000 ? '✅ Active' : '❌ Need ₹2k'}
+                  <Text style={styles.teamStatLabel}>1. KYC Status</Text>
+                  <Text
+                    style={[
+                      styles.teamStatVal,
+                      { color: incomeEligibility.kycStatus === 'VERIFIED' ? '#059669' : '#DC2626' },
+                    ]}
+                  >
+                    {incomeEligibility.kycStatus === 'VERIFIED'
+                      ? '✅ Verified'
+                      : incomeEligibility.kycStatus === 'PENDING'
+                      ? '⏳ Pending'
+                      : '❌ Required'}
+                  </Text>
+                  <Text style={styles.teamStatSub}>Aadhaar & Bank</Text>
+                </View>
+
+                {/* Condition 2: Personal Active */}
+                <View style={styles.teamStatItem}>
+                  <Text style={styles.teamStatLabel}>2. Personal Active</Text>
+                  <Text
+                    style={[
+                      styles.teamStatVal,
+                      {
+                        color:
+                          (teamDashboardData?.personalStatus?.monthlyPurchaseValue ?? user.monthlyPurchaseValue ?? 0) >= 2000
+                            ? '#059669'
+                            : '#DC2626',
+                      },
+                    ]}
+                  >
+                    {(teamDashboardData?.personalStatus?.monthlyPurchaseValue ?? user.monthlyPurchaseValue ?? 0) >= 2000
+                      ? '✅ Active'
+                      : '❌ Need ₹2k'}
                   </Text>
                   <Text style={styles.teamStatSub}>
                     ₹{(teamDashboardData?.personalStatus?.monthlyPurchaseValue ?? user.monthlyPurchaseValue ?? 0).toFixed(0)} / ₹2,000
                   </Text>
                 </View>
 
+                {/* Direct 5 Active */}
                 <View style={styles.teamStatItem}>
-                  <Text style={styles.teamStatLabel}>Direct 5 Active</Text>
-                  <Text style={[styles.teamStatVal, { color: (teamDashboardData?.personalStatus?.direct5ActiveCount ?? user.direct5ActiveCount ?? 0) >= 5 ? '#059669' : '#DC2626' }]}>
+                  <Text style={styles.teamStatLabel}>3. Direct 5 Active</Text>
+                  <Text
+                    style={[
+                      styles.teamStatVal,
+                      {
+                        color:
+                          (teamDashboardData?.personalStatus?.direct5ActiveCount ?? user.direct5ActiveCount ?? 0) >= 5
+                            ? '#059669'
+                            : '#DC2626',
+                      },
+                    ]}
+                  >
                     {(teamDashboardData?.personalStatus?.direct5ActiveCount ?? user.direct5ActiveCount ?? 0) >= 5
                       ? '✅ 5/5'
                       : `❌ ${teamDashboardData?.personalStatus?.direct5ActiveCount ?? user.direct5ActiveCount ?? 0}/5`}
@@ -612,6 +691,7 @@ export const BlinkitMoneyScreen: React.FC = () => {
                   <Text style={styles.teamStatSub}>5 Direct ≥ ₹2k</Text>
                 </View>
 
+                {/* 7-Level Team */}
                 <View style={styles.teamStatItem}>
                   <Text style={styles.teamStatLabel}>7-Level Team</Text>
                   <Text style={[styles.teamStatVal, { color: '#4F46E5', fontWeight: '900' }]}>
@@ -619,6 +699,30 @@ export const BlinkitMoneyScreen: React.FC = () => {
                   </Text>
                   <Text style={styles.teamStatSub}>Members</Text>
                 </View>
+              </View>
+
+              {/* Monthly Level Status Note */}
+              <View
+                style={[
+                  styles.monthlyEligibilityNote,
+                  incomeEligibility.isMonthlyShoppingCoinLevelEligible
+                    ? styles.monthlyEligibleNoteSuccess
+                    : styles.monthlyEligibleNoteWarning,
+                ]}
+              >
+                <Ionicons
+                  name={incomeEligibility.isMonthlyShoppingCoinLevelEligible ? 'checkmark-circle' : 'information-circle'}
+                  size={15}
+                  color={incomeEligibility.isMonthlyShoppingCoinLevelEligible ? '#059669' : '#D97706'}
+                />
+                <Text
+                  style={[
+                    styles.monthlyEligibilityNoteText,
+                    { color: incomeEligibility.isMonthlyShoppingCoinLevelEligible ? '#065F46' : '#92400E' },
+                  ]}
+                >
+                  {incomeEligibility.messages.monthlyLevelIncome}
+                </Text>
               </View>
 
               <TouchableOpacity
@@ -714,10 +818,16 @@ export const BlinkitMoneyScreen: React.FC = () => {
             {/* 5. Customer's Own Referral Code Card */}
             <View style={styles.referralCodeCard}>
               <View style={styles.referralLeftCol}>
-                <Text style={styles.referralHeaderLabel}>MY REFERRAL CODE</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <Text style={styles.referralHeaderLabel}>MY REFERRAL CODE</Text>
+                  <View style={styles.noKycPill}>
+                    <Ionicons name="checkmark-circle" size={10} color="#059669" />
+                    <Text style={styles.noKycPillText}>No KYC for Referral Coins</Text>
+                  </View>
+                </View>
                 <Text style={styles.referralCodeBig}>{user.referralCode || (user as any).sponsorCode || 'WOM3405'}</Text>
                 <Text style={styles.referralHelpText}>
-                  Share with friends to earn ₹20 Direct App Download Income
+                  Shopping Referral: {incomeEligibility.messages.shoppingReferral} • Share to earn ₹20 Direct App Download Income (unlocked with KYC)
                 </Text>
               </View>
               <TouchableOpacity
@@ -2042,11 +2152,12 @@ export const BlinkitMoneyScreen: React.FC = () => {
             ) : (() => {
               const personalStatus = teamDashboardData?.personalStatus;
               const teamSummary = teamDashboardData?.teamSummary;
-              const isEligible = Boolean(personalStatus?.isEligibleForTeamIncome);
+              const isKycVerified = incomeEligibility.kycStatus === 'VERIFIED';
               const personalSpend = Number(personalStatus?.monthlyPurchaseValue ?? user.monthlyPurchaseValue ?? 0);
-              const isPersonalActive = Boolean(personalStatus?.isPersonalActive);
+              const isPersonalActive = Boolean(personalStatus?.isPersonalActive || personalSpend >= 2000);
               const direct5Active = Number(personalStatus?.direct5ActiveCount ?? user.direct5ActiveCount ?? 0);
               const isDirectsActive = direct5Active >= 5;
+              const isEligible = isKycVerified && isPersonalActive && isDirectsActive;
               const potentialIncome = Number(teamSummary?.totalPotentialIncome ?? 0);
               const earnedIncome = isEligible ? potentialIncome : 0;
 
@@ -2063,13 +2174,33 @@ export const BlinkitMoneyScreen: React.FC = () => {
                   <View style={styles.ineligibleWarningCard}>
                     <View style={styles.ineligibleHeaderRow}>
                       <Ionicons name="warning" size={20} color="#DC2626" />
-                      <Text style={styles.ineligibleTitle}>⚠️ NOT ELIGIBLE FOR TEAM INCOME</Text>
+                      <Text style={styles.ineligibleTitle}>⚠️ NOT ELIGIBLE FOR MONTHLY LEVEL INCOME</Text>
                     </View>
                     <Text style={styles.ineligibleSubtitle}>
-                      Notebook Rule: Income is ONLY earned when Personal Active (≥ ₹2k) AND 5 Direct Active (≥ ₹2k) are both met every month.
+                      Rule: Monthly Level Income requires BOTH KYC Verification (Aadhaar & Bank) AND Active User status (Personal Spend ≥ ₹2k with 5 Direct Active members).
                     </Text>
 
                     <View style={styles.ineligibleChecklist}>
+                      {/* Check 1: KYC Verification */}
+                      <View style={styles.ineligibleCheckItem}>
+                        <Ionicons
+                          name={isKycVerified ? 'checkmark-circle' : 'close-circle'}
+                          size={18}
+                          color={isKycVerified ? '#059669' : '#DC2626'}
+                        />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.ineligibleCheckLabel}>
+                            1. KYC Verification {isKycVerified ? '✅' : '❌'}
+                          </Text>
+                          <Text style={styles.ineligibleCheckValue}>
+                            {isKycVerified
+                              ? 'Aadhaar & Bank details verified'
+                              : 'Complete KYC verification to unlock Monthly Level Income'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Check 2: Personal Spend */}
                       <View style={styles.ineligibleCheckItem}>
                         <Ionicons
                           name={isPersonalActive ? 'checkmark-circle' : 'close-circle'}
@@ -2078,7 +2209,7 @@ export const BlinkitMoneyScreen: React.FC = () => {
                         />
                         <View style={{ flex: 1 }}>
                           <Text style={styles.ineligibleCheckLabel}>
-                            Personal Purchase ≥ ₹2,000 {isPersonalActive ? '✅' : '❌'}
+                            2. Personal Purchase ≥ ₹2,000 {isPersonalActive ? '✅' : '❌'}
                           </Text>
                           <Text style={styles.ineligibleCheckValue}>
                             Your spend: ₹{personalSpend.toFixed(2)} (Need ₹{Math.max(0, 2000 - personalSpend).toFixed(2)} more)
@@ -2086,6 +2217,7 @@ export const BlinkitMoneyScreen: React.FC = () => {
                         </View>
                       </View>
 
+                      {/* Check 3: Direct 5 Active */}
                       <View style={styles.ineligibleCheckItem}>
                         <Ionicons
                           name={isDirectsActive ? 'checkmark-circle' : 'close-circle'}
@@ -2094,7 +2226,7 @@ export const BlinkitMoneyScreen: React.FC = () => {
                         />
                         <View style={{ flex: 1 }}>
                           <Text style={styles.ineligibleCheckLabel}>
-                            5 Direct Referrals Active (≥ ₹2k) {isDirectsActive ? '✅' : '❌'}
+                            3. 5 Direct Referrals Active (≥ ₹2k) {isDirectsActive ? '✅' : '❌'}
                           </Text>
                           <Text style={styles.ineligibleCheckValue}>
                             Current active: {direct5Active} / 5 (Need {Math.max(0, 5 - direct5Active)} more active direct members)
@@ -2105,18 +2237,19 @@ export const BlinkitMoneyScreen: React.FC = () => {
 
                     <View style={styles.unlockActionBox}>
                       <Text style={styles.unlockActionHeading}>👉 To Unlock ₹{potentialIncome.toFixed(2)} Income:</Text>
-                      <Text style={styles.unlockActionStep}>1. Purchase groceries/products worth ₹2,000+ this month</Text>
-                      <Text style={styles.unlockActionStep}>2. Ensure 5 direct referrals each purchase ₹2,000+ this month</Text>
+                      {!isKycVerified && <Text style={styles.unlockActionStep}>1. Complete Aadhaar & Bank KYC verification</Text>}
+                      <Text style={styles.unlockActionStep}>{!isKycVerified ? '2' : '1'}. Purchase groceries/products worth ₹2,000+ this month</Text>
+                      <Text style={styles.unlockActionStep}>{!isKycVerified ? '3' : '2'}. Ensure 5 direct referrals each purchase ₹2,000+ this month</Text>
                     </View>
                   </View>
                 ) : (
                   <View style={styles.eligibleSuccessCard}>
                     <View style={styles.ineligibleHeaderRow}>
                       <Ionicons name="checkmark-circle" size={20} color="#059669" />
-                      <Text style={[styles.ineligibleTitle, { color: '#065F46' }]}>✅ QUALIFIED FOR TEAM INCOME</Text>
+                      <Text style={[styles.ineligibleTitle, { color: '#065F46' }]}>✅ QUALIFIED FOR MONTHLY LEVEL INCOME</Text>
                     </View>
                     <Text style={[styles.ineligibleSubtitle, { color: '#047857' }]}>
-                      All conditions met (Personal Spend ≥ ₹2,000 and 5 Direct Active members). Full income will be credited at month-end!
+                      All conditions met (KYC Verified, Personal Spend ≥ ₹2,000, and 5 Direct Active members). Full income will be credited at month-end!
                     </Text>
                   </View>
                 )}
@@ -4037,6 +4170,70 @@ const styles = StyleSheet.create({
   txAmount: {
     fontSize: 14,
     fontWeight: '800',
+  },
+  noKycPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(5, 150, 105, 0.12)',
+    borderWidth: 1,
+    borderColor: '#10B981',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  noKycPillText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#059669',
+  },
+  downloadEligibilityBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginBottom: 12,
+    borderWidth: 1,
+  },
+  eligibilityBarSuccess: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+  eligibilityBarWarning: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#FDE68A',
+  },
+  downloadEligibilityText: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 15,
+  },
+  monthlyEligibilityNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginTop: 10,
+    borderWidth: 1,
+  },
+  monthlyEligibleNoteSuccess: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+  monthlyEligibleNoteWarning: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#FDE68A',
+  },
+  monthlyEligibilityNoteText: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 15,
   },
 });
 
