@@ -38,7 +38,7 @@ import { resolveImageUrl } from '../utils/imageUrl';
 
 export const KYCScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
-  const { goBack, user } = useApp();
+  const { goBack, user, setUser } = useApp();
   const toast = useToast();
 
   // Initialize status from local user state if available to prevent flash of empty form
@@ -134,6 +134,21 @@ export const KYCScreen: React.FC = () => {
 
         if (data.rejectionReason) setRejectionReason(data.rejectionReason);
         if (data.submittedAt) setSubmittedAt(data.submittedAt);
+
+        // Keep global user state synchronized with fresh server KYC status
+        setUser((prev: any) => ({
+          ...prev,
+          customerKycStatus: norm === 'VERIFIED' ? 2 : norm === 'PENDING' ? 1 : norm === 'REJECTED' ? 3 : 0,
+          verificationStatus: norm,
+          aadhaarVerified: norm === 'VERIFIED',
+          rawAadhaarNumber: rawAadhar || prev.rawAadhaarNumber,
+          aadharNumber: rawAadhar || prev.aadharNumber,
+          bankName: bName || prev.bankName,
+          accountNumber: accNum || prev.accountNumber,
+          ifscCode: ifsc || prev.ifscCode,
+          accountHolderName: accHolder || prev.accountHolderName,
+          upiId: upi || prev.upiId,
+        }));
       } else {
         const fallbackNorm = normalizeKycStatus((user as any)?.customerKycStatus, user);
         setKycStatus(fallbackNorm);

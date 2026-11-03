@@ -22,7 +22,7 @@ import { useApp } from '../../context/AppContext';
 import { useToast } from '../../context/ToastContext';
 import { AuthService } from '../../services/authService';
 import { StorageService } from '../../services/storageService';
-import { KycService } from '../../services/kycService';
+import { KycService, normalizeKycStatus } from '../../services/kycService';
 import {
   Blinkit3DWallet,
   SingleTapIllustration,
@@ -334,6 +334,29 @@ export const BlinkitMoneyScreen: React.FC = () => {
         if (d.bankDetails?.ifscCode || d.ifscCode) setIfscCodeInput(d.bankDetails?.ifscCode || d.ifscCode || '');
         if (d.bankDetails?.accountHolderName) setAccountHolderNameInput(d.bankDetails.accountHolderName);
         if (d.bankDetails?.upiId || d.upiId) setUpiIdInput(d.bankDetails?.upiId || d.upiId || '');
+
+        // 🚨 CRITICAL FIX: Synchronize editing mode and local user state with fresh API KYC status!
+        const normalized = normalizeKycStatus(d.kycStatus ?? (d as any).customerKycStatus, d);
+        if (normalized === 'VERIFIED' || normalized === 'PENDING') {
+          setIsEditingKyc(false); // Read-only verified / submitted view
+        } else {
+          setIsEditingKyc(true);  // Form view for NOT_SUBMITTED or REJECTED
+        }
+
+        // Keep local app user state synchronized with server status
+        setUser((prev: any) => ({
+          ...prev,
+          customerKycStatus: normalized === 'VERIFIED' ? 2 : normalized === 'PENDING' ? 1 : normalized === 'REJECTED' ? 3 : 0,
+          verificationStatus: normalized,
+          aadhaarVerified: normalized === 'VERIFIED',
+          fullNameAsPerAadhaar: d.fullNameAsPerAadhaar || prev.fullNameAsPerAadhaar,
+          aadharNumber: d.rawAadhaarNumber || d.aadharNumber || prev.aadharNumber,
+          bankName: d.bankDetails?.bankName || d.bankName || prev.bankName,
+          accountNumber: d.bankDetails?.rawAccountNumber || d.accountNumber || prev.accountNumber,
+          ifscCode: d.bankDetails?.ifscCode || d.ifscCode || prev.ifscCode,
+          accountHolderName: d.bankDetails?.accountHolderName || prev.accountHolderName,
+          upiId: d.bankDetails?.upiId || d.upiId || prev.upiId,
+        }));
       }
     } catch (_) {}
   };
@@ -2153,11 +2176,11 @@ export const BlinkitMoneyScreen: React.FC = () => {
               const personalStatus = teamDashboardData?.personalStatus;
               const teamSummary = teamDashboardData?.teamSummary;
               const isKycVerified = incomeEligibility.kycStatus === 'VERIFIED';
-              const personalSpend = Number(personalStatus?.monthlyPurchaseValue ?? user.monthlyPurchaseValue ?? 0);
-              const isPersonalActive = Boolean(personalStatus?.isPersonalActive || personalSpend >= 2000);
-              const direct5Active = Number(personalStatus?.direct5ActiveCount ?? user.direct5ActiveCount ?? 0);
-              const isDirectsActive = direct5Active >= 5;
-              const isEligible = isKycVerified && isPersonalActive && isDirectsActive;
+              const personalSpend = incomeEligibility.monthlySpend;
+              const isPersonalActive = incomeEligibility.isPersonalActive;
+              const direct5Active = incomeEligibility.direct5ActiveCount;
+              const isDirectsActive = incomeEligibility.isDirectsActive;
+              const isEligible = incomeEligibility.isMonthlyShoppingCoinLevelEligible;
               const potentialIncome = Number(teamSummary?.totalPotentialIncome ?? 0);
               const earnedIncome = isEligible ? potentialIncome : 0;
 
