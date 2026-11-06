@@ -47,7 +47,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: '#05062A',
     justifyContent: 'center',
     alignItems: 'center',

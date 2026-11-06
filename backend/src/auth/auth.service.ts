@@ -789,7 +789,8 @@ export class AuthService {
       // Ahmedabad Core Launch
       '380015': { city: 'Ahmedabad', area: 'Vastrapur / Bodakdev' },
       '380054': { city: 'Ahmedabad', area: 'SG Highway / Thaltej' },
-      '382481': { city: 'Ahmedabad', area: 'Gota (ગોતા)' },
+      '382481': { city: 'Ahmedabad', area: 'Gota / Chandlodia (ગોતા / ચાંદલોડિયા)' },
+      '382470': { city: 'Ahmedabad', area: 'Tragad (ત્રાગડ)' },
       '380009': { city: 'Ahmedabad', area: 'Navrangpura' },
       '380058': { city: 'Ahmedabad', area: 'Bopal / South Bopal' },
       '380061': { city: 'Ahmedabad', area: 'Ghatlodia' },

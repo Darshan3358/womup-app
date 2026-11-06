@@ -131,37 +131,50 @@ export const SidebarDrawer: React.FC = () => {
       hardwareAccelerated={true}
     >
       <View style={styles.modalRoot}>
-        {/* Animated Dark Backdrop Overlay (Press outside drawer to dismiss) */}
-        <Animated.View style={[styles.backdropOverlay, { opacity: fadeAnim }]}>
-          <Pressable
-            style={StyleSheet.absoluteFill}
-            onPress={handleClose}
-            accessibilityLabel="Close Drawer"
-          />
-        </Animated.View>
+        {/* Visual backdrop only. It must never intercept scroll gestures. */}
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.backdropOverlay, { opacity: fadeAnim }]}
+        />
 
-        {/* Flex container holding Left-empty-space and Right-sliding-drawer */}
-        <View style={styles.flexRowContainer} pointerEvents="box-none">
-          {/* Left transparent area that captures outside taps */}
-          <Pressable
-            style={styles.leftDismissArea}
-            onPress={handleClose}
-            accessibilityLabel="Dismiss Sidebar Area"
-          />
+        {/* Dismiss touches are limited to the area OUTSIDE the drawer. */}
+        <Pressable
+          style={[styles.dismissArea, { right: DRAWER_WIDTH }]}
+          onPress={handleClose}
+          accessibilityLabel="Close Drawer"
+        />
 
-          {/* Slide-out Sidebar Content Panel */}
-          <Animated.View
-            pointerEvents="auto"
-            style={[
-              styles.drawerPanel,
-              {
-                width: DRAWER_WIDTH,
-                transform: [{ translateX: slideAnim }],
-              },
-            ]}
-          >
-            {/* Top Branding Header */}
-            <LinearGradient
+        {/* The drawer is above the dismiss area and owns all touches inside it. */}
+        <Animated.View
+          pointerEvents="auto"
+          style={[
+            styles.drawerPanel,
+            {
+              width: DRAWER_WIDTH,
+              transform: [{ translateX: slideAnim }],
+            },
+          ]}
+        >
+            {/* One scroll container for the complete sidebar: header, menu and footer. */}
+            <ScrollView
+              style={styles.sidebarScroll}
+              contentContainerStyle={[
+                styles.sidebarScrollContent,
+                { paddingBottom: Math.max(insets.bottom, 16) + 16 },
+              ]}
+              showsVerticalScrollIndicator={true}
+              persistentScrollbar={true}
+              scrollEnabled={true}
+              nestedScrollEnabled={false}
+              keyboardShouldPersistTaps="handled"
+              bounces={false}
+              overScrollMode="auto"
+              directionalLockEnabled={true}
+              removeClippedSubviews={false}
+              scrollEventThrottle={16}
+            >
+              {/* Top Branding Header */}
+              <LinearGradient
               colors={GRADIENTS.navyHeader}
               style={[
                 styles.drawerHeader,
@@ -214,34 +227,9 @@ export const SidebarDrawer: React.FC = () => {
               </View>
             </LinearGradient>
 
-            {/* 100% Scrollable Navigation Container for Mobile & Web */}
-            <View style={styles.scrollWrapper}>
-              <ScrollView
-                style={styles.menuScroll}
-                contentContainerStyle={[
-                  styles.menuContent,
-                  { paddingBottom: Math.max(insets.bottom, 20) + 100 },
-                ]}
-                showsVerticalScrollIndicator={true}
-                nestedScrollEnabled={true}
-                scrollEnabled={true}
-                keyboardShouldPersistTaps="handled"
-                bounces={true}
-                overScrollMode="always"
-                persistentScrollbar={true}
-                directionalLockEnabled={true}
-                removeClippedSubviews={false}
-                onLayout={(event) => {
-                  console.log(
-                    'SIDEBAR SCROLL HEIGHT:',
-                    event.nativeEvent.layout.height
-                  );
-                }}
-                onContentSizeChange={(width, height) => {
-                  console.log('SIDEBAR CONTENT HEIGHT:', height);
-                }}
-              >
-                <Text style={styles.menuSectionTitle}>PRIMARY MODULES</Text>
+            {/* All menu items remain in the same main sidebar scroll view. */}
+            <View style={styles.menuContent}>
+              <Text style={styles.menuSectionTitle}>PRIMARY MODULES</Text>
 
                 {/* 1. Dashboard */}
                 <TouchableOpacity
@@ -833,10 +821,9 @@ export const SidebarDrawer: React.FC = () => {
                   </Text>
                   <ChevronRight size={16} color={COLORS.secondaryText} />
                 </TouchableOpacity>
-              </ScrollView>
             </View>
 
-            {/* Fixed Footer Sign Out Button */}
+            {/* Sign-out stays in the same scroll area so it is reachable on short screens. */}
             <View
               style={[
                 styles.drawerFooter,
@@ -855,8 +842,8 @@ export const SidebarDrawer: React.FC = () => {
                 <Text style={styles.logoutText}>Admin Sign Out</Text>
               </TouchableOpacity>
             </View>
-          </Animated.View>
-        </View>
+            </ScrollView>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -865,28 +852,32 @@ export const SidebarDrawer: React.FC = () => {
 const styles = StyleSheet.create({
   modalRoot: {
     flex: 1,
+    width: '100%',
+    height: '100%',
   },
   backdropOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0, 0, 0, 0.55)',
   },
-  flexRowContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'stretch',
-  },
-  leftDismissArea: {
-    flex: 1,
+  dismissArea: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 1,
   },
   drawerPanel: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
     width: DRAWER_WIDTH,
     minWidth: DRAWER_WIDTH,
     maxWidth: DRAWER_WIDTH,
-    flex: 1,
-    minHeight: 0,
     backgroundColor: COLORS.white,
     flexDirection: 'column',
-    elevation: 20,
+    zIndex: 2,
+    elevation: 24,
     shadowColor: '#000',
     shadowOffset: { width: -4, height: 0 },
     shadowOpacity: 0.28,
@@ -957,20 +948,20 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '800',
   },
-  scrollWrapper: {
+  sidebarScroll: {
     flex: 1,
-    minHeight: 0,
     width: '100%',
+    minHeight: 0,
+    alignSelf: 'stretch',
   },
-  menuScroll: {
-    flex: 1,
-    minHeight: 0,
-    width: '100%',
+  sidebarScrollContent: {
+    flexGrow: 1,
+    flexDirection: 'column',
   },
   menuContent: {
     paddingHorizontal: 10,
     paddingTop: 12,
-    paddingBottom: 100,
+    paddingBottom: 12,
   },
   menuSectionTitle: {
     fontSize: 10,
