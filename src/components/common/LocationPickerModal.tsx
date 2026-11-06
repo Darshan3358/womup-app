@@ -42,6 +42,7 @@ export const LocationPickerModal: React.FC = () => {
     setDeliveryEtaMinutes,
     currentStoreName,
     deliveryEtaMinutes,
+    isServiceable,
   } = useApp();
 
   const [isDetecting, setIsDetecting] = useState<boolean>(false);
@@ -60,13 +61,15 @@ export const LocationPickerModal: React.FC = () => {
   const handleAutoDetectLocation = async () => {
     setIsDetecting(true);
     setDetectionError(null);
+    setCurrentLocation(null);
+    setGpsResolvedArea(null);
     try {
       const loc = await LocationService.getCurrentLocation();
-      if (loc) {
+      if (loc && typeof loc.latitude === 'number' && typeof loc.longitude === 'number') {
         setCurrentLocation(loc);
         setIsResolvingArea(true);
         try {
-          const resolved = await LocationService.resolveArea(loc.latitude, loc.longitude, false);
+          const resolved = await LocationService.resolveArea(loc.latitude, loc.longitude, true);
           setGpsResolvedArea(resolved);
         } catch (resErr) {
           console.warn('[LocationPickerModal] Background resolveArea notice:', resErr);
@@ -74,11 +77,11 @@ export const LocationPickerModal: React.FC = () => {
           setIsResolvingArea(false);
         }
       } else {
-        setDetectionError('Permission required or location unavailable');
+        setDetectionError('Unable to detect real-time GPS coordinates. Please allow location access or pick an address.');
       }
     } catch (err: any) {
       console.warn('[LocationPickerModal] Detection failed:', err);
-      setDetectionError('Unable to detect real-time GPS');
+      setDetectionError(err?.message || 'Unable to detect real-time GPS coordinates.');
     } finally {
       setIsDetecting(false);
     }
@@ -214,8 +217,8 @@ export const LocationPickerModal: React.FC = () => {
               const isGpsApplied = selectedAddressSource === 'GPS';
 
               const isGpsServiceable = gpsResolvedArea
-                ? gpsResolvedArea.serviceable !== false
-                : true;
+                ? gpsResolvedArea.serviceable === true
+                : (isServiceable === true);
 
               const isFarOrFallback = Boolean(
                 gpsResolvedArea &&
@@ -223,9 +226,9 @@ export const LocationPickerModal: React.FC = () => {
                   gpsResolvedArea.distanceKm > 2.5
               );
 
-              const servingStore = gpsResolvedArea?.storeName || (isGpsApplied ? currentStoreName : (isDetecting ? 'Detecting store…' : 'Wom Up Dark Store'));
+              const servingStore = gpsResolvedArea?.storeName || (isGpsApplied ? currentStoreName : null);
               const distanceDisplay = gpsResolvedArea?.distanceKm ? `${gpsResolvedArea.distanceKm} km` : null;
-              const etaMinutes = gpsResolvedArea?.deliveryMinutes || (isGpsApplied ? deliveryEtaMinutes : 9);
+              const etaMinutes = gpsResolvedArea?.deliveryMinutes || (isGpsApplied ? deliveryEtaMinutes : null);
 
               return (
                 <View
@@ -284,13 +287,17 @@ export const LocationPickerModal: React.FC = () => {
                             /* State 1: Matched & Applied */
                             <View style={styles.gpsActiveBadge}>
                               <View style={styles.greenDot} />
-                              <Text style={styles.gpsActiveText}>Live GPS ✓</Text>
+                              <Text style={styles.gpsActiveText}>
+                                {currentLocation?.source === 'IP' ? 'Approximate IP' : 'Live GPS ✓'}
+                              </Text>
                             </View>
                           ) : (
                             /* State 2: Detected, Not Yet Applied */
                             <View style={styles.gpsDetectedBadge}>
                               <Ionicons name="compass-outline" size={13} color="#0284C7" />
-                              <Text style={styles.gpsDetectedText}>GPS Detected</Text>
+                              <Text style={styles.gpsDetectedText}>
+                                {currentLocation?.source === 'IP' ? 'Approximate IP' : 'GPS Detected'}
+                              </Text>
                             </View>
                           )
                         ) : null}
@@ -337,8 +344,8 @@ export const LocationPickerModal: React.FC = () => {
                                 ]}
                               >
                                 {isFarOrFallback
-                                  ? `Serving Hub: ${servingStore}${distanceDisplay ? ` (${distanceDisplay} away)` : ''} · ETA ${etaMinutes} mins`
-                                  : `Serving Hub: ${servingStore} · Delivery in ${etaMinutes} mins`}
+                                  ? `Serving Hub: ${servingStore || 'Assigned Dark Store'}${distanceDisplay ? ` (${distanceDisplay} away)` : ''}${etaMinutes ? ` · ETA ${etaMinutes} mins` : ''}`
+                                  : `Serving Hub: ${servingStore || 'Assigned Dark Store'}${etaMinutes ? ` · Delivery in ${etaMinutes} mins` : ''}`}
                               </Text>
                             </View>
                           ) : null}
@@ -350,9 +357,14 @@ export const LocationPickerModal: React.FC = () => {
                           )}
                         </View>
                       ) : detectionError ? (
-                        <Text style={styles.errorLocSubtitle}>
-                          {detectionError}. Tap Redetect to retry.
-                        </Text>
+                        <View style={{ marginTop: 2 }}>
+                          <Text style={styles.errorLocSubtitle}>
+                            {detectionError}
+                          </Text>
+                          <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                            Tap "Redetect GPS" below or select a saved address.
+                          </Text>
+                        </View>
                       ) : (
                         <Text style={styles.currentLocSubtitle}>
                           Tap to detect device real-time GPS location

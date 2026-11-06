@@ -87,20 +87,6 @@ export const RootNavigator: React.FC = () => {
     }
   }, [isLoading, isAuthenticated, activeScreen, setActiveScreen]);
 
-  // Listen to Android hardware back button
-  useEffect(() => {
-    const handleHardwareBack = () => {
-      if (canGoBack) {
-        goBack();
-        return true;
-      }
-      return false;
-    };
-
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', handleHardwareBack);
-    return () => backHandler.remove();
-  }, [canGoBack, goBack]);
-
   // Handle Web Browser Back Button (popstate)
   useEffect(() => {
     if (Platform.OS === 'web' && typeof window !== 'undefined') {

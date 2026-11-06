@@ -35,7 +35,11 @@ export const S06_MobileNumberScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // Register Form State (Email OTP)
+  // Register Form States (Mobile OTP or Email OTP per user choice)
+  const [registerMethod, setRegisterMethod] = useState<'PHONE' | 'EMAIL'>('PHONE');
+  const [registerPhone, setRegisterPhone] = useState(
+    user.phoneNumber ? user.phoneNumber.replace(/^\+91/, '').replace(/\D/g, '') : ''
+  );
   const [registerEmail, setRegisterEmail] = useState(user.email || '');
 
   const [error, setError] = useState('');
@@ -47,9 +51,6 @@ export const S06_MobileNumberScreen: React.FC = () => {
       setIdentifier(user.referralCode);
     }
   }, [user.referralCode]);
-
-  const isValidEmail = (val: string) =>
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim());
 
   // Handle Direct Login via Phone, Email, or Sponsor ID + Password
   const handlePasswordLogin = async () => {
@@ -74,7 +75,8 @@ export const S06_MobileNumberScreen: React.FC = () => {
           ...user,
           fullName: res.user.name || res.user.fullName || user.fullName,
           email: res.user.email || user.email,
-          phoneNumber: res.user.phone || user.phoneNumber,
+          phoneNumber: res.user.phoneNumber || res.user.phone || user.phoneNumber,
+          phone: res.user.phone || user.phone,
           referralCode: res.user.referralCode || user.referralCode,
           sponsorCode: res.user.sponsorCode || user.sponsorCode,
           shoppingCoins: res.user.shoppingCoins ?? 2000,
@@ -94,43 +96,83 @@ export const S06_MobileNumberScreen: React.FC = () => {
     }
   };
 
-  // Handle Login via OTP fallback
+  // Handle Login via OTP fallback (Mobile or Email OTP)
   const handleOtpLogin = async () => {
-    const cleanId = identifier.trim().toLowerCase();
+    const cleanId = identifier.trim();
     if (!cleanId) {
-      setError('Please enter your email or phone to receive an OTP');
+      setError('Please enter your mobile number or email to receive an OTP');
       return;
     }
+    const isEmail = cleanId.includes('@');
+    const cleanDigits = cleanId.replace(/\D/g, '').slice(-10);
+    const target = isEmail ? cleanId.toLowerCase() : (cleanDigits.length === 10 ? cleanDigits : cleanId);
+
     setError('');
     setLoading(true);
-    const res = await AuthService.sendOtp(cleanId);
+    const res = await AuthService.sendOtp(target, 'LOGIN');
     setLoading(false);
     if (res.success && res.verificationId) {
       setAuthVerificationId(res.verificationId);
-      setUser({ ...user, email: cleanId });
+      if (isEmail) {
+        setUser({ ...user, email: cleanId.toLowerCase(), phoneNumber: '', phone: '' });
+      } else {
+        const formattedPhone = cleanDigits.length === 10 ? `+91${cleanDigits}` : cleanId;
+        setUser({ ...user, phoneNumber: formattedPhone, phone: cleanDigits, email: '' });
+      }
       setActiveScreen('C07_OtpVerification');
     } else {
-      setError(res.message || 'Failed to send OTP. Please enter a valid registered email.');
+      setError(res.message || 'Failed to send OTP. Please check your credentials.');
     }
   };
 
-  // Handle New Registration OTP verification
+  // Handle New Registration OTP verification (Mobile or Email OTP)
   const handleRegisterOtp = async () => {
-    const trimmed = registerEmail.trim().toLowerCase();
-    if (!isValidEmail(trimmed)) {
-      setError('Please enter a valid email address');
-      return;
-    }
-    setError('');
-    setLoading(true);
-    const res = await AuthService.sendOtp(trimmed);
-    setLoading(false);
-    if (res.success && res.verificationId) {
-      setAuthVerificationId(res.verificationId);
-      setUser({ ...user, email: trimmed });
-      setActiveScreen('C07_OtpVerification');
+    if (registerMethod === 'PHONE') {
+      const cleanDigits = registerPhone.replace(/\D/g, '').slice(-10);
+      if (cleanDigits.length !== 10 || !/^[6-9]\d{9}$/.test(cleanDigits)) {
+        setError('Please enter a valid 10-digit Indian mobile number');
+        return;
+      }
+      setError('');
+      setLoading(true);
+      const res = await AuthService.sendOtp(cleanDigits, 'SIGNUP');
+      setLoading(false);
+      if (res.success && res.verificationId) {
+        setAuthVerificationId(res.verificationId);
+        setUser({
+          ...user,
+          phoneNumber: `+91${cleanDigits}`,
+          phone: cleanDigits,
+          email: '',
+        });
+        setActiveScreen('C07_OtpVerification');
+      } else {
+        setError(res.message || 'Failed to send OTP. Please try again.');
+      }
     } else {
-      setError(res.message || 'Failed to send OTP. Please try again.');
+      // EMAIL OTP REGISTRATION
+      const cleanEmail = registerEmail.trim().toLowerCase();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!cleanEmail || !emailRegex.test(cleanEmail)) {
+        setError('Please enter a valid email address');
+        return;
+      }
+      setError('');
+      setLoading(true);
+      const res = await AuthService.sendOtp(cleanEmail, 'SIGNUP');
+      setLoading(false);
+      if (res.success && res.verificationId) {
+        setAuthVerificationId(res.verificationId);
+        setUser({
+          ...user,
+          email: cleanEmail,
+          phoneNumber: '',
+          phone: '',
+        });
+        setActiveScreen('C07_OtpVerification');
+      } else {
+        setError(res.message || 'Failed to send OTP to email. Please try again.');
+      }
     }
   };
 
@@ -198,8 +240,10 @@ export const S06_MobileNumberScreen: React.FC = () => {
           </Text>
           <Text style={styles.subtitle}>
             {activeTab === 'SIGN_IN'
-              ? 'Log in using your Phone, Email, or Sponsor ID'
-              : 'Enter your email to verify and start your profile'}
+              ? 'Log in using your Mobile Number, Email, or Sponsor ID'
+              : registerMethod === 'EMAIL'
+              ? 'Enter your email address to verify and get ₹2,000 coins'
+              : 'Enter your 10-digit mobile number to verify and get ₹2,000 coins'}
           </Text>
 
           {/* Operating Cities Pill */}
@@ -208,6 +252,63 @@ export const S06_MobileNumberScreen: React.FC = () => {
               🏙️ Now Delivering in <Text style={styles.boldCity}>Ahmedabad</Text> · <Text style={styles.boldCity}>Surat</Text> · <Text style={styles.boldCity}>Vadodara</Text>
             </Text>
           </View>
+
+          {activeTab === 'REGISTER' && (
+            /* Method Switcher for Register: Mobile or Email */
+            <View style={styles.methodSelectorContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.methodTab,
+                  registerMethod === 'PHONE' && styles.methodTabActive,
+                ]}
+                onPress={() => {
+                  setRegisterMethod('PHONE');
+                  setError('');
+                }}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name="phone-portrait-outline"
+                  size={16}
+                  color={registerMethod === 'PHONE' ? COLORS.hotPink : COLORS.textMuted}
+                />
+                <Text
+                  style={[
+                    styles.methodTabText,
+                    registerMethod === 'PHONE' && styles.methodTabTextActive,
+                  ]}
+                >
+                  Mobile Number
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.methodTab,
+                  registerMethod === 'EMAIL' && styles.methodTabActive,
+                ]}
+                onPress={() => {
+                  setRegisterMethod('EMAIL');
+                  setError('');
+                }}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name="mail-outline"
+                  size={16}
+                  color={registerMethod === 'EMAIL' ? COLORS.hotPink : COLORS.textMuted}
+                />
+                <Text
+                  style={[
+                    styles.methodTabText,
+                    registerMethod === 'EMAIL' && styles.methodTabTextActive,
+                  ]}
+                >
+                  Email Address
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {activeTab === 'SIGN_IN' ? (
             /* ==================== SIGN IN TAB ==================== */
@@ -300,40 +401,77 @@ export const S06_MobileNumberScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
           ) : (
-            /* ==================== REGISTER TAB ==================== */
+            /* ==================== REGISTER TAB (Mobile or Email) ==================== */
             <View style={styles.formContainer}>
-              <Text style={styles.inputLabel}>Email Address</Text>
-              <View style={[styles.inputContainer, error ? styles.inputError : null]}>
-                <Ionicons
-                  name="mail-outline"
-                  size={20}
-                  color={COLORS.textMuted}
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="yourname@gmail.com"
-                  placeholderTextColor={COLORS.secondaryText}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  value={registerEmail}
-                  onChangeText={(text) => {
-                    setRegisterEmail(text);
-                    if (error) setError('');
-                  }}
-                  returnKeyType="done"
-                  onSubmitEditing={handleRegisterOtp}
-                />
-                {registerEmail.length > 0 && (
-                  <TouchableOpacity
-                    onPress={() => setRegisterEmail('')}
-                    style={styles.inputActionBtn}
-                  >
-                    <Ionicons name="close-circle" size={18} color={COLORS.textMuted} />
-                  </TouchableOpacity>
-                )}
-              </View>
+              {registerMethod === 'PHONE' ? (
+                <>
+                  <Text style={styles.inputLabel}>Mobile Number</Text>
+                  <View style={[styles.inputContainer, error ? styles.inputError : null]}>
+                    <View style={styles.countryCodeBadge}>
+                      <Text style={styles.flagEmoji}>🇮🇳</Text>
+                      <Text style={styles.countryCodeText}>+91</Text>
+                    </View>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Enter 10-digit mobile number"
+                      placeholderTextColor={COLORS.secondaryText}
+                      keyboardType="number-pad"
+                      maxLength={10}
+                      value={registerPhone}
+                      onChangeText={(text) => {
+                        const digits = text.replace(/\D/g, '');
+                        setRegisterPhone(digits);
+                        if (error) setError('');
+                      }}
+                      returnKeyType="done"
+                      onSubmitEditing={handleRegisterOtp}
+                    />
+                    {registerPhone.length > 0 && (
+                      <TouchableOpacity
+                        onPress={() => setRegisterPhone('')}
+                        style={styles.inputActionBtn}
+                      >
+                        <Ionicons name="close-circle" size={18} color={COLORS.textMuted} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.inputLabel}>Email Address</Text>
+                  <View style={[styles.inputContainer, error ? styles.inputError : null]}>
+                    <Ionicons
+                      name="mail-outline"
+                      size={20}
+                      color={COLORS.textMuted}
+                      style={styles.inputIcon}
+                    />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Enter your email address"
+                      placeholderTextColor={COLORS.secondaryText}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      value={registerEmail}
+                      onChangeText={(text) => {
+                        setRegisterEmail(text);
+                        if (error) setError('');
+                      }}
+                      returnKeyType="done"
+                      onSubmitEditing={handleRegisterOtp}
+                    />
+                    {registerEmail.length > 0 && (
+                      <TouchableOpacity
+                        onPress={() => setRegisterEmail('')}
+                        style={styles.inputActionBtn}
+                      >
+                        <Ionicons name="close-circle" size={18} color={COLORS.textMuted} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </>
+              )}
 
               {/* Error Message */}
               {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -347,9 +485,11 @@ export const S06_MobileNumberScreen: React.FC = () => {
               />
 
               <View style={styles.registerHintBox}>
-                <Ionicons name="information-circle-outline" size={16} color="#0284C7" />
+                <Ionicons name="shield-checkmark-outline" size={16} color="#059669" />
                 <Text style={styles.registerHintText}>
-                  After verifying your email, you can complete registration, set a password, and receive your Sponsor ID.
+                  {registerMethod === 'PHONE'
+                    ? 'A 6-digit OTP will be sent via SMS to verify your mobile number. You will receive 2,000 Shopping Coins upon joining!'
+                    : 'A 6-digit OTP will be sent to your email to verify your address. You will receive 2,000 Shopping Coins upon joining!'}
                 </Text>
               </View>
             </View>
@@ -457,7 +597,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: RADIUS.pill,
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.md,
     alignSelf: 'center',
   },
   operatingCitiesText: {
@@ -467,6 +607,42 @@ const styles = StyleSheet.create({
   boldCity: {
     fontWeight: '700',
     color: COLORS.hotPink,
+  },
+  methodSelectorContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    borderRadius: RADIUS.pill,
+    padding: 3,
+    marginBottom: SPACING.lg,
+    width: '100%',
+    maxWidth: 320,
+    alignSelf: 'center',
+  },
+  methodTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    gap: 6,
+    borderRadius: RADIUS.pill,
+  },
+  methodTabActive: {
+    backgroundColor: COLORS.white,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  methodTabText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.textMuted,
+  },
+  methodTabTextActive: {
+    color: COLORS.hotPink,
+    fontWeight: '700',
   },
   formContainer: {
     width: '100%',
@@ -513,6 +689,24 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     marginLeft: 4,
     fontWeight: '500',
+  },
+  countryCodeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    marginRight: 6,
+  },
+  flagEmoji: {
+    fontSize: 16,
+  },
+  countryCodeText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
   },
   button: {
     marginTop: SPACING.sm,

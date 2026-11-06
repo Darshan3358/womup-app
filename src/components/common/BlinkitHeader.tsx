@@ -70,6 +70,7 @@ const BlinkitHeaderComponent: React.FC<BlinkitHeaderProps> = ({
     openAuthPrompt,
     selectedAddress,
     selectedAddressSource,
+    locationError,
   } = useApp();
 
   const { unreadCount } = useNotifications();
@@ -127,17 +128,27 @@ const BlinkitHeaderComponent: React.FC<BlinkitHeaderProps> = ({
     );
   }
 
-  const displayEta = deliveryEtaMinutes ? `${deliveryEtaMinutes} minutes` : etaTime;
+  // Serviceability & ETA display states
+  const isAvailable = isServiceable === true;
+  const isUnavailable = isServiceable === false;
+  const isUnknown = isServiceable === null;
   const isSavedAddress = selectedAddressSource === 'SAVED' && selectedAddress && selectedAddress.type !== 'Current';
 
-  // Display the real reverse-geocoded detected address (e.g. "A, Tragad gam road, Godrej Garden City, Tragad, 382470")
-  // Priority:
-  // 1. Explicit readableAddress from real-time GPS reverse geocoder
-  // 2. Saved address components if a saved address is active
-  // 3. Clean deliveryLocation text
-  // 4. shortAddress
-  // 5. Fallback areaName, cityName
+  const hasValidLocation = Boolean(
+    !locationError &&
+    ((selectedAddress?.readableAddress && selectedAddress.readableAddress.trim().length > 0) ||
+      (isSavedAddress && selectedAddress) ||
+      (deliveryLocation && deliveryLocation !== 'Set Delivery Location' && deliveryLocation !== 'Select delivery address' && deliveryLocation !== 'Detecting your location...'))
+  );
+
+  // Display the real reverse-geocoded detected address or explicit location error. NEVER default to mock Surat or Ahmedabad.
   const displayLocationText = (() => {
+    if (locationError) {
+      return locationError;
+    }
+    if (!isAvailable && !hasValidLocation) {
+      return 'Device location is unavailable. Please check system location services.';
+    }
     if (selectedAddress?.readableAddress && selectedAddress.readableAddress.trim().length > 0) {
       return selectedAddress.readableAddress.trim();
     }
@@ -146,10 +157,11 @@ const BlinkitHeaderComponent: React.FC<BlinkitHeaderProps> = ({
         selectedAddress.houseFlat,
         selectedAddress.areaLandmark || selectedAddress.street,
         selectedAddress.city,
+        selectedAddress.pincode,
       ].filter(Boolean);
       if (parts.length > 0) return parts.join(', ');
     }
-    if (deliveryLocation && deliveryLocation !== 'Set Delivery Location') {
+    if (deliveryLocation && deliveryLocation !== 'Set Delivery Location' && deliveryLocation !== 'Select delivery address') {
       const cleaned = deliveryLocation.replace(/^Current Location\s*[—–-]\s*/i, '').trim();
       if (cleaned && !cleaned.toLowerCase().startsWith('set delivery')) {
         return cleaned;
@@ -158,16 +170,40 @@ const BlinkitHeaderComponent: React.FC<BlinkitHeaderProps> = ({
     if (selectedAddress?.shortAddress) {
       return selectedAddress.shortAddress.trim();
     }
-    const fallbackArea = currentAreaName || selectedAddress?.areaLandmark || selectedAddress?.street || 'Ahmedabad';
-    const fallbackCity = (isSavedAddress ? selectedAddress?.city : null) || currentCityName || user?.preferredCityName || 'Ahmedabad';
-    return `${fallbackArea}, ${fallbackCity}`;
+    if (currentAreaName && currentCityName) {
+      return `${currentAreaName}, ${currentCityName}`;
+    }
+    return 'Device location is unavailable. Please check system location services.';
   })();
 
-  const cleanStoreName = (
-    currentStoreName || (isServiceable !== false ? 'Wom Up Dark Store' : 'Delivery Unavailable')
-  )
-    .replace(/^🟢\s*/, '')
-    .trim();
+  // Top ETA / Status Header Line
+  const statusLineText = (() => {
+    if (locationError || (!isAvailable && !hasValidLocation)) {
+      return 'LOCATION UNAVAILABLE';
+    }
+    if (isAvailable) {
+      const eta = deliveryEtaMinutes ? `${deliveryEtaMinutes} MINS` : (etaTime || '9 MINS');
+      return `${etaLabel} ${eta}`.toUpperCase();
+    }
+    if (isUnavailable) {
+      return 'DELIVERY UNAVAILABLE';
+    }
+    return hasValidLocation ? 'CHECKING SERVICEABILITY…' : 'LOCATION UNAVAILABLE';
+  })();
+
+  // Store Hub Status Line - Only show when a real resolved store exists
+  const storeStatusText = (() => {
+    if (locationError || (!isAvailable && !hasValidLocation)) {
+      return null;
+    }
+    if (isAvailable && currentStoreName) {
+      return currentStoreName.replace(/^🟢\s*/, '').trim();
+    }
+    if (isUnavailable && hasValidLocation) {
+      return 'Outside delivery area';
+    }
+    return null;
+  })();
 
   return (
     <View style={[styles.headerContainer, { paddingTop: Math.max(insets.top, 8) }]}>
@@ -196,8 +232,15 @@ const BlinkitHeaderComponent: React.FC<BlinkitHeaderProps> = ({
               accessibilityLabel="Select delivery address"
             >
               <View style={styles.locationTextColumn}>
-                <Text style={styles.etaText} numberOfLines={1}>
-                  {isServiceable !== false ? `${etaLabel} ${displayEta}` : 'Currently Unavailable'}
+                <Text
+                  style={[
+                    styles.etaText,
+                    (isUnavailable || !!locationError || statusLineText === 'LOCATION UNAVAILABLE') && { color: '#EF4444' },
+                    isUnknown && !locationError && statusLineText !== 'LOCATION UNAVAILABLE' && { color: '#93C5FD' },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {statusLineText}
                 </Text>
 
                 <View style={styles.locationRow}>
@@ -212,12 +255,19 @@ const BlinkitHeaderComponent: React.FC<BlinkitHeaderProps> = ({
                   />
                 </View>
 
-                <View style={styles.storeStatusRow}>
-                  <View style={styles.storeStatusDot} />
-                  <Text style={styles.locationTitle} numberOfLines={1}>
-                    {cleanStoreName}
-                  </Text>
-                </View>
+                {storeStatusText && (
+                  <View style={styles.storeStatusRow}>
+                    <View
+                      style={[
+                        styles.storeStatusDot,
+                        isUnavailable && { backgroundColor: '#EF4444' },
+                      ]}
+                    />
+                    <Text style={styles.locationTitle} numberOfLines={1}>
+                      {storeStatusText}
+                    </Text>
+                  </View>
+                )}
               </View>
             </TouchableOpacity>
           </View>

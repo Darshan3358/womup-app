@@ -30,6 +30,9 @@ export interface DetectedLocation {
   areaLandmark: string;
   city: string;
   pincode: string;
+  source?: 'GPS' | 'IP' | 'MANUAL';
+  accuracy?: number;
+  timestamp?: number;
 }
 
 const AREA_CACHE_KEY = '@wormup_resolved_area';
@@ -147,82 +150,80 @@ export const LocationService = {
   },
 
   /**
-   * Auto-detect GPS coordinates and resolve delivery address & area.
-   * Throws explicit error or returns null if location is denied or unavailable.
-   * NEVER silently falls back to hardcoded coordinates.
+   * Auto-detect genuine device GPS coordinates and reverse geocode to address.
+   * On Web: uses navigator.geolocation (respects user permission, timeout, errors).
+   * On Mobile: uses Expo Location foreground permissions and high-accuracy GPS.
+   * NEVER silently uses or falls back to IP geolocation.
+   * Throws descriptive errors so caller can prompt user or show error state.
    */
   async getCurrentLocation(): Promise<DetectedLocation | null> {
     let lat: number | null = null;
     let lng: number | null = null;
+    let accuracy: number | undefined;
+    let timestamp: number | undefined;
 
     if (Platform.OS === 'web') {
-      if (typeof navigator !== 'undefined' && navigator.geolocation) {
-        try {
-          const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(
-              resolve,
-              (err) => reject(err),
-              {
-                enableHighAccuracy: true,
-                timeout: 8000,
-                maximumAge: 60000,
-              }
-            );
-          });
-          lat = pos.coords.latitude;
-          lng = pos.coords.longitude;
-        } catch (e) {
-          console.warn('[LocationService] Browser geolocation prompt dismissed/timed out, checking IP location:', e);
-        }
+      if (typeof navigator === 'undefined' || !navigator.geolocation) {
+        throw new Error('Geolocation is not supported by your browser.');
       }
 
-      // If browser location wasn't available or was denied, resolve real live place via IP
-      if (lat === null || lng === null) {
-        try {
-          const ipRes = await fetch('https://ipwho.is/');
-          if (ipRes.ok) {
-            const ipData = await ipRes.json();
-            if (ipData && ipData.success !== false && ipData.latitude && ipData.longitude) {
-              const result: DetectedLocation = {
-                latitude: ipData.latitude,
-                longitude: ipData.longitude,
-                readableAddress: `${ipData.city || ''}, ${ipData.region || ''} ${ipData.postal || ''}`.trim(),
-                shortAddress: ipData.city || 'Ahmedabad',
-                street: ipData.connection?.isp || ipData.city || '',
-                areaLandmark: ipData.region || '',
-                city: ipData.city || 'Ahmedabad',
-                pincode: ipData.postal || '',
-              };
-              return result;
+      try {
+        const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(
+            resolve,
+            (err) => reject(err),
+            {
+              enableHighAccuracy: true,
+              timeout: 10000,
+              maximumAge: 0,
             }
-          }
-        } catch (ipErr) {
-          console.warn('[LocationService] IP geolocation fallback failed:', ipErr);
+          );
+        });
+
+        lat = pos.coords.latitude;
+        lng = pos.coords.longitude;
+        accuracy = pos.coords.accuracy;
+        timestamp = pos.timestamp;
+      } catch (e: any) {
+        if (e?.code === 1) {
+          throw new Error('Location permission denied. Please allow location access in your browser.');
+        } else if (e?.code === 2) {
+          throw new Error('Device location is unavailable. Please check system location services.');
+        } else if (e?.code === 3) {
+          throw new Error('Location request timed out. Please try again.');
         }
+        throw new Error(e?.message || 'Unable to determine device location.');
       }
     } else {
       // Native Mobile (Android APK / iOS)
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status === 'granted') {
-          const isEnabled = await Location.hasServicesEnabledAsync();
-          if (isEnabled) {
-            let location: Location.LocationObject | null = null;
-            try {
-              location = await Location.getCurrentPositionAsync({
-                accuracy: Location.Accuracy.Balanced,
-              });
-            } catch (e) {
-              location = await Location.getLastKnownPositionAsync();
-            }
-            if (location) {
-              lat = location.coords.latitude;
-              lng = location.coords.longitude;
-            }
-          }
+        if (status !== 'granted') {
+          throw new Error('Location permission denied. Please enable location access in App Settings.');
         }
-      } catch (err) {
-        console.warn('[LocationService] Native permission check failed:', err);
+
+        const isEnabled = await Location.hasServicesEnabledAsync();
+        if (!isEnabled) {
+          throw new Error('Device GPS location services are disabled. Please turn on Location in system settings.');
+        }
+
+        let location: Location.LocationObject | null = null;
+        try {
+          location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.High,
+          });
+        } catch (posErr) {
+          location = await Location.getLastKnownPositionAsync();
+        }
+
+        if (location) {
+          lat = location.coords.latitude;
+          lng = location.coords.longitude;
+          accuracy = location.coords.accuracy ?? undefined;
+          timestamp = location.timestamp;
+        }
+      } catch (err: any) {
+        throw new Error(err?.message || 'Failed to obtain device GPS coordinates.');
       }
     }
 
@@ -231,7 +232,42 @@ export const LocationService = {
     }
 
     // Attempt real reverse geocoding for human-readable address & actual postal code
-    return this.reverseGeocode(lat, lng);
+    const geo = await this.reverseGeocode(lat, lng);
+    return {
+      ...geo,
+      source: 'GPS',
+      accuracy,
+      timestamp,
+    };
+  },
+
+  /**
+   * Optional approximate location suggestion derived from public IP address.
+   * MUST NEVER be presented as "Live GPS" or used to calculate delivery distance.
+   */
+  async getApproximateIpLocation(): Promise<DetectedLocation | null> {
+    try {
+      const ipRes = await fetch('https://ipwho.is/');
+      if (ipRes.ok) {
+        const ipData = await ipRes.json();
+        if (ipData && ipData.success !== false && ipData.latitude && ipData.longitude) {
+          return {
+            latitude: ipData.latitude,
+            longitude: ipData.longitude,
+            readableAddress: `${ipData.city || ''}, ${ipData.region || ''} ${ipData.postal || ''}`.trim(),
+            shortAddress: ipData.city || '',
+            street: '',
+            areaLandmark: ipData.region || '',
+            city: ipData.city || '',
+            pincode: ipData.postal || '',
+            source: 'IP',
+          };
+        }
+      }
+    } catch (ipErr) {
+      console.warn('[LocationService] Approximate IP lookup failed:', ipErr);
+    }
+    return null;
   },
 
   /**
@@ -271,7 +307,7 @@ export const LocationService = {
             const name = props.name || '';
             const street = props.street || '';
             const locality = props.locality || props.suburb || props.district || '';
-            const city = props.city || props.county || 'Ahmedabad';
+            const city = props.city || props.county || '';
             const postcode = props.postcode || '';
 
             const primaryPlace = [name, street].filter(Boolean).join(', ') || street || name;
@@ -295,7 +331,7 @@ export const LocationService = {
                 shortAddress,
                 street: primaryPlace || shortAddress,
                 areaLandmark,
-                city: city || 'Ahmedabad',
+                city: city,
                 pincode: postcode,
               };
               _reverseGeocodeCache.set(cacheKey, { data: result, ts: Date.now() });
@@ -314,7 +350,7 @@ export const LocationService = {
           if (nativeResults && nativeResults.length > 0) {
             const item = nativeResults[0];
             const postalCode = item.postalCode || '';
-            const city = item.city || item.subregion || item.region || 'Ahmedabad';
+            const city = item.city || item.subregion || item.region || '';
             const street = item.street || item.name || '';
             const locality = item.district || item.subregion || item.city || '';
             const readableAddress = [street, locality, city, postalCode].filter(Boolean).join(', ');
@@ -327,7 +363,7 @@ export const LocationService = {
                 shortAddress: locality || city || `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
                 street: street || readableAddress,
                 areaLandmark: locality,
-                city: city || 'Ahmedabad',
+                city: city,
                 pincode: postalCode,
               };
               _reverseGeocodeCache.set(cacheKey, { data: result, ts: Date.now() });
@@ -364,7 +400,7 @@ export const LocationService = {
               shortAddress: locality || city || `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
               street: road || locality || '',
               areaLandmark: locality,
-              city: city || 'Ahmedabad',
+              city: city,
               pincode: postcode,
             };
             _reverseGeocodeCache.set(cacheKey, { data: result, ts: Date.now() });
@@ -405,7 +441,7 @@ export const LocationService = {
             shortAddress,
             street: road || shortAddress,
             areaLandmark: locality,
-            city: city || 'Ahmedabad',
+            city: city,
             pincode: postcode,
           };
           _reverseGeocodeCache.set(cacheKey, { data: result, ts: Date.now() });
@@ -425,7 +461,7 @@ export const LocationService = {
         shortAddress: `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
         street: `Coordinates: ${lat.toFixed(4)}, ${lng.toFixed(4)}`,
         areaLandmark: '',
-        city: 'Ahmedabad',
+        city: '',
         pincode: '',
       };
     })();

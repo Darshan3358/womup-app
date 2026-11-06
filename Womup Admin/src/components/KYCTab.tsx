@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   Clock,
   Eye,
+  EyeOff,
   Download,
   CreditCard,
   Building,
@@ -73,9 +74,46 @@ export const KYCTab: React.FC<KYCTabProps> = ({ customer, onStatusChange }) => {
   // Image zoom modal
   const [zoomImage, setZoomImage] = useState<{ url: string; title: string } | null>(null);
 
+  // Reveal/Hide sensitive details with audit
+  const [showAadhaar, setShowAadhaar] = useState(false);
+  const [showBankAccount, setShowBankAccount] = useState(false);
+
   useEffect(() => {
+    setShowAadhaar(false);
+    setShowBankAccount(false);
     loadKycDetails();
   }, [customer.id]);
+
+  // Auto-hide sensitive info after 60 seconds
+  useEffect(() => {
+    if (showAadhaar) {
+      const timer = setTimeout(() => setShowAadhaar(false), 60000);
+      return () => clearTimeout(timer);
+    }
+  }, [showAadhaar]);
+
+  useEffect(() => {
+    if (showBankAccount) {
+      const timer = setTimeout(() => setShowBankAccount(false), 60000);
+      return () => clearTimeout(timer);
+    }
+  }, [showBankAccount]);
+
+  const toggleRevealAadhaar = () => {
+    const nextVal = !showAadhaar;
+    setShowAadhaar(nextVal);
+    if (nextVal) {
+      CustomerService.logSensitiveReveal(customer.id, 'aadhaar', 'Admin revealed Aadhaar number in KYC tab');
+    }
+  };
+
+  const toggleRevealBankAccount = () => {
+    const nextVal = !showBankAccount;
+    setShowBankAccount(nextVal);
+    if (nextVal) {
+      CustomerService.logSensitiveReveal(customer.id, 'bank_account', 'Admin revealed Bank Account in KYC tab');
+    }
+  };
 
   const loadKycDetails = async () => {
     try {
@@ -291,9 +329,39 @@ export const KYCTab: React.FC<KYCTabProps> = ({ customer, onStatusChange }) => {
 
         <View style={styles.grid2Col}>
           <View style={styles.infoField}>
-            <Text style={styles.fieldLabel}>Aadhaar Number</Text>
-            <Text style={styles.fieldValueBold}>
-              {kycData?.aadhaarNumber || 'XXXX XXXX 1234'}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+              <Text style={styles.fieldLabel}>Aadhaar Number</Text>
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
+                  backgroundColor: showAadhaar ? '#FEE2E2' : '#F3E8FF',
+                  borderRadius: 6,
+                  borderWidth: 1,
+                  borderColor: showAadhaar ? '#FCA5A5' : '#DDD6FE',
+                }}
+                onPress={toggleRevealAadhaar}
+                activeOpacity={0.7}
+              >
+                {showAadhaar ? (
+                  <>
+                    <EyeOff size={12} color="#DC2626" style={{ marginRight: 4 }} />
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#DC2626' }}>Hide</Text>
+                  </>
+                ) : (
+                  <>
+                    <Eye size={12} color={COLORS.purple} style={{ marginRight: 4 }} />
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: COLORS.purple }}>Reveal</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+            <Text style={[styles.fieldValueBold, showAadhaar && { letterSpacing: 1.2, color: '#1E1B4B' }]}>
+              {showAadhaar
+                ? (kycData?.rawAadhaarNumber || customer.aadhaarNumber || (customer as any).customer_aadhar_no || kycData?.aadhaarNumber || 'Not Stored')
+                : (kycData?.aadhaarNumber || (customer.aadhaarNumber ? `XXXX XXXX ${customer.aadhaarNumber.slice(-4)}` : 'XXXX XXXX 1234'))}
             </Text>
           </View>
 
@@ -492,10 +560,40 @@ export const KYCTab: React.FC<KYCTabProps> = ({ customer, onStatusChange }) => {
           </View>
 
           <View style={styles.infoField}>
-            <Text style={styles.fieldLabel}>Account Number</Text>
-            <Text style={styles.fieldValueMono}>
-              {kycData?.bankDetails?.accountNumber ||
-                (customer.accountNumber ? `XXXX ${customer.accountNumber.slice(-4)}` : 'N/A')}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+              <Text style={styles.fieldLabel}>Account Number</Text>
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
+                  backgroundColor: showBankAccount ? '#FEE2E2' : '#F3E8FF',
+                  borderRadius: 6,
+                  borderWidth: 1,
+                  borderColor: showBankAccount ? '#FCA5A5' : '#DDD6FE',
+                }}
+                onPress={toggleRevealBankAccount}
+                activeOpacity={0.7}
+              >
+                {showBankAccount ? (
+                  <>
+                    <EyeOff size={12} color="#DC2626" style={{ marginRight: 4 }} />
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#DC2626' }}>Hide</Text>
+                  </>
+                ) : (
+                  <>
+                    <Eye size={12} color={COLORS.purple} style={{ marginRight: 4 }} />
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: COLORS.purple }}>Reveal</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+            <Text style={[styles.fieldValueMono, showBankAccount && { letterSpacing: 1.2, color: '#1E1B4B', fontWeight: '700' }]}>
+              {showBankAccount
+                ? (kycData?.bankDetails?.rawAccountNumber || customer.accountNumber || (customer as any).bankAccountNo || 'Not Stored')
+                : (kycData?.bankDetails?.accountNumber ||
+                    (customer.accountNumber ? `XXXX ${customer.accountNumber.slice(-4)}` : 'XXXX 6162'))}
             </Text>
           </View>
 

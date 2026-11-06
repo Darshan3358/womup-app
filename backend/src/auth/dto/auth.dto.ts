@@ -2,17 +2,21 @@ import { IsString, IsNotEmpty, IsEmail, IsOptional, Matches } from 'class-valida
 import { ApiProperty } from '@nestjs/swagger';
 
 export class SendOtpDto {
-  @ApiProperty({ example: 'user@example.com', required: false, description: 'Customer email address to send OTP' })
-  @IsEmail({}, { message: 'Please provide a valid email address' })
-  @IsOptional()
-  email?: string;
-
-  @ApiProperty({ example: '+919876543210', required: false, description: 'Mobile number with country code' })
+  @ApiProperty({ example: '+919876543210', required: false, description: '10-digit mobile number or with country code' })
   @IsString()
   @IsOptional()
   phoneNumber?: string;
 
-  @ApiProperty({ example: 'DELIVERY_LOGIN', required: false, description: 'Authentication purpose' })
+  @ApiProperty({ example: '+919876543210', required: false })
+  @IsString()
+  @IsOptional()
+  phone?: string;
+
+  @ApiProperty({ example: 'user@example.com', required: false, description: 'Legacy email fallback if applicable' })
+  @IsOptional()
+  email?: string;
+
+  @ApiProperty({ example: 'LOGIN', required: false, description: 'Authentication purpose (LOGIN, SIGNUP, PHONE_CHANGE, DELIVERY_LOGIN)' })
   @IsString()
   @IsOptional()
   purpose?: string;
@@ -29,20 +33,69 @@ export class VerifyOtpDto {
   @IsOptional()
   phoneNumber?: string;
 
+  @ApiProperty({ example: '+919876543210', required: false })
+  @IsString()
+  @IsOptional()
+  phone?: string;
+
   @ApiProperty({ example: '123456', description: '6-digit OTP' })
   @IsString()
   @IsNotEmpty()
   otp: string;
 
-  @ApiProperty({ example: 'rider@example.com', required: false, description: 'Email address for delivery OTP verification' })
-  @IsEmail({}, { message: 'Please provide a valid email address' })
+  @ApiProperty({ example: 'user@example.com', required: false })
   @IsOptional()
   email?: string;
 
-  @ApiProperty({ example: 'DELIVERY_LOGIN', required: false })
+  @ApiProperty({ example: 'LOGIN', required: false })
   @IsString()
   @IsOptional()
   purpose?: string;
+}
+
+export class ResendOtpDto {
+  @ApiProperty({ example: 'verification_uuid_123', required: false })
+  @IsString()
+  @IsOptional()
+  verificationId?: string;
+
+  @ApiProperty({ example: '+919876543210', required: false })
+  @IsString()
+  @IsOptional()
+  phoneNumber?: string;
+
+  @ApiProperty({ example: '+919876543210', required: false })
+  @IsString()
+  @IsOptional()
+  phone?: string;
+
+  @ApiProperty({ example: 'user@example.com', required: false })
+  @IsOptional()
+  email?: string;
+}
+
+export class ChangePhoneSendDto {
+  @ApiProperty({ example: '+919876543210', required: true, description: 'New 10-digit mobile number' })
+  @IsString()
+  @IsNotEmpty()
+  newPhoneNumber: string;
+}
+
+export class ChangePhoneVerifyDto {
+  @ApiProperty({ example: 'verification_uuid_123', required: true })
+  @IsString()
+  @IsNotEmpty()
+  verificationId: string;
+
+  @ApiProperty({ example: '123456', required: true })
+  @IsString()
+  @IsNotEmpty()
+  otp: string;
+
+  @ApiProperty({ example: '+919876543210', required: true })
+  @IsString()
+  @IsNotEmpty()
+  newPhoneNumber: string;
 }
 
 export class RegisterRiderDto {
@@ -112,6 +165,10 @@ export class RegisterDto {
   @IsString()
   @IsNotEmpty()
   name: string;
+
+  @ApiProperty({ example: 'darshan@example.com', required: false, description: 'Optional email address' })
+  @IsOptional()
+  email?: string;
 
   @ApiProperty({ example: '9876543210', required: false, description: '10-digit mobile number' })
   @IsOptional()

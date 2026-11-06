@@ -1220,7 +1220,7 @@ export class UsersService {
       ? `XXXX XXXX ${rawAadhaar.slice(-4)}` 
       : (rawAadhaar ? 'XXXX XXXX XXXX' : 'Not Provided');
 
-    const rawBankAcc = customer.bankAccountNo || customer.account_number || '';
+    const rawBankAcc = customer.accountNumber || customer.bankAccountNo || customer.account_number || '';
     const maskedAccount = rawBankAcc.length >= 4
       ? `XXXX XXXX ${rawBankAcc.slice(-4)}`
       : (rawBankAcc ? 'XXXX XXXX' : 'Not Provided');
@@ -1231,6 +1231,8 @@ export class UsersService {
       success: true,
       data: {
         ...customer,
+        rawAadhaarNumber: rawAadhaar,
+        rawAccountNumber: rawBankAcc,
         maskedAadhaar,
         maskedAccount,
         sponsor,
@@ -1239,6 +1241,27 @@ export class UsersService {
           backImage: sanitizePublicDocUrl(customer.customer_image_aadhar_back || customer.aadharBackImage || ''),
         },
       },
+    };
+  }
+
+  async adminAuditRevealSensitive(
+    customerId: string,
+    payload: { field: string; adminId?: string; adminEmail?: string; purpose?: string },
+    user?: any,
+  ): Promise<any> {
+    const adminIdentifier = payload.adminEmail || payload.adminId || user?.email || user?.id || 'admin';
+    const field = payload.field || 'unknown_field';
+    const purpose = payload.purpose || 'KYC Verification Review';
+    const timestamp = new Date().toISOString();
+
+    this.logger.log(
+      `🔒 [KYC AUDIT] Admin '${adminIdentifier}' revealed sensitive '${field}' for Customer '${customerId}' at ${timestamp}. Purpose: ${purpose}`,
+    );
+
+    return {
+      success: true,
+      message: `Reveal of ${field} logged successfully for audit`,
+      timestamp,
     };
   }
 

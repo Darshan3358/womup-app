@@ -68,12 +68,18 @@ export const S07_OtpVerificationScreen: React.FC = () => {
     }
   };
 
+  const isEmailAuth = Boolean(user.email && !user.phoneNumber && !user.phone);
+  const displayTarget = isEmailAuth
+    ? user.email
+    : user.phoneNumber || (user.phone ? `+91 ${user.phone}` : '+91 Mobile Number');
+
   const handleResend = async () => {
     setTimer(30);
     setError('');
     setResendSuccess(false);
-    if (user.email) {
-      const res = await AuthService.sendOtp(user.email);
+    const target = isEmailAuth ? user.email : (user.phoneNumber || user.phone || '');
+    if (target || authVerificationId) {
+      const res = await AuthService.resendOtp(authVerificationId || undefined, target);
       if (res.success && res.verificationId) {
         setAuthVerificationId(res.verificationId);
         setResendSuccess(true);
@@ -89,11 +95,12 @@ export const S07_OtpVerificationScreen: React.FC = () => {
       setError('');
       if (!authVerificationId) {
         setLoading(false);
-        setError('Verification session expired. Please go back and resend OTP.');
+        setError('Verification session expired. Please go back and request OTP again.');
         return;
       }
 
-      const res = await AuthService.verifyOtp(authVerificationId, code);
+      const target = isEmailAuth ? user.email : (user.phoneNumber || user.phone);
+      const res = await AuthService.verifyOtp(authVerificationId, code, target);
       setLoading(false);
       if (res.success) {
         if (res.isNewUser === false) {
@@ -103,7 +110,8 @@ export const S07_OtpVerificationScreen: React.FC = () => {
               ...user,
               fullName: res.user.name || user.fullName,
               email: res.user.email || user.email,
-              phoneNumber: res.user.phone || user.phoneNumber,
+              phoneNumber: res.user.phoneNumber || res.user.phone || user.phoneNumber,
+              phone: res.user.phone || user.phone,
               shoppingCoins: res.user.shoppingCoins || user.shoppingCoins,
             };
             setUser(updatedUser);
@@ -116,6 +124,13 @@ export const S07_OtpVerificationScreen: React.FC = () => {
           setActiveScreen('Blinkit_Home');
         } else {
           // New user registration flow
+          const nextUser = {
+            ...user,
+            email: res.email || user.email || '',
+            phoneNumber: res.phoneNumber || user.phoneNumber || '',
+            phone: res.phone || user.phone || '',
+          };
+          setUser(nextUser);
           setActiveScreen('C08_CreateAccount');
         }
       } else {
@@ -138,25 +153,31 @@ export const S07_OtpVerificationScreen: React.FC = () => {
 
       {/* Main Form Info */}
       <View style={styles.content}>
-        <Text style={styles.title}>Verify your Email</Text>
+        <Text style={styles.title}>
+          {isEmailAuth ? 'Email Verification' : 'Mobile Verification'}
+        </Text>
         <Text style={styles.subtitle}>
-          Enter the 6-digit code sent to{' '}
-          <Text style={styles.phoneBold}>{user.email || 'your email'}</Text>
+          {isEmailAuth
+            ? 'Enter the six-digit OTP sent to your registered email'
+            : 'Enter the six-digit OTP sent to your registered number'}
         </Text>
 
-        {/* Email confirmation badge */}
+        {/* Verification Target Badge */}
         <View style={styles.sentBadge}>
-          <Ionicons name="mail" size={16} color="#059669" />
-          <Text style={styles.sentBadgeText}>OTP sent to your email inbox</Text>
-        </View>
-
-        {/* Spam / Promotions tip note */}
-        <View style={styles.spamTipBadge}>
-          <Ionicons name="information-circle-outline" size={14} color="#6B7280" />
-          <Text style={styles.spamTipText}>
-            Not in Primary? Check your <Text style={styles.spamTipHighlight}>Spam</Text> or <Text style={styles.spamTipHighlight}>Promotions</Text> folder
+          <Ionicons name={isEmailAuth ? 'mail' : 'chatbubble-ellipses'} size={16} color="#059669" />
+          <Text style={styles.sentBadgeText}>
+            {isEmailAuth ? 'OTP sent via Email to ' : 'OTP sent via SMS to '}
+            <Text style={styles.phoneBold}>{displayTarget}</Text>
           </Text>
         </View>
+
+        {/* Change Target Link */}
+        <TouchableOpacity onPress={goBack} style={styles.changePhoneBtn} activeOpacity={0.7}>
+          <Ionicons name="pencil-outline" size={14} color={COLORS.hotPink} />
+          <Text style={styles.changePhoneText}>
+            {isEmailAuth ? 'Wrong email? Change email address' : 'Wrong number? Change mobile number'}
+          </Text>
+        </TouchableOpacity>
 
         {/* 6 OTP Digit Boxes */}
         <View style={styles.otpBoxesRow}>
@@ -194,7 +215,7 @@ export const S07_OtpVerificationScreen: React.FC = () => {
 
         {resendSuccess && (
           <Text style={styles.resendSuccessText}>
-            ✓ New OTP sent! Please check your Spam / Promotions folder.
+            ✓ New OTP sent to {displayTarget}!
           </Text>
         )}
 
@@ -347,6 +368,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#065F46',
+  },
+  changePhoneBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    marginBottom: 14,
+  },
+  changePhoneText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.hotPink,
   },
   spamTipBadge: {
     flexDirection: 'row',

@@ -7,6 +7,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { EmailService } from './email.service';
+import { SmsService } from './sms.service';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { OtpVerification, OtpVerificationSchema } from './schemas/otp.schema';
 import { RefreshToken, RefreshTokenSchema } from './schemas/refresh-token.schema';
@@ -39,7 +40,7 @@ import { IncomeTransaction, IncomeTransactionSchema } from '../users/schemas/inc
     ]),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, EmailService],
-  exports: [AuthService, JwtStrategy, EmailService, PassportModule],
+  providers: [AuthService, JwtStrategy, EmailService, SmsService],
+  exports: [AuthService, JwtStrategy, EmailService, SmsService, PassportModule],
 })
 export class AuthModule {}

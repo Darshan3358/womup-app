@@ -7,6 +7,7 @@ import {
   Param,
   Query,
   Body,
+  Req,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { UsersService } from './users.service';
@@ -63,6 +64,16 @@ export class AdminCustomersController {
   @ApiOperation({ summary: 'Get customer KYC review details with masked fields and document images' })
   async getCustomerKycReview(@Param('id') id: string): Promise<any> {
     return this.usersService.adminGetCustomerKycReview(id);
+  }
+
+  @Post(':id/reveal-sensitive')
+  @ApiOperation({ summary: 'Audit log for revealing sensitive KYC details (Aadhaar or Bank Account)' })
+  async auditRevealSensitive(
+    @Param('id') id: string,
+    @Body() body: { field: string; adminId?: string; adminEmail?: string; purpose?: string },
+    @Req() req: any,
+  ) {
+    return this.usersService.adminAuditRevealSensitive(id, body, req?.user);
   }
 
   @Get(':id')

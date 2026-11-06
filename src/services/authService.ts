@@ -28,27 +28,91 @@ export const INITIAL_USER: UserProfile = {
 };
 
 export const AuthService = {
-  async sendOtp(email: string): Promise<{ success: boolean; verificationId?: string; message?: string }> {
-    const normalizedEmail = email.trim().toLowerCase();
-    const res = await api.post<any>('/auth/send-otp', { email: normalizedEmail });
-    if (res.success && res.data?.verificationId) {
+  async sendOtp(phoneOrEmail: string, purpose: string = 'LOGIN'): Promise<{ success: boolean; verificationId?: string; message?: string }> {
+    const raw = (phoneOrEmail || '').trim();
+    const isEmail = raw.includes('@');
+    const cleanDigits = raw.replace(/\D/g, '');
+    const cleanPhone = cleanDigits.length > 10 ? cleanDigits.slice(-10) : cleanDigits;
+
+    const payload: any = isEmail
+      ? { email: raw.toLowerCase(), purpose }
+      : { phoneNumber: `+91${cleanPhone}`, phone: cleanPhone, purpose };
+
+    let res = await api.post<any>('/auth/send-otp', payload);
+    if (!res.success && (res.message?.includes('Cannot POST') || res.message?.includes('Not Found'))) {
+      res = await api.post<any>('/auth/otp/send', payload);
+    }
+    const data = res.data || res;
+    const verificationId = data?.verificationId || (res as any)?.verificationId;
+    if (res.success && verificationId) {
       return {
         success: true,
-        verificationId: res.data.verificationId,
-        message: res.data.message || 'OTP sent successfully',
+        verificationId,
+        message: data.message || res.message || 'OTP sent successfully',
       };
     }
     return {
       success: false,
-      message: res.message || 'Failed to send OTP',
+      message: res.message || data?.message || 'Failed to send OTP. Please check your details.',
+    };
+  },
+
+  async resendOtp(verificationId?: string, phoneOrEmail?: string): Promise<{ success: boolean; verificationId?: string; message?: string }> {
+    const payload: any = {};
+    if (verificationId) payload.verificationId = verificationId;
+    if (phoneOrEmail) {
+      const raw = phoneOrEmail.trim();
+      if (raw.includes('@')) {
+        payload.email = raw.toLowerCase();
+      } else {
+        const cleanDigits = raw.replace(/\D/g, '');
+        const cleanPhone = cleanDigits.length > 10 ? cleanDigits.slice(-10) : cleanDigits;
+        payload.phoneNumber = `+91${cleanPhone}`;
+        payload.phone = cleanPhone;
+      }
+    }
+
+    let res = await api.post<any>('/auth/resend-otp', payload);
+    if (!res.success && (res.message?.includes('Cannot POST') || res.message?.includes('Not Found'))) {
+      res = await api.post<any>('/auth/otp/resend', payload);
+    }
+    const data = res.data || res;
+    const resolvedVerificationId = data?.verificationId || (res as any)?.verificationId;
+    if (res.success && resolvedVerificationId) {
+      return {
+        success: true,
+        verificationId: resolvedVerificationId,
+        message: data.message || res.message || 'OTP resent successfully',
+      };
+    }
+    return {
+      success: false,
+      message: res.message || data?.message || 'Failed to resend OTP',
     };
   },
 
   async verifyOtp(
     verificationId: string,
     otp: string,
-  ): Promise<{ success: boolean; isNewUser?: boolean; user?: any; token?: string; message?: string }> {
-    const res = await api.post<any>('/auth/verify-otp', { verificationId, otp });
+    phoneOrEmail?: string,
+  ): Promise<{ success: boolean; isNewUser?: boolean; user?: any; token?: string; message?: string; email?: string; phone?: string; phoneNumber?: string }> {
+    const payload: any = { verificationId, otp: otp.trim() };
+    if (phoneOrEmail) {
+      const raw = phoneOrEmail.trim();
+      if (raw.includes('@')) {
+        payload.email = raw.toLowerCase();
+      } else {
+        const cleanDigits = raw.replace(/\D/g, '');
+        const cleanPhone = cleanDigits.length > 10 ? cleanDigits.slice(-10) : cleanDigits;
+        payload.phoneNumber = `+91${cleanPhone}`;
+        payload.phone = cleanPhone;
+      }
+    }
+
+    let res = await api.post<any>('/auth/verify-otp', payload);
+    if (!res.success && (res.message?.includes('Cannot POST') || res.message?.includes('Not Found'))) {
+      res = await api.post<any>('/auth/otp/verify', payload);
+    }
     if (res.success && res.data) {
       if (res.data.accessToken) {
         api.setToken(res.data.accessToken);
@@ -62,12 +126,15 @@ export const AuthService = {
         isNewUser: res.data.isNewUser,
         user: res.data.user,
         token: res.data.accessToken,
+        email: res.data.email,
+        phone: res.data.phone,
+        phoneNumber: res.data.phoneNumber,
         message: res.data.message,
       };
     }
     return {
       success: false,
-      message: res.message || 'Failed to verify OTP',
+      message: res.message || (res.data as any)?.message || 'Failed to verify OTP',
     };
   },
 

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Platform } from 'react-native';
+import { Platform, BackHandler } from 'react-native';
 import {
   Product,
   CartItem,
@@ -192,13 +192,15 @@ interface AppContextType {
   currentAreaName: string | null;
   currentStoreId: string | null;
   currentStoreName: string | null;
-  isServiceable: boolean;
-  setIsServiceable: (serviceable: boolean) => void;
+  isServiceable: boolean | null;
+  setIsServiceable: (serviceable: boolean | null) => void;
   deliveryEtaMinutes: number | null;
   setDeliveryEtaMinutes: (minutes: number | null) => void;
   setCurrentArea: (areaId: string, areaName: string) => void;
   setCurrentStore: (storeId: string | null, storeName: string | null) => void;
   catalogVersion: number;
+  locationError: string | null;
+  setLocationError: (error: string | null) => void;
 
   // Onboarding & Auth State
   isAuthenticated: boolean;
@@ -416,6 +418,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setSelectedAddressState(normalized);
     setSelectedAddressId(addrId);
     setSelectedAddressSource('SAVED');
+    setLocationError(null);
     setDeliveryLocation(displayLabel);
 
     await StorageService.saveItem(StorageService.KEYS.SELECTED_ADDRESS, {
@@ -478,8 +481,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       phoneNumber: user.phoneNumber || '',
       houseFlat: loc.street || loc.readableAddress || 'Current GPS Location',
       areaLandmark: loc.areaLandmark || loc.shortAddress || '',
-      city: loc.city || 'Ahmedabad',
-      pincode: loc.pincode || '380015',
+      city: loc.city || '',
+      pincode: loc.pincode || '',
       latitude: loc.latitude,
       longitude: loc.longitude,
       isDefault: true,
@@ -490,6 +493,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setSelectedAddressState(addressObj);
     setSelectedAddressId(addressObj.id);
     setSelectedAddressSource('GPS');
+    setLocationError(null);
     setDeliveryLocation(displayLabel);
 
     await StorageService.saveItem(StorageService.KEYS.SELECTED_ADDRESS, {
@@ -508,13 +512,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       if (area) {
-        setCurrentAreaId(area.areaId);
-        setCurrentAreaName(area.areaName);
-        setCurrentCityName(area.city || user.preferredCityName || 'Ahmedabad');
+        setCurrentAreaId(area.areaId || null);
+        setCurrentAreaName(area.areaName || null);
+        setCurrentCityName(area.city || null);
         setCurrentStoreId(area.storeId || null);
         setCurrentStoreName(area.storeName || null);
-        setIsServiceable(area.serviceable === true);
-        setDeliveryEtaMinutes(area.deliveryMinutes || 9);
+        const isSrv = area.serviceable === true;
+        setIsServiceable(isSrv);
+        setDeliveryEtaMinutes(isSrv ? (area.deliveryMinutes || null) : null);
 
         try {
           const liveProducts = await ProductService.fetchProducts({
@@ -528,9 +533,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         } catch (pErr) {
           console.warn('[AppContext] Failed to refresh products for GPS area:', pErr);
         }
+      } else {
+        setCurrentAreaId(null);
+        setCurrentAreaName(null);
+        setCurrentStoreId(null);
+        setCurrentStoreName(null);
+        setIsServiceable(false);
+        setDeliveryEtaMinutes(null);
       }
     } catch (err) {
       console.error('[AppContext] Error resolving area for GPS:', err);
+      setIsServiceable(false);
+      setDeliveryEtaMinutes(null);
     }
   }, [user.fullName, user.phoneNumber, user.preferredCityName]);
 
@@ -541,9 +555,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [currentCityId, setCurrentCityId] = useState<string | null>(null);
   const [currentStoreId, setCurrentStoreId] = useState<string | null>(null);
   const [currentStoreName, setCurrentStoreName] = useState<string | null>(null);
-  const [isServiceable, setIsServiceable] = useState<boolean>(false);
+  const [isServiceable, setIsServiceable] = useState<boolean | null>(null);
   const [deliveryEtaMinutes, setDeliveryEtaMinutes] = useState<number | null>(null);
   const [catalogVersion, setCatalogVersion] = useState<number>(0);
+  const [locationError, setLocationError] = useState<string | null>(
+    'Device location is unavailable. Please check system location services.'
+  );
 
   // Cross-device live checkout synchronization
   const [liveCheckoutState, setLiveCheckoutState] = useState<{
@@ -744,7 +761,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Never persist navigation route to storage so reloads always reset to Home
     setHistory((prev) => {
       if (TAB_SCREENS.includes(targetScreen)) {
-        return [targetScreen];
+        if (targetScreen === 'Blinkit_Home') {
+          return ['Blinkit_Home'];
+        }
+        // For non-home tabs (like Categories, Order Again, Cart), keep previous tabs so back button returns smoothly
+        if (prev[prev.length - 1] === targetScreen) return prev;
+        return [...prev.filter((s) => s !== targetScreen), targetScreen];
       }
       if (prev[prev.length - 1] === targetScreen) {
         return prev;
@@ -784,6 +806,55 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     activeScreen !== 'C01_Splash' &&
     activeScreen !== 'C02_Onboarding1' &&
     activeScreen !== 'C12_Home';
+
+  // Hardware Back Button Handler for Android
+  const backActionRef = useRef<() => boolean>(() => false);
+  backActionRef.current = () => {
+    // 1. If location modal is open, close modal
+    if (isLocationModalVisible) {
+      setLocationModalVisible(false);
+      return true;
+    }
+
+    // 2. If district modal is open, close modal
+    if (isDistrictModalVisible) {
+      setDistrictModalVisible(false);
+      return true;
+    }
+
+    // 3. If auth prompt modal is open, close modal
+    if (isAuthPromptVisible) {
+      closeAuthPrompt();
+      return true;
+    }
+
+    // 4. If jumper menu is visible, close jumper
+    if (isJumperVisible) {
+      setJumperVisible(false);
+      return true;
+    }
+
+    // 5. If canGoBack is true, goBack and prevent app exit
+    if (canGoBack) {
+      goBack();
+      return true;
+    }
+
+    // 6. On Home or Splash, let Android OS handle back (exit app)
+    return false;
+  };
+
+  useEffect(() => {
+    const handleHardwareBack = () => backActionRef.current();
+    const sub = BackHandler.addEventListener('hardwareBackPress', handleHardwareBack);
+    return () => {
+      if (typeof (sub as any)?.remove === 'function') {
+        sub.remove();
+      } else {
+        (BackHandler as any).removeEventListener?.('hardwareBackPress', handleHardwareBack);
+      }
+    };
+  }, []);
 
   // Live cart state with instant local persistence hydration
   const [cart, setCart] = useState<CartItem[]>(() => {
@@ -1558,19 +1629,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           null
         );
         if (savedAddress && (savedAddress.latitude || savedAddress.houseFlat)) {
-          const isGps = savedAddress._selectedSource === 'GPS' || savedAddress.type === 'Current';
-          const addrId = savedAddress._selectedAddressId || savedAddress.id || savedAddress._id || null;
-          setSelectedAddressState(savedAddress);
-          setSelectedAddressId(addrId);
-          setSelectedAddressSource(isGps ? 'GPS' : 'SAVED');
+          const isGps = savedAddress._selectedSource === 'GPS' || savedAddress.type === 'Current' || String(savedAddress.id).startsWith('current_');
+          // Only restore permanent saved addresses from address book!
+          // NEVER restore previous session's temporary GPS cache.
+          if (!isGps && savedAddress.id && !savedAddress.id.startsWith('current_')) {
+            const addrId = savedAddress._selectedAddressId || savedAddress.id || savedAddress._id || null;
+            setSelectedAddressState(savedAddress);
+            setSelectedAddressId(addrId);
+            setSelectedAddressSource('SAVED');
+            setLocationError(null);
 
-          const shortLabel = savedAddress.readableAddress || savedAddress.houseFlat || savedAddress.areaLandmark || savedAddress.city;
-          setDeliveryLocation(isGps ? (savedAddress.readableAddress || shortLabel) : `${savedAddress.type || 'Home'} — ${shortLabel}`);
-          if (savedAddress.latitude && savedAddress.longitude) {
-            initialLat = Number(savedAddress.latitude);
-            initialLng = Number(savedAddress.longitude);
+            const shortLabel = savedAddress.readableAddress || savedAddress.houseFlat || savedAddress.areaLandmark || savedAddress.city;
+            setDeliveryLocation(`${savedAddress.type || 'Home'} — ${shortLabel}`);
+            if (savedAddress.latitude && savedAddress.longitude) {
+              initialLat = Number(savedAddress.latitude);
+              initialLng = Number(savedAddress.longitude);
+            }
+            hasRestoredSavedAddress = true;
+          } else {
+            // Wipe stale temporary GPS marker from previous sessions so stale Surat is removed
+            await StorageService.removeItem(StorageService.KEYS.SELECTED_ADDRESS);
           }
-          hasRestoredSavedAddress = true;
         }
       } catch (e) {
         console.warn('Error restoring saved address:', e);
@@ -1581,6 +1660,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         try {
           const detected = await LocationService.getCurrentLocation();
           if (detected) {
+            setLocationError(null);
             initialLat = detected.latitude;
             initialLng = detected.longitude;
             const fullAddress = detected.readableAddress || detected.shortAddress || 'Current GPS Location';
@@ -1593,8 +1673,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               phoneNumber: user?.phoneNumber || '',
               houseFlat: detected.street || detected.readableAddress || 'Current GPS Location',
               areaLandmark: detected.areaLandmark || detected.shortAddress || '',
-              city: detected.city || 'Ahmedabad',
-              pincode: detected.pincode || '380015',
+              city: detected.city || '',
+              pincode: detected.pincode || '',
               latitude: detected.latitude,
               longitude: detected.longitude,
               isDefault: true,
@@ -1604,15 +1684,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setSelectedAddressState(addressObj);
             setSelectedAddressId(addressObj.id);
             setSelectedAddressSource('GPS');
-            StorageService.saveItem(StorageService.KEYS.SELECTED_ADDRESS, {
-              ...addressObj,
-              _selectedAddressId: addressObj.id,
-              _selectedSource: 'GPS',
-            });
             hasRestoredSavedAddress = true;
+          } else {
+            setLocationError('Device location is unavailable. Please check system location services.');
+            setIsServiceable(false);
+            setCurrentStoreName(null);
+            setDeliveryEtaMinutes(null);
           }
-        } catch (err) {
-          // non-fatal: GPS permission not yet granted on boot
+        } catch (err: any) {
+          console.warn('[AppContext] GPS boot detection failed:', err);
+          setLocationError('Device location is unavailable. Please check system location services.');
+          setIsServiceable(false);
+          setCurrentStoreName(null);
+          setDeliveryEtaMinutes(null);
+          setSelectedAddressState(null as any);
+          setSelectedAddressId(null);
+          setDeliveryLocation('');
         }
       }
 
@@ -1846,7 +1933,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [activeScreen, currentAreaId, currentStoreId]);
 
   // Save cart changes (only after hydration is complete to prevent wiping on refresh)
-  useEffect(() => {
+  useEffect(() => { 
     if (!isCartHydratedRef.current) return;
     StorageService.saveItem(StorageService.KEYS.CART, cart);
   }, [cart]);
@@ -2438,6 +2525,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCurrentArea,
     setCurrentStore,
     catalogVersion,
+    locationError,
+    setLocationError,
     authVerificationId,
     setAuthVerificationId,
     tempRegistration,
@@ -2469,7 +2558,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     selectedBlinkitProduct, wishlist, toggleWishlist, isInWishlist, clearWishlist,
     currentAreaId, currentAreaName, currentCityName, currentCityId,
     currentStoreId, currentStoreName, isServiceable, deliveryEtaMinutes,
-    setCurrentArea, setCurrentStore, catalogVersion,
+    setCurrentArea, setCurrentStore, catalogVersion, locationError,
     authVerificationId, tempRegistration, isAuthenticated,
     handleOnboardingSkip, logout,
     liveCheckoutState, emitCheckoutChange,

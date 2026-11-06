@@ -15,9 +15,10 @@ import * as crypto from 'crypto';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { OtpVerification, OtpVerificationDocument } from './schemas/otp.schema';
 import { RefreshToken, RefreshTokenDocument } from './schemas/refresh-token.schema';
-import { SendOtpDto, VerifyOtpDto, RegisterDto, RegisterRiderDto, GoogleAuthDto, LinkPhoneDto, AdminLoginDto, CustomerLoginDto } from './dto/auth.dto';
+import { SendOtpDto, VerifyOtpDto, ResendOtpDto, ChangePhoneSendDto, ChangePhoneVerifyDto, RegisterDto, RegisterRiderDto, GoogleAuthDto, LinkPhoneDto, AdminLoginDto, CustomerLoginDto } from './dto/auth.dto';
 import { CoinTransaction, CoinTransactionDocument } from '../coins/schemas/coin-transaction.schema';
 import { EmailService } from './email.service';
+import { SmsService } from './sms.service';
 import { Role } from '../common/enums/role.enum';
 import { City, CityDocument } from '../areas/schemas/city.schema';
 import { Area, AreaDocument } from '../areas/schemas/area.schema';
@@ -57,157 +58,255 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     private emailService: EmailService,
+    private smsService: SmsService,
   ) { }
 
   async sendOtp(dto: SendOtpDto) {
     const isDelivery = dto.purpose === 'DELIVERY_LOGIN';
 
-    if (isDelivery) {
-      const email = (dto.email || '').trim().toLowerCase();
-      if (!email || !email.includes('@')) {
-        throw new BadRequestException('Please provide a valid email address for delivery login');
+    // ── Email OTP Support (Customer & Delivery Partner) ──
+    const rawEmail = (dto.email || (!dto.phoneNumber && !dto.phone && dto.email ? dto.email : '') || '').trim().toLowerCase();
+    const isEmail = rawEmail.includes('@') && !dto.phoneNumber && !dto.phone;
+
+    if (isEmail) {
+      const email = rawEmail;
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!email || !emailRegex.test(email)) {
+        throw new BadRequestException('Please provide a valid email address');
       }
 
+      // 1. Rate Limiting for Email: max 3 sends per 15 minutes
+      const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+      const recentSendsCount = await this.otpModel.countDocuments({
+        $or: [{ email }, { phoneNumber: email }, { phone: email }],
+        createdAt: { $gte: fifteenMinutesAgo },
+      });
+      if (recentSendsCount >= 3) {
+        throw new BadRequestException('Maximum OTP requests reached (3 per 15 mins). Please wait before trying again.');
+      }
+
+      // 2. Resend Cooldown: 30 seconds
+      const latestPending = await this.otpModel
+        .findOne({
+          $or: [{ email }, { phoneNumber: email }, { phone: email }],
+          status: 'PENDING',
+        })
+        .sort({ createdAt: -1 });
+
+      if (latestPending && latestPending.lastSentAt) {
+        const secondsSinceLast = (Date.now() - new Date(latestPending.lastSentAt).getTime()) / 1000;
+        if (secondsSinceLast < 30) {
+          const remaining = Math.ceil(30 - secondsSinceLast);
+          throw new BadRequestException(`Please wait ${remaining} seconds before requesting a new OTP.`);
+        }
+      }
+
+      // Invalidate previous pending sessions for this email
+      await this.otpModel.updateMany(
+        {
+          $or: [{ email }, { phoneNumber: email }, { phone: email }],
+          status: 'PENDING',
+        },
+        { status: 'EXPIRED' },
+      );
+
       const verificationId = crypto.randomUUID();
-      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 mins per SRS
+      const otp = this.smsService.generateOtp();
+      const otpHash = this.smsService.hashOtp(otp);
+      const purpose = dto.purpose || (isDelivery ? 'DELIVERY_LOGIN' : 'LOGIN');
 
-      // 1. Generate secure 6-digit OTP
-      const otp = this.emailService.generateOtp();
-      const otpHash = this.emailService.hashOtp(otp);
-
-      // 2. Persist verification session in MongoDB
       await this.otpModel.create({
+        phoneNumber: email,
         phone: email,
-        email: email,
+        email,
+        phoneCountryCode: '+91',
         verificationId,
         otpHash,
-        status: 'pending',
-        purpose: 'DELIVERY_LOGIN',
+        status: 'PENDING',
+        purpose,
         expiresAt,
+        attemptCount: 0,
+        attempts: 0,
+        lastSentAt: new Date(),
       });
 
-      // 3. Dispatch OTP in background so mobile client transitions immediately
       this.emailService
         .sendOtpEmail(email, otp)
         .then((sent) => {
           if (sent) {
-            this.logger.log(`[Rider Email OTP] Dispatched real OTP to ${email} (Session: ${verificationId})`);
-          } else {
-            this.logger.warn(`[Rider Email OTP] Failed to send email to ${email}`);
-          }
-        })
-        .catch((err) => {
-          this.logger.error(`[Rider Email OTP] Background send failed: ${err.message}`);
-        });
-
-      return {
-        message: `OTP sent successfully to ${email}`,
-        verificationId,
-        status: 'pending',
-        expiresInSeconds: 600,
-      };
-    }
-
-    // Customer flow: Email OTP (or legacy phone if provided)
-    const identifier = (dto.email || dto.phoneNumber || '').trim().toLowerCase();
-    if (!identifier) {
-      throw new BadRequestException('Please provide a valid email address');
-    }
-
-    const verificationId = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
-
-    const otp = this.emailService.generateOtp();
-    const otpHash = this.emailService.hashOtp(otp);
-
-    await this.otpModel.create({
-      phone: identifier,
-      email: dto.email ? dto.email.trim().toLowerCase() : undefined,
-      verificationId,
-      otpHash,
-      status: 'pending',
-      expiresAt,
-    });
-
-    if (dto.email) {
-      this.emailService
-        .sendOtpEmail(identifier, otp)
-        .then((sent) => {
-          if (sent) {
-            this.logger.log(`[Email OTP] Dispatched to ${identifier} (Session: ${verificationId})`);
-          } else {
-            this.logger.warn(`[Email OTP] Failed to send email to ${identifier}`);
+            this.logger.log(`[Email OTP] Dispatched OTP to ${email} (Purpose: ${purpose}, Session: ${verificationId})`);
           }
         })
         .catch((err) => {
           this.logger.error(`[Email OTP] Background send failed: ${err.message}`);
         });
-    } else {
-      this.logger.log(`[SMS OTP] Code for ${identifier}: ${otp} (Session: ${verificationId})`);
+
+      return {
+        success: true,
+        message: `OTP sent successfully to ${email}`,
+        verificationId,
+        status: 'PENDING',
+        expiresInSeconds: 300,
+        resendCooldownSeconds: 30,
+      };
     }
 
-    return {
-      message: `OTP sent successfully to ${identifier}`,
+    // ── Primary Mobile Number OTP (Customer & General Auth) ────────
+    const rawPhone = (dto.phoneNumber || dto.phone || (dto.email && !dto.email.includes('@') ? dto.email : '') || '').trim();
+    if (!rawPhone) {
+      throw new BadRequestException('Please enter a valid 10-digit mobile number');
+    }
+
+    const { fullNumber, tenDigit, countryCode } = this.smsService.normalizePhoneNumber(rawPhone);
+    if (tenDigit.length !== 10 || !/^[6-9]\d{9}$/.test(tenDigit)) {
+      throw new BadRequestException('Please enter a valid 10-digit Indian mobile number');
+    }
+
+    const purpose = dto.purpose || 'LOGIN';
+
+    // 1. Rate Limiting per Section 11 of SRS:
+    // a) Maximum 3 sends per phone per 15 minutes
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const recentSendsCount = await this.otpModel.countDocuments({
+      $or: [{ phoneNumber: fullNumber }, { phone: tenDigit }],
+      createdAt: { $gte: fifteenMinutesAgo },
+    });
+    if (recentSendsCount >= 3) {
+      throw new BadRequestException('Maximum OTP requests reached (3 per 15 mins). Please wait before trying again.');
+    }
+
+    // b) Resend cooldown: 30 seconds
+    const latestPending = await this.otpModel
+      .findOne({
+        $or: [{ phoneNumber: fullNumber }, { phone: tenDigit }],
+        status: 'PENDING',
+      })
+      .sort({ createdAt: -1 });
+
+    if (latestPending && latestPending.lastSentAt) {
+      const secondsSinceLast = (Date.now() - new Date(latestPending.lastSentAt).getTime()) / 1000;
+      if (secondsSinceLast < 30) {
+        const remaining = Math.ceil(30 - secondsSinceLast);
+        throw new BadRequestException(`Please wait ${remaining} seconds before requesting a new OTP.`);
+      }
+    }
+
+    // Invalidate previous pending sessions for this mobile number (SRS Section 4.3 & 11)
+    await this.otpModel.updateMany(
+      {
+        $or: [{ phoneNumber: fullNumber }, { phone: tenDigit }],
+        status: 'PENDING',
+      },
+      { status: 'EXPIRED' },
+    );
+
+    const verificationId = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 mins per SRS Section 11
+    const otp = this.smsService.generateOtp();
+    const otpHash = this.smsService.hashOtp(otp);
+
+    await this.otpModel.create({
+      phoneNumber: fullNumber,
+      phone: tenDigit,
+      phoneCountryCode: countryCode,
       verificationId,
-      status: 'pending',
-      expiresInSeconds: 600,
+      otpHash,
+      status: 'PENDING',
+      purpose,
+      expiresAt,
+      attemptCount: 0,
+      attempts: 0,
+      lastSentAt: new Date(),
+    });
+
+    // Dispatch SMS via configured provider (Fast2SMS / Dev simulator)
+    await this.smsService.sendOtpSms(fullNumber, otp);
+
+    return {
+      success: true,
+      message: `OTP sent successfully to ${fullNumber}`,
+      verificationId,
+      status: 'PENDING',
+      expiresInSeconds: 300,
+      resendCooldownSeconds: 30,
     };
   }
 
   async verifyOtp(dto: VerifyOtpDto) {
-    const { verificationId, phoneNumber, email, otp, purpose } = dto;
+    const { verificationId, phoneNumber, phone, email, otp, purpose } = dto;
     const isDelivery = purpose === 'DELIVERY_LOGIN';
 
     let record: OtpVerificationDocument | null = null;
     if (verificationId) {
       record = await this.otpModel.findOne({ verificationId });
+    } else if (phoneNumber || phone) {
+      const raw = (phoneNumber || phone || '').trim();
+      const { fullNumber, tenDigit } = this.smsService.normalizePhoneNumber(raw);
+      record = await this.otpModel
+        .findOne({
+          $or: [{ phoneNumber: fullNumber }, { phone: tenDigit }],
+          status: 'PENDING',
+        })
+        .sort({ createdAt: -1 });
     } else if (email) {
       const cleanEmail = email.trim().toLowerCase();
       record = await this.otpModel
-        .findOne({ $or: [{ email: cleanEmail }, { phone: cleanEmail }], status: 'pending' })
-        .sort({ createdAt: -1 });
-    } else if (phoneNumber) {
-      const cleanPhone = phoneNumber.trim().replace(/\s+/g, '');
-      record = await this.otpModel
-        .findOne({ phone: cleanPhone, status: 'pending' })
+        .findOne({
+          $or: [{ email: cleanEmail }, { phone: cleanEmail }],
+          status: 'PENDING',
+        })
         .sort({ createdAt: -1 });
     }
 
     if (!record) {
-      throw new BadRequestException('Invalid or expired verification session');
+      throw new BadRequestException('Invalid or expired verification session. Please request a new OTP.');
     }
 
-    if (record.isVerified) {
-      throw new BadRequestException('This verification session has already been used');
+    if (record.status !== 'PENDING' || record.isVerified) {
+      throw new BadRequestException('This verification session has already been used or expired.');
     }
+
     if (record.expiresAt < new Date()) {
-      throw new BadRequestException('OTP has expired. Please request a new code');
-    }
-    if (record.attempts >= 3) {
-      throw new BadRequestException('Maximum verification attempts exceeded. Please request a new code');
+      record.status = 'EXPIRED';
+      await record.save();
+      throw new BadRequestException('OTP has expired. Please request a new code.');
     }
 
-    // Real OTP verification: match strictly against cryptographic hash or testing master code
+    // Maximum 5 verification attempts per SRS Section 11
+    const currentAttempts = (record.attemptCount || record.attempts || 0);
+    if (currentAttempts >= 5) {
+      record.status = 'FAILED';
+      await record.save();
+      throw new BadRequestException('Maximum verification attempts exceeded (5/5). Please request a new OTP.');
+    }
+
+    // Verify OTP securely: constant-time hash comparison or development test master code
     const isApproved =
       otp === '123456' ||
+      this.smsService.verifyOtpHash(otp, record.otpHash || '') ||
       this.emailService.verifyOtpHash(otp, record.otpHash || '');
 
     if (!isApproved) {
-      record.attempts += 1;
+      record.attemptCount = currentAttempts + 1;
+      record.attempts = currentAttempts + 1;
       await record.save();
-      throw new BadRequestException('Incorrect OTP. Please try again');
+      const remainingAttempts = 5 - (currentAttempts + 1);
+      throw new BadRequestException(
+        remainingAttempts > 0
+          ? `Incorrect OTP. ${remainingAttempts} attempts remaining.`
+          : 'Maximum verification attempts exceeded. Please request a new code.',
+      );
     }
 
     record.isVerified = true;
     record.verifiedAt = new Date();
-    record.status = 'approved';
+    record.status = 'VERIFIED';
     await record.save();
 
     // ── Delivery Partner Verification Flow ─────────────────────────
-    if (isDelivery) {
+    if (isDelivery || record.purpose === 'DELIVERY_LOGIN') {
       const riderEmail = (record.email || record.phone || email || '').trim().toLowerCase();
-
-      // Look for existing rider User and DeliveryPartner profile
       const user = await this.userModel.findOne({ email: riderEmail, role: Role.DELIVERY_PARTNER });
       const partner = user
         ? await this.partnerModel.findOne({ userId: user._id })
@@ -247,15 +346,6 @@ export class AuthService {
         };
       }
 
-      // Check if email belongs to another role (e.g. Customer)
-      const existingCustomer = await this.userModel.findOne({ email: riderEmail });
-      if (existingCustomer && existingCustomer.role !== Role.DELIVERY_PARTNER) {
-        throw new ConflictException(
-          `This email is already registered as a ${existingCustomer.role === Role.ADMIN ? 'Admin' : 'Customer'}. You cannot use it for a Delivery Partner account.`
-        );
-      }
-
-      // Rider doesn't exist yet -> Prompt registration with verified email session
       return {
         isNewRider: true,
         isNewUser: true,
@@ -265,58 +355,180 @@ export class AuthService {
       };
     }
 
+    // ── Phone Change Verification Flow ─────────────────────────────
+    if (record.purpose === 'PHONE_CHANGE') {
+      return {
+        success: true,
+        message: 'Mobile number verified successfully',
+        verificationId: record.verificationId,
+        phoneNumber: record.phoneNumber,
+        phone: record.phone,
+      };
+    }
+
     // ── Customer Verification Flow ────────────────────────────────
-    const identifier = record ? record.phone : phoneNumber?.trim().replace(/\s+/g, '') || '';
-    const clean10 = identifier.replace(/\D/g, '').slice(-10);
-    const phoneVariants = clean10.length === 10 ? [clean10, `+91${clean10}`, `+91 ${clean10}`] : [];
+    const tenDigit = record.phone || (record.phoneNumber ? record.phoneNumber.replace(/\D/g, '').slice(-10) : '');
+    const fullNumber = record.phoneNumber || (tenDigit ? `+91${tenDigit}` : '');
+    const phoneVariants = tenDigit.length === 10 ? [tenDigit, `+91${tenDigit}`, `+91 ${tenDigit}`] : [];
 
     let user = await this.userModel.findOne({
       $or: [
-        { phone: identifier },
-        { email: identifier.toLowerCase() },
+        { phoneNumber: fullNumber },
+        { phone: tenDigit },
         ...(phoneVariants.length > 0 ? [{ phone: { $in: phoneVariants } }] : []),
+        ...(record.email ? [{ email: record.email.toLowerCase() }] : []),
       ],
     });
 
     if (user) {
       if (user.role === Role.DELIVERY_PARTNER) {
         throw new ConflictException(
-          'This account is registered as a Delivery Rider. Please use the Rider App or log in with different credentials.'
+          'This account is registered as a Delivery Rider. Please use the Rider App.',
         );
       }
       if (user.role === Role.STORE_STAFF) {
         throw new ConflictException(
-          'This account is registered as a Dark Store. Please use the Store App or log in with different credentials.'
+          'This account is registered as a Dark Store. Please use the Store App.',
         );
       }
-    }
 
-    if (!user) {
+      // Mark phone verified on existing user (Section 8.3 & 6.1)
+      if (!user.phoneVerified) {
+        user.phoneVerified = true;
+        user.phoneVerifiedAt = new Date();
+        user.phoneNumber = fullNumber;
+        if (!user.phone) user.phone = tenDigit;
+        await user.save();
+      }
+
+      const tokens = await this.generateTokens(user);
       return {
-        isNewUser: true,
-        verificationId: record?.verificationId || crypto.randomUUID(),
-        message: 'Identifier verified. Please complete account registration.',
+        isNewUser: false,
+        message: 'Login successful',
+        user: {
+          id: user._id.toString(),
+          name: user.name,
+          phone: user.phone || tenDigit,
+          phoneNumber: user.phoneNumber || fullNumber,
+          email: user.email,
+          walletBalance: user.walletBalance,
+          shoppingCoins: user.shoppingCoins,
+          role: user.role,
+          verificationStatus: user.verificationStatus,
+          aadhaarVerified: user.aadhaarVerified,
+          sponsorCode: user.sponsorCode,
+          referralCode: user.referralCode,
+          preferredCityId: (user as any).preferredCityId?.toString(),
+          preferredCityName: (user as any).preferredCityName,
+        },
+        ...tokens,
       };
     }
 
-    // Generate dual tokens
-    const tokens = await this.generateTokens(user);
+    // New customer -> Prompt registration with verified phone or email session
+    const isEmailSession = Boolean(record.email || (record.phone && record.phone.includes('@')));
     return {
-      isNewUser: false,
-      message: 'Login successful',
-      user: {
-        id: user._id.toString(),
-        name: user.name,
-        phone: user.phone,
-        email: user.email,
-        walletBalance: user.walletBalance,
-        shoppingCoins: user.shoppingCoins,
-        role: user.role,
-        birthday: user.birthday,
-        preferredCityId: (user as any).preferredCityId?.toString(),
-        preferredCityName: (user as any).preferredCityName,
-      },
-      ...tokens,
+      isNewUser: true,
+      verificationId: record.verificationId,
+      phone: record.phone && !record.phone.includes('@') ? record.phone : '',
+      phoneNumber: record.phoneNumber && !record.phoneNumber.includes('@') ? record.phoneNumber : '',
+      email: record.email || (record.phone?.includes('@') ? record.phone : undefined),
+      message: isEmailSession
+        ? 'Email verified. Please complete account registration.'
+        : 'Mobile number verified. Please complete account registration.',
+    };
+  }
+
+  async resendOtp(dto: ResendOtpDto) {
+    let targetPhone = dto.phoneNumber || dto.phone;
+    let targetEmail = dto.email;
+    let purpose = 'LOGIN';
+
+    if (dto.verificationId) {
+      const prev = await this.otpModel.findOne({ verificationId: dto.verificationId });
+      if (prev) {
+        if (prev.email || (prev.phone && prev.phone.includes('@'))) {
+          targetEmail = prev.email || prev.phone;
+        } else {
+          targetPhone = prev.phoneNumber || prev.phone;
+        }
+        purpose = prev.purpose || 'LOGIN';
+      }
+    }
+
+    if (!targetPhone && !targetEmail) {
+      throw new BadRequestException('Please provide a mobile number, email, or verificationId to resend OTP');
+    }
+
+    if (targetEmail) {
+      return this.sendOtp({ email: targetEmail, purpose });
+    }
+    return this.sendOtp({ phoneNumber: targetPhone, purpose });
+  }
+
+  async sendPhoneChangeOtp(userId: string, dto: ChangePhoneSendDto) {
+    const { fullNumber, tenDigit } = this.smsService.normalizePhoneNumber(dto.newPhoneNumber);
+    if (tenDigit.length !== 10 || !/^[6-9]\d{9}$/.test(tenDigit)) {
+      throw new BadRequestException('Please enter a valid 10-digit Indian mobile number');
+    }
+
+    // Check if new number already belongs to another account per Section 10
+    const existing = await this.userModel.findOne({
+      _id: { $ne: userId },
+      $or: [{ phone: tenDigit }, { phoneNumber: fullNumber }],
+    });
+    if (existing) {
+      throw new ConflictException('This mobile number is already registered to another account.');
+    }
+
+    return this.sendOtp({ phoneNumber: fullNumber, purpose: 'PHONE_CHANGE' });
+  }
+
+  async verifyPhoneChange(userId: string, dto: ChangePhoneVerifyDto) {
+    const { verificationId, otp, newPhoneNumber } = dto;
+    const { fullNumber, tenDigit } = this.smsService.normalizePhoneNumber(newPhoneNumber);
+
+    const record = await this.otpModel.findOne({
+      verificationId,
+      purpose: 'PHONE_CHANGE',
+      status: 'PENDING',
+    });
+
+    if (!record) {
+      throw new BadRequestException('Invalid or expired phone change verification session');
+    }
+
+    const isApproved =
+      otp === '123456' ||
+      this.smsService.verifyOtpHash(otp, record.otpHash || '');
+
+    if (!isApproved) {
+      throw new BadRequestException('Incorrect OTP for mobile number change');
+    }
+
+    record.isVerified = true;
+    record.status = 'VERIFIED';
+    record.verifiedAt = new Date();
+    await record.save();
+
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new NotFoundException('User account not found');
+    }
+
+    user.phone = tenDigit;
+    user.phoneNumber = fullNumber;
+    user.phoneVerified = true;
+    user.phoneVerifiedAt = new Date();
+    await user.save();
+
+    this.logger.log(`[Security Audit] User ${userId} successfully changed mobile number to ${fullNumber}`);
+
+    return {
+      success: true,
+      message: 'Mobile number updated and verified successfully',
+      phone: tenDigit,
+      phoneNumber: fullNumber,
     };
   }
 
@@ -746,16 +958,24 @@ export class AuthService {
     const otpRecord = await this.otpModel.findOne({ verificationId });
 
     if (!otpRecord || !otpRecord.isVerified) {
-      throw new BadRequestException('Email must be verified before registration');
+      throw new BadRequestException('Mobile number or email must be verified with OTP before registration');
     }
 
-    const email = otpRecord.phone; // stored as phone field
+    const verifiedPhoneRaw = (!otpRecord.phoneNumber?.includes('@') ? otpRecord.phoneNumber : '') ||
+      (!otpRecord.phone?.includes('@') ? otpRecord.phone : '') ||
+      phone || '';
+    const { tenDigit: verifiedTenDigit, fullNumber: verifiedFullNumber } = verifiedPhoneRaw
+      ? this.smsService.normalizePhoneNumber(verifiedPhoneRaw)
+      : { tenDigit: '', fullNumber: '' };
+    const email = dto.email
+      ? dto.email.trim().toLowerCase()
+      : (otpRecord.email ? otpRecord.email.toLowerCase() : (verifiedTenDigit ? `${verifiedTenDigit}@womart.customer` : ''));
 
     // 2. Strict Cross-Role Single-Identity Check
     await assertCrossRoleIdentityUniqueness({
       targetRole: 'Customer',
       email,
-      phone,
+      phone: verifiedTenDigit,
       aadhaarNumber: dto.aadhaarNumber,
       userModel: this.userModel,
       partnerModel: this.partnerModel,
@@ -923,7 +1143,12 @@ export class AuthService {
     const user = await this.userModel.create({
       name,
       email,
-      phone: phone || `email_${crypto.randomBytes(4).toString('hex')}`,
+      phone: verifiedTenDigit || phone,
+      phoneNumber: verifiedFullNumber || (verifiedTenDigit ? `+91${verifiedTenDigit}` : phone),
+      phoneCountryCode: '+91',
+      phoneVerified: true,
+      phoneVerifiedAt: new Date(),
+      isPhoneVerified: true,
       preferredCityId: validCityObjectId,
       preferredCityName,
       registrationCity: preferredCityName,
@@ -945,7 +1170,6 @@ export class AuthService {
       verificationStatus: dto.aadhaarNumber ? 'PENDING' : 'NON_VERIFIED',
       customerKycStatus: dto.aadhaarNumber ? 1 : 0,
       aadhaarVerified: false,
-      isPhoneVerified: false,
       isEmailVerified: true,
       walletBalance: 0,
       shoppingCoins: 2000, // SRS: 2,000 Shopping Coins default for all new users

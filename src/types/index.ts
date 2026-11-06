@@ -153,6 +153,7 @@ export interface UserProfile {
   surname?: string;
   fullName: string;
   phoneNumber: string;
+  phone?: string;
   email: string;
   referralCode?: string;
   shoppingCoins: number;

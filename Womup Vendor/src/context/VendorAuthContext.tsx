@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { BackHandler } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   VendorProfile,
@@ -18,6 +19,8 @@ interface VendorAuthContextType {
   isLoggedIn: boolean;
   activeTab: VendorTab;
   setActiveTab: (tab: VendorTab) => void;
+  goBack: () => void;
+  canGoBack: boolean;
   pendingRequests: CollectionRequest[];
   activeModalRequest: CollectionRequest | null;
   setActiveModalRequest: (req: CollectionRequest | null) => void;
@@ -41,12 +44,71 @@ const VendorAuthContext = createContext<VendorAuthContextType>({} as any);
 export const VendorAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [vendor, setVendor] = useState<VendorProfile | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [activeTab, setActiveTab] = useState<VendorTab>('Dashboard');
+  const [activeTab, setActiveTabState] = useState<VendorTab>('Dashboard');
+  const [tabHistory, setTabHistory] = useState<VendorTab[]>(['Dashboard']);
+
+  const setActiveTab = (tab: VendorTab) => {
+    setActiveTabState(tab);
+    setTabHistory((prev) => (prev[prev.length - 1] === tab ? prev : [...prev, tab]));
+  };
   const [pendingRequests, setPendingRequests] = useState<CollectionRequest[]>([]);
   const [activeModalRequest, setActiveModalRequest] = useState<CollectionRequest | null>(null);
   const [transactions, setTransactions] = useState<VendorTransaction[]>([]);
   const [isQRModalVisible, setIsQRModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  const canGoBack =
+    isQRModalVisible ||
+    activeModalRequest !== null ||
+    tabHistory.length > 1 ||
+    activeTab !== 'Dashboard';
+
+  const goBack = useCallback(() => {
+    if (isQRModalVisible) {
+      setIsQRModalVisible(false);
+      return true;
+    }
+    if (activeModalRequest !== null) {
+      setActiveModalRequest(null);
+      return true;
+    }
+    if (tabHistory.length > 1) {
+      const next = [...tabHistory];
+      next.pop();
+      const prevTab = next[next.length - 1] || 'Dashboard';
+      setTabHistory(next);
+      setActiveTabState(prevTab);
+      return true;
+    }
+    if (activeTab !== 'Dashboard') {
+      setActiveTabState('Dashboard');
+      setTabHistory(['Dashboard']);
+      return true;
+    }
+    return false;
+  }, [isQRModalVisible, activeModalRequest, tabHistory, activeTab]);
+
+  // Android Hardware BackHandler
+  const backActionRef = useRef<() => boolean>(() => false);
+  backActionRef.current = () => {
+    if (canGoBack) {
+      goBack();
+      return true;
+    }
+    return false;
+  };
+
+  useEffect(() => {
+    const onBackPress = () => backActionRef.current();
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => {
+      if (typeof (sub as any)?.remove === 'function') {
+        sub.remove();
+      } else {
+        (BackHandler as any).removeEventListener?.('hardwareBackPress', onBackPress);
+      }
+    };
+  }, []);
 
   const [stats, setStats] = useState<VendorStats>({
     todayCollection: 0,
@@ -295,6 +357,8 @@ export const VendorAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         isLoggedIn,
         activeTab,
         setActiveTab,
+        goBack,
+        canGoBack,
         pendingRequests,
         activeModalRequest,
         setActiveModalRequest,

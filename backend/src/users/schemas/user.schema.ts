@@ -12,8 +12,20 @@ export class User {
   @Prop({ sparse: true, index: true })
   phone?: string;
 
-  @Prop({ required: true, unique: true, trim: true, lowercase: true, index: true })
-  email: string;
+  @Prop({ sparse: true, index: true })
+  phoneNumber?: string;
+
+  @Prop({ default: '+91' })
+  phoneCountryCode: string;
+
+  @Prop({ default: false })
+  phoneVerified: boolean;
+
+  @Prop()
+  phoneVerifiedAt?: Date;
+
+  @Prop({ required: false, sparse: true, trim: true, lowercase: true, index: true })
+  email?: string;
 
   @Prop({ sparse: true, index: true })
   googleId?: string;

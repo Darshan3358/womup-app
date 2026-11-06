@@ -151,6 +151,7 @@ export const SidebarDrawer: React.FC = () => {
 
           {/* Slide-out Sidebar Content Panel */}
           <Animated.View
+            pointerEvents="auto"
             style={[
               styles.drawerPanel,
               {
@@ -219,15 +220,26 @@ export const SidebarDrawer: React.FC = () => {
                 style={styles.menuScroll}
                 contentContainerStyle={[
                   styles.menuContent,
-                  { paddingBottom: Math.max(insets.bottom, 20) + 70 },
+                  { paddingBottom: Math.max(insets.bottom, 20) + 100 },
                 ]}
                 showsVerticalScrollIndicator={true}
                 nestedScrollEnabled={true}
+                scrollEnabled={true}
                 keyboardShouldPersistTaps="handled"
                 bounces={true}
                 overScrollMode="always"
-                scrollEventThrottle={16}
+                persistentScrollbar={true}
+                directionalLockEnabled={true}
                 removeClippedSubviews={false}
+                onLayout={(event) => {
+                  console.log(
+                    'SIDEBAR SCROLL HEIGHT:',
+                    event.nativeEvent.layout.height
+                  );
+                }}
+                onContentSizeChange={(width, height) => {
+                  console.log('SIDEBAR CONTENT HEIGHT:', height);
+                }}
               >
                 <Text style={styles.menuSectionTitle}>PRIMARY MODULES</Text>
 
@@ -861,21 +873,24 @@ const styles = StyleSheet.create({
   flexRowContainer: {
     flex: 1,
     flexDirection: 'row',
+    alignItems: 'stretch',
   },
   leftDismissArea: {
     flex: 1,
   },
   drawerPanel: {
-    height: '100%',
+    width: DRAWER_WIDTH,
+    minWidth: DRAWER_WIDTH,
+    maxWidth: DRAWER_WIDTH,
+    flex: 1,
+    minHeight: 0,
     backgroundColor: COLORS.white,
     flexDirection: 'column',
-    // iOS shadow
+    elevation: 20,
     shadowColor: '#000',
     shadowOffset: { width: -4, height: 0 },
     shadowOpacity: 0.28,
     shadowRadius: 12,
-    // Android elevation (without overflow: 'hidden' to prevent Android scroll gesture clipping)
-    elevation: 20,
   },
   drawerHeader: {
     paddingBottom: SPACING.md,
@@ -944,16 +959,18 @@ const styles = StyleSheet.create({
   },
   scrollWrapper: {
     flex: 1,
+    minHeight: 0,
     width: '100%',
   },
   menuScroll: {
     flex: 1,
+    minHeight: 0,
     width: '100%',
   },
   menuContent: {
     paddingHorizontal: 10,
     paddingTop: 12,
-    flexGrow: 1,
+    paddingBottom: 100,
   },
   menuSectionTitle: {
     fontSize: 10,
@@ -999,6 +1016,7 @@ const styles = StyleSheet.create({
     color: COLORS.hotPink,
   },
   drawerFooter: {
+    flexShrink: 0,
     padding: SPACING.md,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,

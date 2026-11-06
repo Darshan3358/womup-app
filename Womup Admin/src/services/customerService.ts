@@ -65,6 +65,23 @@ export const CustomerService = {
   },
 
   /**
+   * Log sensitive KYC disclosure (Aadhaar or Bank Account) for audit trail
+   */
+  async logSensitiveReveal(customerId: string, field: 'aadhaar' | 'bank_account', purpose: string = 'KYC Admin Review'): Promise<any> {
+    try {
+      const res = await fetch(`${BASE_URL}/admin/customers/${customerId}/reveal-sensitive`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ field, purpose }),
+      });
+      return await res.json();
+    } catch (err: any) {
+      console.warn('[CustomerService] logSensitiveReveal warning:', err);
+      return { success: false };
+    }
+  },
+
+  /**
    * Approve customer KYC document verification
    */
   async approveCustomerKyc(customerId: string): Promise<any> {

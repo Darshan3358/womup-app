@@ -53,14 +53,14 @@ export class StoresController {
     const res = await this.storesService.checkServiceability(lat, lng);
     return {
       success: true,
-      serviceable: res.serviceable,
-      areaId: res.areaId,
-      areaName: res.areaName,
-      storeId: res.storeId,
-      storeName: res.storeName,
-      storeCode: res.storeCode,
-      city: 'Ahmedabad',
-      deliveryMinutes: res.estimatedDeliveryMinutes || 9,
+      serviceable: Boolean(res.serviceable),
+      areaId: res.serviceable ? res.areaId : null,
+      areaName: res.serviceable ? res.areaName : null,
+      storeId: res.serviceable ? res.storeId : null,
+      storeName: res.serviceable ? res.storeName : null,
+      storeCode: res.serviceable ? res.storeCode : null,
+      city: res.serviceable ? (res.areaName || '') : '',
+      deliveryMinutes: res.serviceable ? (res.estimatedDeliveryMinutes || 0) : 0,
       distanceKm: (res as any).distanceKm || 0,
       message: res.message,
     };

@@ -1,7 +1,20 @@
-import { Controller, Post, Get, Query, Body, HttpCode, HttpStatus } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { Controller, Post, Get, Query, Body, HttpCode, HttpStatus, UseGuards, Req } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { SendOtpDto, VerifyOtpDto, RegisterDto, RegisterRiderDto, RefreshTokenDto, GoogleAuthDto, LinkPhoneDto, AdminLoginDto, CustomerLoginDto } from './dto/auth.dto';
+import {
+  SendOtpDto,
+  VerifyOtpDto,
+  ResendOtpDto,
+  ChangePhoneSendDto,
+  ChangePhoneVerifyDto,
+  RegisterDto,
+  RegisterRiderDto,
+  RefreshTokenDto,
+  GoogleAuthDto,
+  LinkPhoneDto,
+  AdminLoginDto,
+  CustomerLoginDto,
+} from './dto/auth.dto';
 
 @ApiTags('Authentication')
 @Controller('api/v1/auth')
@@ -55,9 +68,17 @@ export class AuthController {
 
   @Post('send-otp')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Send 4-digit verification OTP to mobile number' })
+  @ApiOperation({ summary: 'Send 6-digit verification OTP to mobile number' })
   @ApiResponse({ status: 200, description: 'OTP sent successfully' })
   async sendOtp(@Body() dto: SendOtpDto) {
+    return this.authService.sendOtp(dto);
+  }
+
+  @Post('otp/send')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send 6-digit verification OTP to mobile number (SRS route)' })
+  @ApiResponse({ status: 200, description: 'OTP sent successfully' })
+  async otpSend(@Body() dto: SendOtpDto) {
     return this.authService.sendOtp(dto);
   }
 
@@ -67,6 +88,44 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Verification result' })
   async verifyOtp(@Body() dto: VerifyOtpDto) {
     return this.authService.verifyOtp(dto);
+  }
+
+  @Post('otp/verify')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify OTP and return dual tokens or prompt registration (SRS route)' })
+  @ApiResponse({ status: 200, description: 'Verification result' })
+  async otpVerify(@Body() dto: VerifyOtpDto) {
+    return this.authService.verifyOtp(dto);
+  }
+
+  @Post('resend-otp')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Resend OTP to mobile number' })
+  async resendOtp(@Body() dto: ResendOtpDto) {
+    return this.authService.resendOtp(dto);
+  }
+
+  @Post('otp/resend')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Resend OTP to mobile number (SRS route)' })
+  async otpResend(@Body() dto: ResendOtpDto) {
+    return this.authService.resendOtp(dto);
+  }
+
+  @Post('phone/change/send')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send verification OTP to a new mobile number for account phone change' })
+  async sendPhoneChangeOtp(@Req() req: any, @Body() dto: ChangePhoneSendDto) {
+    const userId = req.user?.id || req.user?._id || req.body?.userId;
+    return this.authService.sendPhoneChangeOtp(userId, dto);
+  }
+
+  @Post('phone/change/verify')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify OTP and update account mobile number' })
+  async verifyPhoneChange(@Req() req: any, @Body() dto: ChangePhoneVerifyDto) {
+    const userId = req.user?.id || req.user?._id || req.body?.userId;
+    return this.authService.verifyPhoneChange(userId, dto);
   }
 
   @Post('login')

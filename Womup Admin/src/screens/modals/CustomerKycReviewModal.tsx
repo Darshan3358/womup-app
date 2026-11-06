@@ -23,6 +23,8 @@ import {
   Shield,
   Maximize2,
   Users,
+  Eye,
+  EyeOff,
 } from 'lucide-react-native';
 import { ApiService } from '../../services/api';
 import { resolveImageUrl } from '../../utils/imageUrl';
@@ -65,11 +67,56 @@ export const CustomerKycReviewModal: React.FC<CustomerKycReviewModalProps> = ({
   // Zoom modal
   const [zoomImage, setZoomImage] = useState<{ url: string; title: string } | null>(null);
 
+  // Reveal/Hide sensitive details with audit
+  const [showAadhaar, setShowAadhaar] = useState(false);
+  const [showBankAccount, setShowBankAccount] = useState(false);
+
   useEffect(() => {
+    setShowAadhaar(false);
+    setShowBankAccount(false);
     if (isOpen && customerId) {
       loadReviewData();
     }
   }, [isOpen, customerId]);
+
+  // Auto-hide sensitive info after 60 seconds
+  useEffect(() => {
+    if (showAadhaar) {
+      const timer = setTimeout(() => setShowAadhaar(false), 60000);
+      return () => clearTimeout(timer);
+    }
+  }, [showAadhaar]);
+
+  useEffect(() => {
+    if (showBankAccount) {
+      const timer = setTimeout(() => setShowBankAccount(false), 60000);
+      return () => clearTimeout(timer);
+    }
+  }, [showBankAccount]);
+
+  const toggleRevealAadhaar = () => {
+    const nextVal = !showAadhaar;
+    setShowAadhaar(nextVal);
+    if (nextVal && customerId) {
+      fetch(`http://localhost:5050/api/v1/admin/customers/${customerId}/reveal-sensitive`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ field: 'aadhaar', purpose: 'Admin Review Modal' }),
+      }).catch(() => {});
+    }
+  };
+
+  const toggleRevealBankAccount = () => {
+    const nextVal = !showBankAccount;
+    setShowBankAccount(nextVal);
+    if (nextVal && customerId) {
+      fetch(`http://localhost:5050/api/v1/admin/customers/${customerId}/reveal-sensitive`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ field: 'bank_account', purpose: 'Admin Review Modal' }),
+      }).catch(() => {});
+    }
+  };
 
   const loadReviewData = async () => {
     if (!customerId) return;
@@ -181,7 +228,40 @@ export const CustomerKycReviewModal: React.FC<CustomerKycReviewModalProps> = ({
                   <InfoItem label="Birthdate" value={customer?.customer_birthdate || customer?.birthdate || '—'} />
                   <InfoItem label="Mobile Number" value={customer?.phone || customer?.customer_mobile} />
                   <InfoItem label="Customer Code" value={customer?.customer_code || customer?.referralCode} />
-                  <InfoItem label="Aadhaar Number (Masked)" value={customer?.maskedAadhaar || 'XXXX XXXX 1234'} />
+                  <View style={[styles.infoItem]}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                      <Text style={styles.infoLabel}>Aadhaar Number</Text>
+                      <TouchableOpacity
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingHorizontal: 6,
+                          paddingVertical: 2,
+                          backgroundColor: showAadhaar ? '#FEE2E2' : '#F3E8FF',
+                          borderRadius: 4,
+                        }}
+                        onPress={toggleRevealAadhaar}
+                        activeOpacity={0.7}
+                      >
+                        {showAadhaar ? (
+                          <>
+                            <EyeOff size={11} color="#DC2626" style={{ marginRight: 3 }} />
+                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#DC2626' }}>Hide</Text>
+                          </>
+                        ) : (
+                          <>
+                            <Eye size={11} color="#6B21A8" style={{ marginRight: 3 }} />
+                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#6B21A8' }}>Reveal</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={[styles.infoValue, showAadhaar && { letterSpacing: 1.1, fontWeight: '700', color: '#1E1B4B' }]}>
+                      {showAadhaar
+                        ? (customer?.rawAadhaarNumber || customer?.aadhaarNumber || customer?.customer_aadhar_no || 'Not Stored')
+                        : (customer?.maskedAadhaar || (customer?.aadhaarNumber ? `XXXX XXXX ${customer.aadhaarNumber.slice(-4)}` : 'XXXX XXXX 1234'))}
+                    </Text>
+                  </View>
                 </View>
               </View>
 
@@ -261,7 +341,40 @@ export const CustomerKycReviewModal: React.FC<CustomerKycReviewModalProps> = ({
                   <InfoItem label="Bank Name" value={customer?.bankName || 'Not Linked'} />
                   <InfoItem label="Branch" value={customer?.branchName || 'N/A'} />
                   <InfoItem label="Account Holder" value={customer?.accountHolderName || customer?.name || 'N/A'} />
-                  <InfoItem label="Account Number" value={customer?.accountNumber || customer?.maskedAccount || 'N/A'} />
+                  <View style={[styles.infoItem]}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                      <Text style={styles.infoLabel}>Account Number</Text>
+                      <TouchableOpacity
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingHorizontal: 6,
+                          paddingVertical: 2,
+                          backgroundColor: showBankAccount ? '#FEE2E2' : '#F3E8FF',
+                          borderRadius: 4,
+                        }}
+                        onPress={toggleRevealBankAccount}
+                        activeOpacity={0.7}
+                      >
+                        {showBankAccount ? (
+                          <>
+                            <EyeOff size={11} color="#DC2626" style={{ marginRight: 3 }} />
+                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#DC2626' }}>Hide</Text>
+                          </>
+                        ) : (
+                          <>
+                            <Eye size={11} color="#6B21A8" style={{ marginRight: 3 }} />
+                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#6B21A8' }}>Reveal</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={[styles.infoValue, showBankAccount && { letterSpacing: 1.1, fontWeight: '700', color: '#1E1B4B' }]}>
+                      {showBankAccount
+                        ? (customer?.rawAccountNumber || customer?.accountNumber || customer?.bankAccountNo || 'Not Stored')
+                        : (customer?.maskedAccount || (customer?.accountNumber ? `XXXX ${customer.accountNumber.slice(-4)}` : 'XXXX 6162'))}
+                    </Text>
+                  </View>
                   <InfoItem label="IFSC Code" value={customer?.ifscCode || 'N/A'} />
                   <InfoItem label="UPI ID" value={customer?.upiId || 'N/A'} />
                 </View>

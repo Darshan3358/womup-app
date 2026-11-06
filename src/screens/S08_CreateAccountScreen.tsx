@@ -293,7 +293,15 @@ export const S08_CreateAccountScreen: React.FC = () => {
 
     const cleanPin = pincode.trim();
     if (!cleanPin || cleanPin.length !== 6 || !/^\d{6}$/.test(cleanPin)) {
-      newErrors.pincode = 'Please enter a valid 6-digit Pincode';
+      Alert.alert(
+        'Location Required',
+        'Pincode is required for registration. Please turn on your device GPS and tap "Retry GPS" to auto-detect.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Retry GPS', onPress: () => detectCurrentLocation() },
+        ],
+      );
+      newErrors.pincode = 'GPS location required. Please turn on location and tap "Auto-detected" to retry.';
     }
 
     if (!selectedCityName || !selectedCityId) {

@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { Alert, AppState, AppStateStatus } from 'react-native';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { Alert, AppState, AppStateStatus, BackHandler } from 'react-native';
 import {
   RiderProfile,
   DeliveryRequest,
@@ -111,6 +111,8 @@ interface RiderContextType {
   toggleDutyStatus: () => Promise<void>;
   setCurrentTab: (tab: RiderTabKey) => void;
   setSubScreen: (sub: RiderSubScreenKey) => void;
+  goBack: () => void;
+  canGoBack: boolean;
   acceptDelivery: (job?: DeliveryRequest) => Promise<void>;
   rejectDelivery: (reason: string) => Promise<void>;
   dismissJob: (jobId: string) => Promise<void>;
@@ -158,8 +160,15 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [incomingJobOffer, setIncomingJobOffer] = useState<DeliveryRequest | null>(null);
   const [availableJobs, setAvailableJobs] = useState<DeliveryRequest[]>([]);
   const [jobsError, setJobsError] = useState<string | null>(null);
-  const [currentTab, setCurrentTab] = useState<RiderTabKey>('Home');
+  const [currentTab, setCurrentTabState] = useState<RiderTabKey>('Home');
+  const [tabHistory, setTabHistory] = useState<RiderTabKey[]>(['Home']);
   const [subScreen, setSubScreen] = useState<RiderSubScreenKey>('None');
+
+  const setCurrentTab = (tab: RiderTabKey) => {
+    setCurrentTabState(tab);
+    setSubScreen('None');
+    setTabHistory((prev) => (prev[prev.length - 1] === tab ? prev : [...prev, tab]));
+  };
   const [currentLocation, setCurrentLocation] = useState<LocationCoordinates | null>(null);
   const [detectedHubName, setDetectedHubName] = useState<string | null>(null);
   const [detectedAddress, setDetectedAddress] = useState<string | null>(null);
@@ -177,6 +186,111 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [showEmergencyModal, setShowEmergencyModal] = useState<boolean>(false);
   const [showPickupModal, setShowPickupModal] = useState<boolean>(false);
   const [showUnavailableModal, setShowUnavailableModal] = useState<boolean>(false);
+
+  const canGoBack =
+    showNewRequestModal ||
+    showRejectModal ||
+    showOtpModal ||
+    showEmergencyModal ||
+    showPickupModal ||
+    showUnavailableModal ||
+    subScreen !== 'None' ||
+    tabHistory.length > 1 ||
+    currentTab !== 'Home' ||
+    authStep === 'OTP' ||
+    authStep === 'REGISTER' ||
+    authStep === 'KYC';
+
+  const goBack = useCallback(() => {
+    // 1. Modals
+    if (showNewRequestModal) {
+      setShowNewRequestModal(false);
+      return true;
+    }
+    if (showRejectModal) {
+      setShowRejectModal(false);
+      return true;
+    }
+    if (showOtpModal) {
+      setShowOtpModal(false);
+      return true;
+    }
+    if (showEmergencyModal) {
+      setShowEmergencyModal(false);
+      return true;
+    }
+    if (showPickupModal) {
+      setShowPickupModal(false);
+      return true;
+    }
+    if (showUnavailableModal) {
+      setShowUnavailableModal(false);
+      return true;
+    }
+
+    // 2. Sub screen
+    if (subScreen !== 'None') {
+      setSubScreen('None');
+      return true;
+    }
+
+    // 3. Tab history
+    if (tabHistory.length > 1) {
+      const next = [...tabHistory];
+      next.pop();
+      const prevTab = next[next.length - 1] || 'Home';
+      setTabHistory(next);
+      setCurrentTabState(prevTab);
+      return true;
+    }
+
+    if (currentTab !== 'Home') {
+      setCurrentTabState('Home');
+      setTabHistory(['Home']);
+      return true;
+    }
+
+    // 4. Auth flow navigation
+    if (authStep === 'OTP' || authStep === 'REGISTER' || authStep === 'KYC') {
+      setAuthStep('LOGIN');
+      return true;
+    }
+
+    return false;
+  }, [
+    showNewRequestModal,
+    showRejectModal,
+    showOtpModal,
+    showEmergencyModal,
+    showPickupModal,
+    showUnavailableModal,
+    subScreen,
+    tabHistory,
+    currentTab,
+    authStep,
+  ]);
+
+  // Android Hardware BackHandler
+  const backActionRef = useRef<() => boolean>(() => false);
+  backActionRef.current = () => {
+    if (canGoBack) {
+      goBack();
+      return true;
+    }
+    return false;
+  };
+
+  useEffect(() => {
+    const onBackPress = () => backActionRef.current();
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => {
+      if (typeof (sub as any)?.remove === 'function') {
+        sub.remove();
+      } else {
+        (BackHandler as any).removeEventListener?.('hardwareBackPress', onBackPress);
+      }
+    };
+  }, []);
 
   const refreshAvailableJobs = useCallback(async () => {
     try {
@@ -986,6 +1100,8 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         toggleDutyStatus,
         setCurrentTab,
         setSubScreen,
+        goBack,
+        canGoBack,
         acceptDelivery,
         rejectDelivery,
         dismissJob,

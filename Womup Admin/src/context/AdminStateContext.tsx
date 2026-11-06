@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { AppState, AppStateStatus } from 'react-native';
+import { AppState, AppStateStatus, BackHandler } from 'react-native';
 import {
   Customer,
   DeliveryPartnerItem,
@@ -69,6 +69,8 @@ export type ActiveModal =
 interface AdminStateContextType {
   activeTab: ActiveTab;
   setActiveTab: (tab: ActiveTab) => void;
+  goBack: () => void;
+  canGoBack: boolean;
   subView: ActiveSubView;
   setSubView: (view: ActiveSubView) => void;
   previousSubView: ActiveSubView;
@@ -220,7 +222,17 @@ interface AdminStateContextType {
 const AdminStateContext = createContext<AdminStateContextType | undefined>(undefined);
 
 export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('Dashboard');
+  const [activeTab, setActiveTabState] = useState<ActiveTab>('Dashboard');
+  const [tabHistory, setTabHistory] = useState<ActiveTab[]>(['Dashboard']);
+
+  const setActiveTab = (tab: ActiveTab) => {
+    setActiveTabState(tab);
+    setTabHistory((prev) => {
+      if (prev[prev.length - 1] === tab) return prev;
+      return [...prev, tab];
+    });
+  };
+
   const [subView, setSubView] = useState<ActiveSubView>('none');
   const [previousSubView, setPreviousSubView] = useState<ActiveSubView>('none');
 
@@ -243,6 +255,73 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [locationSubTab, setLocationSubTab] = useState<'Cities' | 'Areas' | 'Pincodes'>('Cities');
 
   const toggleSidebar = () => setIsSidebarOpen((prev) => !prev);
+
+  const canGoBack =
+    activeModal !== 'none' ||
+    isSidebarOpen ||
+    subView !== 'none' ||
+    tabHistory.length > 1 ||
+    activeTab !== 'Dashboard';
+
+  const goBack = useCallback(() => {
+    // 1. If any modal is open, close modal
+    if (activeModal !== 'none') {
+      setActiveModal('none');
+      return true;
+    }
+
+    // 2. If sidebar drawer is open, close sidebar
+    if (isSidebarOpen) {
+      setIsSidebarOpen(false);
+      return true;
+    }
+
+    // 3. If subView is open, go back to main tab
+    if (subView !== 'none') {
+      goBackSubView();
+      return true;
+    }
+
+    // 4. If on a tab other than Dashboard or has tab history, go back in history
+    if (tabHistory.length > 1) {
+      const next = [...tabHistory];
+      next.pop();
+      const prevTab = next[next.length - 1] || 'Dashboard';
+      setTabHistory(next);
+      setActiveTabState(prevTab);
+      return true;
+    }
+
+    if (activeTab !== 'Dashboard') {
+      setActiveTabState('Dashboard');
+      setTabHistory(['Dashboard']);
+      return true;
+    }
+
+    return false;
+  }, [activeModal, isSidebarOpen, subView, tabHistory, activeTab]);
+
+  // Hardware Back Button Handler for Android
+  const backActionRef = useRef<() => boolean>(() => false);
+  backActionRef.current = () => {
+    if (canGoBack) {
+      goBack();
+      return true; // Event handled, prevent app exit
+    }
+    return false; // On Dashboard with no overlays, allow OS exit
+  };
+
+  useEffect(() => {
+    const onBackPress = () => backActionRef.current();
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => {
+      if (typeof (sub as any)?.remove === 'function') {
+        sub.remove();
+      } else {
+        (BackHandler as any).removeEventListener?.('hardwareBackPress', onBackPress);
+      }
+    };
+  }, []);
 
   // Admin Auth & Master Sponsor ID state
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
@@ -1670,6 +1749,8 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       value={{
         activeTab,
         setActiveTab,
+        goBack,
+        canGoBack,
         subView,
         setSubView,
         previousSubView,

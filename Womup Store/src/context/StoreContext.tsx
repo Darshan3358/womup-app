@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { AppState, AppStateStatus } from 'react-native';
+import { AppState, AppStateStatus, BackHandler } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   AuthStep,
@@ -30,6 +30,8 @@ interface StoreContextType {
   setCurrentTab: (tab: CurrentTab) => void;
   subScreen: SubScreen;
   setSubScreen: (screen: SubScreen) => void;
+  goBack: () => void;
+  canGoBack: boolean;
 
   staff: StoreStaffProfile | null;
   store: StoreHub | null;
@@ -99,8 +101,15 @@ const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [authStep, setAuthStep] = useState<AuthStep>('SPLASH');
-  const [currentTab, setCurrentTab] = useState<CurrentTab>('Dashboard');
+  const [currentTab, setCurrentTabState] = useState<CurrentTab>('Dashboard');
+  const [tabHistory, setTabHistory] = useState<CurrentTab[]>(['Dashboard']);
   const [subScreen, setSubScreen] = useState<SubScreen>(null);
+
+  const setCurrentTab = (tab: CurrentTab) => {
+    setCurrentTabState(tab);
+    setSubScreen(null);
+    setTabHistory((prev) => (prev[prev.length - 1] === tab ? prev : [...prev, tab]));
+  };
 
   const [staff, setStaff] = useState<StoreStaffProfile | null>(null);
   const [store, setStore] = useState<StoreHub | null>(null);
@@ -124,6 +133,80 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isSidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const toggleSidebar = () => setSidebarOpen((prev) => !prev);
   const [storeUnreadCount, setStoreUnreadCount] = useState<number>(0);
+
+  const canGoBack =
+    isSidebarOpen ||
+    riderArrivalAlert !== null ||
+    subScreen !== null ||
+    tabHistory.length > 1 ||
+    currentTab !== 'Dashboard' ||
+    authStep === 'OTP' ||
+    authStep === 'REGISTER' ||
+    authStep === 'STORE_SELECT';
+
+  const goBack = useCallback(() => {
+    // 1. Alerts & Sidebar
+    if (riderArrivalAlert !== null) {
+      setRiderArrivalAlert(null);
+      return true;
+    }
+    if (isSidebarOpen) {
+      setSidebarOpen(false);
+      return true;
+    }
+
+    // 2. SubScreen
+    if (subScreen !== null) {
+      setSubScreen(null);
+      return true;
+    }
+
+    // 3. Tab history
+    if (tabHistory.length > 1) {
+      const next = [...tabHistory];
+      next.pop();
+      const prevTab = next[next.length - 1] || 'Dashboard';
+      setTabHistory(next);
+      setCurrentTabState(prevTab);
+      return true;
+    }
+
+    if (currentTab !== 'Dashboard') {
+      setCurrentTabState('Dashboard');
+      setTabHistory(['Dashboard']);
+      return true;
+    }
+
+    // 4. Auth flow
+    if (authStep === 'OTP' || authStep === 'REGISTER' || authStep === 'STORE_SELECT') {
+      setAuthStep('LOGIN');
+      return true;
+    }
+
+    return false;
+  }, [riderArrivalAlert, isSidebarOpen, subScreen, tabHistory, currentTab, authStep]);
+
+  // Android Hardware BackHandler
+  const backActionRef = useRef<() => boolean>(() => false);
+  backActionRef.current = () => {
+    if (canGoBack) {
+      goBack();
+      return true;
+    }
+    return false;
+  };
+
+  useEffect(() => {
+    const onBackPress = () => backActionRef.current();
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => {
+      if (typeof (sub as any)?.remove === 'function') {
+        sub.remove();
+      } else {
+        (BackHandler as any).removeEventListener?.('hardwareBackPress', onBackPress);
+      }
+    };
+  }, []);
 
   const currentTabRef = useRef<CurrentTab>(currentTab);
   currentTabRef.current = currentTab;
@@ -891,6 +974,8 @@ const enrichStore = (rawStore: any): StoreHub | null => {
         setCurrentTab,
         subScreen,
         setSubScreen,
+        goBack,
+        canGoBack,
         staff,
         store,
         performance,
