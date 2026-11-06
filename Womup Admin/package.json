@@ -8,7 +8,9 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "build:web": "expo export -p web",
-    "backend": "node server/index.js"
+    "backend": "node server/index.js",
+    "update:preview": "eas update --channel preview --auto",
+    "update:prod": "eas update --channel production --auto"
   },
   "dependencies": {
     "@expo/metro-runtime": "~4.0.0",

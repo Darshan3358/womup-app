@@ -44,6 +44,11 @@
     "web": "expo start --web",
     "update:preview": "eas update --channel preview --auto",
     "update:prod": "eas update --channel production --auto",
+    "update:admin": "cd \"Womup Admin\" && eas update --channel production --auto",
+    "update:rider": "cd \"Womup Rider\" && eas update --channel production --auto",
+    "update:store": "cd \"Womup Store\" && eas update --channel production --auto",
+    "update:vendor": "cd \"Womup Vendor\" && eas update --channel production --auto",
+    "update:all": "eas update --channel production --auto && cd \"Womup Admin\" && eas update --channel production --auto && cd ../\"Womup Rider\" && eas update --channel production --auto && cd ../\"Womup Store\" && eas update --channel production --auto && cd ../\"Womup Vendor\" && eas update --channel production --auto",
     "postinstall": "node scripts/patch-expo-swift.js"
   },
   "private": true
