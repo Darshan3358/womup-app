@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import {
   Search,
+  User,
   UserPlus,
   ChevronRight,
   Phone,
@@ -600,7 +601,13 @@ export const CustomersScreen: React.FC = () => {
                 onPress={() => handleSelectCustomer(c)}
                 activeOpacity={0.8}
               >
-                <Image source={{ uri: c.avatar }} style={styles.avatar} />
+                {c.avatar ? (
+                  <Image source={{ uri: c.avatar }} style={styles.avatar} />
+                ) : (
+                  <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                    <User size={22} color={COLORS.purple} />
+                  </View>
+                )}
 
                 <View style={styles.infoCol}>
                   <View style={styles.nameRow}>
@@ -684,7 +691,13 @@ export const CustomersScreen: React.FC = () => {
                 onPress={() => handleOpenRiderDetail(r)}
                 activeOpacity={0.8}
               >
-                <Image source={{ uri: r.avatar }} style={styles.avatar} />
+                {r.avatar ? (
+                  <Image source={{ uri: r.avatar }} style={styles.avatar} />
+                ) : (
+                  <View style={[styles.avatar, styles.riderAvatarPlaceholder]}>
+                    <Bike size={22} color={COLORS.hotPink} />
+                  </View>
+                )}
 
                 <View style={styles.infoCol}>
                   <View style={styles.nameRow}>
@@ -855,7 +868,13 @@ export const CustomersScreen: React.FC = () => {
                   <>
                     {/* Top Identity Card */}
                     <View style={styles.profileTopCard}>
-                      <Image source={{ uri: selectedRider.avatar }} style={styles.profileAvatar} />
+                      {selectedRider.avatar ? (
+                        <Image source={{ uri: selectedRider.avatar }} style={styles.profileAvatar} />
+                      ) : (
+                        <View style={[styles.profileAvatar, styles.riderAvatarPlaceholder]}>
+                          <Bike size={28} color={COLORS.hotPink} />
+                        </View>
+                      )}
                       <View style={styles.profileTopInfo}>
                         <View style={styles.profileNameRow}>
                           <Text style={styles.profileFullName}>{selectedRider.name}</Text>
@@ -1958,6 +1977,20 @@ const styles = StyleSheet.create({
     borderRadius: 23,
     marginRight: SPACING.md,
     backgroundColor: COLORS.lightBlueLavender,
+  },
+  avatarPlaceholder: {
+    backgroundColor: '#F3E8FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+  },
+  riderAvatarPlaceholder: {
+    backgroundColor: '#FCE7F3',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#FBCFE8',
   },
   infoCol: {
     flex: 1,

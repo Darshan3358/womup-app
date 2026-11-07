@@ -8,6 +8,7 @@ import {
   Image,
 } from 'react-native';
 import {
+  User,
   Phone,
   MapPin,
   Edit3,
@@ -111,7 +112,13 @@ export const CustomerProfileScreen: React.FC = () => {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Header Profile Card */}
       <View style={styles.profileHeaderCard}>
-        <Image source={{ uri: selectedCustomer.avatar }} style={styles.avatar} />
+        {selectedCustomer.avatar ? (
+          <Image source={{ uri: selectedCustomer.avatar }} style={styles.avatar} />
+        ) : (
+          <View style={[styles.avatar, styles.avatarPlaceholder]}>
+            <User size={24} color={COLORS.purple} />
+          </View>
+        )}
 
         <View style={styles.profileMain}>
           <Text style={styles.customerName}>{selectedCustomer.name}</Text>
@@ -453,6 +460,13 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 30,
     marginRight: SPACING.md,
+  },
+  avatarPlaceholder: {
+    backgroundColor: '#F3E8FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
   },
   profileMain: {
     flex: 1,

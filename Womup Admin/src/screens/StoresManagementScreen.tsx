@@ -1016,6 +1016,9 @@ export const StoresManagementScreen: React.FC = () => {
                       <View key={store.id} style={styles.storeCard}>
                         {/* Store Header Row */}
                         <View style={styles.cardHeader}>
+                          <View style={styles.storeIconCircle}>
+                            <Store size={20} color={COLORS.purple} />
+                          </View>
                           <View style={styles.storeMainInfo}>
                             <View style={styles.storeTitleRow}>
                               <View style={styles.storeNameContainer}>
@@ -2345,9 +2348,21 @@ const styles = StyleSheet.create({
   },
   cardHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 8,
+  },
+  storeIconCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#F3E8FF',
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+    marginTop: 2,
+    flexShrink: 0,
   },
   storeMainInfo: {
     flex: 1,

@@ -753,9 +753,9 @@ export const InventoryScreen: React.FC = () => {
         <View style={styles.invKpiCard}>
           <View style={styles.kpiHeader}>
             <View style={styles.kpiIconBoxBlue}>
-              <Package size={14} color="#3B82F6" />
+              <Package size={12} color="#3B82F6" />
             </View>
-            <Text style={styles.invKpiLabel}>TOTAL STOCK</Text>
+            <Text style={styles.invKpiLabel} numberOfLines={1} ellipsizeMode="tail">TOTAL STOCK</Text>
           </View>
           <Text style={styles.kpiNumber}>
             {(totalStockUnits > 0 ? totalStockUnits : 3294).toLocaleString()}
@@ -767,30 +767,30 @@ export const InventoryScreen: React.FC = () => {
         <View style={styles.invKpiCard}>
           <View style={styles.kpiHeader}>
             <View style={styles.kpiIconBoxGreen}>
-              <Check size={14} color="#16A34A" strokeWidth={2.5} />
+              <Check size={12} color="#16A34A" strokeWidth={2.5} />
             </View>
-            <Text style={[styles.invKpiLabel, { color: '#16A34A' }]}>AVAILABLE</Text>
+            <Text style={[styles.invKpiLabel, { color: '#16A34A' }]} numberOfLines={1} ellipsizeMode="tail">AVAILABLE</Text>
           </View>
           <Text style={[styles.kpiNumber, { color: '#059669' }]}>
             {(availableStockUnits > 0 ? availableStockUnits : 2899).toLocaleString()}
           </Text>
           <Text style={styles.kpiSub}>units</Text>
-          <Text style={styles.kpiFooterGreen}>88% Available Free Stock</Text>
+          <Text style={styles.kpiFooterGreen} numberOfLines={1}>88% Available Free Stock</Text>
         </View>
 
         {/* RESERVED */}
         <View style={styles.invKpiCard}>
           <View style={styles.kpiHeader}>
             <View style={styles.kpiIconBoxPurple}>
-              <Layers size={14} color="#8B5CF6" />
+              <Layers size={12} color="#8B5CF6" />
             </View>
-            <Text style={[styles.invKpiLabel, { color: '#7C3AED' }]}>RESERVED</Text>
+            <Text style={[styles.invKpiLabel, { color: '#7C3AED' }]} numberOfLines={1} ellipsizeMode="tail">RESERVED</Text>
           </View>
           <Text style={[styles.kpiNumber, { color: '#7C3AED' }]}>
             {(reservedStockUnits > 0 ? reservedStockUnits : 395).toLocaleString()}
           </Text>
           <Text style={styles.kpiSub}>units</Text>
-          <Text style={styles.kpiFooterPurple}>Live Cart / Packing Locks</Text>
+          <Text style={styles.kpiFooterPurple} numberOfLines={1}>Live Cart / Packing Locks</Text>
         </View>
       </View>
 
@@ -2706,7 +2706,7 @@ const styles = StyleSheet.create({
   },
   kpiRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
     marginBottom: 14,
   },
   invKpiCard: {
@@ -2715,7 +2715,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
     borderRadius: 12,
-    padding: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 10,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.03,
@@ -2725,44 +2726,48 @@ const styles = StyleSheet.create({
   kpiHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
     marginBottom: 6,
   },
   kpiIconBoxBlue: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
+    width: 20,
+    height: 20,
+    borderRadius: 5,
     backgroundColor: '#EFF6FF',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   kpiIconBoxGreen: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
+    width: 20,
+    height: 20,
+    borderRadius: 5,
     backgroundColor: '#F0FDF4',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   kpiIconBoxPurple: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
+    width: 20,
+    height: 20,
+    borderRadius: 5,
     backgroundColor: '#FAF5FF',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   invKpiLabel: {
-    fontSize: 10,
+    fontSize: 8.5,
     fontWeight: '800',
     color: '#64748B',
-    letterSpacing: 0.3,
+    letterSpacing: 0.1,
+    flexShrink: 1,
   },
   kpiNumber: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '900',
     color: '#071B52',
-    lineHeight: 24,
+    lineHeight: 22,
   },
   kpiSub: {
     fontSize: 11,

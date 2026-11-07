@@ -10,6 +10,7 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import {
   X,
@@ -228,14 +229,9 @@ export const CustomerKycReviewModal: React.FC<CustomerKycReviewModalProps> = ({
                   <InfoItem label="Birthdate" value={customer?.customer_birthdate || customer?.birthdate || '—'} />
                   <InfoItem label="Mobile Number" value={customer?.phone || customer?.customer_mobile} />
                   <InfoItem label="Customer Code" value={customer?.customer_code || customer?.referralCode} />
-                  <View style={[styles.infoItem]}>
-                    <Text style={styles.infoLabel}>Aadhaar Number</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 3 }}>
-                      <Text style={[styles.infoValue, showAadhaar && { letterSpacing: 1.1, fontWeight: '700', color: '#1E1B4B' }]}>
-                        {showAadhaar
-                          ? (customer?.rawAadhaarNumber || customer?.aadhaarNumber || customer?.customer_aadhar_no || 'Not Stored')
-                          : (customer?.maskedAadhaar || (customer?.aadhaarNumber ? `XXXX XXXX ${customer.aadhaarNumber.slice(-4)}` : 'XXXX XXXX 1234'))}
-                      </Text>
+                  <View style={[styles.infoItem, { width: '100%', marginTop: 4 }]}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <Text style={styles.infoLabel}>AADHAAR NUMBER</Text>
                       <TouchableOpacity
                         style={{
                           flexDirection: 'row',
@@ -263,6 +259,11 @@ export const CustomerKycReviewModal: React.FC<CustomerKycReviewModalProps> = ({
                         )}
                       </TouchableOpacity>
                     </View>
+                    <Text style={[styles.infoValue, showAadhaar && { letterSpacing: 1.1, fontWeight: '700', color: '#1E1B4B' }]}>
+                      {showAadhaar
+                        ? (customer?.rawAadhaarNumber || customer?.aadhaarNumber || customer?.customer_aadhar_no || 'Not Stored')
+                        : (customer?.maskedAadhaar || (customer?.aadhaarNumber ? `XXXX XXXX ${customer.aadhaarNumber.slice(-4)}` : 'Not Provided'))}
+                    </Text>
                   </View>
                 </View>
               </View>
@@ -343,14 +344,9 @@ export const CustomerKycReviewModal: React.FC<CustomerKycReviewModalProps> = ({
                   <InfoItem label="Bank Name" value={customer?.bankName || 'Not Linked'} />
                   <InfoItem label="Branch" value={customer?.branchName || 'N/A'} />
                   <InfoItem label="Account Holder" value={customer?.accountHolderName || customer?.name || 'N/A'} />
-                  <View style={[styles.infoItem]}>
-                    <Text style={styles.infoLabel}>Account Number</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 3 }}>
-                      <Text style={[styles.infoValue, showBankAccount && { letterSpacing: 1.1, fontWeight: '700', color: '#1E1B4B' }]}>
-                        {showBankAccount
-                          ? (customer?.rawAccountNumber || customer?.accountNumber || customer?.bankAccountNo || 'Not Stored')
-                          : (customer?.maskedAccount || (customer?.accountNumber ? `XXXX ${customer.accountNumber.slice(-4)}` : 'XXXX 6162'))}
-                      </Text>
+                  <View style={[styles.infoItem, { width: '100%', marginTop: 4 }]}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <Text style={styles.infoLabel}>ACCOUNT NUMBER</Text>
                       <TouchableOpacity
                         style={{
                           flexDirection: 'row',
@@ -378,6 +374,11 @@ export const CustomerKycReviewModal: React.FC<CustomerKycReviewModalProps> = ({
                         )}
                       </TouchableOpacity>
                     </View>
+                    <Text style={[styles.infoValue, showBankAccount && { letterSpacing: 1.1, fontWeight: '700', color: '#1E1B4B' }]}>
+                      {showBankAccount
+                        ? (customer?.rawAccountNumber || customer?.accountNumber || customer?.bankAccountNo || 'Not Stored')
+                        : (customer?.maskedAccount || (customer?.accountNumber ? `XXXX ${customer.accountNumber.slice(-4)}` : 'XXXX 6162'))}
+                    </Text>
                   </View>
                   <InfoItem label="IFSC Code" value={customer?.ifscCode || 'N/A'} />
                   <InfoItem label="UPI ID" value={customer?.upiId || 'N/A'} />
@@ -436,22 +437,24 @@ export const CustomerKycReviewModal: React.FC<CustomerKycReviewModalProps> = ({
               style={styles.rejectBtn}
               onPress={() => setIsRejectModalOpen(true)}
               disabled={submitting}
+              activeOpacity={0.8}
             >
-              <AlertCircle size={16} color="#EF4444" />
-              <Text style={styles.rejectBtnText}>Reject with Reason</Text>
+              <AlertCircle size={15} color="#EF4444" />
+              <Text style={styles.rejectBtnText} numberOfLines={1}>Reject Reason</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.approveBtn}
               onPress={handleApprove}
               disabled={submitting}
+              activeOpacity={0.85}
             >
               {submitting ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
                 <>
-                  <CheckCircle2 size={16} color="#FFFFFF" />
-                  <Text style={styles.approveBtnText}>Approve & Verify (Unlock Income)</Text>
+                  <CheckCircle2 size={15} color="#FFFFFF" />
+                  <Text style={styles.approveBtnText} numberOfLines={1}>Approve & Verify</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -748,22 +751,27 @@ const styles = StyleSheet.create({
   },
   footer: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
-    padding: 14,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'android' ? 24 : 14,
     borderTopWidth: 1,
     borderTopColor: '#1E293B',
     backgroundColor: '#090D1A',
   },
   rejectBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     backgroundColor: '#3F1219',
     borderWidth: 1,
     borderColor: '#7F1D1D',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 12,
     borderRadius: 8,
   },
   rejectBtnText: {
@@ -772,12 +780,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   approveBtn: {
+    flex: 1.4,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     backgroundColor: '#10B981',
-    paddingHorizontal: 18,
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
     borderRadius: 8,
   },
   approveBtnText: {

@@ -7,6 +7,9 @@ import {
   TextInput,
   Modal,
   ActivityIndicator,
+  ScrollView,
+  Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { AlertTriangle, X, ShieldAlert } from 'lucide-react-native';
 import { COLORS, RADIUS, SPACING } from '../../theme';
@@ -63,7 +66,10 @@ export const RejectModal: React.FC<RejectModalProps> = ({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.backdrop}
+      >
         <View style={styles.dialog}>
           {/* Header */}
           <View style={styles.dialogHeader}>
@@ -78,8 +84,13 @@ export const RejectModal: React.FC<RejectModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          {/* Body */}
-          <View style={styles.dialogBody}>
+          {/* Body inside ScrollView */}
+          <ScrollView
+            style={styles.scrollBody}
+            contentContainerStyle={styles.dialogBody}
+            showsVerticalScrollIndicator={true}
+            keyboardShouldPersistTaps="handled"
+          >
             {/* Meta summary card */}
             <View style={styles.metaCard}>
               <Text style={styles.metaCode}>{item.code}</Text>
@@ -131,9 +142,9 @@ export const RejectModal: React.FC<RejectModalProps> = ({
                 The applicant will receive an instant push notification and SMS with this exact rejection reason.
               </Text>
             </View>
-          </View>
+          </ScrollView>
 
-          {/* Footer Actions */}
+          {/* Footer Actions (Always visible & pinned at bottom) */}
           <View style={styles.dialogFooter}>
             <TouchableOpacity style={styles.cancelBtn} onPress={onClose} disabled={submitting}>
               <Text style={styles.cancelBtnText}>Cancel</Text>
@@ -152,7 +163,7 @@ export const RejectModal: React.FC<RejectModalProps> = ({
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -163,11 +174,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15, 23, 42, 0.75)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: SPACING.lg,
+    padding: SPACING.md,
   },
   dialog: {
     width: '100%',
     maxWidth: 540,
+    maxHeight: '88%',
+    display: 'flex',
+    flexDirection: 'column',
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     overflow: 'hidden',
@@ -176,6 +190,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 20,
     elevation: 10,
+  },
+  scrollBody: {
+    flexShrink: 1,
   },
   dialogHeader: {
     flexDirection: 'row',
@@ -313,7 +330,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
+    paddingTop: SPACING.md,
+    paddingBottom: Platform.OS === 'android' ? 22 : SPACING.md,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
     backgroundColor: '#FAFAFA',

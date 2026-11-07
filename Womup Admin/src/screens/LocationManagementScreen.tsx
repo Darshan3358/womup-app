@@ -907,7 +907,7 @@ export const LocationManagementScreen: React.FC = () => {
             activeOpacity={0.8}
           >
             <Building2
-              size={15}
+              size={14}
               color={activeSubTab === 'Cities' ? COLORS.white : COLORS.textMuted}
             />
             <Text
@@ -915,8 +915,9 @@ export const LocationManagementScreen: React.FC = () => {
                 styles.tabNavText,
                 activeSubTab === 'Cities' && styles.tabNavTextActive,
               ]}
+              numberOfLines={1}
             >
-              Cities Master ({cities.length})
+              Cities ({cities.length})
             </Text>
           </TouchableOpacity>
 
@@ -926,7 +927,7 @@ export const LocationManagementScreen: React.FC = () => {
             activeOpacity={0.8}
           >
             <MapPin
-              size={15}
+              size={14}
               color={activeSubTab === 'Areas' ? COLORS.white : COLORS.textMuted}
             />
             <Text
@@ -934,8 +935,9 @@ export const LocationManagementScreen: React.FC = () => {
                 styles.tabNavText,
                 activeSubTab === 'Areas' && styles.tabNavTextActive,
               ]}
+              numberOfLines={1}
             >
-              Areas & Store Allocations ({zones.length})
+              Areas & Stores ({zones.length})
             </Text>
           </TouchableOpacity>
 
@@ -945,7 +947,7 @@ export const LocationManagementScreen: React.FC = () => {
             activeOpacity={0.8}
           >
             <Layers
-              size={15}
+              size={14}
               color={activeSubTab === 'Pincodes' ? COLORS.white : COLORS.textMuted}
             />
             <Text
@@ -953,8 +955,9 @@ export const LocationManagementScreen: React.FC = () => {
                 styles.tabNavText,
                 activeSubTab === 'Pincodes' && styles.tabNavTextActive,
               ]}
+              numberOfLines={1}
             >
-              GeoJSON Pincodes & Serviceability ({geojsonPincodes.length})
+              Pincodes ({geojsonPincodes.length})
             </Text>
           </TouchableOpacity>
         </View>
@@ -2684,9 +2687,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 4,
     paddingVertical: 8,
-    paddingHorizontal: 6,
+    paddingHorizontal: 4,
     borderRadius: 8,
   },
   tabNavBtnActive: {
