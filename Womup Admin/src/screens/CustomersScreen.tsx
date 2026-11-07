@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  RefreshControl,
   TextInput,
   TouchableOpacity,
   Image,
@@ -72,8 +73,22 @@ export const CustomersScreen: React.FC = () => {
     updateRider,
     deleteCustomer,
     deleteRider,
+    refreshFromDb,
     isLoading,
   } = useAdminState();
+
+  const [isPullRefreshing, setIsPullRefreshing] = useState(false);
+
+  const handlePullToRefresh = async () => {
+    setIsPullRefreshing(true);
+    try {
+      if (refreshFromDb) await refreshFromDb();
+    } catch (e) {
+      console.warn('Pull refresh failed:', e);
+    } finally {
+      setIsPullRefreshing(false);
+    }
+  };
 
   const [activeTabMode, setActiveTabMode] = useState<'CUSTOMERS' | 'RIDERS'>('CUSTOMERS');
   const [searchQuery, setSearchQuery] = useState('');
@@ -434,8 +449,22 @@ export const CustomersScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* Top Segmented Navigation: Customers vs Delivery Partners */}
-      <View style={styles.modeTabsRow}>
+      <ScrollView
+        style={styles.mainScroll}
+        contentContainerStyle={styles.mainScrollContent}
+        showsVerticalScrollIndicator={true}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={isPullRefreshing}
+            onRefresh={handlePullToRefresh}
+            colors={[COLORS.hotPink]}
+            tintColor={COLORS.hotPink}
+          />
+        }
+      >
+        {/* Top Segmented Navigation: Customers vs Delivery Partners */}
+        <View style={styles.modeTabsRow}>
         <TouchableOpacity
           style={[styles.modeTab, activeTabMode === 'CUSTOMERS' && styles.activeModeTab]}
           onPress={() => {
@@ -555,7 +584,7 @@ export const CustomersScreen: React.FC = () => {
       </View>
 
       {/* Main List */}
-      <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+      <View style={styles.listContent}>
         {activeTabMode === 'CUSTOMERS' ? (
           isLoading ? (
             <CustomerListSkeleton count={5} />
@@ -737,6 +766,7 @@ export const CustomersScreen: React.FC = () => {
             ))
           )
         )}
+      </View>
       </ScrollView>
 
       {/* Add Customer FAB only when in Customer tab */}
@@ -1886,12 +1916,18 @@ const styles = StyleSheet.create({
   activeFilterText: {
     color: COLORS.white,
   },
+  mainScroll: {
+    flex: 1,
+  },
+  mainScrollContent: {
+    paddingBottom: 110,
+  },
   list: {
     flex: 1,
   },
   listContent: {
     padding: SPACING.md,
-    paddingBottom: 110,
+    paddingBottom: 20,
   },
   emptyState: {
     padding: SPACING.xxl,

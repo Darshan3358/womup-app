@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  RefreshControl,
   TouchableOpacity,
   TextInput,
   Modal,
@@ -464,8 +465,22 @@ export const StoresManagementScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* Header Banner */}
-      <LinearGradient colors={GRADIENTS.navyHeader} style={styles.topHeader}>
+      <ScrollView
+        style={styles.mainScroll}
+        contentContainerStyle={styles.mainScrollContent}
+        showsVerticalScrollIndicator={true}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[COLORS.hotPink]}
+            tintColor={COLORS.hotPink}
+          />
+        }
+      >
+        {/* Header Banner */}
+        <LinearGradient colors={GRADIENTS.navyHeader} style={styles.topHeader}>
         {/* Row 1: Icon + Title + Actions */}
         <View style={styles.topHeaderRow}>
           <View style={styles.titleIconRow}>
@@ -728,11 +743,7 @@ export const StoresManagementScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       ) : (
-        <ScrollView
-          style={styles.listScroll}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={true}
-        >
+        <View style={styles.listContent}>
           {isFullView && (
             <View style={styles.fullViewHeaderBar}>
               <TouchableOpacity
@@ -1205,8 +1216,9 @@ export const StoresManagementScreen: React.FC = () => {
             );
           })
         )}
-        </ScrollView>
+        </View>
       )}
+      </ScrollView>
 
       {/* ================= MODAL: CITY FILTER SELECTOR ================= */}
       <Modal
@@ -2246,12 +2258,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 13,
   },
+  mainScroll: {
+    flex: 1,
+  },
+  mainScrollContent: {
+    paddingBottom: 120,
+  },
   listScroll: {
     flex: 1,
   },
   listContent: {
     paddingHorizontal: SPACING.md,
-    paddingBottom: 100,
+    paddingTop: 6,
     gap: 16,
   },
   citySectionGroup: {

@@ -215,8 +215,14 @@ export const OrdersScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* Top Section: Tabs & Cascading Hierarchy Filters */}
-      <View style={styles.topSection}>
+      <ScrollView
+        style={styles.mainScroll}
+        contentContainerStyle={styles.mainScrollContent}
+        showsVerticalScrollIndicator={true}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Top Section: Tabs & Cascading Hierarchy Filters */}
+        <View style={styles.topSection}>
         {/* Main Tab Switcher */}
         <View style={styles.mainTabRow}>
           {(() => {
@@ -354,7 +360,7 @@ export const OrdersScreen: React.FC = () => {
       </View>
 
       {/* Orders List */}
-      <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+      <View style={styles.listContent}>
         {isLoading ? (
           <OrderListSkeleton count={4} />
         ) : filteredOrders.length === 0 ? (
@@ -470,6 +476,7 @@ export const OrdersScreen: React.FC = () => {
             );
           })
         )}
+      </View>
       </ScrollView>
 
       {/* ================= MODAL: SELECT CITY ================= */}
@@ -791,12 +798,18 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontWeight: '700',
   },
+  mainScroll: {
+    flex: 1,
+  },
+  mainScrollContent: {
+    paddingBottom: 110,
+  },
   list: {
     flex: 1,
   },
   listContent: {
     padding: SPACING.md,
-    paddingBottom: 24,
+    paddingBottom: 20,
   },
   emptyState: {
     padding: SPACING.xl,
