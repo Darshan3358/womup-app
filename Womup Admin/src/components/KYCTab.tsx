@@ -145,9 +145,9 @@ export const KYCTab: React.FC<KYCTabProps> = ({ customer, onStatusChange }) => {
           personalInfo: {
             firstName: customer.firstName || customer.name.split(' ')[0],
             surname: customer.surname || customer.name.split(' ').slice(1).join(' '),
-            fatherHusbandName: customer.fatherHusbandName || 'Mukesh Thanki',
-            gender: customer.gender || 'Female',
-            birthdate: customer.birthdate || customer.birthDate || '15 Aug 1995',
+            fatherHusbandName: customer.fatherHusbandName || (customer as any).fatherName || (customer as any).customer_father_husband_name || 'N/A',
+            gender: customer.gender || (customer as any).customer_gender || 'Not Specified',
+            birthdate: customer.birthdate || customer.birthDate || (customer as any).customer_birthdate || 'N/A',
           },
           kycRejectReason: customer.kycRejectReason || '',
         });
@@ -327,44 +327,36 @@ export const KYCTab: React.FC<KYCTabProps> = ({ customer, onStatusChange }) => {
           <Text style={styles.sectionTitle}>Aadhaar Information</Text>
         </View>
 
-        <View style={styles.grid2Col}>
-          <View style={styles.infoField}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-              <Text style={styles.fieldLabel}>Aadhaar Number</Text>
-              <TouchableOpacity
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingHorizontal: 8,
-                  paddingVertical: 3,
-                  backgroundColor: showAadhaar ? '#FEE2E2' : '#F3E8FF',
-                  borderRadius: 6,
-                  borderWidth: 1,
-                  borderColor: showAadhaar ? '#FCA5A5' : '#DDD6FE',
-                }}
-                onPress={toggleRevealAadhaar}
-                activeOpacity={0.7}
-              >
-                {showAadhaar ? (
-                  <>
-                    <EyeOff size={12} color="#DC2626" style={{ marginRight: 4 }} />
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#DC2626' }}>Hide</Text>
-                  </>
-                ) : (
-                  <>
-                    <Eye size={12} color={COLORS.purple} style={{ marginRight: 4 }} />
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: COLORS.purple }}>Reveal</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-            <Text style={[styles.fieldValueBold, showAadhaar && { letterSpacing: 1.2, color: '#1E1B4B' }]}>
+        {/* Full-Width Sensitive Field: Aadhaar Number */}
+        <View style={styles.sensitiveCardField}>
+          <Text style={styles.fieldLabel}>Aadhaar Number</Text>
+          <View style={styles.sensitiveValueRow}>
+            <Text style={[styles.fieldValueBold, showAadhaar && styles.sensitiveRevealedText]}>
               {showAadhaar
                 ? (kycData?.rawAadhaarNumber || customer.aadhaarNumber || (customer as any).customer_aadhar_no || kycData?.aadhaarNumber || 'Not Stored')
                 : (kycData?.aadhaarNumber || (customer.aadhaarNumber ? `XXXX XXXX ${customer.aadhaarNumber.slice(-4)}` : 'XXXX XXXX 1234'))}
             </Text>
+            <TouchableOpacity
+              style={[styles.revealBtn, showAadhaar && styles.revealBtnActive]}
+              onPress={toggleRevealAadhaar}
+              activeOpacity={0.75}
+            >
+              {showAadhaar ? (
+                <>
+                  <EyeOff size={13} color="#DC2626" style={{ marginRight: 4 }} />
+                  <Text style={styles.hideBtnText}>Hide</Text>
+                </>
+              ) : (
+                <>
+                  <Eye size={13} color={COLORS.purple} style={{ marginRight: 4 }} />
+                  <Text style={styles.revealBtnText}>Reveal</Text>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
+        </View>
 
+        <View style={styles.grid2Col}>
           <View style={styles.infoField}>
             <Text style={styles.fieldLabel}>Full Name (as per Aadhaar)</Text>
             <Text style={styles.fieldValueBold}>
@@ -377,27 +369,27 @@ export const KYCTab: React.FC<KYCTabProps> = ({ customer, onStatusChange }) => {
           <View style={styles.infoField}>
             <Text style={styles.fieldLabel}>Father / Husband Name</Text>
             <Text style={styles.fieldValue}>
-              {kycData?.personalInfo?.fatherHusbandName || customer.fatherHusbandName || 'Mukesh Thanki'}
+              {kycData?.personalInfo?.fatherHusbandName || customer.fatherHusbandName || (customer as any).fatherName || (customer as any).customer_father_husband_name || 'N/A'}
             </Text>
           </View>
 
           <View style={styles.infoField}>
             <Text style={styles.fieldLabel}>Gender</Text>
             <Text style={styles.fieldValue}>
-              {kycData?.personalInfo?.gender || customer.gender || 'Female'}
+              {kycData?.personalInfo?.gender || customer.gender || (customer as any).customer_gender || 'Not Specified'}
             </Text>
           </View>
 
           <View style={styles.infoField}>
             <Text style={styles.fieldLabel}>Date of Birth</Text>
             <Text style={styles.fieldValue}>
-              {kycData?.personalInfo?.birthdate || customer.birthdate || customer.birthDate || '15 Aug 1995'}
+              {kycData?.personalInfo?.birthdate || customer.birthdate || customer.birthDate || (customer as any).customer_birthdate || 'N/A'}
             </Text>
           </View>
 
           <View style={styles.infoField}>
             <Text style={styles.fieldLabel}>Registered Mobile</Text>
-            <Text style={styles.fieldValue}>{customer.phone}</Text>
+            <Text style={styles.fieldValue}>{customer.phone || 'N/A'}</Text>
           </View>
         </View>
       </View>
@@ -537,6 +529,36 @@ export const KYCTab: React.FC<KYCTabProps> = ({ customer, onStatusChange }) => {
           <Text style={styles.sectionTitle}>Bank Details (for withdrawal)</Text>
         </View>
 
+        {/* Full-Width Sensitive Field: Bank Account Number */}
+        <View style={styles.sensitiveCardField}>
+          <Text style={styles.fieldLabel}>Account Number</Text>
+          <View style={styles.sensitiveValueRow}>
+            <Text style={[styles.fieldValueMono, showBankAccount && styles.sensitiveRevealedText]}>
+              {showBankAccount
+                ? (kycData?.bankDetails?.rawAccountNumber || customer.accountNumber || (customer as any).bankAccountNo || 'Not Stored')
+                : (kycData?.bankDetails?.accountNumber ||
+                    (customer.accountNumber ? `XXXX ${customer.accountNumber.slice(-4)}` : 'XXXX 6162'))}
+            </Text>
+            <TouchableOpacity
+              style={[styles.revealBtn, showBankAccount && styles.revealBtnActive]}
+              onPress={toggleRevealBankAccount}
+              activeOpacity={0.75}
+            >
+              {showBankAccount ? (
+                <>
+                  <EyeOff size={13} color="#DC2626" style={{ marginRight: 4 }} />
+                  <Text style={styles.hideBtnText}>Hide</Text>
+                </>
+              ) : (
+                <>
+                  <Eye size={13} color={COLORS.purple} style={{ marginRight: 4 }} />
+                  <Text style={styles.revealBtnText}>Reveal</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <View style={styles.grid2Col}>
           <View style={styles.infoField}>
             <Text style={styles.fieldLabel}>Bank Name</Text>
@@ -556,44 +578,6 @@ export const KYCTab: React.FC<KYCTabProps> = ({ customer, onStatusChange }) => {
             <Text style={styles.fieldLabel}>Account Holder Name</Text>
             <Text style={styles.fieldValueBold}>
               {kycData?.bankDetails?.accountHolderName || customer.accountHolderName || customer.name || 'N/A'}
-            </Text>
-          </View>
-
-          <View style={styles.infoField}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-              <Text style={styles.fieldLabel}>Account Number</Text>
-              <TouchableOpacity
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingHorizontal: 8,
-                  paddingVertical: 3,
-                  backgroundColor: showBankAccount ? '#FEE2E2' : '#F3E8FF',
-                  borderRadius: 6,
-                  borderWidth: 1,
-                  borderColor: showBankAccount ? '#FCA5A5' : '#DDD6FE',
-                }}
-                onPress={toggleRevealBankAccount}
-                activeOpacity={0.7}
-              >
-                {showBankAccount ? (
-                  <>
-                    <EyeOff size={12} color="#DC2626" style={{ marginRight: 4 }} />
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#DC2626' }}>Hide</Text>
-                  </>
-                ) : (
-                  <>
-                    <Eye size={12} color={COLORS.purple} style={{ marginRight: 4 }} />
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: COLORS.purple }}>Reveal</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-            <Text style={[styles.fieldValueMono, showBankAccount && { letterSpacing: 1.2, color: '#1E1B4B', fontWeight: '700' }]}>
-              {showBankAccount
-                ? (kycData?.bankDetails?.rawAccountNumber || customer.accountNumber || (customer as any).bankAccountNo || 'Not Stored')
-                : (kycData?.bankDetails?.accountNumber ||
-                    (customer.accountNumber ? `XXXX ${customer.accountNumber.slice(-4)}` : 'XXXX 6162'))}
             </Text>
           </View>
 
@@ -889,6 +873,49 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: COLORS.textPrimary,
+  },
+  sensitiveCardField: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: RADIUS.input,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: SPACING.sm,
+    marginBottom: 12,
+  },
+  sensitiveValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  sensitiveRevealedText: {
+    letterSpacing: 1.2,
+    color: '#1E1B4B',
+    fontWeight: '700',
+  },
+  revealBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: '#F3E8FF',
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+  },
+  revealBtnActive: {
+    backgroundColor: '#FEE2E2',
+    borderColor: '#FCA5A5',
+  },
+  revealBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.purple,
+  },
+  hideBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#DC2626',
   },
   grid2Col: {
     flexDirection: 'row',

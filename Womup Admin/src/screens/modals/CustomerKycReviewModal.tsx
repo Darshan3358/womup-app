@@ -229,16 +229,23 @@ export const CustomerKycReviewModal: React.FC<CustomerKycReviewModalProps> = ({
                   <InfoItem label="Mobile Number" value={customer?.phone || customer?.customer_mobile} />
                   <InfoItem label="Customer Code" value={customer?.customer_code || customer?.referralCode} />
                   <View style={[styles.infoItem]}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
-                      <Text style={styles.infoLabel}>Aadhaar Number</Text>
+                    <Text style={styles.infoLabel}>Aadhaar Number</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 3 }}>
+                      <Text style={[styles.infoValue, showAadhaar && { letterSpacing: 1.1, fontWeight: '700', color: '#1E1B4B' }]}>
+                        {showAadhaar
+                          ? (customer?.rawAadhaarNumber || customer?.aadhaarNumber || customer?.customer_aadhar_no || 'Not Stored')
+                          : (customer?.maskedAadhaar || (customer?.aadhaarNumber ? `XXXX XXXX ${customer.aadhaarNumber.slice(-4)}` : 'XXXX XXXX 1234'))}
+                      </Text>
                       <TouchableOpacity
                         style={{
                           flexDirection: 'row',
                           alignItems: 'center',
-                          paddingHorizontal: 6,
-                          paddingVertical: 2,
+                          paddingHorizontal: 8,
+                          paddingVertical: 3,
                           backgroundColor: showAadhaar ? '#FEE2E2' : '#F3E8FF',
-                          borderRadius: 4,
+                          borderRadius: 6,
+                          borderWidth: 1,
+                          borderColor: showAadhaar ? '#FCA5A5' : '#DDD6FE',
                         }}
                         onPress={toggleRevealAadhaar}
                         activeOpacity={0.7}
@@ -256,11 +263,6 @@ export const CustomerKycReviewModal: React.FC<CustomerKycReviewModalProps> = ({
                         )}
                       </TouchableOpacity>
                     </View>
-                    <Text style={[styles.infoValue, showAadhaar && { letterSpacing: 1.1, fontWeight: '700', color: '#1E1B4B' }]}>
-                      {showAadhaar
-                        ? (customer?.rawAadhaarNumber || customer?.aadhaarNumber || customer?.customer_aadhar_no || 'Not Stored')
-                        : (customer?.maskedAadhaar || (customer?.aadhaarNumber ? `XXXX XXXX ${customer.aadhaarNumber.slice(-4)}` : 'XXXX XXXX 1234'))}
-                    </Text>
                   </View>
                 </View>
               </View>
@@ -342,16 +344,23 @@ export const CustomerKycReviewModal: React.FC<CustomerKycReviewModalProps> = ({
                   <InfoItem label="Branch" value={customer?.branchName || 'N/A'} />
                   <InfoItem label="Account Holder" value={customer?.accountHolderName || customer?.name || 'N/A'} />
                   <View style={[styles.infoItem]}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
-                      <Text style={styles.infoLabel}>Account Number</Text>
+                    <Text style={styles.infoLabel}>Account Number</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 3 }}>
+                      <Text style={[styles.infoValue, showBankAccount && { letterSpacing: 1.1, fontWeight: '700', color: '#1E1B4B' }]}>
+                        {showBankAccount
+                          ? (customer?.rawAccountNumber || customer?.accountNumber || customer?.bankAccountNo || 'Not Stored')
+                          : (customer?.maskedAccount || (customer?.accountNumber ? `XXXX ${customer.accountNumber.slice(-4)}` : 'XXXX 6162'))}
+                      </Text>
                       <TouchableOpacity
                         style={{
                           flexDirection: 'row',
                           alignItems: 'center',
-                          paddingHorizontal: 6,
-                          paddingVertical: 2,
+                          paddingHorizontal: 8,
+                          paddingVertical: 3,
                           backgroundColor: showBankAccount ? '#FEE2E2' : '#F3E8FF',
-                          borderRadius: 4,
+                          borderRadius: 6,
+                          borderWidth: 1,
+                          borderColor: showBankAccount ? '#FCA5A5' : '#DDD6FE',
                         }}
                         onPress={toggleRevealBankAccount}
                         activeOpacity={0.7}
@@ -369,11 +378,6 @@ export const CustomerKycReviewModal: React.FC<CustomerKycReviewModalProps> = ({
                         )}
                       </TouchableOpacity>
                     </View>
-                    <Text style={[styles.infoValue, showBankAccount && { letterSpacing: 1.1, fontWeight: '700', color: '#1E1B4B' }]}>
-                      {showBankAccount
-                        ? (customer?.rawAccountNumber || customer?.accountNumber || customer?.bankAccountNo || 'Not Stored')
-                        : (customer?.maskedAccount || (customer?.accountNumber ? `XXXX ${customer.accountNumber.slice(-4)}` : 'XXXX 6162'))}
-                    </Text>
                   </View>
                   <InfoItem label="IFSC Code" value={customer?.ifscCode || 'N/A'} />
                   <InfoItem label="UPI ID" value={customer?.upiId || 'N/A'} />
