@@ -29,6 +29,10 @@ import {
 import { Product, Category, BlinkitProduct } from '../../types';
 
 export const BlinkitHomeScreen: React.FC = () => {
+  const { width } = useWindowDimensions();
+  const bannerWidth = Math.min(width - 24, 1400);
+  const diwaliBannerHeight = Math.max(Math.min(Math.round(bannerWidth * (250 / 900)), 150), 96);
+
   const {
     setActiveScreen,
     setSelectedProduct,
@@ -433,7 +437,7 @@ export const BlinkitHomeScreen: React.FC = () => {
         <TouchableOpacity
           activeOpacity={0.9}
           onPress={() => setActiveScreen('C15_ProductListing')}
-          style={styles.festiveBannerCard}
+          style={[styles.festiveBannerCard, { height: diwaliBannerHeight }]}
         >
           <Image
             source={require('../../../assets/banners/diwali_ready_banner.png')}
@@ -442,13 +446,13 @@ export const BlinkitHomeScreen: React.FC = () => {
           />
         </TouchableOpacity>
       </View>
-      {/* 4-Item Trust / Value Proposition Bar */}
-      <ValuePropositionBar />
     </>
-  ), [handleBannerPress, handleSelectCategory, setActiveScreen]);
+  ), [handleBannerPress, handleSelectCategory, setActiveScreen, diwaliBannerHeight]);
 
   const ListFooter = useMemo(() => (
     <>
+      {/* 24x7 Support & Trust Badges moved to LAST */}
+      <ValuePropositionBar />
       <MonthlyBenefitsBanner onJoinPress={() => setActiveScreen('Blinkit_Money')} />
       <View style={{ height: 90 }} />
     </>
@@ -571,16 +575,19 @@ const styles = StyleSheet.create({
     height: 44,
   },
   festiveBannerWrapper: {
+    maxWidth: 1440,
     width: '100%',
-    paddingHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 4,
+    alignSelf: 'center',
+    paddingHorizontal: 12,
+    marginTop: 10,
+    marginBottom: 8,
+    overflow: 'hidden',
   },
   festiveBannerCard: {
     width: '100%',
-    aspectRatio: 453 / 122,
     borderRadius: 18,
     overflow: 'hidden',
+    backgroundColor: '#1E0638',
     shadowColor: '#7C3AED',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
