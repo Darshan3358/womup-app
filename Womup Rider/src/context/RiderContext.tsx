@@ -472,20 +472,57 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setAuthStep('LOGIN');
         return;
       }
-      const userProfile = await RiderApiService.getProfile();
-      setProfile(userProfile);
-      setIsOnline(userProfile.isOnline);
 
-      if (userProfile.status === 'APPROVED' || userProfile.status === 'ACTIVE') {
-        setAuthStep('AUTHENTICATED');
-        // Load active delivery, GPS, and dark store telemetry in background without blocking splash
-        refreshDashboard().catch(() => {});
-      } else if (userProfile.status === 'UNDER_REVIEW') {
-        setAuthStep('APPROVAL_PENDING');
-      } else if (userProfile.status === 'KYC_PENDING' || userProfile.status === 'REGISTERED') {
-        setAuthStep('KYC');
-      } else {
-        setAuthStep('LOGIN');
+      // 1. Immediately restore cached profile to keep rider logged in even offline
+      let cachedStatus: string | null = null;
+      try {
+        const rawCached = await AsyncStorage.getItem('@womup_rider_profile');
+        if (rawCached) {
+          const cached = JSON.parse(rawCached);
+          if (cached && (cached.id || cached.email || cached.phone)) {
+            setProfile(cached);
+            setIsOnline(!!cached.isOnline);
+            cachedStatus = cached.status;
+            if (cached.status === 'APPROVED' || cached.status === 'ACTIVE') {
+              setAuthStep('AUTHENTICATED');
+            } else if (cached.status === 'UNDER_REVIEW') {
+              setAuthStep('APPROVAL_PENDING');
+            } else if (cached.status === 'KYC_PENDING' || cached.status === 'REGISTERED') {
+              setAuthStep('KYC');
+            }
+          }
+        }
+      } catch (_) {}
+
+      // 2. Fetch fresh live profile from backend
+      try {
+        const userProfile = await RiderApiService.getProfile();
+        setProfile(userProfile);
+        setIsOnline(userProfile.isOnline);
+        await AsyncStorage.setItem('@womup_rider_profile', JSON.stringify(userProfile));
+
+        if (userProfile.status === 'APPROVED' || userProfile.status === 'ACTIVE') {
+          setAuthStep('AUTHENTICATED');
+          // Load active delivery, GPS, and dark store telemetry in background without blocking splash
+          refreshDashboard().catch(() => {});
+        } else if (userProfile.status === 'UNDER_REVIEW') {
+          setAuthStep('APPROVAL_PENDING');
+        } else if (userProfile.status === 'KYC_PENDING' || userProfile.status === 'REGISTERED') {
+          setAuthStep('KYC');
+        } else {
+          setAuthStep('LOGIN');
+        }
+      } catch (networkErr: any) {
+        // If 401 Unauthorized or SESSION_EXPIRED, clear session
+        if (networkErr?.message === 'NOT_AUTHENTICATED' || networkErr?.message === 'SESSION_EXPIRED' || networkErr?.status === 401) {
+          await logout();
+        } else if (!cachedStatus) {
+          // If no cached status existed and network failed, default to LOGIN
+          setAuthStep('LOGIN');
+        } else {
+          // Keep rider authenticated using cached credentials
+          console.warn('[RiderContext] Network error during session restore, keeping cached session:', networkErr?.message);
+        }
       }
     } catch {
       setAuthStep('LOGIN');
@@ -1035,8 +1072,22 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const logout = async () => {
-    LocationTrackerService.stopTracking();
-    await RiderApiService.logout();
+    try {
+      LocationTrackerService.stopTracking();
+    } catch (_) {}
+    try {
+      await RiderApiService.logout();
+    } catch (_) {}
+    try {
+      await AsyncStorage.multiRemove([
+        '@womup_rider_token',
+        '@womup_rider_profile',
+        '@womup_rider_active_delivery',
+        '@womup_rider_selected_hub',
+        '@womup_rider_duty_history',
+        '@womup_rider_settlements',
+      ]);
+    } catch (_) {}
     setProfile(null);
     setActiveDelivery(null);
     setIsOnline(false);

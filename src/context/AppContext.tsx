@@ -805,6 +805,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     activeScreen !== 'Blinkit_Home' &&
     activeScreen !== 'C01_Splash' &&
     activeScreen !== 'C02_Onboarding1' &&
+    activeScreen !== 'C06_MobileNumber' &&
     activeScreen !== 'C12_Home';
 
   // Hardware Back Button Handler for Android
@@ -1348,6 +1349,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setWalletBalance(0);
     setWishlist([]);
     setAuthVerificationId(null);
+    setHistory([]);
     setActiveScreenState('C06_MobileNumber');
   };
 
@@ -1374,23 +1376,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         if (token) {
           api.setToken(token);
-          let isTokenValid = false;
+          let isTokenValid = true;
           try {
             const profile = await AuthService.getProfile();
             if (profile && (profile.email || profile.phoneNumber || profile.fullName)) {
               // Live database user profile
               setUser(profile);
               StorageService.saveItem(StorageService.KEYS.USER, profile);
-              isTokenValid = true;
             } else {
               // Token was invalid or expired (401)
               api.setToken(null);
               await StorageService.removeItem(StorageService.KEYS.AUTH_TOKEN);
               await StorageService.removeItem(StorageService.KEYS.REFRESH_TOKEN);
+              isTokenValid = false;
             }
-          } catch (e) {
+          } catch (e: any) {
             console.warn('Profile fetch error on init:', e);
-            api.setToken(null);
+            const status = e?.response?.status || e?.status;
+            if (status === 401) {
+              api.setToken(null);
+              await StorageService.removeItem(StorageService.KEYS.AUTH_TOKEN);
+              await StorageService.removeItem(StorageService.KEYS.REFRESH_TOKEN);
+              isTokenValid = false;
+            } else {
+              // Network offline / timeout: preserve session and token
+              isTokenValid = true;
+            }
           }
 
           if (isTokenValid) {

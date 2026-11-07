@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { AppState, AppStateStatus, BackHandler } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Customer,
   DeliveryPartnerItem,
@@ -323,58 +324,112 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
   }, []);
 
-  // Admin Auth & Master Sponsor ID state
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      return localStorage.getItem('womup_admin_auth') === 'true';
-    }
-    return false;
-  });
-
-  const [adminUser, setAdminUser] = useState<any>(() => {
-    if (typeof window !== 'undefined' && window.localStorage) {
+  // Cross-platform persistent storage helper for Admin session
+  const adminStorage = {
+    getItem: async (key: string): Promise<string | null> => {
       try {
-        const saved = localStorage.getItem('womup_admin_user');
-        return saved ? JSON.parse(saved) : null;
-      } catch (e) {
-        return null;
+        const val = await AsyncStorage.getItem(key);
+        if (val !== null) return val;
+      } catch (_) {}
+      if (typeof window !== 'undefined' && window.localStorage) {
+        return localStorage.getItem(key);
       }
-    }
-    return null;
-  });
+      return null;
+    },
+    setItem: async (key: string, value: string): Promise<void> => {
+      try {
+        await AsyncStorage.setItem(key, value);
+      } catch (_) {}
+      if (typeof window !== 'undefined' && window.localStorage) {
+        try {
+          localStorage.setItem(key, value);
+        } catch (_) {}
+      }
+    },
+    removeItem: async (key: string): Promise<void> => {
+      try {
+        await AsyncStorage.removeItem(key);
+      } catch (_) {}
+      if (typeof window !== 'undefined' && window.localStorage) {
+        try {
+          localStorage.removeItem(key);
+        } catch (_) {}
+      }
+    },
+  };
 
+  // Admin Auth & Master Sponsor ID state
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(false);
+  const [adminUser, setAdminUser] = useState<any>(null);
   const [adminSponsorId, setAdminSponsorId] = useState<string>('WORMUP001');
+
+  // Hydrate persistent Admin session on startup
+  useEffect(() => {
+    let mounted = true;
+    const restoreAdminSession = async () => {
+      try {
+        const savedAuth = await adminStorage.getItem('womup_admin_auth');
+        const savedUserStr = await adminStorage.getItem('womup_admin_user');
+        const savedSponsor = await adminStorage.getItem('womup_admin_sponsor');
+
+        if (savedAuth === 'true' && mounted) {
+          setIsAdminAuthenticated(true);
+          if (savedUserStr) {
+            try {
+              setAdminUser(JSON.parse(savedUserStr));
+            } catch (_) {}
+          }
+          if (savedSponsor) {
+            setAdminSponsorId(savedSponsor);
+          }
+        }
+      } catch (err) {
+        console.warn('[AdminState] Error restoring persistent session:', err);
+      }
+    };
+    restoreAdminSession();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const loginAdmin = async (identifier?: string, password?: string) => {
     const res = await ApiService.adminLogin(identifier, password);
     if (res.success) {
       setIsAdminAuthenticated(true);
       setAdminUser(res.user);
-      setAdminSponsorId(res.sponsorId || 'WORMUP001');
-      if (typeof window !== 'undefined' && window.localStorage) {
-        localStorage.setItem('womup_admin_auth', 'true');
-        localStorage.setItem('womup_admin_user', JSON.stringify(res.user));
-        if (res.accessToken) {
-          localStorage.setItem('womup_admin_token', res.accessToken);
-        }
+      const sponsor = res.sponsorId || 'WORMUP001';
+      setAdminSponsorId(sponsor);
+
+      await adminStorage.setItem('womup_admin_auth', 'true');
+      if (res.user) {
+        await adminStorage.setItem('womup_admin_user', JSON.stringify(res.user));
       }
+      if (res.accessToken) {
+        await adminStorage.setItem('womup_admin_token', res.accessToken);
+      }
+      if (res.refreshToken) {
+        await adminStorage.setItem('womup_admin_refresh_token', res.refreshToken);
+      }
+      await adminStorage.setItem('womup_admin_sponsor', sponsor);
+
       return { success: true };
     } else {
       return { success: false, error: res.error || 'Admin login failed' };
     }
   };
 
-  const logoutAdmin = () => {
+  const logoutAdmin = async () => {
     setIsAdminAuthenticated(false);
     setAdminUser(null);
-    if (typeof window !== 'undefined' && window.localStorage) {
-      localStorage.removeItem('womup_admin_auth');
-      localStorage.removeItem('womup_admin_user');
-      localStorage.removeItem('womup_admin_token');
-      try {
-        window.location.reload();
-      } catch (e) {}
-    }
+    setActiveTab('Dashboard');
+    setSubView('none');
+
+    await adminStorage.removeItem('womup_admin_auth');
+    await adminStorage.removeItem('womup_admin_user');
+    await adminStorage.removeItem('womup_admin_token');
+    await adminStorage.removeItem('womup_admin_refresh_token');
+    await adminStorage.removeItem('womup_admin_sponsor');
   };
 
   const [syncStatus, setSyncStatus] = useState<string>('Live MongoDB Connected');

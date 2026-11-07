@@ -13,6 +13,7 @@ import { vendorSocket } from '../services/socket';
 
 const VENDOR_LOGGED_IN_KEY = '@womup_vendor_logged_in';
 const VENDOR_CODE_KEY = '@womup_vendor_code';
+const VENDOR_PROFILE_KEY = '@womup_vendor_profile';
 
 interface VendorAuthContextType {
   vendor: VendorProfile | null;
@@ -129,10 +130,33 @@ export const VendorAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
         // Only restore if user was previously logged in
         if (savedAuth === 'true' && savedCode) {
-          const profile = await VendorApi.getProfile(savedCode);
-          if (mounted && profile) {
-            setVendor(profile);
-            setIsLoggedIn(true);
+          // Immediately restore cached vendor profile to stay logged in offline
+          let hasCached = false;
+          try {
+            const rawProfile = await AsyncStorage.getItem(VENDOR_PROFILE_KEY);
+            if (rawProfile && mounted) {
+              const cached = JSON.parse(rawProfile);
+              if (cached && (cached.id || cached.vendorCode)) {
+                setVendor(cached);
+                setIsLoggedIn(true);
+                hasCached = true;
+              }
+            }
+          } catch (_) {}
+
+          // Refresh live profile in background
+          try {
+            const profile = await VendorApi.getProfile(savedCode);
+            if (mounted && profile) {
+              setVendor(profile);
+              setIsLoggedIn(true);
+              await AsyncStorage.setItem(VENDOR_PROFILE_KEY, JSON.stringify(profile));
+            }
+          } catch (netErr: any) {
+            console.warn('[VendorAuthContext] Network error refreshing profile, keeping cached session:', netErr?.message || netErr);
+            if (hasCached && mounted) {
+              setIsLoggedIn(true);
+            }
           }
         } else {
           // Defaults to logged out state if no valid session
@@ -259,6 +283,7 @@ export const VendorAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         // Persist session
         await AsyncStorage.setItem(VENDOR_LOGGED_IN_KEY, 'true');
         await AsyncStorage.setItem(VENDOR_CODE_KEY, res.vendor.vendorCode);
+        await AsyncStorage.setItem(VENDOR_PROFILE_KEY, JSON.stringify(res.vendor));
         return true;
       }
       return false;
@@ -277,6 +302,7 @@ export const VendorAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setActiveTab('Dashboard');
         await AsyncStorage.setItem(VENDOR_LOGGED_IN_KEY, 'true');
         await AsyncStorage.setItem(VENDOR_CODE_KEY, res.vendor.vendorCode);
+        await AsyncStorage.setItem(VENDOR_PROFILE_KEY, JSON.stringify(res.vendor));
         return true;
       }
       return false;
@@ -290,6 +316,7 @@ export const VendorAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setIsLoggedIn(true);
     AsyncStorage.setItem(VENDOR_LOGGED_IN_KEY, 'true');
     AsyncStorage.setItem(VENDOR_CODE_KEY, profile.vendorCode);
+    AsyncStorage.setItem(VENDOR_PROFILE_KEY, JSON.stringify(profile));
   };
 
   const logout = async (): Promise<void> => {
@@ -299,8 +326,11 @@ export const VendorAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       vendorSocket.disconnect();
 
       // 2. Clear persisted auth in AsyncStorage
-      await AsyncStorage.removeItem(VENDOR_LOGGED_IN_KEY);
-      await AsyncStorage.removeItem(VENDOR_CODE_KEY);
+      await AsyncStorage.multiRemove([
+        VENDOR_LOGGED_IN_KEY,
+        VENDOR_CODE_KEY,
+        VENDOR_PROFILE_KEY,
+      ]);
     } catch (e) {
       console.warn('Storage clear warning during logout:', e);
     } finally {
@@ -308,6 +338,7 @@ export const VendorAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setVendor(null);
       setIsLoggedIn(false);
       setActiveTab('Dashboard');
+      setTabHistory(['Dashboard']);
       setPendingRequests([]);
       setActiveModalRequest(null);
       setTransactions([]);

@@ -27,52 +27,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [userRole, setUserRole] = useState<UserRole>('CUSTOMER');
 
   /**
-   * Check login state and validate token with backend on launch
-   */
-  const checkAuth = useCallback(async (): Promise<boolean> => {
-    setIsLoading(true);
-    try {
-      const storedToken = await StorageService.getItem<string | null>(StorageService.KEYS.AUTH_TOKEN, null);
-
-      if (!storedToken) {
-        api.setToken(null);
-        setIsAuthenticated(false);
-        setUser(null);
-        setIsLoading(false);
-        return false;
-      }
-
-      api.setToken(storedToken);
-
-      // Validate session with backend
-      const profile = await AuthService.getProfile();
-      if (profile && (profile.email || profile.phoneNumber || profile.id)) {
-        setUser(profile);
-        setIsAuthenticated(true);
-        setUserRole('CUSTOMER');
-        setIsLoading(false);
-        return true;
-      } else {
-        // Token invalid or expired - attempt refresh
-        const refreshed = await refreshToken();
-        if (!refreshed) {
-          await logout();
-          setIsLoading(false);
-          return false;
-        }
-        setIsLoading(false);
-        return true;
-      }
-    } catch (e) {
-      console.warn('[AuthGuard] checkAuth error:', e);
-      setIsAuthenticated(false);
-      setUser(null);
-      setIsLoading(false);
-      return false;
-    }
-  }, []);
-
-  /**
    * Rotate access token using refresh token
    */
   const refreshToken = useCallback(async (): Promise<boolean> => {
@@ -101,6 +55,81 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return false;
     }
   }, []);
+
+  /**
+   * Check login state and validate token with backend on launch
+   * Restores cached session immediately so offline/network delays never kick user out.
+   */
+  const checkAuth = useCallback(async (): Promise<boolean> => {
+    setIsLoading(true);
+    try {
+      const storedToken = await StorageService.getItem<string | null>(StorageService.KEYS.AUTH_TOKEN, null);
+
+      if (!storedToken) {
+        api.setToken(null);
+        setIsAuthenticated(false);
+        setUser(null);
+        setIsLoading(false);
+        return false;
+      }
+
+      api.setToken(storedToken);
+
+      // Restore cached user profile immediately for instant offline-safe login
+      const cachedUser = await StorageService.getItem<UserProfile | null>(StorageService.KEYS.USER, null);
+      if (cachedUser) {
+        setUser(cachedUser);
+        setIsAuthenticated(true);
+        setUserRole('CUSTOMER');
+      }
+
+      // Validate session with backend in background
+      try {
+        const profile = await AuthService.getProfile();
+        if (profile && (profile.email || profile.phoneNumber || profile.id)) {
+          setUser(profile);
+          await StorageService.saveItem(StorageService.KEYS.USER, profile);
+          setIsAuthenticated(true);
+          setUserRole('CUSTOMER');
+          setIsLoading(false);
+          return true;
+        } else {
+          // Token invalid or expired - attempt refresh
+          const refreshed = await refreshToken();
+          if (!refreshed) {
+            await logout();
+            setIsLoading(false);
+            return false;
+          }
+          setIsLoading(false);
+          return true;
+        }
+      } catch (backendError: any) {
+        // Only log out if backend explicitly reports 401 Unauthorized / token revoked
+        const status = backendError?.response?.status || backendError?.status;
+        if (status === 401) {
+          const refreshed = await refreshToken();
+          if (!refreshed) {
+            await logout();
+            setIsLoading(false);
+            return false;
+          }
+          setIsLoading(false);
+          return true;
+        }
+        // For temporary network errors, keep user authenticated with cached credentials
+        console.warn('[AuthGuard] Offline or temporary network error during checkAuth:', backendError?.message || backendError);
+        setIsAuthenticated(true);
+        setUserRole('CUSTOMER');
+        setIsLoading(false);
+        return true;
+      }
+    } catch (e) {
+      console.warn('[AuthGuard] checkAuth storage error:', e);
+      setIsLoading(false);
+      return false;
+    }
+  }, [refreshToken]);
 
   /**
    * Log in user and persist credentials
