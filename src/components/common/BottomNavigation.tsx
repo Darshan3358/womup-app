@@ -7,10 +7,11 @@ import {
   useWindowDimensions,
   Platform,
   Image,
+  ImageBackground,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons, Feather } from '@expo/vector-icons';
 import { COLORS } from '../../theme/colors';
-import { AppIcon, IconName } from './AppIcon';
 
 import { useApp } from '../../context/AppContext';
 
@@ -44,33 +45,53 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
   const tabs: {
     key: BlinkitTabKey;
     label: string;
-    icon?: IconName;
     isWomupAppButton?: boolean;
   }[] = [
-    { key: 'Home', label: 'Home', icon: 'home' },
-    { key: 'Order Again', label: 'Orders', icon: 'shopping-basket' },
-    { key: 'Categories', label: 'Categories', icon: 'grid' },
+    { key: 'Home', label: 'Home' },
+    { key: 'Order Again', label: 'Orders' },
+    { key: 'Categories', label: 'Categories' },
     {
       key: 'Profile',
       label: isAuthenticated ? 'Profile' : 'Login',
-      icon: 'user',
     },
     { key: 'Local Shop', label: 'App', isWomupAppButton: true },
   ];
 
-  const bottomPadding = Math.max(insets.bottom, 8);
-  const barHeight = 64;
+  const bottomPadding = Math.max(insets.bottom, 6);
+  const barHeight = 58;
+
+  const renderIcon = (tabKey: BlinkitTabKey, isActive: boolean) => {
+    const iconColor = isActive ? '#E11D88' : '#6B7280';
+    const iconSize = isSmallDevice ? 22 : 24;
+
+    switch (tabKey) {
+      case 'Home':
+        return <Ionicons name={isActive ? 'home' : 'home-outline'} size={iconSize} color={iconColor} />;
+      case 'Order Again':
+        return <Feather name="shopping-bag" size={iconSize - 2} color={iconColor} />;
+      case 'Categories':
+        return <Ionicons name={isActive ? 'grid' : 'grid-outline'} size={iconSize} color={iconColor} />;
+      case 'Profile':
+        return <Feather name="user" size={iconSize - 1} color={iconColor} />;
+      default:
+        return null;
+    }
+  };
 
   return (
-    <View style={[styles.wrapper, { paddingBottom: bottomPadding }]}>
+    <ImageBackground
+      source={require('../../../assets/womart_footer_wave.png')}
+      style={[styles.wrapper, { paddingBottom: bottomPadding }]}
+      resizeMode="cover"
+    >
       <View style={[styles.container, { height: barHeight }]}>
         {tabs.map((tab) => {
-          const isActive =
+          const isActive = Boolean(
             currentTab === tab.key ||
-            (tab.isWomupAppButton && (currentTab === 'Local Shop' || currentTab === 'App'));
+            (tab.isWomupAppButton && (currentTab === 'Local Shop' || currentTab === 'App'))
+          );
 
-          const iconColor = isActive ? COLORS.hotPink : COLORS.textMuted;
-          const labelColor = isActive ? COLORS.hotPink : COLORS.textMuted;
+          const labelColor = isActive ? '#E11D88' : '#6B7280';
 
           // Special 3D Circular WOMUP Logo Button ("App" / Local Shop)
           if (tab.isWomupAppButton) {
@@ -106,13 +127,11 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                 >
                   App
                 </Text>
-
-                {isActive && <View style={styles.activeBar} />}
               </TouchableOpacity>
             );
           }
 
-          // Standard navigation tabs (Home, Order Again, Print, Profile)
+          // Standard navigation tabs (Home, Orders, Categories, Login/Profile)
           return (
             <TouchableOpacity
               key={tab.key}
@@ -122,14 +141,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
               accessibilityLabel={`${tab.label} tab`}
             >
               <View style={styles.iconContainer}>
-                {tab.icon && (
-                  <AppIcon
-                    name={tab.icon}
-                    size={isSmallDevice ? 21 : 23}
-                    color={iconColor}
-                    isActive={isActive}
-                  />
-                )}
+                {renderIcon(tab.key, isActive)}
               </View>
 
               <Text
@@ -142,36 +154,31 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
               >
                 {tab.label}
               </Text>
-
-              {/* Active Indicator Bar */}
-              {isActive && <View style={styles.activeBar} />}
             </TouchableOpacity>
           );
         })}
       </View>
-    </View>
+    </ImageBackground>
   );
 };
 
 const styles = StyleSheet.create({
   wrapper: {
-    backgroundColor: COLORS.white,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: '#FAF5FF',
     width: '100%',
     maxWidth: '100%',
     overflow: 'hidden',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     ...Platform.select({
       web: {
-        boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.06)',
+        boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.06)',
       } as any,
       default: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: -2 },
+        shadowOffset: { width: 0, height: -3 },
         shadowOpacity: 0.06,
-        shadowRadius: 4,
+        shadowRadius: 6,
         elevation: 8,
       },
     }),
@@ -182,38 +189,31 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     width: '100%',
     maxWidth: '100%',
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
+    paddingTop: 8,
   },
   tabItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 4,
+    paddingVertical: 2,
     position: 'relative',
   },
   iconContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    height: 24,
+    height: 26,
   },
   tabLabel: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '600',
-    marginTop: 3,
+    marginTop: 2,
     letterSpacing: -0.2,
   },
   activeTabLabel: {
     fontWeight: '800',
+    color: '#E11D88',
   },
-  activeBar: {
-    width: 18,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: COLORS.hotPink,
-    marginTop: 2,
-  },
-
-  // Distinctive Circular WOMUP App Button (Matches User Screenshot Image 2)
   womupAppTabItem: {
     flex: 1,
     alignItems: 'center',
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: '#0F172A',
     borderWidth: 2,
-    borderColor: '#C026D3', // Neon purple/magenta glowing rim
+    borderColor: '#C026D3',
     alignItems: 'center',
     justifyContent: 'center',
     ...Platform.select({
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
     }),
   },
   womupAppCircleActive: {
-    borderColor: COLORS.hotPink,
+    borderColor: '#E11D88',
     borderWidth: 2.5,
     transform: [{ scale: 1.05 }],
     ...Platform.select({
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
         boxShadow: '0 0 12px rgba(225, 29, 72, 0.75), 0 2px 6px rgba(0, 0, 0, 0.4)',
       } as any,
       default: {
-        shadowColor: COLORS.hotPink,
+        shadowColor: '#E11D88',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.75,
         shadowRadius: 7,

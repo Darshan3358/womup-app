@@ -21,6 +21,12 @@ export interface HeroBannerItem {
 
 export const HERO_SLIDES: HeroBannerItem[] = [
   {
+    id: 'hero_snack_attack',
+    type: 'deals',
+    image: require('../../../assets/banners/snack_attack_banner.png'),
+    bgColor: '#1E0638',
+  },
+  {
     id: 'hero_1',
     type: 'deals',
     image: require('../../../assets/home banner .png'),
@@ -174,7 +180,7 @@ const styles = StyleSheet.create({
   },
   carouselContainer: {
     maxWidth: '100%',
-    borderRadius: 16,
+    borderRadius: 20,
     overflow: 'hidden',
     backgroundColor: '#F9ECF8',
     shadowColor: '#EC4A9D',
@@ -206,12 +212,12 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   activeDot: {
-    width: 20,
-    backgroundColor: '#EC4A9D',
+    width: 22,
+    backgroundColor: '#E11D88',
   },
   inactiveDot: {
     width: 6,
-    backgroundColor: 'rgba(16, 26, 77, 0.16)',
+    backgroundColor: '#FCE7F3',
   },
 });
 

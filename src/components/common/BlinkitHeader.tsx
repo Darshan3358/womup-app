@@ -3,6 +3,7 @@ import {
   View,
   Text,
   Image,
+  ImageBackground,
   TouchableOpacity,
   TextInput,
   StyleSheet,
@@ -206,11 +207,15 @@ const BlinkitHeaderComponent: React.FC<BlinkitHeaderProps> = ({
   })();
 
   return (
-    <View style={[styles.headerContainer, { paddingTop: Math.max(insets.top, 8) }]}>
+    <ImageBackground
+      source={require('../../../assets/womart_header_bg.png')}
+      style={[styles.headerContainer, { paddingTop: Math.max(insets.top, 8) }]}
+      resizeMode="cover"
+    >
       <View style={styles.containerInner}>
-        {/* Row 1: Logo & Location (Left) | Action Icons (Right) */}
+        {/* Row 1: Logo & Location (Left) | 3 Circle Action Icons (Right) */}
         <View style={styles.headerTopRow}>
-          {/* Left Group: WOM UP Brand Logo & Location */}
+          {/* Left Group: Brand Logo & Location */}
           <View style={styles.topLeftGroup}>
             <TouchableOpacity
               activeOpacity={0.85}
@@ -224,57 +229,45 @@ const BlinkitHeaderComponent: React.FC<BlinkitHeaderProps> = ({
               />
             </TouchableOpacity>
 
-            {/* Location Selector */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => setLocationModalVisible(true)}
-              style={styles.locationWrapper}
-              accessibilityLabel="Select delivery address"
-            >
-              <View style={styles.locationTextColumn}>
-                <Text
-                  style={[
-                    styles.etaText,
-                    (isUnavailable || !!locationError || statusLineText === 'LOCATION UNAVAILABLE') && { color: '#EF4444' },
-                    isUnknown && !locationError && statusLineText !== 'LOCATION UNAVAILABLE' && { color: '#93C5FD' },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {statusLineText}
+            {/* Brand Title & Location Selector */}
+            <View style={styles.locationTextColumn}>
+              <Text style={styles.brandTitleText}>WOMART</Text>
+
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setLocationModalVisible(true)}
+                style={styles.locationRow}
+                accessibilityLabel="Select delivery address"
+              >
+                <Ionicons name="location-sharp" size={13} color="#E11D88" style={{ marginRight: 3 }} />
+                <Text style={styles.locationSubtitle} numberOfLines={1}>
+                  {displayLocationText}
                 </Text>
+                <Feather
+                  name="chevron-down"
+                  size={14}
+                  color="#1E1B4B"
+                  style={{ marginLeft: 2 }}
+                />
+              </TouchableOpacity>
 
-                <View style={styles.locationRow}>
-                  <Text style={styles.locationSubtitle} numberOfLines={1}>
-                    {displayLocationText}
-                  </Text>
-                  <Feather
-                    name="chevron-down"
-                    size={13}
-                    color="rgba(255,255,255,0.85)"
-                    style={{ marginLeft: 3 }}
-                  />
-                </View>
-
-                {storeStatusText && (
-                  <View style={styles.storeStatusRow}>
-                    <View
-                      style={[
-                        styles.storeStatusDot,
-                        isUnavailable && { backgroundColor: '#EF4444' },
-                      ]}
-                    />
-                    <Text style={styles.locationTitle} numberOfLines={1}>
-                      {storeStatusText}
-                    </Text>
-                  </View>
-                )}
+              <View style={styles.storeStatusRow}>
+                <View
+                  style={[
+                    styles.storeStatusDot,
+                    (isUnavailable && !hasValidLocation) ? { backgroundColor: '#EF4444' } : { backgroundColor: '#10B981' },
+                  ]}
+                />
+                <Text style={styles.locationTitle} numberOfLines={1}>
+                  {storeStatusText || 'Outside delivery area'}
+                </Text>
               </View>
-            </TouchableOpacity>
+            </View>
           </View>
 
-          {/* Right Group: Wishlist & Wallet */}
+          {/* Right Group: 3 White Circular Buttons (Wishlist, Notifications, Cart) */}
           <View style={styles.headerActions}>
-            {/* Wishlist */}
+            {/* 1. Wishlist */}
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => setActiveScreen('Blinkit_Wishlist')}
@@ -283,8 +276,8 @@ const BlinkitHeaderComponent: React.FC<BlinkitHeaderProps> = ({
             >
               <Feather
                 name="heart"
-                size={17}
-                color={wishlist.length > 0 ? COLORS.hotPink : '#FFFFFF'}
+                size={18}
+                color={wishlist.length > 0 ? '#E11D88' : '#1F2937'}
               />
               {wishlist.length > 0 && (
                 <View style={styles.badgePill}>
@@ -293,47 +286,42 @@ const BlinkitHeaderComponent: React.FC<BlinkitHeaderProps> = ({
               )}
             </TouchableOpacity>
 
-            {/* Notification Bell */}
+            {/* 2. Notification Bell */}
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => setNotificationCenterVisible(true)}
               style={styles.actionIconButton}
               accessibilityLabel="Notifications"
             >
-              <Feather name="bell" size={17} color="#FFFFFF" />
-              {unreadCount > 0 && (
-                <View style={[styles.badgePill, { backgroundColor: '#EF4444' }]}>
-                  <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
-                </View>
-              )}
+              <Feather name="bell" size={18} color="#1F2937" />
+              <View style={[styles.badgePill, { backgroundColor: '#EF4444' }]}>
+                <Text style={styles.badgeText}>{unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : 3}</Text>
+              </View>
             </TouchableOpacity>
 
-            {/* Wallet with balance badge */}
+            {/* 3. Shopping Cart */}
             <TouchableOpacity
-              activeOpacity={0.8}
+              activeOpacity={0.85}
               onPress={() => {
                 if (!isAuthenticated) {
-                  openAuthPrompt('Please sign in or register to access your wallet and cashback earnings.', 'My Wallet');
+                  openAuthPrompt('Please sign in or register to view your cart and checkout.', 'Your Cart');
                 } else {
-                  setActiveScreen('Blinkit_Money');
+                  setActiveScreen('Blinkit_Cart');
                 }
               }}
               style={styles.actionIconButton}
-              accessibilityLabel="Wallet"
+              accessibilityLabel="Shopping Cart"
             >
-              <Ionicons name="wallet-outline" size={17} color="#FFFFFF" />
-              <View style={styles.walletBadge}>
-                <Text style={styles.walletBadgeText}>
-                  ₹{walletBalance ?? 0}
-                </Text>
+              <Feather name="shopping-bag" size={17} color="#111827" />
+              <View style={styles.badgePill}>
+                <Text style={styles.badgeText}>{totalCartCount}</Text>
               </View>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Row 2: Search Bar & Cart Icon (Replaces deleted tabs) */}
+        {/* Row 2: Full-Width Search Bar */}
         <View style={styles.headerSearchRow}>
-          {/* Search Bar */}
           <TouchableOpacity
             activeOpacity={0.9}
             onPress={() => setActiveScreen('C17_Search')}
@@ -341,18 +329,17 @@ const BlinkitHeaderComponent: React.FC<BlinkitHeaderProps> = ({
           >
             <Feather
               name="search"
-              size={16}
-              color="#9296A7"
-              style={{ marginRight: 8 }}
+              size={18}
+              color="#9CA3AF"
+              style={{ marginRight: 10 }}
             />
             <TextInput
               style={styles.searchInput}
               placeholder={searchPlaceholder || placeholderQueries[placeholderIndex]}
-              placeholderTextColor="#9296A7"
+              placeholderTextColor="#9CA3AF"
               editable={false}
               pointerEvents="none"
             />
-            <View style={styles.searchDivider} />
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => {
@@ -362,29 +349,8 @@ const BlinkitHeaderComponent: React.FC<BlinkitHeaderProps> = ({
               style={styles.micButton}
               accessibilityLabel="Voice search"
             >
-              <Feather name="mic" size={16} color={COLORS.hotPink} />
+              <Ionicons name="mic" size={19} color="#E11D88" />
             </TouchableOpacity>
-          </TouchableOpacity>
-
-          {/* Cart Icon */}
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => {
-              if (!isAuthenticated) {
-                openAuthPrompt('Please sign in or register to view your cart and checkout.', 'Your Cart');
-              } else {
-                setActiveScreen('Blinkit_Cart');
-              }
-            }}
-            style={styles.cartButton}
-            accessibilityLabel="Shopping Cart"
-          >
-            <Feather name="shopping-cart" size={18} color="#FFFFFF" />
-            {totalCartCount > 0 && (
-              <View style={styles.cartBadge}>
-                <Text style={styles.cartBadgeText}>{totalCartCount}</Text>
-              </View>
-            )}
           </TouchableOpacity>
         </View>
 
@@ -395,15 +361,13 @@ const BlinkitHeaderComponent: React.FC<BlinkitHeaderProps> = ({
         visible={isNotificationCenterVisible}
         onClose={() => setNotificationCenterVisible(false)}
       />
-    </View>
+    </ImageBackground>
   );
 };
 
 const styles = StyleSheet.create({
   headerContainer: {
-    backgroundColor: '#0B1755',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: '#FAF5FF',
     zIndex: 100,
     width: '100%',
     maxWidth: '100%',
@@ -413,8 +377,8 @@ const styles = StyleSheet.create({
     maxWidth: 1440,
     width: '100%',
     alignSelf: 'center',
-    paddingHorizontal: 12,
-    paddingBottom: 4,
+    paddingHorizontal: 14,
+    paddingBottom: 10,
     overflow: 'hidden',
   },
 
@@ -422,14 +386,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 6,
+    paddingVertical: 4,
     width: '100%',
     maxWidth: '100%',
   },
   topLeftGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
     flex: 1,
     marginRight: 8,
   },
@@ -437,11 +401,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     flexShrink: 0,
-    paddingRight: 2,
   },
   headerLogoImage: {
-    width: 36,
-    height: 36,
+    width: 38,
+    height: 38,
   },
   locationWrapper: {
     flexDirection: 'row',
@@ -453,6 +416,13 @@ const styles = StyleSheet.create({
   },
   locationTextColumn: {
     flexShrink: 1,
+    justifyContent: 'center',
+  },
+  brandTitleText: {
+    color: '#E11D88',
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 0.5,
   },
   etaText: {
     color: '#FFD700',
@@ -467,11 +437,11 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   locationSubtitle: {
-    color: '#FFFFFF',
-    fontSize: 12,
+    color: '#111827',
+    fontSize: 12.5,
     fontWeight: '700',
     lineHeight: 16,
-    flexShrink: 1,
+    maxWidth: 180,
   },
   storeStatusRow: {
     flexDirection: 'row',
@@ -483,37 +453,42 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#22C55E',
+    backgroundColor: '#10B981',
   },
   locationTitle: {
-    color: 'rgba(255, 255, 255, 0.75)',
-    fontSize: 10,
+    color: '#4B5563',
+    fontSize: 10.5,
     fontWeight: '500',
     lineHeight: 13,
   },
   headerSearchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingTop: 2,
-    paddingBottom: 6,
+    paddingTop: 8,
     width: '100%',
     maxWidth: '100%',
   },
   searchBar: {
     flex: 1,
-    height: 46,
+    height: 44,
     backgroundColor: '#FFFFFF',
-    borderRadius: 9999,
+    borderRadius: 22,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F3E8FF',
   },
   searchInput: {
     flex: 1,
     height: '100%',
-    fontSize: 14,
-    color: '#101A4D',
+    fontSize: 13.5,
+    color: '#111827',
     padding: 0,
   },
   searchDivider: {
@@ -523,37 +498,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   micButton: {
-    padding: 3,
-  },
-  cartButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
-  },
-  cartBadge: {
-    position: 'absolute',
-    top: -3,
-    right: -3,
-    backgroundColor: '#EC4A9D',
-    borderRadius: 9,
-    minWidth: 18,
-    height: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 3,
-    borderWidth: 1.5,
-    borderColor: '#0B1755',
-  },
-  cartBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 9,
-    fontWeight: '800',
+    padding: 4,
   },
   headerActions: {
     flexDirection: 'row',
@@ -562,25 +507,32 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   actionIconButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1.5 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
   },
   badgePill: {
     position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: '#EC4A9D',
-    borderRadius: 10,
-    minWidth: 15,
-    height: 15,
+    top: -3,
+    right: -3,
+    backgroundColor: '#EF4444',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 3,
+    paddingHorizontal: 2,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
   },
   badgeText: {
     color: '#FFFFFF',

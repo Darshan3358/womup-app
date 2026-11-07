@@ -7,6 +7,7 @@ import {
   StyleSheet,
   useWindowDimensions,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 export interface WomupCategoryItem {
   id: string;
@@ -109,75 +110,89 @@ const WomupCategoryGridComponent: React.FC<WomupCategoryGridProps> = ({
 
   // Exactly 5 columns x 2 rows (9 categories + 1 More = 10 items)
   const isSmall = width < 480;
-  const gap = isSmall ? 6 : 10;
-  const cardWidth = Math.floor((containerWidth - 4 * gap - 2) / 5);
+  // Inside white card padding (24 total horizontal padding inside containerWidth)
+  const innerWidth = containerWidth - 24;
+  const gap = isSmall ? 6 : 8;
+  const cardWidth = Math.floor((innerWidth - 4 * gap) / 5);
 
   return (
     <View style={styles.sectionContainer}>
-      {/* Header Row */}
-      <View style={styles.headerRow}>
-        <Text style={[styles.sectionTitle, isSmall && { fontSize: 20 }]}>Shop by Category</Text>
-        <TouchableOpacity activeOpacity={0.8} onPress={onViewAll} style={styles.viewAllRow}>
-          <Text style={[styles.viewAllText, isSmall && { fontSize: 12 }]}>View All →</Text>
-        </TouchableOpacity>
-      </View>
+      <View style={styles.cardContainer}>
+        {/* Header Row with Pink Bag Icon */}
+        <View style={styles.headerRow}>
+          <View style={styles.headerLeftGroup}>
+            <View style={styles.headerBagBadge}>
+              <Ionicons name="bag-handle" size={15} color="#FFFFFF" />
+            </View>
+            <Text style={styles.sectionTitle}>Shop by Category</Text>
+          </View>
+          <TouchableOpacity activeOpacity={0.8} onPress={onViewAll} style={styles.viewAllRow}>
+            <Text style={styles.viewAllText}>View All →</Text>
+          </TouchableOpacity>
+        </View>
 
-      {/* Grid: 5 columns x 2 rows = 10 items */}
-      <View style={styles.gridContainer}>
-        {CATEGORIES_DATA.map((cat) => (
-          <TouchableOpacity
-            key={cat.id}
-            activeOpacity={0.85}
-            onPress={() => {
-              if (cat.id === 'c12' || cat.name.toLowerCase().includes('more')) {
-                if (onViewAll) {
-                  onViewAll();
+        {/* Grid: 5 columns x 2 rows = 10 items */}
+        <View style={styles.gridContainer}>
+          {CATEGORIES_DATA.map((cat) => (
+            <TouchableOpacity
+              key={cat.id}
+              activeOpacity={0.85}
+              onPress={() => {
+                if (cat.id === 'c12' || cat.name.toLowerCase().includes('more')) {
+                  if (onViewAll) {
+                    onViewAll();
+                  } else {
+                    onSelectCategory(cat.name.replace('\n', ' '), cat.id);
+                  }
                 } else {
                   onSelectCategory(cat.name.replace('\n', ' '), cat.id);
                 }
-              } else {
-                onSelectCategory(cat.name.replace('\n', ' '), cat.id);
-              }
-            }}
-            style={[
-              styles.card,
-              {
-                width: cardWidth,
-                height: Math.round(cardWidth * 1.16),
-                backgroundColor: cat.bgColor,
-                paddingVertical: isSmall ? 6 : 8,
-                paddingHorizontal: 2,
-                borderRadius: isSmall ? 12 : 14,
-                marginBottom: gap,
-              },
-            ]}
-            accessibilityLabel={cat.name.replace('\n', ' ')}
-          >
-            {/* Image sits directly on the card background with NO inner container */}
-            <Image
-              source={cat.localImage}
+              }}
               style={[
-                styles.categoryImage,
+                styles.card,
                 {
-                  width: Math.round(cardWidth * 0.62),
-                  height: Math.round(cardWidth * 0.54),
-                  marginBottom: isSmall ? 3 : 5,
+                  width: cardWidth,
+                  height: Math.round(cardWidth * 1.18),
+                  backgroundColor: cat.bgColor,
+                  paddingVertical: isSmall ? 6 : 8,
+                  paddingHorizontal: 2,
+                  borderRadius: isSmall ? 12 : 14,
+                  marginBottom: gap,
                 },
               ]}
-              resizeMode="contain"
-            />
-
-            <Text
-              style={[
-                styles.categoryName,
-                isSmall && { fontSize: 9, lineHeight: 11 },
-              ]}
-              numberOfLines={2}
+              accessibilityLabel={cat.name.replace('\n', ' ')}
             >
-              {cat.name}
-            </Text>
-          </TouchableOpacity>
-        ))}
+              {cat.id === 'c12' ? (
+                <View style={styles.moreIconWrapper}>
+                  <Ionicons name="grid" size={20} color="#E11D88" />
+                </View>
+              ) : (
+                <Image
+                  source={cat.localImage}
+                  style={[
+                    styles.categoryImage,
+                    {
+                      width: Math.round(cardWidth * 0.65),
+                      height: Math.round(cardWidth * 0.55),
+                      marginBottom: isSmall ? 3 : 5,
+                    },
+                  ]}
+                  resizeMode="contain"
+                />
+              )}
+
+              <Text
+                style={[
+                  styles.categoryName,
+                  isSmall && { fontSize: 9.5, lineHeight: 11.5 },
+                ]}
+                numberOfLines={2}
+              >
+                {cat.id === 'c3' ? 'Dairy, Bread\n& ...' : cat.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
     </View>
   );
@@ -189,8 +204,21 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'center',
     paddingHorizontal: 12,
-    marginVertical: 18,
+    marginTop: 10,
+    marginBottom: 4,
     overflow: 'hidden',
+  },
+  cardContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#F3E8FF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   headerRow: {
     flexDirection: 'row',
@@ -198,11 +226,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
+  headerLeftGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerBagBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    backgroundColor: '#E11D88',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   sectionTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#101A4D',
-    letterSpacing: -0.4,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+    letterSpacing: -0.2,
   },
   viewAllRow: {
     flexDirection: 'row',
@@ -210,8 +251,8 @@ const styles = StyleSheet.create({
   },
   viewAllText: {
     fontSize: 13,
-    fontWeight: '700',
-    color: '#EC4A9D',
+    fontWeight: '600',
+    color: '#E11D88',
   },
   gridContainer: {
     flexDirection: 'row',
@@ -224,15 +265,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  moreIconWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
   categoryImage: {
     backgroundColor: 'transparent',
   },
   categoryName: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#101A4D',
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#111827',
     textAlign: 'center',
-    lineHeight: 13,
+    lineHeight: 12.5,
   },
 });
 

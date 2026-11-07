@@ -18,6 +18,7 @@ import { MonthlyBenefitsBanner } from '../../components/common/MonthlyBenefitsBa
 import { ProductSection } from '../../components/common/ProductSection';
 import { WomupPopularBrands } from '../../components/common/WomupPopularBrands';
 import { FloatingCartPill } from '../../components/common/FloatingCartPill';
+import { ValuePropositionBar } from '../../components/common/ValuePropositionBar';
 import { KYCBanner } from '../../components/KYCBanner';
 
 import { useApp, mapProductToBlinkit } from '../../context/AppContext';
@@ -427,13 +428,22 @@ export const BlinkitHomeScreen: React.FC = () => {
         }}
         onViewAll={() => setActiveScreen('Blinkit_Categories')}
       />
-      <WomupFestiveBanners
-        variant="diwali"
-        onSelectCategory={handleSelectCategory}
-        onOpenProduct={() => {
-          setActiveScreen('C15_ProductListing');
-        }}
-      />
+      {/* Festive Special Diwali Banner */}
+      <View style={styles.festiveBannerWrapper}>
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => setActiveScreen('C15_ProductListing')}
+          style={styles.festiveBannerCard}
+        >
+          <Image
+            source={require('../../../assets/banners/diwali_ready_banner.png')}
+            style={styles.festiveBannerImage}
+            resizeMode="cover"
+          />
+        </TouchableOpacity>
+      </View>
+      {/* 4-Item Trust / Value Proposition Bar */}
+      <ValuePropositionBar />
     </>
   ), [handleBannerPress, handleSelectCategory, setActiveScreen]);
 
@@ -470,15 +480,20 @@ export const BlinkitHomeScreen: React.FC = () => {
           onPress={() => setLocationModalVisible(true)}
           style={styles.unserviceableBanner}
         >
-          <Feather name="alert-triangle" size={18} color="#DC2626" />
+          <Ionicons name="warning" size={24} color="#EF4444" style={styles.unserviceableIcon} />
           <View style={styles.unserviceableTextWrap}>
-            <Text style={[styles.unserviceableTitle, { color: '#DC2626' }]}>
+            <Text style={styles.unserviceableTitle}>
               ⚠️ Sorry, WOMART is not serviceable in your area.
             </Text>
             <Text style={styles.unserviceableSubtitle}>
               We are expanding soon! You can browse products, but ordering is disabled for unsupported locations.
             </Text>
           </View>
+          <Image
+            source={require('../../../assets/megaphone_notice.png')}
+            style={styles.megaphoneImage}
+            resizeMode="contain"
+          />
         </TouchableOpacity>
       )}
 
@@ -521,27 +536,60 @@ const styles = StyleSheet.create({
   unserviceableBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEF3C7',
-    borderBottomWidth: 1,
-    borderBottomColor: '#FDE68A',
-    paddingHorizontal: 16,
+    backgroundColor: '#FFF1F2',
+    borderWidth: 1,
+    borderColor: '#FECDD3',
+    borderRadius: 16,
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 4,
+    paddingHorizontal: 12,
     paddingVertical: 10,
-    gap: 10,
+    gap: 8,
+  },
+  unserviceableIcon: {
+    marginRight: 2,
   },
   unserviceableTextWrap: {
     flex: 1,
   },
   unserviceableTitle: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '700',
-    color: '#92400E',
+    color: '#E11D48',
+    lineHeight: 16,
   },
   unserviceableSubtitle: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '500',
-    color: '#B45309',
+    color: '#6B7280',
     marginTop: 2,
-    lineHeight: 15,
+    lineHeight: 14,
+  },
+  megaphoneImage: {
+    width: 44,
+    height: 44,
+  },
+  festiveBannerWrapper: {
+    width: '100%',
+    paddingHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  festiveBannerCard: {
+    width: '100%',
+    aspectRatio: 453 / 122,
+    borderRadius: 18,
+    overflow: 'hidden',
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  festiveBannerImage: {
+    width: '100%',
+    height: '100%',
   },
   bannerWrapper: {
     width: '100%',
