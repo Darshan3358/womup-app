@@ -91,29 +91,30 @@ export class UsersService {
 
   async settleUserPendingIncome(userId: string) {
     try {
-      const now = new Date();
       const uId = Types.ObjectId.isValid(userId) ? new Types.ObjectId(userId) : null;
       if (!uId) return;
 
-      const pendingTxs = await this.incomeTxModel.find({
-        userId: uId,
-        status: 'PENDING',
-        availableFrom: { $lte: now },
-      });
+      const user = await this.userModel.findById(uId);
+      if (!user) return;
 
-      if (pendingTxs.length > 0) {
-        const totalToMove = pendingTxs.reduce((sum, tx) => sum + (tx.amount || 0), 0);
-        await this.userModel.findByIdAndUpdate(uId, {
-          $inc: {
-            pendingIncome: -totalToMove,
-            availableIncome: totalToMove,
-            walletBalance: totalToMove,
-          },
-        });
+      // Auto-unlock pending income into availableIncome and walletBalance
+      if ((user.pendingIncome || 0) > 0) {
+        const amountToMove = user.pendingIncome;
+        user.availableIncome = Number(((user.availableIncome || 0) + amountToMove).toFixed(2));
+        user.walletBalance = Number(((user.walletBalance || 0) + amountToMove).toFixed(2));
+        user.pendingIncome = 0;
+        await user.save();
+
         await this.incomeTxModel.updateMany(
-          { _id: { $in: pendingTxs.map((t) => t._id) } },
-          { $set: { status: 'AVAILABLE', isUsable: true } },
+          { userId: uId, status: 'PENDING' },
+          { $set: { status: 'AVAILABLE', isUsable: true, availableFrom: new Date() } },
         );
+
+        this.trackingGateway.emitWalletUpdated(uId.toString(), {
+          pendingIncome: 0,
+          availableIncome: user.availableIncome,
+          walletBalance: user.walletBalance,
+        });
       }
     } catch (e) {
       // Non-blocking
@@ -1116,7 +1117,7 @@ export class UsersService {
           continue;
         }
 
-        // 1. App Download Income (To pendingIncome, locked until midnight/24h)
+        // 1. App Download Income (Available immediately upon KYC approval)
         await this.incomeTxModel.create({
           userId: sponsor._id,
           type: 'APP_DOWNLOAD',
@@ -1124,13 +1125,15 @@ export class UsersService {
           sourceUserId: user._id,
           sourceVerificationStatus: 'VERIFIED',
           earnedAt: new Date(),
-          availableFrom: this.getNextMidnight(),
-          status: 'PENDING',
+          availableFrom: new Date(),
+          status: 'AVAILABLE',
+          isUsable: true,
           description: `Level ${tier.level} App Download Income from verified referral: ${user.fullNameAsPerAadhaar || user.name}`,
         });
 
-        sponsor.pendingIncome = (sponsor.pendingIncome || 0) + tier.appIncome;
-        sponsor.appDownloadIncome = (sponsor.appDownloadIncome || 0) + tier.appIncome;
+        sponsor.availableIncome = Number(((sponsor.availableIncome || 0) + tier.appIncome).toFixed(2));
+        sponsor.walletBalance = Number(((sponsor.walletBalance || 0) + tier.appIncome).toFixed(2));
+        sponsor.appDownloadIncome = Number(((sponsor.appDownloadIncome || 0) + tier.appIncome).toFixed(2));
         if (tier.level === 1) {
           sponsor.verifiedReferralsCount = (sponsor.verifiedReferralsCount || 0) + 1;
         }

@@ -114,10 +114,18 @@ const MainApp: React.FC = () => {
     }
   };
 
+  const isDashboard = activeTab === 'Dashboard' && subView === 'none';
+
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.navy} />
-      <View style={styles.container}>
+    <SafeAreaView
+      style={[styles.safeArea, isDashboard && { backgroundColor: '#F8F4FF' }]}
+      edges={['top']}
+    >
+      <StatusBar
+        barStyle={isDashboard ? 'dark-content' : 'light-content'}
+        backgroundColor={isDashboard ? '#F8F4FF' : COLORS.navy}
+      />
+      <View style={[styles.container, isDashboard && { backgroundColor: '#F8F4FF' }]}>
         <Header />
         <View style={styles.body}>{renderContent()}</View>
         <BottomNav />

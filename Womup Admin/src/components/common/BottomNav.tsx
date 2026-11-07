@@ -49,19 +49,20 @@ export const BottomNav: React.FC = () => {
             <View style={[styles.iconContainer, isActive && styles.activeIconContainer]}>
               <Icon
                 size={22}
-                color={isActive ? COLORS.hotPink : COLORS.textMuted}
+                color={isActive ? '#F12A9B' : '#8E8CA7'}
                 strokeWidth={isActive ? 2.5 : 1.8}
               />
             </View>
             <Text
               style={[
                 styles.tabLabel,
-                { color: isActive ? COLORS.hotPink : COLORS.textMuted, fontWeight: isActive ? '700' : '500' },
+                { color: isActive ? '#F12A9B' : '#8E8CA7', fontWeight: isActive ? '700' : '500' },
               ]}
               numberOfLines={1}
             >
               {tab.label}
             </Text>
+            {isActive && <View style={styles.activeIndicator} />}
           </TouchableOpacity>
         );
       })}
@@ -73,34 +74,45 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     height: 64,
-    backgroundColor: COLORS.white,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    paddingHorizontal: SPACING.md,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1.2,
+    borderTopColor: '#E7D9FF',
+    paddingHorizontal: 8,
     justifyContent: 'space-around',
     alignItems: 'center',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
+    elevation: 10,
+    shadowColor: '#762DEB',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
     flexShrink: 0,
   },
   tabButton: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 4,
+    paddingVertical: 2,
+    position: 'relative',
   },
   iconContainer: {
-    padding: 4,
-    borderRadius: RADIUS.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
   },
   activeIconContainer: {
-    backgroundColor: COLORS.lightPink,
+    backgroundColor: 'rgba(241, 42, 155, 0.12)',
   },
   tabLabel: {
     fontSize: 11,
     marginTop: 2,
+    letterSpacing: -0.2,
+  },
+  activeIndicator: {
+    position: 'absolute',
+    bottom: -4,
+    width: 22,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: '#F12A9B',
   },
 });

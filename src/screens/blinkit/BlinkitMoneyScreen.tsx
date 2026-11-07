@@ -2192,6 +2192,7 @@ export const BlinkitMoneyScreen: React.FC = () => {
                 nestedScrollEnabled={true}
                 bounces={true}
               >
+                
                 {/* 🚨 Eligibility Status Banner */}
                 {!isEligible ? (
                   <View style={styles.ineligibleWarningCard}>

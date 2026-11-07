@@ -36,6 +36,7 @@ export const Header: React.FC<HeaderProps> = ({ title, showBack, onBack }) => {
   }, []);
 
   const isSubScreen = showBack || subView !== 'none';
+  const isDashboard = activeTab === 'Dashboard' && !isSubScreen;
 
   const handleBack = () => {
     if (onBack) {
@@ -49,6 +50,61 @@ export const Header: React.FC<HeaderProps> = ({ title, showBack, onBack }) => {
     setShowApprovalsModal(false);
     setActiveTab(tabName);
   };
+
+  if (isDashboard) {
+    return (
+      <View style={styles.dashboardContainer}>
+        <View style={styles.content}>
+          {/* Left Brand Identity: Logo + WomUp + Admin Panel */}
+          <TouchableOpacity style={styles.dashboardBrandRow} onPress={toggleSidebar} activeOpacity={0.8}>
+            <Image
+              source={require('../../../assets/womup_logo.png')}
+              style={styles.dashboardLogoImage}
+              resizeMode="contain"
+            />
+            <View style={styles.dashboardBrandTextCol}>
+              <Text style={styles.dashboardBrandName}>WomUp</Text>
+              <Text style={styles.dashboardBrandSub}>Admin Panel</Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Right Action Buttons: Bell with Badge + Hamburger Menu */}
+          <View style={styles.dashboardActionRow}>
+            <TouchableOpacity
+              style={styles.dashboardIconButton}
+              onPress={() => setShowNotificationModal(true)}
+              accessibilityLabel="Notifications"
+            >
+              <Bell color="#111044" size={20} strokeWidth={2.2} />
+              {adminUnreadCount > 0 ? (
+                <View style={styles.dashboardBadgePill}>
+                  <Text style={styles.dashboardBadgeText}>{adminUnreadCount > 99 ? '99+' : adminUnreadCount}</Text>
+                </View>
+              ) : (
+                <View style={styles.dashboardBadgeDot} />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.dashboardIconButton}
+              onPress={toggleSidebar}
+              accessibilityLabel="Open navigation menu"
+            >
+              <Menu color="#111044" size={22} strokeWidth={2.4} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <AdminNotificationModal
+          visible={showNotificationModal}
+          onClose={() => {
+            setShowNotificationModal(false);
+            adminNotificationService.getUnreadCount().then(setAdminUnreadCount).catch(() => {});
+          }}
+        />
+      </View>
+    );
+  }
 
   return (
     <LinearGradient colors={GRADIENTS.navyHeader} style={styles.container}>
@@ -201,6 +257,88 @@ export const Header: React.FC<HeaderProps> = ({ title, showBack, onBack }) => {
 };
 
 const styles = StyleSheet.create({
+  dashboardContainer: {
+    paddingTop: Platform.OS === 'android' ? 12 : 8,
+    paddingBottom: 10,
+    paddingHorizontal: 16,
+    backgroundColor: '#F8F4FF',
+  },
+  dashboardBrandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  dashboardLogoImage: {
+    width: 36,
+    height: 36,
+    marginRight: 10,
+  },
+  dashboardBrandTextCol: {
+    justifyContent: 'center',
+  },
+  dashboardBrandName: {
+    color: '#111044',
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    lineHeight: 22,
+  },
+  dashboardBrandSub: {
+    color: '#565477',
+    fontSize: 11.5,
+    fontWeight: '500',
+    marginTop: 1,
+  },
+  dashboardActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  dashboardIconButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.2,
+    borderColor: '#E7D9FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#762DEB',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+    position: 'relative',
+  },
+  dashboardBadgePill: {
+    position: 'absolute',
+    top: -3,
+    right: -3,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  dashboardBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    fontWeight: '800',
+  },
+  dashboardBadgeDot: {
+    position: 'absolute',
+    top: 3,
+    right: 3,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#EF4444',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
   container: {
     paddingTop: Platform.OS === 'android' ? 10 : 8,
     paddingBottom: 12,
