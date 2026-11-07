@@ -859,9 +859,10 @@ export class UsersService {
 
     const personalPurchase = Number((user.monthlyPurchaseValue || 0).toFixed(2));
     const isPersonalActive = personalPurchase >= 2000;
+    const isPersonalKyc = user.verificationStatus === 'VERIFIED' || user.customerKycStatus === 2 || user.aadhaarVerified;
     const direct5ActiveCount = levelBreakdown[0]?.activeMemberCount || 0;
-    // Rule: Monthly Shopping Coin Level -> KYC: No | Active: Yes (User is active if personal purchase >= 2000)
-    const isEligible = isPersonalActive;
+    // Rule: Monthly Shopping Coin Level -> KYC: Yes | Active: Yes (Both required)
+    const isEligible = isPersonalActive && isPersonalKyc;
 
     // Cache updated team size on user doc
     if (user.teamSize !== totalTeamSize || user.direct5ActiveCount !== direct5ActiveCount) {
@@ -884,6 +885,7 @@ export class UsersService {
         monthlyPurchaseValue: personalPurchase,
         requiredPurchase: 2000,
         isPersonalActive,
+        isPersonalKyc,
         direct5ActiveCount,
         requiredDirectActive: 5,
         isEligibleForTeamIncome: isEligible,
