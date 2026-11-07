@@ -784,64 +784,7 @@ export class AuthService {
       };
     }
 
-    // 3. Fallback approved launch pincodes with city/area mapping
-    const launchPincodes: Record<string, { city: string; area: string }> = {
-      // Ahmedabad Core Launch
-      '380015': { city: 'Ahmedabad', area: 'Vastrapur / Bodakdev' },
-      '380054': { city: 'Ahmedabad', area: 'SG Highway / Thaltej' },
-      '382481': { city: 'Ahmedabad', area: 'Gota / Chandlodia (ગોતા / ચાંદલોડિયા)' },
-      '382470': { city: 'Ahmedabad', area: 'Tragad (ત્રાગડ)' },
-      '380009': { city: 'Ahmedabad', area: 'Navrangpura' },
-      '380058': { city: 'Ahmedabad', area: 'Bopal / South Bopal' },
-      '380061': { city: 'Ahmedabad', area: 'Ghatlodia' },
-      '380001': { city: 'Ahmedabad', area: 'Central Ahmedabad' },
-      '380004': { city: 'Ahmedabad', area: 'Shahibaug (શાહીબાગ)' },
-      '380006': { city: 'Ahmedabad', area: 'Ellisbridge' },
-      '380051': { city: 'Ahmedabad', area: 'Satellite / Jodhpur' },
-      '380052': { city: 'Ahmedabad', area: 'Memnagar' },
-      '380059': { city: 'Ahmedabad', area: 'Thaltej' },
-      '382424': { city: 'Ahmedabad', area: 'Chandkheda' },
-      '382480': { city: 'Ahmedabad', area: 'Ranip' },
-      // New Launch Zones (Gujarat Expansion)
-      '384001': { city: 'Mahesana', area: 'Mahesana (મહેસાણા)' },
-      '384002': { city: 'Mahesana', area: 'Mahesana East (મહેસાણા)' },
-      '384151': { city: 'Siddhpur', area: 'Siddhpur (સિદ્ધપુર)' },
-      '383001': { city: 'Himmatnagar', area: 'Himmatnagar (હિંમતનગર)' },
-      '391440': { city: 'Padra', area: 'Padra (પાદરા)' },
-      '390011': { city: 'Vadodara', area: 'Manjalpur (માંજલપુર)' },
-      '390012': { city: 'Vadodara', area: 'Atladra (અટલાદરા)' },
-      '382421': { city: 'Gandhinagar', area: 'Sargasan (સરગાસણ)' },
-      '382225': { city: 'Dholka', area: 'Dholka (ધોળકા)' },
-      '363421': { city: 'Limdi', area: 'Limdi (લીમડી)' },
-      '388001': { city: 'Anand', area: 'Anand (આણંદ)' },
-      '388325': { city: 'Anand', area: 'Karamsad (કરમસદ)' },
-    };
-
-    if (launchPincodes[cleanPin]) {
-      const pinInfo = launchPincodes[cleanPin];
-      await this.approvedPincodeModel.findOneAndUpdate(
-        { pincode: cleanPin },
-        {
-          pincode: cleanPin,
-          cityName: pinInfo.city,
-          isRegistrationAllowed: true,
-          isDeliveryAllowed: true,
-          isIncomeEnabled: true,
-          areaName: pinInfo.area,
-        },
-        { upsert: true },
-      );
-      return {
-        isAvailable: true,
-        isIncomeEligible: true,
-        serviceable: true,
-        pincode: cleanPin,
-        city: pinInfo.city,
-        areaName: pinInfo.area,
-        message: `Service and referral earnings active in ${pinInfo.area}, ${pinInfo.city}`,
-      };
-    }
-
+    // 100% Database-driven: Agar MongoDB me approved_pincodes ya areas me nahi hai, toh non-serviceable hai
     return {
       isAvailable: false,
       isIncomeEligible: false,

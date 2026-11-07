@@ -61,29 +61,25 @@ export class UsersService {
     const cleanPin = (pincode || '').trim();
     if (!cleanPin || cleanPin.length !== 6) return false;
 
-    // 1. Authoritative check in approved_pincodes
+    // 100% Database-driven: Sirf aur sirf MongoDB approved_pincodes se check hoga
     const approved = await this.approvedPincodeModel.findOne({
       pincode: cleanPin,
     });
-    if (approved) {
-      if (
-        (approved as any).isActive === false ||
-        approved.isIncomeEnabled === false ||
-        approved.isDeliveryAllowed === false ||
-        approved.isRegistrationAllowed === false
-      ) {
-        return false;
-      }
-      return true;
+
+    if (!approved) {
+      return false; // DB me nahi hai -> Eligible nahi hai
     }
 
-    const defaultApprovedPins = [
-      '380015', '380054', '382481', '382470', '380009', '380058', '380061',
-      '380001', '380004', '380006', '380051', '380052', '380059', '382424', '382480',
-      '384001', '384002', '384151', '383001', '391440', '390011', '390012',
-      '382421', '382225', '363421', '388001', '388325',
-    ];
-    return defaultApprovedPins.includes(cleanPin);
+    if (
+      (approved as any).isActive === false ||
+      approved.isIncomeEnabled === false ||
+      approved.isDeliveryAllowed === false ||
+      approved.isRegistrationAllowed === false
+    ) {
+      return false; // Admin ne inactive kiya hai -> Eligible nahi hai
+    }
+
+    return true;
   }
 
   private getNextMidnight(): Date {
