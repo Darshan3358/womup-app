@@ -329,14 +329,16 @@ export class PaymentsService {
           await customer.save();
         }
 
-        // Sponsor Commission (0.4% Team Purchase for others or 3% for veg)
-        // Conditional Earning Check: Customer must be from an eligible pincode
-        if (customer && customer.isIncomeEligible && customer.sponsorId) {
-          const sponsorRate = (vendor.categoryName === 'Vegetables' || (vendor as any).storeCategory === 'Vegetables') ? 0.03 : 0.004;
+        // Sponsor Commission (3% for veg, 0.4% for other)
+        // Rule: Shopping Referral -> KYC: No | Active: No (Direct sponsor gets commission without needing KYC or active purchase)
+        const sponsorId = customer.referredBy || (customer.isCompanySponsored ? undefined : customer.sponsorId);
+        if (customer && sponsorId) {
+          const isVeg = (vendor.categoryName === 'Vegetables' || (vendor as any).storeCategory === 'Vegetables');
+          const sponsorRate = isVeg ? 0.03 : 0.004;
           const sponsorCommission = Math.round(billAmount * sponsorRate * 100) / 100;
           if (sponsorCommission > 0) {
             await this.incomeTxModel.create({
-              userId: customer.sponsorId,
+              userId: sponsorId,
               type: 'TEAM_PURCHASE',
               amount: sponsorCommission,
               sourceUserId: customer._id,
@@ -345,11 +347,18 @@ export class PaymentsService {
               availableFrom: new Date(),
               status: 'AVAILABLE',
               isUsable: true,
-              description: `Team Purchase commission from ${customer.name || 'User'} (${vendor.storeName})`,
+              description: `Shopping Referral commission from ${customer.name || 'User'} (${vendor.storeName})`,
             });
-            await this.userModel.findByIdAndUpdate(customer.sponsorId, {
-              $inc: { availableIncome: sponsorCommission },
-            });
+            const updatedSponsor = await this.userModel.findByIdAndUpdate(sponsorId, {
+              $inc: { availableIncome: sponsorCommission, walletBalance: sponsorCommission },
+            }, { new: true });
+            if (this.trackingGateway && updatedSponsor) {
+              this.trackingGateway.emitWalletUpdated(updatedSponsor._id.toString(), {
+                availableIncome: updatedSponsor.availableIncome,
+                pendingIncome: updatedSponsor.pendingIncome,
+                walletBalance: updatedSponsor.walletBalance,
+              });
+            }
           }
         }
       }

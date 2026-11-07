@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { WithdrawalRequest, WithdrawalRequestSchema } from '../users/schemas/withdrawal-request.schema';
@@ -13,6 +13,7 @@ import { AdminApprovalsController } from './admin-approvals.controller';
 import { AdminRealtimeController } from './admin-realtime.controller';
 import { TrackingModule } from '../tracking/tracking.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     ]),
     TrackingModule,
     NotificationsModule,
+    forwardRef(() => UsersModule),
   ],
   controllers: [AdminApprovalsController, AdminRealtimeController],
   providers: [AdminApprovalsService],

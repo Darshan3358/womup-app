@@ -1213,6 +1213,66 @@ export class DeliveryOrderService implements OnModuleInit {
                 isActiveMember: newTotal >= 2000,
               });
             }
+
+            // 5c. Shopping Referral Commission (3% Veg GMV, 0.4% Other GMV)
+            // Rule: Shopping Referral -> KYC: No | Active: No (Direct sponsor gets commission without needing KYC or active purchase)
+            const sponsorId = customer.referredBy || (customer.isCompanySponsored ? undefined : customer.sponsorId);
+            if (sponsorId) {
+              try {
+                const sponsor = await this.connection.collection('users').findOne({ _id: new Types.ObjectId(sponsorId.toString()) });
+                if (sponsor && !sponsor.isCompanyAccount) {
+                  const vegCommission = vegGmv * 0.03;
+                  const otherCommission = otherGmv * 0.004;
+                  const totalReferralCommission = Math.round((vegCommission + otherCommission) * 100) / 100;
+
+                  if (totalReferralCommission > 0) {
+                    const newAvail = Number(((sponsor.availableIncome || 0) + totalReferralCommission).toFixed(2));
+                    const newWallet = Number(((sponsor.walletBalance || 0) + totalReferralCommission).toFixed(2));
+
+                    await this.connection.collection('users').updateOne(
+                      { _id: sponsor._id },
+                      {
+                        $set: {
+                          availableIncome: newAvail,
+                          walletBalance: newWallet,
+                        },
+                      },
+                      { session },
+                    );
+
+                    await this.connection.collection('income_transactions').insertOne(
+                      {
+                        userId: sponsor._id,
+                        type: 'TEAM_PURCHASE',
+                        amount: totalReferralCommission,
+                        sourceUserId: customer._id,
+                        sourceVerificationStatus: customer.verificationStatus || 'VERIFIED',
+                        earnedAt: new Date(),
+                        availableFrom: new Date(),
+                        status: 'AVAILABLE',
+                        isUsable: true,
+                        description: `Shopping Referral commission from ${customer.fullNameAsPerAadhaar || customer.name || 'Team member'} (Order #${orderNumber})`,
+                        createdAt: new Date(),
+                        updatedAt: new Date(),
+                      },
+                      { session },
+                    );
+
+                    this.logger.log(`[Shopping Referral] Credited ₹${totalReferralCommission} to sponsor ${sponsor.name || sponsor._id} for order #${orderNumber}`);
+
+                    if (this.trackingGateway) {
+                      this.trackingGateway.emitWalletUpdated(sponsor._id.toString(), {
+                        availableIncome: newAvail,
+                        walletBalance: newWallet,
+                        pendingIncome: sponsor.pendingIncome,
+                      });
+                    }
+                  }
+                }
+              } catch (refErr: any) {
+                this.logger.warn(`Failed to credit shopping referral to sponsor: ${refErr.message}`);
+              }
+            }
           }
         } catch (gmvErr: any) {
           this.logger.error('Failed to credit customer GMV upon delivery', gmvErr);

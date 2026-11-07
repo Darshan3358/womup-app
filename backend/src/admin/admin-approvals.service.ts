@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, Optional } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, Optional, Inject, forwardRef, OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User, UserDocument } from '../users/schemas/user.schema';
@@ -12,6 +12,7 @@ import { WithdrawalRequest, WithdrawalRequestDocument } from '../users/schemas/w
 import { IncomeTransaction, IncomeTransactionDocument } from '../users/schemas/income-transaction.schema';
 import { TrackingGateway } from '../tracking/tracking.gateway';
 import { NotificationService } from '../notifications/notification.service';
+import { UsersService } from '../users/users.service';
 
 export interface ApprovalSummaryResponse {
   customerKyc: number;
@@ -52,7 +53,7 @@ export interface QueueItem {
 }
 
 @Injectable()
-export class AdminApprovalsService {
+export class AdminApprovalsService implements OnModuleInit {
   private readonly logger = new Logger(AdminApprovalsService.name);
 
   constructor(
@@ -67,7 +68,35 @@ export class AdminApprovalsService {
     @InjectModel(IncomeTransaction.name) private readonly incomeTxModel: Model<IncomeTransactionDocument>,
     private readonly trackingGateway: TrackingGateway,
     @Optional() private readonly notificationService?: NotificationService,
+    @Optional() @Inject(forwardRef(() => UsersService)) private readonly usersService?: UsersService,
   ) {}
+
+  async onModuleInit() {
+    // Background self-healing for missing KYC rewards from previous approvals
+    setTimeout(async () => {
+      try {
+        if (!this.usersService) return;
+        const verifiedUsersWithSponsor = await this.userModel.find({
+          customerKycStatus: 2,
+          verificationStatus: 'VERIFIED',
+          $or: [{ referredBy: { $exists: true, $ne: null } }, { sponsorId: { $exists: true, $ne: null } }],
+        }).limit(100).exec();
+
+        for (const u of verifiedUsersWithSponsor) {
+          const hasReward = await this.incomeTxModel.exists({
+            sourceUserId: u._id,
+            type: 'APP_DOWNLOAD',
+          });
+          if (!hasReward) {
+            this.logger.log(`[Self-Healing KYC] Retroactively crediting missing App Download reward for user ${u._id} (${u.name})`);
+            await this.usersService.distributeKycRewards(u);
+          }
+        }
+      } catch (e: any) {
+        this.logger.warn(`[Self-Healing KYC] Error running sync: ${e.message}`);
+      }
+    }, 5000);
+  }
 
   private cachedSummary: ApprovalSummaryResponse | null = null;
   private cacheExpiresAt = 0;
@@ -739,6 +768,8 @@ export class AdminApprovalsService {
     const user = await this.userModel.findById(userId);
     if (!user) throw new NotFoundException(`Customer not found with ID ${userId}`);
 
+    const wasAlreadyVerified = user.customerKycStatus === 2 && (user.aadhaarVerified || user.verificationStatus === 'VERIFIED');
+
     user.customerKycStatus = 2; // Confirmed
     user.customerIsVerify = 1;
     user.aadhaarVerified = true;
@@ -747,6 +778,15 @@ export class AdminApprovalsService {
     user.verifiedAt = new Date();
     user.kycRejectReason = '';
     await user.save();
+
+    // Trigger sponsor rewards: App Download Income ₹20 & Tier Referral Shopping Coins
+    if (this.usersService) {
+      try {
+        await this.usersService.distributeKycRewards(user);
+      } catch (err: any) {
+        this.logger.warn(`Failed distributing KYC rewards for customer ${userId}: ${err.message}`);
+      }
+    }
 
     await this.logAudit({
       actorId: adminId || 'ADMIN',

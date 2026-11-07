@@ -398,25 +398,28 @@ export class LocalShopsService implements OnModuleInit {
       coinsEarned = 0;
     }
 
-    // Team Purchase Income (0.4% per notebook rule on eligible non-wallet purchases)
-    // Conditional Earning Check: Customer must be from an eligible pincode
-    if (customer && customer.isIncomeEligible && customer.sponsorId && dto.paymentMethod !== 'WALLET' && billAmount > 0) {
+    // Team Purchase / Shopping Referral Income (3% Veg, 0.4% Other on eligible non-wallet purchases)
+    // Rule: Shopping Referral -> KYC: No | Active: No (Sponsor gets commission without needing KYC or active purchase)
+    const sponsorId = customer?.referredBy || (customer?.isCompanySponsored ? undefined : customer?.sponsorId);
+    if (customer && sponsorId && dto.paymentMethod !== 'WALLET' && billAmount > 0) {
       try {
-        const sponsor = await this.userModel.findById(customer.sponsorId);
-        if (sponsor) {
-          const teamIncome = Number(((billAmount * 0.4) / 100).toFixed(2));
+        const sponsor = await this.userModel.findById(sponsorId);
+        if (sponsor && !sponsor.isCompanyAccount) {
+          const isVeg = vendor?.categoryName === 'Vegetables' || (vendor as any)?.storeCategory === 'Vegetables';
+          const sponsorRate = isVeg ? 0.03 : 0.004;
+          const teamIncome = Number((billAmount * sponsorRate).toFixed(2));
           if (teamIncome > 0) {
             await this.incomeTxModel.create({
               userId: sponsor._id,
               type: 'TEAM_PURCHASE',
               amount: teamIncome,
               sourceUserId: customer._id,
-              sourceVerificationStatus: customer.verificationStatus,
+              sourceVerificationStatus: customer.verificationStatus || 'VERIFIED',
               earnedAt: new Date(),
               availableFrom: new Date(),
               isUsable: true,
               status: 'AVAILABLE',
-              description: `0.4% Team Purchase Income from ${customer.fullNameAsPerAadhaar || customer.name || 'Team member'} at ${vendor.storeName}`,
+              description: `${isVeg ? '3% Veg' : '0.4% Other'} Shopping Referral Income from ${customer.fullNameAsPerAadhaar || customer.name || 'Team member'} at ${vendor.storeName}`,
             });
             sponsor.availableIncome = Number(((sponsor.availableIncome || 0) + teamIncome).toFixed(2));
             sponsor.walletBalance = Number(((sponsor.walletBalance || 0) + teamIncome).toFixed(2));
@@ -1757,25 +1760,28 @@ export class LocalShopsService implements OnModuleInit {
           });
         }
 
-        // Team Purchase Income (0.4% on eligible non-wallet purchases per notebook spec)
-        // Conditional Earning Check: Customer must be from an eligible pincode
-        if (customer && customer.isIncomeEligible && customer.sponsorId && request.paymentMethod !== 'WALLET' && request.billAmount > 0) {
+        // Team Purchase / Shopping Referral Income (3% Veg, 0.4% Other on eligible non-wallet purchases)
+        // Rule: Shopping Referral -> KYC: No | Active: No (Sponsor gets commission without needing KYC or active purchase)
+        const sponsorId = customer?.referredBy || (customer?.isCompanySponsored ? undefined : customer?.sponsorId);
+        if (customer && sponsorId && request.paymentMethod !== 'WALLET' && request.billAmount > 0) {
           try {
-            const sponsor = await this.userModel.findById(customer.sponsorId);
-            if (sponsor) {
-              const teamIncome = Number(((request.billAmount * 0.4) / 100).toFixed(2));
+            const sponsor = await this.userModel.findById(sponsorId);
+            if (sponsor && !sponsor.isCompanyAccount) {
+              const isVeg = vendor?.categoryName === 'Vegetables' || (vendor as any)?.storeCategory === 'Vegetables';
+              const sponsorRate = isVeg ? 0.03 : 0.004;
+              const teamIncome = Number((request.billAmount * sponsorRate).toFixed(2));
               if (teamIncome > 0) {
                 await this.incomeTxModel.create({
                   userId: sponsor._id,
                   type: 'TEAM_PURCHASE',
                   amount: teamIncome,
                   sourceUserId: customer._id,
-                  sourceVerificationStatus: customer.verificationStatus,
+                  sourceVerificationStatus: customer.verificationStatus || 'VERIFIED',
                   earnedAt: new Date(),
                   availableFrom: new Date(),
                   isUsable: true,
                   status: 'AVAILABLE',
-                  description: `0.4% Team Purchase Income from ${customer.fullNameAsPerAadhaar || customer.name || 'Team member'} at ${vendor?.storeName || 'Vendor'}`,
+                  description: `${isVeg ? '3% Veg' : '0.4% Other'} Shopping Referral Income from ${customer.fullNameAsPerAadhaar || customer.name || 'Team member'} at ${vendor?.storeName || 'Vendor'}`,
                 });
                 sponsor.availableIncome = Number(((sponsor.availableIncome || 0) + teamIncome).toFixed(2));
                 sponsor.walletBalance = Number(((sponsor.walletBalance || 0) + teamIncome).toFixed(2));

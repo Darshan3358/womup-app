@@ -809,7 +809,8 @@ export class UsersService {
     const levelBreakdown = downlineLevels.map((members, index) => {
       const levelNum = index + 1;
       const memberCount = members.length;
-      const eligibleMembers = members.filter((m) => m.isIncomeEligible);
+      // All members count towards 7-level GMV regardless of pincode
+      const eligibleMembers = members;
       const activeMemberCount = eligibleMembers.filter((m) => (m.monthlyPurchaseValue || 0) >= 2000).length;
       const vegetableGMV = Number(eligibleMembers.reduce((sum, m) => sum + (m.monthlyVegetablePurchase || 0), 0).toFixed(2));
       const otherGMV = Number(eligibleMembers.reduce((sum, m) => sum + (m.monthlyOtherPurchase || 0), 0).toFixed(2));
@@ -820,11 +821,11 @@ export class UsersService {
       totalOtherGMV += otherGMV;
 
       const detailedMembers = members.map((m) => {
-        const isEligibleForIncome = !!m.isIncomeEligible;
-        const veg = isEligibleForIncome ? Number((m.monthlyVegetablePurchase || 0).toFixed(2)) : 0;
-        const other = isEligibleForIncome ? Number((m.monthlyOtherPurchase || 0).toFixed(2)) : 0;
+        const isEligibleForIncome = true;
+        const veg = Number((m.monthlyVegetablePurchase || 0).toFixed(2));
+        const other = Number((m.monthlyOtherPurchase || 0).toFixed(2));
         const mIncome = Number(((veg * 0.03) + (other * 0.004)).toFixed(2));
-        const isActive = isEligibleForIncome && (m.monthlyPurchaseValue || 0) >= 2000;
+        const isActive = (m.monthlyPurchaseValue || 0) >= 2000;
         const memberCode = m.referralCode || m.sponsorCode || (m.phone ? `WOM${m.phone.slice(-5)}` : `WOM${m._id.toString().slice(-5).toUpperCase()}`);
         return {
           id: m._id.toString(),
@@ -859,7 +860,8 @@ export class UsersService {
     const personalPurchase = Number((user.monthlyPurchaseValue || 0).toFixed(2));
     const isPersonalActive = personalPurchase >= 2000;
     const direct5ActiveCount = levelBreakdown[0]?.activeMemberCount || 0;
-    const isEligible = isPersonalActive && direct5ActiveCount >= 5;
+    // Rule: Monthly Shopping Coin Level -> KYC: No | Active: Yes (User is active if personal purchase >= 2000)
+    const isEligible = isPersonalActive;
 
     // Cache updated team size on user doc
     if (user.teamSize !== totalTeamSize || user.direct5ActiveCount !== direct5ActiveCount) {
@@ -1080,14 +1082,6 @@ export class UsersService {
   }
 
   async distributeKycRewards(user: any) {
-    // Conditional Earning Check: User B must be from an eligible pincode
-    if (!user.isIncomeEligible) {
-      this.logger.log(
-        `[MLM KYC] Skipping referral reward distribution: user ${user._id} (${user.registrationPincode || 'unknown pin'}) is not from an eligible pincode.`,
-      );
-      return;
-    }
-
     const TIERS = [
       { level: 1, appIncome: 20, coinIncome: 400 },
       { level: 2, appIncome: 10, coinIncome: 400 },
@@ -1103,9 +1097,23 @@ export class UsersService {
       if (!sponsor || sponsor.isCompanyAccount) break;
 
       // Business Rule: ONLY VERIFIED members receive App Download Income & Coin Income
-      const isVerifiedSponsor = sponsor.verificationStatus === 'VERIFIED' && sponsor.aadhaarVerified;
+      // Rule: App Download ₹20 -> KYC: Yes | Active: No (Sponsor must have KYC approved, Active not required)
+      const isVerifiedSponsor = sponsor.verificationStatus === 'VERIFIED' || sponsor.customerKycStatus === 2 || sponsor.aadhaarVerified;
 
       if (isVerifiedSponsor) {
+        // Idempotency: avoid duplicate rewards for the same user & sponsor
+        const existingTx = await this.incomeTxModel.findOne({
+          userId: sponsor._id,
+          type: 'APP_DOWNLOAD',
+          sourceUserId: user._id,
+        });
+
+        if (existingTx) {
+          this.logger.log(`[MLM KYC] App Download reward already credited to sponsor ${sponsor._id} for referral ${user._id}`);
+          currentSponsorId = sponsor.referredBy || (sponsor.isCompanySponsored ? undefined : sponsor.sponsorId);
+          continue;
+        }
+
         // 1. App Download Income (To pendingIncome, locked until midnight/24h)
         await this.incomeTxModel.create({
           userId: sponsor._id,
@@ -1266,6 +1274,10 @@ export class UsersService {
     if (!customer) throw new NotFoundException('Customer not found');
 
     const wasAlreadyVerified = customer.customerKycStatus === 2 && customer.aadhaarVerified;
+    const hasExistingReward = await this.incomeTxModel.exists({
+      sourceUserId: customer._id,
+      type: 'APP_DOWNLOAD',
+    });
 
     customer.customerKycStatus = 2; // Confirmed
     customer.customerIsVerify = 1; // Yes
@@ -1276,7 +1288,7 @@ export class UsersService {
     customer.verifiedAt = new Date();
     await customer.save();
 
-    if (!wasAlreadyVerified) {
+    if (!wasAlreadyVerified || !hasExistingReward) {
       await this.distributeKycRewards(customer);
     }
 

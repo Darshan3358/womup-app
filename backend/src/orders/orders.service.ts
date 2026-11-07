@@ -1416,6 +1416,53 @@ export class OrdersService {
       );
 
       this.logger.log(`[MLM GMV] Credited order #${order.orderNumber} to user ${user.name} (${user._id}): +₹${vegGmv} Veg GMV, +₹${otherGmv} Other GMV. New Total Monthly Spend: ₹${user.monthlyPurchaseValue}`);
+
+      // Shopping Referral Commission (3% Veg GMV, 0.4% Other GMV)
+      // Rule: Shopping Referral -> KYC: No | Active: No (Direct sponsor gets commission without needing KYC or active purchase)
+      const sponsorId = user.referredBy || (user.isCompanySponsored ? undefined : user.sponsorId);
+      if (sponsorId) {
+        try {
+          const sponsor = await this.userModel.findById(sponsorId);
+          if (sponsor && !sponsor.isCompanyAccount) {
+            const vegCommission = vegGmv * 0.03;
+            const otherCommission = otherGmv * 0.004;
+            const totalReferralCommission = Math.round((vegCommission + otherCommission) * 100) / 100;
+
+            if (totalReferralCommission > 0) {
+              sponsor.availableIncome = Number(((sponsor.availableIncome || 0) + totalReferralCommission).toFixed(2));
+              sponsor.walletBalance = Number(((sponsor.walletBalance || 0) + totalReferralCommission).toFixed(2));
+              await sponsor.save();
+
+              await this.connection.collection('income_transactions').insertOne({
+                userId: sponsor._id,
+                type: 'TEAM_PURCHASE',
+                amount: totalReferralCommission,
+                sourceUserId: user._id,
+                sourceVerificationStatus: user.verificationStatus || 'VERIFIED',
+                earnedAt: new Date(),
+                availableFrom: new Date(),
+                status: 'AVAILABLE',
+                isUsable: true,
+                description: `Shopping Referral commission from ${user.fullNameAsPerAadhaar || user.name || 'Team member'} (Order #${order.orderNumber})`,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              });
+
+              this.logger.log(`[Shopping Referral] Credited ₹${totalReferralCommission} to sponsor ${sponsor.name || sponsor._id} for order #${order.orderNumber}`);
+
+              if (this.trackingGateway) {
+                this.trackingGateway.emitWalletUpdated(sponsor._id.toString(), {
+                  availableIncome: sponsor.availableIncome,
+                  walletBalance: sponsor.walletBalance,
+                  pendingIncome: sponsor.pendingIncome,
+                });
+              }
+            }
+          }
+        } catch (refErr: any) {
+          this.logger.warn(`Failed to credit shopping referral to sponsor: ${refErr.message}`);
+        }
+      }
     } catch (err: any) {
       this.logger.error(`[MLM GMV] Failed crediting order GMV: ${err.message}`);
     }
