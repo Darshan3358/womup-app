@@ -61,18 +61,39 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
   const barHeight = 58;
 
   const renderIcon = (tabKey: BlinkitTabKey, isActive: boolean) => {
-    const iconColor = isActive ? '#E11D88' : '#6B7280';
-    const iconSize = isSmallDevice ? 22 : 24;
-
     switch (tabKey) {
       case 'Home':
-        return <Ionicons name={isActive ? 'home' : 'home-outline'} size={iconSize} color={iconColor} />;
+        return (
+          <Image
+            source={require('../../../assets/nav_home_ref.png')}
+            style={{ width: 24, height: 24 }}
+            resizeMode="contain"
+          />
+        );
       case 'Order Again':
-        return <Feather name="shopping-bag" size={iconSize - 2} color={iconColor} />;
+        return (
+          <Image
+            source={require('../../../assets/nav_orders_ref.png')}
+            style={{ width: 24, height: 24, tintColor: isActive ? '#E11D88' : undefined }}
+            resizeMode="contain"
+          />
+        );
       case 'Categories':
-        return <Ionicons name={isActive ? 'grid' : 'grid-outline'} size={iconSize} color={iconColor} />;
+        return (
+          <Image
+            source={require('../../../assets/nav_categories_ref.png')}
+            style={{ width: 24, height: 24, tintColor: isActive ? '#E11D88' : undefined }}
+            resizeMode="contain"
+          />
+        );
       case 'Profile':
-        return <Feather name="user" size={iconSize - 1} color={iconColor} />;
+        return (
+          <Image
+            source={require('../../../assets/nav_login_ref.png')}
+            style={{ width: 24, height: 24, tintColor: isActive ? '#E11D88' : undefined }}
+            resizeMode="contain"
+          />
+        );
       default:
         return null;
     }
@@ -91,7 +112,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
             (tab.isWomupAppButton && (currentTab === 'Local Shop' || currentTab === 'App'))
           );
 
-          const labelColor = isActive ? '#E11D88' : '#6B7280';
+          const labelColor = isActive ? '#E11D88' : '#52525B';
 
           // Special 3D Circular WOMUP Logo Button ("App" / Local Shop)
           if (tab.isWomupAppButton) {
@@ -103,16 +124,11 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                 style={styles.womupAppTabItem}
                 accessibilityLabel="WOMUP Local Shop App"
               >
-                <View
-                  style={[
-                    styles.womupAppCircle,
-                    isActive && styles.womupAppCircleActive,
-                  ]}
-                >
+                <View style={styles.womupAppHalo}>
                   <Image
-                    source={require('../../../assets/icon.png')}
+                    source={require('../../../assets/nav_app_button_ref.png')}
                     style={styles.womupAppIconImage}
-                    resizeMode="cover"
+                    resizeMode="contain"
                   />
                 </View>
 
@@ -154,6 +170,9 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
               >
                 {tab.label}
               </Text>
+
+              {/* Pink Underline Pill Indicator under Active Tab */}
+              {isActive && <View style={styles.activeBar} />}
             </TouchableOpacity>
           );
         })}
@@ -167,12 +186,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAF5FF',
     width: '100%',
     maxWidth: '100%',
-    overflow: 'hidden',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    overflow: 'visible',
+    paddingTop: 14,
+  },
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    width: '100%',
+    maxWidth: '100%',
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingHorizontal: 8,
+    paddingTop: 8,
+    paddingBottom: 2,
     ...Platform.select({
       web: {
-        boxShadow: '0 -4px 12px rgba(0, 0, 0, 0.06)',
+        boxShadow: '0 -4px 14px rgba(0, 0, 0, 0.06)',
       } as any,
       default: {
         shadowColor: '#000',
@@ -182,15 +213,6 @@ const styles = StyleSheet.create({
         elevation: 8,
       },
     }),
-  },
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    width: '100%',
-    maxWidth: '100%',
-    paddingHorizontal: 8,
-    paddingTop: 8,
   },
   tabItem: {
     flex: 1,
@@ -205,14 +227,21 @@ const styles = StyleSheet.create({
     height: 26,
   },
   tabLabel: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontWeight: '600',
     marginTop: 2,
     letterSpacing: -0.2,
   },
   activeTabLabel: {
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#E11D88',
+  },
+  activeBar: {
+    width: 22,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: '#E11D88',
+    marginTop: 3,
   },
   womupAppTabItem: {
     flex: 1,
@@ -221,51 +250,18 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     position: 'relative',
   },
-  womupAppCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    overflow: 'hidden',
-    backgroundColor: '#0F172A',
-    borderWidth: 2,
-    borderColor: '#C026D3',
+  womupAppHalo: {
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    ...Platform.select({
-      web: {
-        boxShadow: '0 0 8px rgba(192, 38, 211, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3)',
-      } as any,
-      default: {
-        shadowColor: '#C026D3',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.5,
-        shadowRadius: 5,
-        elevation: 6,
-      },
-    }),
-  },
-  womupAppCircleActive: {
-    borderColor: '#E11D88',
-    borderWidth: 2.5,
-    transform: [{ scale: 1.05 }],
-    ...Platform.select({
-      web: {
-        boxShadow: '0 0 12px rgba(225, 29, 72, 0.75), 0 2px 6px rgba(0, 0, 0, 0.4)',
-      } as any,
-      default: {
-        shadowColor: '#E11D88',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.75,
-        shadowRadius: 7,
-        elevation: 8,
-      },
-    }),
   },
   womupAppIconImage: {
-    width: '100%',
-    height: '100%',
+    width: 42,
+    height: 42,
   },
   womupAppLabel: {
-    fontWeight: '700',
+    fontWeight: '600',
+    marginTop: 1,
   },
 });
