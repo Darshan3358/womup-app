@@ -257,25 +257,59 @@ const enrichStore = (rawStore: any): StoreHub | null => {
           return;
         }
 
-        const me = await StoreApiService.getMe();
-        if (me && me.staff) {
-          setStaff(me.staff);
-          setStore(enrichStore(me.store));
-          setPerformance({
-            todayPicked: me.performance?.todayPicked ?? me.staff?.totalOrdersPicked ?? 0,
-            avgPickTime: me.performance?.avgPickTime || null,
-            avgPickTimeSeconds: me.performance?.avgPickTimeSeconds ?? 0,
-            accuracy: me.performance?.accuracy ?? 100,
-            currentStreak: me.performance?.currentStreak ?? 0,
-            totalOrdersPicked: me.performance?.totalOrdersPicked ?? me.performance?.todayPicked ?? 0,
-          });
-          setTimeout(() => setAuthStep('AUTHENTICATED'), 1800);
-
-          if (me.store?.id) {
-            storeSocket.connect(me.store.id);
+        // Restore cached staff and store session immediately so offline/network delays keep user logged in
+        let hasCachedSession = false;
+        try {
+          const cachedStaff = await AsyncStorage.getItem(STAFF_STORAGE_KEY);
+          const cachedStore = await AsyncStorage.getItem('@womup_store_session');
+          if (cachedStaff) {
+            setStaff(JSON.parse(cachedStaff));
+            hasCachedSession = true;
           }
-        } else {
-          setTimeout(() => setAuthStep('LOGIN'), 1800);
+          if (cachedStore) {
+            setStore(enrichStore(JSON.parse(cachedStore)));
+            hasCachedSession = true;
+          }
+          if (hasCachedSession) {
+            setTimeout(() => setAuthStep('AUTHENTICATED'), 1800);
+          }
+        } catch (_) {}
+
+        try {
+          const me = await StoreApiService.getMe();
+          if (me && me.staff) {
+            setStaff(me.staff);
+            setStore(enrichStore(me.store));
+            await AsyncStorage.setItem(STAFF_STORAGE_KEY, JSON.stringify(me.staff));
+            if (me.store) {
+              await AsyncStorage.setItem('@womup_store_session', JSON.stringify(me.store));
+            }
+            setPerformance({
+              todayPicked: me.performance?.todayPicked ?? me.staff?.totalOrdersPicked ?? 0,
+              avgPickTime: me.performance?.avgPickTime || null,
+              avgPickTimeSeconds: me.performance?.avgPickTimeSeconds ?? 0,
+              accuracy: me.performance?.accuracy ?? 100,
+              currentStreak: me.performance?.currentStreak ?? 0,
+              totalOrdersPicked: me.performance?.totalOrdersPicked ?? me.performance?.todayPicked ?? 0,
+            });
+            setTimeout(() => setAuthStep('AUTHENTICATED'), 1800);
+
+            if (me.store?.id) {
+              storeSocket.connect(me.store.id);
+            }
+          } else if (!hasCachedSession) {
+            setTimeout(() => setAuthStep('LOGIN'), 1800);
+          }
+        } catch (fetchErr: any) {
+          const status = fetchErr?.status || fetchErr?.response?.status;
+          if (status === 401) {
+            await StoreApiService.logout();
+            setTimeout(() => setAuthStep('LOGIN'), 1800);
+          } else if (!hasCachedSession) {
+            setTimeout(() => setAuthStep('LOGIN'), 1800);
+          } else {
+            console.warn('[StoreContext] Network error during session restore, preserving cached session:', fetchErr?.message || fetchErr);
+          }
         }
       } catch (err) {
         // non-fatal: session restore failed, routing to login
@@ -773,8 +807,19 @@ const enrichStore = (rawStore: any): StoreHub | null => {
   };
 
   const logout = async () => {
-    await StoreApiService.logout();
-    storeSocket.disconnect();
+    try {
+      await StoreApiService.logout();
+    } catch (_) {}
+    try {
+      storeSocket.disconnect();
+    } catch (_) {}
+    try {
+      await AsyncStorage.multiRemove([
+        TOKEN_STORAGE_KEY,
+        STAFF_STORAGE_KEY,
+        '@womup_store_session',
+      ]);
+    } catch (_) {}
     setStaff(null);
     setStore(null);
     setPerformance(null);
