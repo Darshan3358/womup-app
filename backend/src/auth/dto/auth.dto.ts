@@ -232,7 +232,7 @@ export class RegisterDto {
 }
 
 export class CustomerLoginDto {
-  @ApiProperty({ example: 'admin@wormup.com, 9999999999, or WORMADMIN', description: 'Phone, Email, or Sponsor ID' })
+  @ApiProperty({ example: 'womupproducts@gmail.com, 9999999999, or WORMADMIN', description: 'Phone, Email, or Sponsor ID' })
   @IsString()
   @IsNotEmpty({ message: 'Please enter your Phone, Email, or Sponsor ID' })
   identifier: string;
@@ -307,7 +307,7 @@ export class LinkPhoneDto {
 }
 
 export class AdminLoginDto {
-  @ApiProperty({ example: 'admin@wormup.com', required: false, description: 'Admin Email or Mobile' })
+  @ApiProperty({ example: 'womupproducts@gmail.com', required: false, description: 'Admin Email or Mobile' })
   @IsString()
   @IsOptional()
   identifier?: string;
