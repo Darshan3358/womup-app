@@ -43,7 +43,7 @@ export const CustomerProfileScreen: React.FC = () => {
   } = useAdminState();
 
   const [activeTab, setActiveTab] = useState<'Profile' | 'Orders' | 'Wallet' | 'KYC'>('Orders');
-  const [ordersSubTab, setOrdersSubTab] = useState<'All' | 'Store Orders' | 'Paper Print'>('All');
+  const [ordersSubTab, setOrdersSubTab] = useState<'All' | 'Store Orders'>('All');
 
   if (!selectedCustomer) {
     return (
@@ -208,18 +208,18 @@ export const CustomerProfileScreen: React.FC = () => {
           <View style={styles.cardHeaderRow}>
             <Text style={styles.cardTitle}>Recent Customer Orders</Text>
             <Text style={styles.totalBadge}>
-              {customerStoreOrders.length + customerPrintOrders.length} Total
+              {customerStoreOrders.length} Total
             </Text>
           </View>
 
-          {/* Sub Filters: All, Store Orders, Paper Print */}
+          {/* Sub Filters: All, Store Orders */}
           <View style={styles.orderFilterPills}>
             <TouchableOpacity
               style={[styles.filterPill, ordersSubTab === 'All' && styles.filterPillActive]}
               onPress={() => setOrdersSubTab('All')}
             >
               <Text style={[styles.filterPillText, ordersSubTab === 'All' && styles.filterPillTextActive]}>
-                All ({customerStoreOrders.length + customerPrintOrders.length})
+                All ({customerStoreOrders.length})
               </Text>
             </TouchableOpacity>
 
@@ -232,27 +232,16 @@ export const CustomerProfileScreen: React.FC = () => {
                 Store ({customerStoreOrders.length})
               </Text>
             </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.filterPill, ordersSubTab === 'Paper Print' && styles.filterPillActive]}
-              onPress={() => setOrdersSubTab('Paper Print')}
-            >
-              <Printer size={12} color={ordersSubTab === 'Paper Print' ? COLORS.white : COLORS.hotPink} style={{ marginRight: 4 }} />
-              <Text style={[styles.filterPillText, ordersSubTab === 'Paper Print' && styles.filterPillTextActive]}>
-                Paper Print ({customerPrintOrders.length})
-              </Text>
-            </TouchableOpacity>
           </View>
 
-          {customerStoreOrders.length === 0 && customerPrintOrders.length === 0 ? (
+          {customerStoreOrders.length === 0 ? (
             <Text style={[styles.emptyText, { paddingVertical: SPACING.md, textAlign: 'center' }]}>
               No orders placed by this customer yet.
             </Text>
           ) : (
             <View>
               {/* STORE ORDERS */}
-              {(ordersSubTab === 'All' || ordersSubTab === 'Store Orders') &&
-                customerStoreOrders.map((order: Order) => (
+              {customerStoreOrders.map((order: Order) => (
                   <TouchableOpacity
                     key={order.id}
                     style={styles.orderItemCard}
@@ -296,78 +285,6 @@ export const CustomerProfileScreen: React.FC = () => {
                       >
                         <Printer size={12} color={COLORS.purple} style={{ marginRight: 3 }} />
                         <Text style={styles.labelBtnText}>Label</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-
-              {/* PAPER PRINT ORDERS */}
-              {(ordersSubTab === 'All' || ordersSubTab === 'Paper Print') &&
-                customerPrintOrders.map((printOrder: PrintOrder) => (
-                  <TouchableOpacity
-                    key={printOrder.id}
-                    style={[styles.orderItemCard, styles.printOrderCard]}
-                    activeOpacity={0.7}
-                    onPress={() => handleOpenPrintOrderDetail(printOrder)}
-                  >
-                    <View style={[styles.orderIconBox, { backgroundColor: '#FCE1F5' }]}>
-                      <Printer size={18} color={COLORS.hotPink} />
-                    </View>
-
-                    <View style={{ flex: 1 }}>
-                      <View style={styles.orderHeaderRow}>
-                        <Text style={[styles.orderIdText, { color: COLORS.hotPink }]}>
-                          {printOrder.printOrderNumber}
-                        </Text>
-                        <Text style={styles.orderTimeText}>{printOrder.timestamp}</Text>
-                      </View>
-                      <Text style={styles.orderSubText} numberOfLines={1}>
-                        📄 {printOrder.originalFileName || 'Document.pdf'} ({printOrder.pageCount} pgs, {printOrder.numberOfCopies} copy)
-                      </Text>
-                      <View style={styles.printMetaRow}>
-                        <View style={[styles.statusPillSmall, { backgroundColor: '#FCE1F5' }]}>
-                          <Text style={[styles.statusPillSmallText, { color: COLORS.hotPink }]}>
-                            {printOrder.status}
-                          </Text>
-                        </View>
-                        <Text style={styles.printSpecLabel}>
-                          {printOrder.isColor ? 'Color' : 'B&W'} • {printOrder.paperQuality}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.orderRightCol}>
-                      <Text style={styles.orderPrice}>₹{printOrder.totalAmount}</Text>
-                      <TouchableOpacity
-                        style={[styles.labelBtn, { borderColor: COLORS.hotPink }]}
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          openLabelPrint({
-                            orderId: printOrder.printOrderNumber,
-                            type: 'PRINT',
-                            customerName: selectedCustomer.name,
-                            customerPhone: selectedCustomer.phone,
-                            address: printOrder.deliveryAddress || selectedCustomer.address,
-                            items: [
-                              {
-                                name: `${printOrder.originalFileName || 'Document'} (${printOrder.pageCount} pgs)`,
-                                quantity: printOrder.numberOfCopies,
-                                subtotal: printOrder.totalAmount,
-                              },
-                            ],
-                            total: printOrder.totalAmount,
-                            paymentMethod: 'UPI Online Paid',
-                            specs: {
-                              pageCount: printOrder.pageCount,
-                              copies: printOrder.numberOfCopies,
-                              color: printOrder.isColor,
-                              paperQuality: printOrder.paperQuality,
-                            },
-                          });
-                        }}
-                      >
-                        <Printer size={12} color={COLORS.hotPink} style={{ marginRight: 3 }} />
-                        <Text style={[styles.labelBtnText, { color: COLORS.hotPink }]}>Label</Text>
                       </TouchableOpacity>
                     </View>
                   </TouchableOpacity>

@@ -265,7 +265,7 @@ export const EditCustomerModal: React.FC = () => {
                 style={styles.input}
                 value={fatherHusbandName}
                 onChangeText={setFatherHusbandName}
-                placeholder="e.g. Mukesh Thanki"
+                placeholder="Enter Father / Husband Name"
                 placeholderTextColor={COLORS.textMuted}
               />
             </View>
