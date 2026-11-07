@@ -988,6 +988,7 @@ export const WalletsRevenueScreen: React.FC = () => {
               style={[
                 styles.settleEntityBtn,
                 settlementEntityTab === 'STORES' && styles.settleEntityBtnActive,
+                { position: 'relative' },
               ]}
               onPress={() => setSettlementEntityTab('STORES')}
               activeOpacity={0.8}
@@ -999,13 +1000,11 @@ export const WalletsRevenueScreen: React.FC = () => {
                   settlementEntityTab === 'STORES' && styles.settleEntityBtnTextActive,
                 ]}
               >
-                Store Settlements ({storeSettlementRequests.length})
+                Store Settlements
               </Text>
-              {storeSettlementRequests.filter((r) => r.status === 'PENDING').length > 0 && (
-                <View style={styles.pendingEntityBadge}>
-                  <Text style={styles.pendingEntityBadgeText}>
-                    {storeSettlementRequests.filter((r) => r.status === 'PENDING').length}
-                  </Text>
+              {storeSettlementRequests.length > 0 && (
+                <View style={styles.tabBadge}>
+                  <Text style={styles.tabBadgeText}>{storeSettlementRequests.length}</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -1014,6 +1013,7 @@ export const WalletsRevenueScreen: React.FC = () => {
               style={[
                 styles.settleEntityBtn,
                 settlementEntityTab === 'RIDERS' && styles.settleEntityBtnActive,
+                { position: 'relative' },
               ]}
               onPress={() => setSettlementEntityTab('RIDERS')}
               activeOpacity={0.8}
@@ -1025,13 +1025,11 @@ export const WalletsRevenueScreen: React.FC = () => {
                   settlementEntityTab === 'RIDERS' && styles.settleEntityBtnTextActive,
                 ]}
               >
-                Rider Settlements ({settlementRequests.length})
+                Rider Settlements
               </Text>
-              {settlementRequests.filter((r) => r.status === 'PENDING').length > 0 && (
-                <View style={styles.pendingEntityBadge}>
-                  <Text style={styles.pendingEntityBadgeText}>
-                    {settlementRequests.filter((r) => r.status === 'PENDING').length}
-                  </Text>
+              {settlementRequests.length > 0 && (
+                <View style={styles.tabBadge}>
+                  <Text style={styles.tabBadgeText}>{settlementRequests.length}</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -3511,6 +3509,27 @@ const styles = StyleSheet.create({
   pendingEntityBadgeText: {
     color: '#FFFFFF',
     fontSize: 10,
+    fontWeight: '800',
+  },
+  tabBadge: {
+    position: 'absolute',
+    top: -4,
+    right: 4,
+    backgroundColor: '#EF4444',
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    zIndex: 10,
+    elevation: 4,
+  },
+  tabBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
     fontWeight: '800',
   },
 });

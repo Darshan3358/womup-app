@@ -222,22 +222,40 @@ export const CustomerProfileScreen: React.FC = () => {
           {/* Sub Filters: All, Store Orders */}
           <View style={styles.orderFilterPills}>
             <TouchableOpacity
-              style={[styles.filterPill, ordersSubTab === 'All' && styles.filterPillActive]}
+              style={[
+                styles.filterPill,
+                ordersSubTab === 'All' && styles.filterPillActive,
+                { position: 'relative', paddingRight: customerStoreOrders.length > 0 ? 22 : 12 },
+              ]}
               onPress={() => setOrdersSubTab('All')}
             >
               <Text style={[styles.filterPillText, ordersSubTab === 'All' && styles.filterPillTextActive]}>
-                All ({customerStoreOrders.length})
+                All
               </Text>
+              {customerStoreOrders.length > 0 && (
+                <View style={styles.pillBadge}>
+                  <Text style={styles.pillBadgeText}>{customerStoreOrders.length}</Text>
+                </View>
+              )}
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.filterPill, ordersSubTab === 'Store Orders' && styles.filterPillActive]}
+              style={[
+                styles.filterPill,
+                ordersSubTab === 'Store Orders' && styles.filterPillActive,
+                { position: 'relative', paddingRight: customerStoreOrders.length > 0 ? 22 : 12 },
+              ]}
               onPress={() => setOrdersSubTab('Store Orders')}
             >
               <ShoppingBag size={12} color={ordersSubTab === 'Store Orders' ? COLORS.white : COLORS.purple} style={{ marginRight: 4 }} />
               <Text style={[styles.filterPillText, ordersSubTab === 'Store Orders' && styles.filterPillTextActive]}>
-                Store ({customerStoreOrders.length})
+                Store
               </Text>
+              {customerStoreOrders.length > 0 && (
+                <View style={styles.pillBadge}>
+                  <Text style={styles.pillBadgeText}>{customerStoreOrders.length}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
 
@@ -569,6 +587,27 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: RADIUS.pill,
     backgroundColor: COLORS.cardBackground,
+  },
+  pillBadge: {
+    position: 'absolute',
+    top: -4,
+    right: 2,
+    backgroundColor: '#EF4444',
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 3,
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+    zIndex: 10,
+    elevation: 3,
+  },
+  pillBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 8.5,
+    fontWeight: '800',
   },
   filterPillActive: {
     backgroundColor: COLORS.purple,

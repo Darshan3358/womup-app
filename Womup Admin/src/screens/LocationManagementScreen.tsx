@@ -917,8 +917,13 @@ export const LocationManagementScreen: React.FC = () => {
               ]}
               numberOfLines={1}
             >
-              Cities ({cities.length})
+              Cities
             </Text>
+            {cities.length > 0 && (
+              <View style={[styles.tabBadge, activeSubTab === 'Cities' && styles.tabBadgeActive]}>
+                <Text style={styles.tabBadgeText}>{cities.length}</Text>
+              </View>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -937,8 +942,13 @@ export const LocationManagementScreen: React.FC = () => {
               ]}
               numberOfLines={1}
             >
-              Areas & Stores ({zones.length})
+              Areas & Stores
             </Text>
+            {zones.length > 0 && (
+              <View style={[styles.tabBadge, activeSubTab === 'Areas' && styles.tabBadgeActive]}>
+                <Text style={styles.tabBadgeText}>{zones.length}</Text>
+              </View>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -957,8 +967,13 @@ export const LocationManagementScreen: React.FC = () => {
               ]}
               numberOfLines={1}
             >
-              Pincodes ({geojsonPincodes.length})
+              Pincodes
             </Text>
+            {geojsonPincodes.length > 0 && (
+              <View style={[styles.tabBadge, activeSubTab === 'Pincodes' && styles.tabBadgeActive]}>
+                <Text style={styles.tabBadgeText}>{geojsonPincodes.length}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -1018,25 +1033,35 @@ export const LocationManagementScreen: React.FC = () => {
         {activeSubTab === 'Pincodes' && (
           <View style={[styles.filterGroup, { marginTop: 8 }]}>
             <Text style={styles.filterLabel}>Serviceability Status:</Text>
-            {(['All', 'Active', 'Inactive'] as const).map((st) => (
-              <TouchableOpacity
-                key={st}
-                style={[
-                  styles.filterChip,
-                  pincodeStatusFilter === st && styles.filterChipActive,
-                ]}
-                onPress={() => setPincodeStatusFilter(st)}
-              >
-                <Text
+            {(['All', 'Active', 'Inactive'] as const).map((st) => {
+              const count = st === 'All' ? geojsonPincodes.length : st === 'Active' ? geojsonPincodes.filter((p) => p.isActive).length : geojsonPincodes.filter((p) => !p.isActive).length;
+              const isSelected = pincodeStatusFilter === st;
+              return (
+                <TouchableOpacity
+                  key={st}
                   style={[
-                    styles.filterChipText,
-                    pincodeStatusFilter === st && styles.filterChipTextActive,
+                    styles.filterChip,
+                    isSelected && styles.filterChipActive,
+                    { position: 'relative', paddingRight: count > 0 ? 22 : 12 },
                   ]}
+                  onPress={() => setPincodeStatusFilter(st)}
                 >
-                  {st} ({st === 'All' ? geojsonPincodes.length : st === 'Active' ? geojsonPincodes.filter((p) => p.isActive).length : geojsonPincodes.filter((p) => !p.isActive).length})
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      isSelected && styles.filterChipTextActive,
+                    ]}
+                  >
+                    {st}
+                  </Text>
+                  {count > 0 && (
+                    <View style={styles.chipBadge}>
+                      <Text style={styles.chipBadgeText}>{count}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
           </View>
         )}
 
@@ -2691,9 +2716,55 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 4,
     borderRadius: 8,
+    position: 'relative',
   },
   tabNavBtnActive: {
     backgroundColor: COLORS.navy,
+  },
+  tabBadge: {
+    position: 'absolute',
+    top: -5,
+    right: 2,
+    backgroundColor: '#EF4444',
+    minWidth: 17,
+    height: 17,
+    borderRadius: 8.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    zIndex: 10,
+    elevation: 4,
+  },
+  tabBadgeActive: {
+    borderColor: COLORS.navy,
+  },
+  tabBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 8.5,
+    fontWeight: '800',
+  },
+  chipBadge: {
+    position: 'absolute',
+    top: -4,
+    right: 2,
+    backgroundColor: '#EF4444',
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 3,
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+    zIndex: 10,
+    elevation: 3,
+  },
+  chipBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 8.5,
+    fontWeight: '800',
   },
   tabNavText: {
     fontSize: 11,

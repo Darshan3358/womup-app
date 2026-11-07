@@ -466,32 +466,42 @@ export const CustomersScreen: React.FC = () => {
       >
         {/* Top Segmented Navigation: Customers vs Delivery Partners */}
         <View style={styles.modeTabsRow}>
-        <TouchableOpacity
-          style={[styles.modeTab, activeTabMode === 'CUSTOMERS' && styles.activeModeTab]}
-          onPress={() => {
-            setActiveTabMode('CUSTOMERS');
-            setSearchQuery('');
-          }}
-          activeOpacity={0.85}
-        >
-          <Text style={[styles.modeTabText, activeTabMode === 'CUSTOMERS' && styles.activeModeTabText]}>
-            👥 Customers ({customers.length})
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.modeTab, activeTabMode === 'CUSTOMERS' && styles.activeModeTab]}
+            onPress={() => {
+              setActiveTabMode('CUSTOMERS');
+              setSearchQuery('');
+            }}
+            activeOpacity={0.85}
+          >
+            <Text style={[styles.modeTabText, activeTabMode === 'CUSTOMERS' && styles.activeModeTabText]}>
+              👥 Customers
+            </Text>
+            {customers.length > 0 && (
+              <View style={[styles.tabBadge, activeTabMode === 'CUSTOMERS' && styles.tabBadgeActive]}>
+                <Text style={styles.tabBadgeText}>{customers.length}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.modeTab, activeTabMode === 'RIDERS' && styles.activeModeTab]}
-          onPress={() => {
-            setActiveTabMode('RIDERS');
-            setSearchQuery('');
-          }}
-          activeOpacity={0.85}
-        >
-          <Text style={[styles.modeTabText, activeTabMode === 'RIDERS' && styles.activeModeTabText]}>
-            🛵 Delivery Partners ({riders?.length || 0})
-          </Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            style={[styles.modeTab, activeTabMode === 'RIDERS' && styles.activeModeTab]}
+            onPress={() => {
+              setActiveTabMode('RIDERS');
+              setSearchQuery('');
+            }}
+            activeOpacity={0.85}
+          >
+            <Text style={[styles.modeTabText, activeTabMode === 'RIDERS' && styles.activeModeTabText]}>
+              🛵 Delivery Partners
+            </Text>
+            {(riders?.length || 0) > 0 && (
+              <View style={[styles.tabBadge, activeTabMode === 'RIDERS' && styles.tabBadgeActive]}>
+                <Text style={styles.tabBadgeText}>{riders?.length || 0}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
 
       {/* Search & Filter Section */}
       <View style={styles.topSection}>
@@ -2102,10 +2112,12 @@ const styles = StyleSheet.create({
   },
   modeTab: {
     paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.md,
+    paddingLeft: SPACING.xs,
+    paddingRight: SPACING.lg + 4,
     marginRight: SPACING.md,
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
+    position: 'relative',
   },
   activeModeTab: {
     borderBottomColor: COLORS.hotPink,
@@ -2118,6 +2130,30 @@ const styles = StyleSheet.create({
   activeModeTabText: {
     color: COLORS.hotPink,
     fontWeight: '700',
+  },
+  tabBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 0,
+    backgroundColor: '#EF4444',
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    zIndex: 10,
+    elevation: 4,
+  },
+  tabBadgeActive: {
+    borderColor: COLORS.hotPink,
+  },
+  tabBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
   },
   riderCard: {
     flexDirection: 'row',

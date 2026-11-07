@@ -697,22 +697,36 @@ export const StoresManagementScreen: React.FC = () => {
 
         {/* Row 3: Status Filter Chips */}
         <View style={styles.filterChipsRow}>
-          {(['All', 'Active', 'Pending', 'On Shift', 'Logged In'] as const).map((filter) => (
-            <TouchableOpacity
-              key={filter}
-              style={[styles.filterChip, filterStatus === filter && styles.filterChipActive]}
-              onPress={() => setFilterStatus(filter)}
-            >
-              <Text
+          {(['All', 'Active', 'Pending', 'On Shift', 'Logged In'] as const).map((filter) => {
+            const isAll = filter === 'All';
+            const count = filteredStores.length;
+            const isSelected = filterStatus === filter;
+            return (
+              <TouchableOpacity
+                key={filter}
                 style={[
-                  styles.filterChipText,
-                  filterStatus === filter && styles.filterChipTextActive,
+                  styles.filterChip,
+                  isSelected && styles.filterChipActive,
+                  isAll && { position: 'relative', paddingRight: count > 0 ? 22 : 12 },
                 ]}
+                onPress={() => setFilterStatus(filter)}
               >
-                {filter} {filter === 'All' ? `(${filteredStores.length})` : ''}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    isSelected && styles.filterChipTextActive,
+                  ]}
+                >
+                  {filter}
+                </Text>
+                {isAll && count > 0 && (
+                  <View style={styles.chipBadge}>
+                    <Text style={styles.chipBadgeText}>{count}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </View>
 
@@ -2219,6 +2233,27 @@ const styles = StyleSheet.create({
   },
   filterChipTextActive: {
     color: COLORS.white,
+  },
+  chipBadge: {
+    position: 'absolute',
+    top: -4,
+    right: 2,
+    backgroundColor: '#EF4444',
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 3,
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+    zIndex: 10,
+    elevation: 3,
+  },
+  chipBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 8.5,
+    fontWeight: '800',
   },
   loadingContainer: {
     flex: 1,

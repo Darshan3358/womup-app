@@ -136,27 +136,47 @@ export const StaffScreen: React.FC = () => {
         <View style={styles.topSection}>
         {/* Role Tabs */}
         <View style={styles.roleTabRow}>
-          <TouchableOpacity
-            style={[styles.roleTab, activeRole === 'Picker' && styles.activeRoleTab]}
-            onPress={() => setActiveRole('Picker')}
-          >
-            <Text
-              style={[styles.roleTabText, activeRole === 'Picker' && styles.activeRoleTabText]}
-            >
-              Pickers ({staff.filter((s) => s.role === 'Picker').length})
-            </Text>
-          </TouchableOpacity>
+          {(() => {
+            const pickerCount = staff.filter((s) => s.role === 'Picker').length;
+            const riderCount = staff.filter((s) => s.role === 'Rider').length;
+            const isPicker = activeRole === 'Picker';
+            const isRider = activeRole === 'Rider';
+            return (
+              <>
+                <TouchableOpacity
+                  style={[styles.roleTab, isPicker && styles.activeRoleTab]}
+                  onPress={() => setActiveRole('Picker')}
+                >
+                  <Text
+                    style={[styles.roleTabText, isPicker && styles.activeRoleTabText]}
+                  >
+                    Pickers
+                  </Text>
+                  {pickerCount > 0 && (
+                    <View style={[styles.tabBadge, isPicker && styles.tabBadgeActive]}>
+                      <Text style={styles.tabBadgeText}>{pickerCount}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.roleTab, activeRole === 'Rider' && styles.activeRoleTab]}
-            onPress={() => setActiveRole('Rider')}
-          >
-            <Text
-              style={[styles.roleTabText, activeRole === 'Rider' && styles.activeRoleTabText]}
-            >
-              Riders ({staff.filter((s) => s.role === 'Rider').length})
-            </Text>
-          </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.roleTab, isRider && styles.activeRoleTab]}
+                  onPress={() => setActiveRole('Rider')}
+                >
+                  <Text
+                    style={[styles.roleTabText, isRider && styles.activeRoleTabText]}
+                  >
+                    Riders
+                  </Text>
+                  {riderCount > 0 && (
+                    <View style={[styles.tabBadge, isRider && styles.tabBadgeActive]}>
+                      <Text style={styles.tabBadgeText}>{riderCount}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </>
+            );
+          })()}
         </View>
 
         {/* Cascading Filter Bar: City + Area + Duty Status */}
@@ -529,6 +549,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     alignItems: 'center',
     borderRadius: RADIUS.pill,
+    position: 'relative',
   },
   activeRoleTab: {
     backgroundColor: COLORS.purple,
@@ -541,6 +562,30 @@ const styles = StyleSheet.create({
   activeRoleTabText: {
     color: COLORS.white,
     fontWeight: '700',
+  },
+  tabBadge: {
+    position: 'absolute',
+    top: -4,
+    right: 8,
+    backgroundColor: '#EF4444',
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    zIndex: 10,
+    elevation: 4,
+  },
+  tabBadgeActive: {
+    borderColor: COLORS.purple,
+  },
+  tabBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
   },
   filtersBar: {
     flexDirection: 'row',
