@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  RefreshControl,
   TouchableOpacity,
   TextInput,
   Modal,
@@ -70,6 +71,19 @@ export const LocationManagementScreen: React.FC = () => {
   const [loadingPincodes, setLoadingPincodes] = useState(false);
   const [togglingPincodeKey, setTogglingPincodeKey] = useState<string | null>(null);
   const [pincodeToast, setPincodeToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [isPullRefreshing, setIsPullRefreshing] = useState(false);
+
+  const handlePullToRefresh = async () => {
+    setIsPullRefreshing(true);
+    try {
+      await refreshFromDb();
+      await fetchDbPincodes();
+    } catch (e) {
+      console.warn('Pull to refresh failed:', e);
+    } finally {
+      setIsPullRefreshing(false);
+    }
+  };
 
   const fetchDbPincodes = async () => {
     try {
@@ -816,8 +830,22 @@ export const LocationManagementScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* 1. Top Header Banner */}
-      <LinearGradient colors={GRADIENTS.navyHeader} style={styles.headerBanner}>
+      <ScrollView
+        style={styles.mainScroll}
+        contentContainerStyle={styles.mainScrollContent}
+        showsVerticalScrollIndicator={true}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={isPullRefreshing}
+            onRefresh={handlePullToRefresh}
+            colors={[COLORS.hotPink]}
+            tintColor={COLORS.hotPink}
+          />
+        }
+      >
+        {/* 1. Top Header Banner */}
+        <LinearGradient colors={GRADIENTS.navyHeader} style={styles.headerBanner}>
         <View style={styles.headerTop}>
           <View style={styles.headerLeftCol}>
             <View style={styles.badgeRow}>
@@ -1084,11 +1112,7 @@ export const LocationManagementScreen: React.FC = () => {
       </View>
 
       {/* 4. Main Content List */}
-      <ScrollView
-        style={styles.scrollArea}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={true}
-      >
+      <View style={styles.scrollContent}>
         {/* ================= VIEW: CITIES ================= */}
         {activeSubTab === 'Cities' && (
           <View>
@@ -1712,6 +1736,7 @@ export const LocationManagementScreen: React.FC = () => {
             )}
           </View>
         )}
+      </View>
       </ScrollView>
 
       {/* ================= MODAL: ADD / EDIT CITY ================= */}
@@ -2754,13 +2779,19 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontWeight: '700',
   },
+  mainScroll: {
+    flex: 1,
+  },
+  mainScrollContent: {
+    paddingBottom: 130,
+  },
   scrollArea: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 8,
-    paddingBottom: 30,
+    paddingBottom: 20,
   },
   sectionHeadingRow: {
     marginBottom: 10,

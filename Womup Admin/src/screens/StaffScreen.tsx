@@ -126,8 +126,14 @@ export const StaffScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* Top Segmented Controls & Cascading Filters */}
-      <View style={styles.topSection}>
+      <ScrollView
+        style={styles.mainScroll}
+        contentContainerStyle={styles.mainScrollContent}
+        showsVerticalScrollIndicator={true}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Top Segmented Controls & Cascading Filters */}
+        <View style={styles.topSection}>
         {/* Role Tabs */}
         <View style={styles.roleTabRow}>
           <TouchableOpacity
@@ -225,7 +231,7 @@ export const StaffScreen: React.FC = () => {
       </View>
 
       {/* Staff List */}
-      <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+      <View style={styles.listContent}>
         {filteredStaff.length === 0 ? (
           <View style={styles.emptyState}>
             <UserCheck size={40} color={COLORS.border} style={{ marginBottom: 10 }} />
@@ -299,6 +305,7 @@ export const StaffScreen: React.FC = () => {
             );
           })
         )}
+      </View>
       </ScrollView>
 
       {/* ================= MODAL: SELECT CITY ================= */}
@@ -613,12 +620,18 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontWeight: '700',
   },
+  mainScroll: {
+    flex: 1,
+  },
+  mainScrollContent: {
+    paddingBottom: 110,
+  },
   list: {
     flex: 1,
   },
   listContent: {
     padding: SPACING.md,
-    paddingBottom: 24,
+    paddingBottom: 20,
   },
   emptyState: {
     padding: SPACING.xl,
