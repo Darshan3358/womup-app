@@ -14,33 +14,12 @@ export interface AreaOption {
 }
 
 /**
- * Initial offline baseline (fallback before network or when offline).
- * As soon as the app starts, syncAreasFromBackend() replaces this with live MongoDB data.
+ * Live dynamic areas list. Initialized empty.
+ * Populated ONLY from:
+ * 1. Offline Storage Cache (StorageService.KEYS.AREAS)
+ * 2. Live MongoDB API (/location/areas)
  */
-const INITIAL_AREAS: AreaOption[] = [
-  { name: 'Prahlad Nagar', city: 'Ahmedabad', lat: 23.0125, lng: 72.5082, storeName: 'Wom Up Prahlad Nagar Dark Store', pincode: '380015' },
-  { name: 'Chandlodiya - Tragad', city: 'Ahmedabad', lat: 23.1288, lng: 72.5587, storeName: 'Wom Up Chandlodiya - Tragad Dark Store', pincode: '382481' },
-  { name: 'Chandlodia', city: 'Ahmedabad', lat: 23.1288, lng: 72.5587, storeName: 'Wom Up Chandlodiya - Tragad Dark Store', pincode: '382481' },
-  { name: 'Tragad', city: 'Ahmedabad', lat: 23.1288, lng: 72.5587, storeName: 'Wom Up Chandlodiya - Tragad Dark Store', pincode: '382470' },
-  { name: 'Ghatlodia', city: 'Ahmedabad', lat: 23.0750, lng: 72.5350, storeName: 'Wom Up Ghatlodia Dark Store', pincode: '380061' },
-  { name: 'Satellite', city: 'Ahmedabad', lat: 23.0304, lng: 72.5178, storeName: 'Wom Up Satellite Dark Store', pincode: '380015' },
-  { name: 'Navrangpura', city: 'Ahmedabad', lat: 23.0365, lng: 72.5611, storeName: 'Wom Up Navrangpura Dark Store', pincode: '380009' },
-  { name: 'Bopal', city: 'Ahmedabad', lat: 23.0336, lng: 72.4646, storeName: 'Wom Up Bopal Dark Store', pincode: '380058' },
-  { name: 'SG Highway', city: 'Ahmedabad', lat: 23.0300, lng: 72.5050, storeName: 'Wom Up SG Highway Dark Store', pincode: '380054' },
-  { name: 'Thaltej', city: 'Ahmedabad', lat: 23.0500, lng: 72.5160, storeName: 'Wom Up Thaltej Dark Store', pincode: '380059' },
-  { name: 'Vastrapur', city: 'Ahmedabad', lat: 23.0350, lng: 72.5293, storeName: 'Wom Up Vastrapur Dark Store', pincode: '380015' },
-  { name: 'Maninagar', city: 'Ahmedabad', lat: 22.9978, lng: 72.6033, storeName: 'Wom Up Maninagar Dark Store', pincode: '380008' },
-  { name: 'Paldi', city: 'Ahmedabad', lat: 23.0129, lng: 72.5632, storeName: 'Wom Up Paldi Dark Store', pincode: '380007' },
-  { name: 'Ramol', city: 'Ahmedabad', lat: 22.9850, lng: 72.6450, storeName: 'Wom Up Ramol Dark Store', pincode: '382449' },
-  { name: 'Hathijan / Vatva side', city: 'Ahmedabad', lat: 22.9650, lng: 72.6350, storeName: 'Wom Up Vatva Dark Store', pincode: '382440' },
-  { name: 'Lambha', city: 'Ahmedabad', lat: 22.9450, lng: 72.5950, storeName: 'Wom Up Lambha Dark Store', pincode: '382440' },
-  { name: 'Isanpur', city: 'Ahmedabad', lat: 22.9820, lng: 72.5980, storeName: 'Wom Up Isanpur Dark Store', pincode: '382443' },
-];
-
-/**
- * Live dynamic areas list. Mutated in-place so all external imports immediately see updates.
- */
-export const AHMEDABAD_AREAS: AreaOption[] = [...INITIAL_AREAS];
+export const AHMEDABAD_AREAS: AreaOption[] = [];
 
 let _isSyncing = false;
 let _hasLoadedFromStorage = false;
