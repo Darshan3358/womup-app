@@ -48,12 +48,6 @@ const MAX_FILE_SIZE_MB = 5;
 const DEFAULT_ALLOWED_EXTS = ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
 
 const getApiBaseUrl = () => {
-  if (typeof window !== 'undefined' && window.location) {
-    const host = window.location.hostname;
-    if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') {
-      return 'http://localhost:5050/api/v1';
-    }
-  }
   return 'https://womup-app-uquz.onrender.com/api/v1';
 };
 

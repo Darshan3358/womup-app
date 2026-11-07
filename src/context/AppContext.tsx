@@ -997,15 +997,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     const currentUserId = user?.id || (user as any)?._id || 'guest_user';
 
-    const isLocalWeb =
-      typeof window !== 'undefined' &&
-      (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1');
-
     const wsUrl =
       (process.env.EXPO_PUBLIC_API_URL
         ? process.env.EXPO_PUBLIC_API_URL.replace(/\/api\/v1\/?$/, '')
-        : isLocalWeb
-        ? 'http://localhost:5050'
         : 'https://womup-app-uquz.onrender.com') + '/tracking';
 
     const socket = io(wsUrl, {

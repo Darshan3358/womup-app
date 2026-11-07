@@ -57,7 +57,7 @@ export const OrderInspectorScreen: React.FC = () => {
   const fetchChat = useCallback(async () => {
     if (!cleanOrderId) return;
     try {
-      const res = await fetch(`http://localhost:5050/api/v1/chat/${encodeURIComponent(cleanOrderId)}/history`);
+      const res = await fetch(`https://womup-app-uquz.onrender.com/api/v1/chat/${encodeURIComponent(cleanOrderId)}/history`);
       if (res.ok) {
         const json = await res.json();
         if (json.data) {
@@ -81,7 +81,7 @@ export const OrderInspectorScreen: React.FC = () => {
 
     setIsSending(true);
     try {
-      const res = await fetch(`http://localhost:5050/api/v1/chat/${encodeURIComponent(cleanOrderId)}/send`, {
+      const res = await fetch(`https://womup-app-uquz.onrender.com/api/v1/chat/${encodeURIComponent(cleanOrderId)}/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

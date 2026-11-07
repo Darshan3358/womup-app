@@ -21,7 +21,7 @@ export interface UseFileUploadOptions {
 export function useFileUpload(options: UseFileUploadOptions = {}) {
   const {
     folder = 'womup/kyc',
-    backendBaseUrl = 'http://localhost:5050/api/v1',
+    backendBaseUrl = 'https://womup-app-uquz.onrender.com/api/v1',
     entityType,
     entityId,
     resourceType,

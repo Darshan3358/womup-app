@@ -35,10 +35,7 @@ export const PendingApprovalsWidget: React.FC = () => {
     // Real-time WebSocket updates (replaces 15-second continuous polling)
     let socket: any = null;
     try {
-      const socketUrl =
-        typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-          ? 'http://localhost:5050/tracking'
-          : 'https://womup-app-uquz.onrender.com/tracking';
+      const socketUrl = 'https://womup-app-uquz.onrender.com/tracking';
 
       socket = io(socketUrl, { transports: ['websocket'] });
       socket.on('approval_summary_updated', (updatedSummary: any) => {
@@ -69,7 +66,7 @@ export const PendingApprovalsWidget: React.FC = () => {
 
   const fetchSummary = async () => {
     try {
-      const res = await fetch('http://localhost:5050/api/v1/admin/approvals/summary');
+      const res = await fetch('https://womup-app-uquz.onrender.com/api/v1/admin/approvals/summary');
       if (res.ok) {
         const json = await res.json();
         if (json?.data) {

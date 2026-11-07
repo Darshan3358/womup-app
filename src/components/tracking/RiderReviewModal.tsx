@@ -70,7 +70,7 @@ export const RiderReviewModal: React.FC<RiderReviewModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      const res = await fetch(`http://localhost:5050/api/v1/orders/${encodeURIComponent(orderId)}/rate-rider`, {
+      const res = await fetch(`https://womup-app-uquz.onrender.com/api/v1/orders/${encodeURIComponent(orderId)}/rate-rider`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

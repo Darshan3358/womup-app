@@ -2,12 +2,6 @@ import { ApiService } from './api';
 import { Customer } from '../types/admin';
 
 const getNestApiBaseUrl = () => {
-  if (typeof window !== 'undefined' && window.location) {
-    const host = window.location.hostname;
-    if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') {
-      return 'http://localhost:5050/api/v1';
-    }
-  }
   return 'https://womup-app-uquz.onrender.com/api/v1';
 };
 
@@ -148,9 +142,7 @@ export const CustomerService = {
    */
   async getAreas(): Promise<Array<{ id: string; name: string }>> {
     try {
-      const adminBase = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-        ? 'http://localhost:5050'
-        : 'https://womup-app-uquz.onrender.com';
+      const adminBase = 'https://womup-app-uquz.onrender.com';
 
       let res = await fetch(`${adminBase}/api/admin/areas`).catch(() => null);
       if (!res || !res.ok) {

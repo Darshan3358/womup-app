@@ -55,10 +55,7 @@ export const ApprovalHubScreen: React.FC = () => {
     // WebSocket real-time updates (replaces redundant HTTP polling)
     let socket: any = null;
     try {
-      const socketUrl =
-        typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-          ? 'http://localhost:5050/tracking'
-          : 'https://womup-app-uquz.onrender.com/tracking';
+      const socketUrl = 'https://womup-app-uquz.onrender.com/tracking';
 
       socket = io(socketUrl, { transports: ['websocket'] });
       socket.on('approval_summary_updated', (updatedSummary: any) => {

@@ -21,9 +21,7 @@ const isLocalWeb =
   typeof window !== 'undefined' &&
   (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1');
 
-const API_BASE_URL = isLocalWeb
-  ? 'http://localhost:5050/api/v1'
-  : 'https://womup-app-uquz.onrender.com/api/v1';
+const API_BASE_URL = 'https://womup-app-uquz.onrender.com/api/v1';
 
 // Native-safe XHR multipart uploader (avoids Expo 57 / React Native 0.86 New Architecture WinterCG fetch FormData errors)
 function sendMultipartXhr(

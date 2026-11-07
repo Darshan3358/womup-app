@@ -1,10 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 
-const isLocalWeb =
-  typeof window !== 'undefined' &&
-  (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1');
-
-const SOCKET_URL = isLocalWeb ? 'http://localhost:5050/tracking' : 'https://womup-app-uquz.onrender.com/tracking';
+const SOCKET_URL = 'https://womup-app-uquz.onrender.com/tracking';
 
 class StoreSocketService {
   private socket: Socket | null = null;

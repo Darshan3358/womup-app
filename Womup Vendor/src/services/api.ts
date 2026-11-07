@@ -6,12 +6,6 @@ import {
 } from '../types/vendor';
 
 const getApiBaseUrl = () => {
-  if (typeof window !== 'undefined' && window.location) {
-    const host = window.location.hostname;
-    if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') {
-      return 'http://localhost:5050/api/v1';
-    }
-  }
   return 'https://womup-app-uquz.onrender.com/api/v1';
 };
 

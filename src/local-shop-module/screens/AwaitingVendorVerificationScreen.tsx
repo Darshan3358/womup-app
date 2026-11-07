@@ -106,8 +106,6 @@ export const AwaitingVendorVerificationScreen: React.FC<AwaitingVerificationProp
     const wsUrl =
       (process.env.EXPO_PUBLIC_API_URL
         ? process.env.EXPO_PUBLIC_API_URL.replace(/\/api\/v1\/?$/, '')
-        : isLocalWeb
-        ? 'http://localhost:5050'
         : 'https://womup-app-uquz.onrender.com') + '/tracking';
 
     const socket = io(wsUrl, {

@@ -79,7 +79,7 @@ export const S27_ChatModal: React.FC<S27_ChatModalProps> = ({
       setIsLoadingHistory(true);
       try {
         const cleanId = orderId.replace(/^#/, '');
-        const res = await fetch(`http://localhost:5050/api/v1/chat/${encodeURIComponent(cleanId)}/history`);
+        const res = await fetch(`https://womup-app-uquz.onrender.com/api/v1/chat/${encodeURIComponent(cleanId)}/history`);
         if (res.ok) {
           const json = await res.json();
           if (isMounted && json.data) {
@@ -176,7 +176,7 @@ export const S27_ChatModal: React.FC<S27_ChatModalProps> = ({
       });
     } else {
       // REST fallback
-      fetch(`http://localhost:5050/api/v1/chat/${encodeURIComponent(cleanId)}/send`, {
+      fetch(`https://womup-app-uquz.onrender.com/api/v1/chat/${encodeURIComponent(cleanId)}/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -287,7 +287,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
       if (!freshOrder && (orderId || orderNum)) {
         const targetQuery = (activeOrder as any)?._id || (orderNum && orderNum.replace(/^#/, '')) || orderNum || orderId;
         if (targetQuery && targetQuery !== 'W12345678') {
-          fetch(`http://localhost:5050/api/v1/orders/${encodeURIComponent(targetQuery)}`)
+          fetch(`https://womup-app-uquz.onrender.com/api/v1/orders/${encodeURIComponent(targetQuery)}`)
             .then((res) => res.json())
             .then((json) => {
               const fresh = json.data || json;
@@ -304,7 +304,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
       return;
     }
 
-    const socket = io('http://localhost:5050/tracking', {
+    const socket = io('https://womup-app-uquz.onrender.com/tracking', {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: 20,
@@ -459,7 +459,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
       if (!targetQuery || targetQuery === 'W12345678') return;
 
       try {
-        const res = await fetch(`http://localhost:5050/api/v1/orders/${encodeURIComponent(targetQuery)}`);
+        const res = await fetch(`https://womup-app-uquz.onrender.com/api/v1/orders/${encodeURIComponent(targetQuery)}`);
         if (res.ok) {
           const json = await res.json();
           const fresh = json.data || json;

@@ -7,8 +7,7 @@ const isLocalWeb =
   (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1');
 
 export const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL ||
-  (isLocalWeb ? 'http://localhost:5050/api/v1' : 'https://womup-app-uquz.onrender.com/api/v1');
+  process.env.EXPO_PUBLIC_API_URL || 'https://womup-app-uquz.onrender.com/api/v1';
 
 class ApiClient {
   private token: string | null = null;

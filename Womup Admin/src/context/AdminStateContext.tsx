@@ -558,12 +558,6 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     // Connect to NestJS authoritative WebSocket Tracking Gateway
     const getSocketUrl = () => {
-      if (typeof window !== 'undefined' && window.location) {
-        const host = window.location.hostname;
-        if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') {
-          return 'http://localhost:5050/tracking';
-        }
-      }
       return 'https://womup-app-uquz.onrender.com/tracking';
     };
 
@@ -963,7 +957,7 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }, 10000); // 10s maximum timeout
 
       try {
-        const res = await fetch(`http://localhost:5050/api/v1/sync-updates?since=${encodeURIComponent(lastCheckTime)}`, {
+        const res = await fetch(`https://womup-app-uquz.onrender.com/api/v1/sync-updates?since=${encodeURIComponent(lastCheckTime)}`, {
           signal: syncController.signal,
           headers: {
             'Accept': 'application/json',

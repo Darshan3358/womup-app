@@ -222,7 +222,7 @@ export const EditProductModal: React.FC = () => {
           setUploadingImage(true);
           const formData = new FormData();
           formData.append('file', file);
-          const res = await fetch('http://localhost:5050/api/v1/media/upload?folder=wormup/products', {
+          const res = await fetch('https://womup-app-uquz.onrender.com/api/v1/media/upload?folder=wormup/products', {
             method: 'POST',
             body: formData,
           });

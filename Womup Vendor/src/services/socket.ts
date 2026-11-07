@@ -2,12 +2,6 @@ import io, { Socket } from 'socket.io-client';
 import { CollectionRequest } from '../types/vendor';
 
 const getSocketUrl = () => {
-  if (typeof window !== 'undefined' && window.location) {
-    const host = window.location.hostname;
-    if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') {
-      return 'http://localhost:5050';
-    }
-  }
   return 'https://womup-app-uquz.onrender.com';
 };
 

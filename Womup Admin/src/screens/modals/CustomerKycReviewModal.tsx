@@ -99,7 +99,7 @@ export const CustomerKycReviewModal: React.FC<CustomerKycReviewModalProps> = ({
     const nextVal = !showAadhaar;
     setShowAadhaar(nextVal);
     if (nextVal && customerId) {
-      fetch(`http://localhost:5050/api/v1/admin/customers/${customerId}/reveal-sensitive`, {
+      fetch(`https://womup-app-uquz.onrender.com/api/v1/admin/customers/${customerId}/reveal-sensitive`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ field: 'aadhaar', purpose: 'Admin Review Modal' }),
@@ -111,7 +111,7 @@ export const CustomerKycReviewModal: React.FC<CustomerKycReviewModalProps> = ({
     const nextVal = !showBankAccount;
     setShowBankAccount(nextVal);
     if (nextVal && customerId) {
-      fetch(`http://localhost:5050/api/v1/admin/customers/${customerId}/reveal-sensitive`, {
+      fetch(`https://womup-app-uquz.onrender.com/api/v1/admin/customers/${customerId}/reveal-sensitive`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ field: 'bank_account', purpose: 'Admin Review Modal' }),

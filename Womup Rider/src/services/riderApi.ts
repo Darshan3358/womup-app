@@ -33,9 +33,7 @@ const isLocalWeb =
   typeof window !== 'undefined' &&
   (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1');
 
-const DEFAULT_API_URL = isLocalWeb
-  ? 'http://localhost:5050/api/v1'
-  : 'https://womup-app-uquz.onrender.com/api/v1';
+const DEFAULT_API_URL = 'https://womup-app-uquz.onrender.com/api/v1';
 
 interface BufferedHttpResponse {
   status: number;

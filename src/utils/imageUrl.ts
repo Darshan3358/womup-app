@@ -1,23 +1,6 @@
 import { Platform } from 'react-native';
 
 const getUploadsBaseUrl = (): string => {
-  if (typeof window !== 'undefined' && window.location) {
-    const host = window.location.hostname;
-    if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') {
-      return 'http://localhost:5050';
-    }
-  }
-
-  // React Native Native platforms (Android emulator vs iOS)
-  if (typeof Platform !== 'undefined') {
-    if (typeof __DEV__ !== 'undefined' && __DEV__) {
-      if (Platform.OS === 'android') {
-        return 'http://10.0.2.2:5050';
-      }
-      return 'http://localhost:5050';
-    }
-  }
-
   return 'https://womup-app-uquz.onrender.com';
 };
 

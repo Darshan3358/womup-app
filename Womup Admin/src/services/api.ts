@@ -31,28 +31,22 @@ import {
 } from '../types/admin';
 
 const getApiBaseUrl = () => {
-  if (typeof window !== 'undefined' && window.location) {
-    const host = window.location.hostname;
-    if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') {
-      return 'http://localhost:5050';
-    }
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL.replace(/\/api\/v1\/?$/, '');
   }
   return 'https://womup-app-uquz.onrender.com';
 };
 
-const API_BASE_URL = getApiBaseUrl();
+export const API_BASE_URL = getApiBaseUrl();
 
 const getNestApiBaseUrl = () => {
-  if (typeof window !== 'undefined' && window.location) {
-    const host = window.location.hostname;
-    if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0') {
-      return 'http://localhost:5050/api/v1';
-    }
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
   }
   return 'https://womup-app-uquz.onrender.com/api/v1';
 };
 
-const NEST_API_BASE_URL = getNestApiBaseUrl();
+export const NEST_API_BASE_URL = getNestApiBaseUrl();
 
 let cachedLiveSnapshot: LiveDbData | null = null;
 
