@@ -484,10 +484,15 @@ export const BlinkitHomeScreen: React.FC = () => {
           onPress={() => setLocationModalVisible(true)}
           style={styles.unserviceableBanner}
         >
-          <Ionicons name="warning" size={24} color="#EF4444" style={styles.unserviceableIcon} />
+          <Image
+            source={require('../../../assets/red_triangle_alert.png')}
+            style={styles.unserviceableIcon}
+            resizeMode="contain"
+          />
           <View style={styles.unserviceableTextWrap}>
-            <Text style={styles.unserviceableTitle}>
-              ⚠️ Sorry, WOMART is not serviceable in your area.
+            <Text style={styles.unserviceableTitle} numberOfLines={1}>
+              <Text style={styles.unserviceableMiniWarning}>▲ </Text>
+              Sorry, WOMART is not serviceable in your area.
             </Text>
             <Text style={styles.unserviceableSubtitle}>
               We are expanding soon! You can browse products, but ordering is disabled for unsupported locations.
@@ -540,39 +545,46 @@ const styles = StyleSheet.create({
   unserviceableBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF1F2',
+    backgroundColor: '#FFF0F3',
     borderWidth: 1,
     borderColor: '#FECDD3',
-    borderRadius: 16,
-    marginHorizontal: 16,
-    marginTop: 10,
+    borderRadius: 24,
+    marginHorizontal: 12,
+    marginTop: 8,
     marginBottom: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
     gap: 8,
   },
   unserviceableIcon: {
-    marginRight: 2,
+    width: 26,
+    height: 32,
   },
   unserviceableTextWrap: {
     flex: 1,
+    justifyContent: 'center',
   },
   unserviceableTitle: {
-    fontSize: 12.5,
+    fontSize: 12,
     fontWeight: '700',
     color: '#E11D48',
-    lineHeight: 16,
+    lineHeight: 15,
+  },
+  unserviceableMiniWarning: {
+    color: '#EAB308',
+    fontSize: 9,
+    fontWeight: '900',
   },
   unserviceableSubtitle: {
-    fontSize: 10.5,
+    fontSize: 10,
     fontWeight: '500',
-    color: '#6B7280',
-    marginTop: 2,
-    lineHeight: 14,
+    color: '#4B5563',
+    marginTop: 1,
+    lineHeight: 13,
   },
   megaphoneImage: {
-    width: 44,
-    height: 44,
+    width: 46,
+    height: 42,
   },
   festiveBannerWrapper: {
     maxWidth: 1440,
