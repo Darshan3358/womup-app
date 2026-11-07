@@ -108,7 +108,7 @@ export const AdminLoginScreen: React.FC = () => {
                 <Mail size={18} color="#94A3B8" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="admin@wormup.com or WORMUP001"
+                  placeholder="womupproducts@gmail.com or WORMUP001"
                   placeholderTextColor="#64748B"
                   value={identifier}
                   onChangeText={(val) => {

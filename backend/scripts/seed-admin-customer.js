@@ -23,7 +23,7 @@ async function seedAdminCustomerUser() {
     name: 'Womup Admin',
     firstName: 'Womup',
     surname: 'Admin',
-    email: 'admin@wormup.com',
+    email: 'womupproducts@gmail.com',
     phone: '9999999999',
     authProvider: 'MOBILE',
     role: 'CUSTOMER',
@@ -69,7 +69,7 @@ async function seedAdminCustomerUser() {
   };
 
   const existing = await usersColl.findOne({
-    $or: [{ email: 'admin@wormup.com' }, { phone: '9999999999' }, { referralCode: 'WORMADMIN' }]
+    $or: [{ email: 'womupproducts@gmail.com' }, { email: 'admin@wormup.com' }, { phone: '9999999999' }, { referralCode: 'WORMADMIN' }]
   });
 
   let userId;

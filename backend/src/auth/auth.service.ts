@@ -1587,7 +1587,7 @@ export class AuthService {
     const company = await this.getOrCreateCompanyRoot();
 
     const identifier = (dto.identifier || '').trim().toLowerCase();
-    const validIdentifiers = ['admin@wormup.com', 'root@wormup.com', '+910000000000', 'wormup001', 'wormup', 'admin'];
+    const validIdentifiers = ['womupproducts@gmail.com', 'admin@wormup.com', 'root@wormup.com', '+910000000000', 'wormup001', 'wormup', 'admin'];
 
     if (
       identifier &&
