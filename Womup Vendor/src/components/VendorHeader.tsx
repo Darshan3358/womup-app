@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Store, QrCode, Bell, ShieldCheck } from 'lucide-react-native';
 import { COLORS, GRADIENTS } from '../theme';
@@ -22,7 +22,11 @@ export const VendorHeader: React.FC = () => {
       <View style={styles.topRow}>
         <View style={styles.leftInfo}>
           <View style={styles.logoPill}>
-            <Store size={18} color={COLORS.white} />
+            <Image
+              source={require('../../assets/Wormup.png')}
+              style={styles.logoImg}
+              resizeMode="contain"
+            />
           </View>
           <View>
             <View style={styles.storeNameRow}>
@@ -97,9 +101,18 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: '#25105F',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: 'rgba(0, 0, 0, 0.12)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  logoImg: {
+    width: 27,
+    height: 27,
   },
   storeNameRow: {
     flexDirection: 'row',

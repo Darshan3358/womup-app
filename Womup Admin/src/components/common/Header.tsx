@@ -57,11 +57,13 @@ export const Header: React.FC<HeaderProps> = ({ title, showBack, onBack }) => {
         <View style={styles.content}>
           {/* Left Brand Identity: Logo + WomUp + Admin Panel */}
           <TouchableOpacity style={styles.dashboardBrandRow} onPress={toggleSidebar} activeOpacity={0.8}>
-            <Image
-              source={require('../../../assets/womup_logo.png')}
-              style={styles.dashboardLogoImage}
-              resizeMode="contain"
-            />
+            <View style={styles.logoBadgeContainer}>
+              <Image
+                source={require('../../../assets/Wormup.png')}
+                style={styles.dashboardLogoImage}
+                resizeMode="contain"
+              />
+            </View>
             <View style={styles.dashboardBrandTextCol}>
               <Text style={styles.dashboardBrandName}>WomUp</Text>
               <Text style={styles.dashboardBrandSub}>Admin Panel</Text>
@@ -115,11 +117,13 @@ export const Header: React.FC<HeaderProps> = ({ title, showBack, onBack }) => {
           </TouchableOpacity>
         ) : (
           <TouchableOpacity style={styles.logoRow} onPress={toggleSidebar} activeOpacity={0.8}>
-            <Image
-              source={require('../../../assets/womup_logo.png')}
-              style={styles.logoImage}
-              resizeMode="contain"
-            />
+            <View style={styles.logoBadgeContainer}>
+              <Image
+                source={require('../../../assets/Wormup.png')}
+                style={styles.dashboardLogoImage}
+                resizeMode="contain"
+              />
+            </View>
             <Text style={styles.brandTitle}>Womup</Text>
           </TouchableOpacity>
         )}
@@ -267,10 +271,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  dashboardLogoImage: {
-    width: 36,
-    height: 36,
+  logoBadgeContainer: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#25105F',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: 10,
+    shadowColor: 'rgba(0, 0, 0, 0.12)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  dashboardLogoImage: {
+    width: 27,
+    height: 27,
   },
   dashboardBrandTextCol: {
     justifyContent: 'center',

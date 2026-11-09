@@ -1,10 +1,9 @@
 import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from '../../context/StoreContext';
 import { CurrentTab } from '../../types/store.types';
-import { COLORS } from '../../theme/colors';
 
 interface TabItem {
   id: CurrentTab;
@@ -17,7 +16,7 @@ interface TabItem {
 export const BottomNav: React.FC = () => {
   const { currentTab, setCurrentTab, setSubScreen, incomingOrders, pickingOrders } = useStore();
   const insets = useSafeAreaInsets();
-  const bottomPadding = Math.max(insets.bottom, 6);
+  const bottomPadding = Math.max(insets.bottom, 10);
 
   const tabs: TabItem[] = [
     {
@@ -59,75 +58,115 @@ export const BottomNav: React.FC = () => {
   };
 
   return (
-    <View style={[styles.navContainer, { height: 58 + bottomPadding, paddingBottom: bottomPadding }]}>
-      {tabs.map((tab) => {
-        const isActive = currentTab === tab.id;
-        return (
-          <TouchableOpacity
-            key={tab.id}
-            style={styles.tabBtn}
-            onPress={() => handleTabPress(tab.id)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.iconContainer}>
-              <Ionicons
-                name={isActive ? tab.activeIcon : tab.icon}
-                size={22}
-                color={isActive ? '#FF3B98' : '#64748B'}
-              />
-              {Boolean(tab.badge && tab.badge > 0) && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>
-                    {tab.badge! > 99 ? '99+' : tab.badge}
-                  </Text>
-                </View>
-              )}
-            </View>
-            <Text
-              style={[
-                styles.tabLabel,
-                {
-                  color: isActive ? '#FF3B98' : '#64748B',
-                  fontWeight: isActive ? '800' : '500',
-                },
-              ]}
+    <View
+      style={[styles.outerWrapper, { paddingBottom: bottomPadding }]}
+      pointerEvents="box-none"
+    >
+      <View style={styles.navContainer} pointerEvents="auto">
+        {tabs.map((tab) => {
+          const isActive = currentTab === tab.id;
+          const activeColor = '#F20B87';
+          const inactiveColor = '#657493';
+          const labelColor = isActive ? activeColor : inactiveColor;
+
+          return (
+            <TouchableOpacity
+              key={tab.id}
+              style={styles.tabBtn}
+              onPress={() => handleTabPress(tab.id)}
+              activeOpacity={0.7}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isActive }}
+              accessibilityLabel={`${tab.label} tab`}
             >
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
+              <View style={styles.iconContainer}>
+                <Ionicons
+                  name={isActive ? tab.activeIcon : tab.icon}
+                  size={22}
+                  color={isActive ? activeColor : '#8886AE'}
+                />
+                {Boolean(tab.badge && tab.badge > 0) && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>
+                      {tab.badge! > 99 ? '99+' : tab.badge}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <Text
+                style={[
+                  styles.tabLabel,
+                  { color: labelColor },
+                  isActive && styles.activeTabLabel,
+                ]}
+                numberOfLines={1}
+              >
+                {tab.label}
+              </Text>
+              {isActive && <View style={styles.activeBar} />}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  outerWrapper: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 99,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 16,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   navContainer: {
     flexDirection: 'row',
     backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
+    borderRadius: 36,
     alignItems: 'center',
     justifyContent: 'space-around',
-    paddingHorizontal: 8,
-    shadowColor: '#071B52',
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    height: 66,
+    width: '100%',
+    maxWidth: 480,
+    borderWidth: 1.5,
+    borderColor: 'rgba(242, 11, 135, 0.12)',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#4327C9',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.12,
+        shadowRadius: 16,
+      },
+      android: {
+        elevation: 8,
+      },
+      web: {
+        boxShadow: '0 8px 24px rgba(67, 39, 201, 0.12), 0 2px 6px rgba(0, 0, 0, 0.04)',
+      } as any,
+    }),
   },
   tabBtn: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
     height: '100%',
+    position: 'relative',
+    paddingBottom: 2,
   },
   iconContainer: {
-    position: 'relative',
-    width: 26,
-    height: 26,
     alignItems: 'center',
     justifyContent: 'center',
+    height: 26,
+    marginBottom: 2,
+    position: 'relative',
   },
   badge: {
     position: 'absolute',
@@ -136,10 +175,10 @@ const styles = StyleSheet.create({
     minWidth: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: '#FF3B98',
+    backgroundColor: '#F20B87',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 3,
     borderWidth: 1.5,
     borderColor: '#FFFFFF',
   },
@@ -149,8 +188,21 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   tabLabel: {
-    fontSize: 10,
-    marginTop: 2,
-    letterSpacing: 0.2,
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 1,
+    letterSpacing: -0.2,
+  },
+  activeTabLabel: {
+    fontWeight: '800',
+    color: '#F20B87',
+  },
+  activeBar: {
+    position: 'absolute',
+    bottom: -2,
+    width: 24,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: '#F20B87',
   },
 });

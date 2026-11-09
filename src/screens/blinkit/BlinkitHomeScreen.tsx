@@ -48,6 +48,7 @@ export const BlinkitHomeScreen: React.FC = () => {
     requestLocationPermissionAndDetect,
     catalogVersion,
     blinkitCart,
+    blinkitCartCount,
   } = useApp();
 
   // Direct app open: Request location permission & detect location once on initial mount
@@ -292,6 +293,7 @@ export const BlinkitHomeScreen: React.FC = () => {
             onViewAll={() => setActiveScreen('C15_ProductListing')}
             viewAllText="View All"
             isLoading={isLoading}
+            cartCount={blinkitCartCount}
           />
         );
       case 'fast_delivery':
@@ -305,6 +307,7 @@ export const BlinkitHomeScreen: React.FC = () => {
             onViewAll={() => setActiveScreen('C15_ProductListing')}
             viewAllText="View All"
             isLoading={isLoading}
+            cartCount={blinkitCartCount}
           />
         );
       case 'banner_veggies':
@@ -334,6 +337,7 @@ export const BlinkitHomeScreen: React.FC = () => {
             onViewAll={() => handleSelectCategory('Vegetables & Fruits', 'c1')}
             viewAllText="View All"
             isLoading={isLoading}
+            cartCount={blinkitCartCount}
           />
         );
       case 'bestsellers':
@@ -347,6 +351,7 @@ export const BlinkitHomeScreen: React.FC = () => {
             onViewAll={() => setActiveScreen('C15_ProductListing')}
             viewAllText="View All"
             isLoading={isLoading}
+            cartCount={blinkitCartCount}
           />
         );
       case 'banner_dairy':
@@ -376,6 +381,7 @@ export const BlinkitHomeScreen: React.FC = () => {
             onViewAll={() => handleSelectCategory('Dairy, Bread & Eggs', 'c3')}
             viewAllText="View All"
             isLoading={isLoading}
+            cartCount={blinkitCartCount}
           />
         );
       case 'popular_brands':
@@ -396,6 +402,7 @@ export const BlinkitHomeScreen: React.FC = () => {
             onViewAll={() => setActiveScreen('C15_ProductListing')}
             viewAllText="View All"
             isLoading={isLoading}
+            cartCount={blinkitCartCount}
           />
         );
       case 'under_50':
@@ -409,6 +416,7 @@ export const BlinkitHomeScreen: React.FC = () => {
             onViewAll={() => setActiveScreen('C15_ProductListing')}
             viewAllText="View All"
             isLoading={isLoading}
+            cartCount={blinkitCartCount}
           />
         );
       default:
@@ -416,7 +424,8 @@ export const BlinkitHomeScreen: React.FC = () => {
     }
   }, [dealsList, fastDeliveryList, freshVegFruitsList, bestsellersList,
       dairyBreadEggsList, newArrivalsList, under50List, isLoading,
-      handleOpenProductDetail, handleSelectCategory, navigateToProductListing, setActiveScreen]);
+      handleOpenProductDetail, handleSelectCategory, navigateToProductListing, setActiveScreen,
+      blinkitCart, blinkitCartCount]);
 
   const ListHeader = useMemo(() => (
     <>
@@ -442,7 +451,7 @@ export const BlinkitHomeScreen: React.FC = () => {
           <Image
             source={require('../../../assets/banners/diwali_ready_banner.png')}
             style={styles.festiveBannerImage}
-            resizeMode="cover"
+            resizeMode="contain"
           />
         </TouchableOpacity>
       </View>
@@ -490,8 +499,8 @@ export const BlinkitHomeScreen: React.FC = () => {
             resizeMode="contain"
           />
           <View style={styles.unserviceableTextWrap}>
-            <Text style={styles.unserviceableTitle} numberOfLines={1}>
-              <Text style={styles.unserviceableMiniWarning}>▲ </Text>
+            <Text style={styles.unserviceableTitle}>
+              <Text style={styles.unserviceableMiniWarning}>⚠️ </Text>
               Sorry, WOMART is not serviceable in your area.
             </Text>
             <Text style={styles.unserviceableSubtitle}>
@@ -515,6 +524,7 @@ export const BlinkitHomeScreen: React.FC = () => {
         ListHeaderComponent={ListHeader}
         ListFooterComponent={ListFooter}
         showsVerticalScrollIndicator={false}
+        style={styles.flatListStyle}
         contentContainerStyle={styles.listContent}
         initialNumToRender={3}
         maxToRenderPerBatch={2}
@@ -531,13 +541,18 @@ export const BlinkitHomeScreen: React.FC = () => {
 const styles = StyleSheet.create({
   mainContainer: {
     flex: 1,
-    backgroundColor: '#FAFBFE',
+    backgroundColor: '#FEF7FF',
     width: '100%',
     maxWidth: '100%',
     minHeight: 0,
     overflow: 'hidden',
   },
+  flatListStyle: {
+    backgroundColor: '#FEF7FF',
+    flex: 1,
+  },
   listContent: {
+    backgroundColor: '#FEF7FF',
     paddingBottom: 110,
     width: '100%',
     maxWidth: '100%',
@@ -545,45 +560,45 @@ const styles = StyleSheet.create({
   unserviceableBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF0F3',
-    borderWidth: 1,
-    borderColor: '#FECDD3',
-    borderRadius: 24,
-    marginHorizontal: 12,
+    backgroundColor: '#FFF5F8',
+    borderWidth: 1.5,
+    borderColor: '#FBCFE8',
+    borderRadius: 20,
+    marginHorizontal: 10,
     marginTop: 8,
-    marginBottom: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    gap: 8,
+    marginBottom: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    gap: 10,
   },
   unserviceableIcon: {
-    width: 26,
+    width: 32,
     height: 32,
   },
   unserviceableTextWrap: {
     flex: 1,
     justifyContent: 'center',
+    paddingRight: 2,
   },
   unserviceableTitle: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     color: '#E11D48',
-    lineHeight: 15,
+    lineHeight: 17,
+    letterSpacing: -0.2,
   },
   unserviceableMiniWarning: {
-    color: '#EAB308',
-    fontSize: 9,
-    fontWeight: '900',
+    fontSize: 13,
   },
   unserviceableSubtitle: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '500',
     color: '#4B5563',
-    marginTop: 1,
-    lineHeight: 13,
+    marginTop: 3,
+    lineHeight: 15,
   },
   megaphoneImage: {
-    width: 46,
+    width: 54,
     height: 42,
   },
   festiveBannerWrapper: {

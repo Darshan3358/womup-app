@@ -67,12 +67,20 @@ export class StoreAuthController {
     return this.storeAuthService.getMe(req.user.id);
   }
 
-  @Patch('me/shift')
+  @Patch(['me/shift', 'shift'])
+  @Post(['me/shift', 'shift'])
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Toggle ON/OFF shift duty status' })
-  async updateShift(@Request() req: any, @Body() dto: UpdateShiftDto) {
-    return this.storeAuthService.updateShift(req.user.id, dto.isOnShift);
+  async updateShift(@Request() req: any, @Body() dto: any) {
+    const targetId =
+      req?.user?.id ||
+      req?.user?.storeId ||
+      req?.headers?.['x-store-id'] ||
+      req?.headers?.['x-store-code'] ||
+      dto?.storeId ||
+      dto?.storeCode;
+    return this.storeAuthService.updateShift(targetId, dto?.isOnShift);
   }
 
   @Get('me/performance')

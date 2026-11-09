@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 586 149" width="586" height="149">
+  <defs>
+    <linearGradient id="pinkWave1" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#FEF7FF" />
+      <stop offset="30%" stop-color="#FCE4F5" />
+      <stop offset="70%" stop-color="#F8B9E5" />
+      <stop offset="100%" stop-color="#FCE4F5" />
+    </linearGradient>
+    <linearGradient id="pinkWave2" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#FCE4F5" stop-opacity="0.6" />
+      <stop offset="40%" stop-color="#F8B9E5" stop-opacity="0.9" />
+      <stop offset="80%" stop-color="#F58BD3" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#FCE4F5" stop-opacity="0.6" />
+    </linearGradient>
+    <filter id="capsuleShadow" x="-5%" y="-10%" width="110%" height="130%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#D89ACD" flood-opacity="0.28" />
+    </filter>
+  </defs>
+
+  <!-- Layer 1: Upper Soft Pink Wave -->
+  <path d="M 0,38 C 120,18 240,55 380,32 C 460,18 520,10 586,24 L 586,149 L 0,149 Z" fill="url(#pinkWave1)" />
+
+  <!-- Layer 2: Middle Vibrant Wave -->
+  <path d="M 0,55 C 140,32 260,65 410,28 C 480,8 530,16 586,38 L 586,149 L 0,149 Z" fill="url(#pinkWave2)" />
+
+  <!-- Layer 3: Floating White Capsule with Raised Arch -->
+  <path d="M 10,86 C 10,58 28,37 54,37 L 452,37 C 464,37 472,20 488,8 C 498,0 514,0 524,8 C 540,20 548,37 560,37 C 572,37 576,58 576,86 C 576,114 562,136 536,136 L 50,136 C 22,136 10,114 10,86 Z" fill="#FFFFFF" filter="url(#capsuleShadow)" />
+</svg>

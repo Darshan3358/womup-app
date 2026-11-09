@@ -1090,6 +1090,53 @@ export class RiderApiService {
     }
   }
 
+  // --- NEAREST HUB RESOLVER ---
+  static async getNearestHub(latitude: number, longitude: number): Promise<{
+    success: boolean;
+    storeId?: string;
+    storeName?: string;
+    storeCode?: string;
+    address?: string;
+    distanceKm?: number;
+    message?: string;
+  }> {
+    const headers = await this.getAuthHeader();
+    try {
+      const res = await this.resilientFetch(
+        `${this.getApiBaseUrl()}/delivery/nearest-hub`,
+        {
+          method: 'POST',
+          headers: {
+            ...headers,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ latitude, longitude }),
+        },
+        8000
+      );
+
+      if (res.ok) {
+        const json = await res.json();
+        const data = this.unwrapData<any>(json) || json;
+        if (data && typeof data.success === 'boolean') {
+          return data;
+        }
+        return { success: true, ...data };
+      }
+
+      const errJson = await res.json().catch(() => ({}));
+      return {
+        success: false,
+        message: errJson?.message || 'No active dark store found within 10km of your location.',
+      };
+    } catch (e: any) {
+      return {
+        success: false,
+        message: e?.message || 'Network error checking nearby hub.',
+      };
+    }
+  }
+
   // --- SETTLEMENTS & PAYOUTS ---
   static async getRiderWallet(): Promise<{
     balance: number;

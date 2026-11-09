@@ -77,11 +77,76 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
   server: Server;
 
   handleConnection(client: Socket) {
-    this.logger.log(`Client connected to real-time tracking: ${client.id}`);
+    try {
+      const auth = client.handshake?.auth || {};
+      const query = (client.handshake?.query || {}) as Record<string, any>;
+      const role = String(auth.role || query.role || '').toUpperCase();
+      const id = String(
+        auth.id ||
+        auth.userId ||
+        auth.storeId ||
+        auth.riderId ||
+        auth.vendorId ||
+        query.id ||
+        query.userId ||
+        query.storeId ||
+        query.riderId ||
+        query.vendorId ||
+        ''
+      );
+
+      if (role === 'CUSTOMER' && id) {
+        client.join(`user_${id}`);
+        client.join(`user:${id}`);
+      } else if (role === 'STORE' && id) {
+        client.join(`store_${id}`);
+        client.join(`store:${id}`);
+      } else if (role === 'RIDER' && id) {
+        client.join(`rider_${id}`);
+        client.join(`rider:${id}`);
+      } else if (role === 'ADMIN') {
+        client.join('admin');
+      } else if (role === 'VENDOR' && id) {
+        client.join(`vendor_${id}`);
+        client.join(`vendor:${id}`);
+      }
+
+      this.logger.log(`Client ${client.id} connected (role=${role || 'ANON'}, id=${id || 'N/A'})`);
+    } catch (e: any) {
+      this.logger.log(`Client connected to real-time tracking: ${client.id}`);
+    }
   }
 
   handleDisconnect(client: Socket) {
     this.logger.log(`Client disconnected from tracking: ${client.id}`);
+  }
+
+  @SubscribeMessage('auth_scope')
+  @SubscribeMessage('join_role_room')
+  handleAuthScope(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { role?: string; id?: string; userId?: string; storeId?: string; riderId?: string; vendorId?: string },
+  ) {
+    const role = String(payload?.role || '').toUpperCase();
+    const id = String(payload?.id || payload?.userId || payload?.storeId || payload?.riderId || payload?.vendorId || '');
+
+    if (role === 'CUSTOMER' && id) {
+      client.join(`user_${id}`);
+      client.join(`user:${id}`);
+    } else if (role === 'STORE' && id) {
+      client.join(`store_${id}`);
+      client.join(`store:${id}`);
+    } else if (role === 'RIDER' && id) {
+      client.join(`rider_${id}`);
+      client.join(`rider:${id}`);
+    } else if (role === 'ADMIN') {
+      client.join('admin');
+    } else if (role === 'VENDOR' && id) {
+      client.join(`vendor_${id}`);
+      client.join(`vendor:${id}`);
+    }
+
+    return { success: true, role, id, rooms: Array.from(client.rooms) };
   }
 
   @SubscribeMessage('join_order')

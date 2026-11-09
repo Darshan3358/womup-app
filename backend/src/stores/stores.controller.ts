@@ -66,6 +66,29 @@ export class StoresController {
     };
   }
 
+  @Post(['rider/nearest-hub', 'delivery/nearest-hub', 'stores/nearest-hub'])
+  @ApiOperation({ summary: 'Find nearest active dark store hub for rider GPS within 10km radius' })
+  async getNearestHubPost(
+    @Body() body: { latitude?: number; longitude?: number; lat?: number; lng?: number },
+  ) {
+    const lat = Number(body?.latitude ?? body?.lat);
+    const lng = Number(body?.longitude ?? body?.lng);
+    return this.storesService.getNearestHubForRider(lat, lng, 10);
+  }
+
+  @Get(['rider/nearest-hub', 'delivery/nearest-hub', 'stores/nearest-hub'])
+  @ApiOperation({ summary: 'Find nearest active dark store hub for rider GPS via GET' })
+  async getNearestHubGet(
+    @Query('lat') latQ?: string,
+    @Query('lng') lngQ?: string,
+    @Query('latitude') latQ2?: string,
+    @Query('longitude') lngQ2?: string,
+  ) {
+    const lat = Number(latQ ?? latQ2);
+    const lng = Number(lngQ ?? lngQ2);
+    return this.storesService.getNearestHubForRider(lat, lng, 10);
+  }
+
   // ── Admin Store Approval Endpoints ──
   @Get('admin/stores')
   @ApiOperation({ summary: 'List all dark stores with status and search filters' })

@@ -86,6 +86,7 @@ interface RiderContextType {
   currentLocation: LocationCoordinates | null;
   detectedHubName: string | null;
   detectedAddress: string | null;
+  locationError: string | null;
   availableHubs: HubLocation[];
   detectLocation: () => Promise<void>;
   setSimulatedHub: (hub: HubLocation) => Promise<void>;
@@ -168,6 +169,7 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [currentLocation, setCurrentLocation] = useState<LocationCoordinates | null>(null);
   const [detectedHubName, setDetectedHubName] = useState<string | null>(null);
   const [detectedAddress, setDetectedAddress] = useState<string | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const availableHubs = AHMEDABAD_HUBS;
   const [settlementSummary, setSettlementSummary] = useState<SettlementSummary | null>(null);
   const [bankAccount, setBankAccount] = useState<RiderBankAccount | null>(null);
@@ -305,31 +307,32 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const detectLocation = useCallback(async () => {
     try {
-      let coords = await LocationTrackerService.detectRealGps();
+      const coords = await LocationTrackerService.detectRealGps();
       if (!coords) {
-        // Auto-detect fallback: use saved hub or default Chandlodiya Dark Store Hub
-        const savedHubRaw = await AsyncStorage.getItem('@womup_rider_selected_hub');
-        let hub = AHMEDABAD_HUBS[0];
-        if (savedHubRaw) {
-          try {
-            hub = JSON.parse(savedHubRaw);
-          } catch {}
-        }
-        coords = await LocationTrackerService.setSimulatedLocation(hub.latitude, hub.longitude);
+        setDetectedHubName(null);
+        setDetectedAddress(null);
+        setLocationError('GPS permission denied or location unavailable. Please enable device GPS.');
+        return;
       }
-      if (coords) {
-        setCurrentLocation(coords);
-        const nearest = LocationTrackerService.getNearestHub(coords.latitude, coords.longitude);
-        setDetectedHubName(`${nearest.hub.name} (${nearest.distanceKm} km away)`);
-        const addr = await LocationTrackerService.getAddressForCoords(coords.latitude, coords.longitude);
-        setDetectedAddress(addr);
-        await AsyncStorage.setItem('@womup_rider_selected_hub', JSON.stringify(nearest.hub));
+
+      setCurrentLocation(coords);
+
+      // Dynamic Nearest Hub Resolver from Backend
+      const res = await RiderApiService.getNearestHub(coords.latitude, coords.longitude);
+      if (res && res.success && res.storeName) {
+        const distStr = res.distanceKm != null ? `${res.distanceKm} km away` : '';
+        setDetectedHubName(distStr ? `${res.storeName} (${distStr})` : res.storeName);
+        setDetectedAddress(res.address || (distStr ? `${distStr} from your location` : 'Active Dark Store'));
+        setLocationError(null);
+      } else {
+        setDetectedHubName(null);
+        setDetectedAddress(null);
+        setLocationError(res?.message || 'No active dark store found within 10 km of your location.');
       }
-      // B-04 fix: removed refreshAvailableJobs() call here.
-      // Job list is now refreshed independently by the dashboard's duty-aware polling
-      // so that every GPS tick does NOT trigger a backend API request.
-    } catch {
-      // non-fatal
+    } catch (err: any) {
+      setDetectedHubName(null);
+      setDetectedAddress(null);
+      setLocationError(err?.message || 'GPS location error. Please check your connection.');
     }
   }, []);
 
@@ -1124,6 +1127,7 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         currentLocation,
         detectedHubName,
         detectedAddress,
+        locationError,
         availableHubs,
         detectLocation,
         setSimulatedHub,

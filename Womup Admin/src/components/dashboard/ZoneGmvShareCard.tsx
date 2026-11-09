@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { MapPin, ArrowRight } from 'lucide-react-native';
 import Svg, { Circle, G, Path, Rect, Line } from 'react-native-svg';
 
@@ -16,17 +16,17 @@ interface ZoneGmvShareCardProps {
 
 export const ZoneGmvShareCard: React.FC<ZoneGmvShareCardProps> = ({
   shares = [
-    { name: 'Ahmedabad', percentage: 78, color: '#762DEB' },
-    { name: 'Surat', percentage: 12, color: '#268BFA' },
+    { name: 'Ahmedabad', percentage: 0, color: '#762DEB' },
+    { name: 'Surat', percentage: 0, color: '#268BFA' },
     { name: 'Vadodara', percentage: 10, color: '#FF922E' },
   ],
   onViewAll,
 }) => {
   // Use real data items
   const items = shares.length > 0 ? shares : [
-    { name: 'Ahmedabad', percentage: 78, color: '#762DEB' },
-    { name: 'Surat', percentage: 12, color: '#268BFA' },
-    { name: 'Vadodara', percentage: 10, color: '#FF922E' },
+    { name: 'Ahmedabad', percentage: 0, color: '#762DEB' },
+    { name: 'Surat', percentage: 0, color: '#268BFA' },
+    { name: 'Vadodara', percentage: 0, color: '#FF922E' },
   ];
 
   const topArea = items[0] || { name: 'Ahmedabad', percentage: 78 };
@@ -88,7 +88,7 @@ export const ZoneGmvShareCard: React.FC<ZoneGmvShareCardProps> = ({
             />
 
             {/* Rotated group to start from 12 o'clock */}
-            <G rotation="-90" origin="55, 55">
+            <G transform="rotate(-90 55 55)">
               {segments.map((seg, idx) => (
                 <Circle
                   key={idx}
@@ -127,36 +127,13 @@ export const ZoneGmvShareCard: React.FC<ZoneGmvShareCardProps> = ({
         </View>
       </View>
 
-      {/* Faint Ahmedabad-inspired architectural skyline silhouette at bottom-right */}
+      {/* Ahmedabad architectural heritage skyline in bottom-right corner */}
       <View style={styles.skylineWrapper} pointerEvents="none">
-        <Svg width={160} height={60} viewBox="0 0 160 60" fill="none">
-          {/* Subtle domes, minarets, and heritage arches in pale lavender line art */}
-          {/* Base ground line */}
-          <Path d="M 0 58 L 160 58" stroke="#E0D4F5" strokeWidth="1" opacity={0.6} />
-
-          {/* Heritage Arch building */}
-          <Rect x="20" y="32" width="28" height="26" fill="#F3ECFC" opacity={0.4} />
-          <Path d="M 26 58 L 26 44 Q 34 36 42 44 L 42 58 Z" fill="#E8DCF8" opacity={0.5} />
-
-          {/* Dome pavilion */}
-          <Rect x="54" y="24" width="22" height="34" fill="#F3ECFC" opacity={0.35} />
-          <Path d="M 52 24 Q 65 10 78 24 Z" fill="#E4D6F6" opacity={0.45} />
-          <Circle cx="65" cy="8" r="2" fill="#D4C2F2" opacity={0.5} />
-
-          {/* Tower / Minaret */}
-          <Rect x="82" y="14" width="8" height="44" fill="#EAE0FA" opacity={0.45} />
-          <Path d="M 80 14 Q 86 6 92 14 Z" fill="#D8C5F5" opacity={0.55} />
-          <Line x1="86" y1="6" x2="86" y2="2" stroke="#CBB4F0" strokeWidth="1" opacity={0.6} />
-
-          {/* Clock tower / Sidi Saiyyed inspired arch facade */}
-          <Rect x="96" y="22" width="30" height="36" fill="#F0E6FB" opacity={0.38} />
-          <Path d="M 104 36 Q 111 26 118 36 Z" fill="#E0D2F6" opacity={0.5} />
-          <Rect x="109" y="16" width="4" height="6" fill="#D2C0F2" opacity={0.5} />
-
-          {/* Far right minaret */}
-          <Rect x="134" y="18" width="6" height="40" fill="#E8DCF8" opacity={0.4} />
-          <Path d="M 132 18 Q 137 10 142 18 Z" fill="#D6C4F4" opacity={0.5} />
-        </Svg>
+        <Image
+          source={require('../../../assets/building.png')}
+          style={styles.skylineImage}
+          resizeMode="contain"
+        />
       </View>
     </View>
   );
@@ -274,6 +251,11 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 1,
-    opacity: 0.85,
+    overflow: 'hidden',
+  },
+  skylineImage: {
+    width: 170,
+    height: 67,
+    opacity: 0.9,
   },
 });

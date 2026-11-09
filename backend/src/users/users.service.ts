@@ -1087,8 +1087,8 @@ export class UsersService {
   async distributeKycRewards(user: any) {
     const TIERS = [
       { level: 1, appIncome: 20, coinIncome: 400 },
-      { level: 2, appIncome: 10, coinIncome: 400 },
-      { level: 3, appIncome: 5,  coinIncome: 300 },
+      { level: 2, appIncome: 10, coinIncome: 300 },
+      { level: 3, appIncome: 5,  coinIncome: 200 },
     ];
 
     let currentSponsorId: Types.ObjectId | undefined = user.referredBy || (user.isCompanySponsored ? undefined : user.sponsorId);

@@ -916,24 +916,6 @@ export const BlinkitMoneyScreen: React.FC = () => {
             </View>
           </View>
 
-          {/* Primary CTA: Add Money (Signature Worm Up Gradient Button) */}
-          <TouchableOpacity
-            activeOpacity={0.88}
-            onPress={() => setAddMoneyModalVisible(true)}
-            style={styles.addMoneyBtnWrapper}
-            accessibilityLabel="Add Money to Womup Wallet"
-          >
-            <LinearGradient
-              colors={GRADIENTS.primary}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.addMoneyBtnGradient}
-            >
-              <Ionicons name="wallet-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-              <Text style={styles.addMoneyBtnText}>Add Money</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-
           {/* Claim Gift Card Card */}
           <TouchableOpacity
             activeOpacity={0.85}

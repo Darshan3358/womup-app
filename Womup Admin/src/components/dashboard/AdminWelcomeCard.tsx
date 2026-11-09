@@ -1,8 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Calendar, ChevronRight, Check } from 'lucide-react-native';
-import Svg, { Path, Circle, Rect } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import { GRADIENTS } from '../../theme';
 
 interface AdminWelcomeCardProps {
@@ -42,51 +42,11 @@ export const AdminWelcomeCard: React.FC<AdminWelcomeCardProps> = ({
         {/* Avatar with online badge */}
         <View style={styles.avatarContainer}>
           <View style={styles.avatarCircle}>
-            {/* SVG Male Administrator Avatar with glasses, suit, tie */}
-            <Svg width={50} height={50} viewBox="0 0 100 100">
-              {/* Background circular surface */}
-              <Circle cx="50" cy="50" r="48" fill="#F3E8FF" />
-
-              {/* Suit shoulders */}
-              <Path d="M 12 100 Q 50 68 88 100 Z" fill="#1E1B4B" />
-
-              {/* White Shirt collar */}
-              <Path d="M 38 72 L 50 90 L 62 72 L 50 64 Z" fill="#FFFFFF" />
-
-              {/* Dark Tie */}
-              <Path d="M 47 70 L 53 70 L 55 92 L 50 100 L 45 92 Z" fill="#4338CA" />
-
-              {/* Neck */}
-              <Rect x="43" y="52" width="14" height="16" rx="4" fill="#FBCFE8" />
-
-              {/* Face */}
-              <Circle cx="50" cy="40" r="21" fill="#FDE047" opacity={0.25} />
-              <Circle cx="50" cy="38" r="20" fill="#FBCFE8" />
-
-              {/* Hair */}
-              <Path
-                d="M 28 35 C 28 18, 72 18, 72 35 C 72 37, 68 24, 50 24 C 34 24, 28 36, 28 35 Z"
-                fill="#1E293B"
-              />
-
-              {/* Glasses frame */}
-              <Rect x="34" y="32" width="13" height="9" rx="2" fill="none" stroke="#0F172A" strokeWidth="2.5" />
-              <Rect x="53" y="32" width="13" height="9" rx="2" fill="none" stroke="#0F172A" strokeWidth="2.5" />
-              <Path d="M 47 36 L 53 36" stroke="#0F172A" strokeWidth="2" />
-
-              {/* Eyes */}
-              <Circle cx="40.5" cy="36.5" r="2" fill="#0F172A" />
-              <Circle cx="59.5" cy="36.5" r="2" fill="#0F172A" />
-
-              {/* Smile */}
-              <Path
-                d="M 44 48 Q 50 53 56 48"
-                fill="none"
-                stroke="#9D174D"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-            </Svg>
+            <Image
+              source={require('../../../assets/adminimage.png')}
+              style={styles.avatarImage}
+              resizeMode="contain"
+            />
           </View>
 
           {/* Green Online Status Dot */}
@@ -122,6 +82,15 @@ export const AdminWelcomeCard: React.FC<AdminWelcomeCardProps> = ({
           </Text>
           <ChevronRight size={13} color="#FFFFFF" />
         </TouchableOpacity>
+      </View>
+
+      {/* Ahmedabad-inspired architectural heritage skyline silhouette at bottom-right */}
+      <View style={styles.skylineWrapper} pointerEvents="none">
+        <Image
+          source={require('../../../assets/building.png')}
+          style={styles.skylineImage}
+          resizeMode="contain"
+        />
       </View>
 
       {/* Subtle decorative bottom wave */}
@@ -175,6 +144,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
+  },
+  avatarImage: {
+    width: 50,
+    height: 50,
   },
   onlineBadge: {
     position: 'absolute',
@@ -253,6 +226,18 @@ const styles = StyleSheet.create({
     right: 0,
     height: 26,
     zIndex: 1,
+  },
+  skylineWrapper: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    zIndex: 1,
+    overflow: 'hidden',
+  },
+  skylineImage: {
+    width: 170,
+    height: 67,
+    opacity: 0.9,
   },
 });
 

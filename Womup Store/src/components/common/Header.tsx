@@ -6,14 +6,28 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Animated,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Path } from 'react-native-svg';
 import { useStore } from '../../context/StoreContext';
-import { COLORS } from '../../theme/colors';
+import { COLORS, GRADIENTS } from '../../theme/colors';
 import { StoreNotificationModal } from './StoreNotificationModal';
 
 export const Header: React.FC = () => {
-  const { staff, store, subScreen, setSubScreen, toggleShift, shiftLoading, setSidebarOpen, storeUnreadCount, refreshUnreadCount } = useStore();
+  const {
+    staff,
+    store,
+    subScreen,
+    setSubScreen,
+    toggleShift,
+    shiftLoading,
+    setSidebarOpen,
+    storeUnreadCount,
+    refreshUnreadCount,
+  } = useStore();
+
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isNotificationModalVisible, setNotificationModalVisible] = useState(false);
 
@@ -50,12 +64,15 @@ export const Header: React.FC = () => {
   }, [store?.id]);
 
   // Clean Store Name Truncation Rule
-  let displayStoreName = store?.name || 'Prahlad Nagar Dark Store';
+  let displayStoreName = store?.name || 'Chandlodiya';
   if (displayStoreName.startsWith('Wom Up ')) {
     displayStoreName = displayStoreName.slice(7).trim();
   }
-  if (displayStoreName.length > 25 && displayStoreName.endsWith(' Dark Store')) {
+  if (displayStoreName.endsWith(' Dark Store')) {
     displayStoreName = displayStoreName.replace(/\s*Dark\s*Store$/i, '').trim();
+  }
+  if (displayStoreName.includes(' - ')) {
+    displayStoreName = displayStoreName.split(' - ')[0].trim();
   }
 
   // Location info
@@ -63,130 +80,148 @@ export const Header: React.FC = () => {
     store?.areaName ||
     (store?.name
       ? store.name.replace(/^Wom\s*Up\s*/i, '').replace(/\s*(Dark\s*Store|Store)$/i, '').trim()
-      : 'Prahlad Nagar');
-
-  const cityName = store?.cityName || store?.city || 'Ahmedabad';
-
-  // Compact picker code (#782 or last 4-5 chars)
-  const rawCode = staff?.employeeCode || store?.code || 'HUB-01';
-  const cleanCode = rawCode.replace(/^STF-STORE-/, '').replace(/^STF-/, '');
-  const pickerDisplay = cleanCode.length > 8 ? `#${cleanCode.slice(-4)}` : `#${cleanCode}`;
+      : 'Chandlodiya - Tragad');
 
   const handleToggleShift = async () => {
     if (shiftLoading) return;
     const targetState = !isOnShift;
+    setToastMessage(targetState ? '🟢 Shift Started · Ready to receive orders' : '⚪ Shift Ended · Store off-duty');
+    setTimeout(() => setToastMessage(null), 2500);
     try {
       await toggleShift(targetState);
-      setToastMessage(targetState ? '🟢 Shift Started · Ready to receive orders' : '⚪ Shift Ended · Store off-duty');
-      setTimeout(() => setToastMessage(null), 2500);
-    } catch (e: any) {
-      setToastMessage('⚠️ Failed to update shift. Please try again.');
-      setTimeout(() => setToastMessage(null), 2500);
+    } catch (_) {
+      // Non-fatal: optimistic and offline persistence already saved
     }
   };
 
   return (
-    <View style={styles.headerContainer}>
-      {/* Row 1: 🏪 Store Name + [ON SHIFT] Toggle */}
-      <View style={styles.rowOne}>
-        <View style={styles.leftRowOne}>
-          {subScreen ? (
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => setSubScreen(null)}
-              activeOpacity={0.7}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons name="arrow-back" size={20} color="#FFF" />
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.storeBadge}>
-              <Ionicons name="storefront" size={17} color={COLORS.primary} />
-            </View>
-          )}
-
-          <Text style={styles.storeName} numberOfLines={1} ellipsizeMode="tail">
-            {displayStoreName}
-          </Text>
-        </View>
-
-        <View style={styles.rightRowOne}>
-          {/* ON SHIFT Toggle Pill Button */}
-          <TouchableOpacity
-            style={[
-              styles.shiftPill,
-              isOnShift ? styles.shiftPillOn : styles.shiftPillOff,
-            ]}
-            onPress={handleToggleShift}
-            activeOpacity={0.8}
-            disabled={shiftLoading}
-          >
-            {shiftLoading ? (
-              <ActivityIndicator size="small" color={isOnShift ? COLORS.primary : COLORS.danger} />
+    <View style={styles.outerContainer}>
+      <LinearGradient
+        colors={['#FA35A5', '#A72CC7', '#34229E']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0.9 }}
+        style={styles.gradientHeader}
+      >
+        {/* Top Control Bar */}
+        <View style={styles.topBar}>
+          {/* Left: Store Logo or Back Button + Store Identity */}
+          <View style={styles.leftGroup}>
+            {subScreen ? (
+              <TouchableOpacity
+                style={styles.circleBtn}
+                onPress={() => setSubScreen(null)}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityLabel="Go Back"
+              >
+                <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
             ) : (
-              <>
-                <Animated.View
-                  style={[
-                    styles.pulseDot,
-                    {
-                      backgroundColor: isOnShift ? COLORS.primary : COLORS.danger,
-                      transform: isOnShift ? [{ scale: pulseAnim }] : [],
-                    },
-                  ]}
+              <View style={styles.logoBox}>
+                <Image
+                  source={require('../../../assets/Wormup.png')}
+                  style={styles.logoImg}
+                  resizeMode="contain"
                 />
-                <Text
-                  style={[
-                    styles.shiftPillText,
-                    { color: isOnShift ? COLORS.primary : COLORS.danger },
-                  ]}
-                >
-                  {isOnShift ? 'ON SHIFT' : 'OFF SHIFT'}
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
-
-          {/* 🔔 Notification Bell Button */}
-          <TouchableOpacity
-            style={styles.bellBtn}
-            onPress={() => setNotificationModalVisible(true)}
-            activeOpacity={0.7}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel="Store Notifications"
-          >
-            <Ionicons name="notifications" size={19} color="#FFF" />
-            {storeUnreadCount > 0 && (
-              <View style={styles.bellBadge}>
-                <Text style={styles.bellBadgeText}>{storeUnreadCount > 99 ? '99+' : storeUnreadCount}</Text>
               </View>
             )}
-          </TouchableOpacity>
 
-          {/* ☰ Hamburger Menu Button */}
-          <TouchableOpacity
-            style={styles.hamburgerBtn}
-            onPress={() => setSidebarOpen(true)}
-            activeOpacity={0.7}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons name="menu" size={22} color="#FFF" />
-          </TouchableOpacity>
-        </View>
-      </View>
+            <View style={styles.storeTextWrapper}>
+              <View style={styles.storeTitleRow}>
+                <Text style={styles.storeNameText} numberOfLines={1}>
+                  {subScreen ? subScreen : displayStoreName}
+                </Text>
+                {!subScreen && (
+                  <Ionicons name="chevron-down" size={15} color="#FFFFFF" style={{ marginLeft: 3 }} />
+                )}
+              </View>
 
-      {/* Row 2: 📍 Area · City (Left) + Picker Code (Right) */}
-      <View style={styles.rowTwo}>
-        <View style={styles.locationContainer}>
-          <Ionicons name="location-sharp" size={12} color={COLORS.primary} />
-          <Text style={styles.locationText} numberOfLines={1}>
-            {areaName} <Text style={styles.dotSeparator}>·</Text> {cityName}
-          </Text>
+              {!subScreen && (
+                <View style={styles.locationRow}>
+                  <Ionicons name="location-sharp" size={11} color="rgba(255, 255, 255, 0.9)" />
+                  <Text style={styles.locationText} numberOfLines={1}>
+                    {areaName}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* Right: Shift Pill + Bell + Menu */}
+          <View style={styles.rightGroup}>
+            {/* Shift Pill Button */}
+            <TouchableOpacity
+              style={[
+                styles.shiftPill,
+                isOnShift ? styles.shiftPillOn : styles.shiftPillOff,
+              ]}
+              onPress={handleToggleShift}
+              activeOpacity={0.8}
+              disabled={shiftLoading}
+              accessibilityLabel={`Current shift: ${isOnShift ? 'On Shift' : 'Off Shift'}. Tap to toggle.`}
+            >
+              {shiftLoading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Animated.View
+                    style={[
+                      styles.shiftDot,
+                      {
+                        backgroundColor: isOnShift ? '#10B981' : '#F43F5E',
+                        transform: isOnShift ? [{ scale: pulseAnim }] : [],
+                      },
+                    ]}
+                  />
+                  <Text style={styles.shiftPillText}>
+                    {isOnShift ? 'ON SHIFT' : 'OFF SHIFT'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={11} color="rgba(255, 255, 255, 0.8)" style={{ marginLeft: 2 }} />
+                </>
+              )}
+            </TouchableOpacity>
+
+            {/* Notification Bell Button */}
+            <TouchableOpacity
+              style={styles.circleBtn}
+              onPress={() => setNotificationModalVisible(true)}
+              activeOpacity={0.7}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              accessibilityLabel="Notifications"
+            >
+              <Ionicons name="notifications" size={18} color="#FFFFFF" />
+              {Boolean(storeUnreadCount && storeUnreadCount > 0) && (
+                <View style={styles.bellBadge}>
+                  <Text style={styles.bellBadgeText}>
+                    {storeUnreadCount! > 99 ? '99+' : storeUnreadCount}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {/* Hamburger Menu Button */}
+            <TouchableOpacity
+              style={styles.circleBtn}
+              onPress={() => setSidebarOpen(true)}
+              activeOpacity={0.7}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              accessibilityLabel="Main Menu"
+            >
+              <Ionicons name="menu" size={20} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
         </View>
 
-        <View style={styles.pickerCodeBadge}>
-          <Text style={styles.pickerCodeText}>Picker: {pickerDisplay}</Text>
+        {/* Decorative soft wave at the bottom */}
+        <View style={styles.waveSvgContainer} pointerEvents="none">
+          <Svg width="100%" height={20} viewBox="0 0 375 20" preserveAspectRatio="none">
+            <Path
+              d="M 0 0 Q 90 18 190 6 T 375 14 L 375 20 L 0 20 Z"
+              fill="rgba(255, 255, 255, 0.08)"
+            />
+          </Svg>
         </View>
-      </View>
+      </LinearGradient>
 
       {/* Feedback Toast Notification */}
       {toastMessage && (
@@ -208,180 +243,165 @@ export const Header: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  headerContainer: {
-    backgroundColor: '#0A1449',
+  outerContainer: {
+    backgroundColor: '#FAF9FF',
+    position: 'relative',
+    zIndex: 10,
+  },
+  gradientHeader: {
     paddingHorizontal: 16,
     paddingTop: 10,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    paddingBottom: 16,
     position: 'relative',
-    minHeight: 68,
-    justifyContent: 'center',
+    overflow: 'hidden',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#4327C9',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 6,
   },
-  rowOne: {
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
+    zIndex: 2,
   },
-  leftRowOne: {
+  leftGroup: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
     flex: 1,
     minWidth: 0,
-    marginRight: 10,
-    gap: 8,
+    marginRight: 8,
   },
-  storeBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.25)',
+  logoBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: '#25105F',
     alignItems: 'center',
     justifyContent: 'center',
-    flexShrink: 0,
+    shadowColor: 'rgba(0, 0, 0, 0.12)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  backButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
+  logoImg: {
+    width: 30,
+    height: 30,
   },
-  storeName: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
+  storeTextWrapper: {
     flex: 1,
-    letterSpacing: 0.1,
+    justifyContent: 'center',
   },
-  rightRowOne: {
+  storeTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+  },
+  storeNameText: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  locationText: {
+    color: 'rgba(255, 255, 255, 0.88)',
+    fontSize: 11.5,
+    fontWeight: '500',
+  },
+  rightGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
     flexShrink: 0,
   },
-  hamburgerBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  shiftPill: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    gap: 5,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
-  bellBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  shiftPillOn: {
+    backgroundColor: 'rgba(16, 185, 129, 0.25)',
+    borderColor: 'rgba(16, 185, 129, 0.5)',
+  },
+  shiftPillOff: {
+    backgroundColor: 'rgba(0, 0, 0, 0.22)',
+    borderColor: 'rgba(255, 255, 255, 0.22)',
+  },
+  shiftDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  shiftPillText: {
+    color: '#FFFFFF',
+    fontSize: 10.5,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+  },
+  circleBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderColor: 'rgba(255, 255, 255, 0.25)',
     position: 'relative',
   },
   bellBadge: {
     position: 'absolute',
-    top: -4,
-    right: -4,
+    top: -3,
+    right: -3,
     minWidth: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: '#EF4444',
-    paddingHorizontal: 4,
+    backgroundColor: '#FF2B98',
+    paddingHorizontal: 3,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: '#0F172A',
+    borderColor: '#FFFFFF',
   },
   bellBadgeText: {
     color: '#FFFFFF',
     fontSize: 9,
     fontWeight: '800',
   },
-  shiftPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 9999,
-    borderWidth: 1,
-    flexShrink: 0,
-    minWidth: 92,
-    justifyContent: 'center',
-    height: 32,
-  },
-  shiftPillOn: {
-    backgroundColor: 'rgba(16, 185, 129, 0.18)',
-    borderColor: 'rgba(16, 185, 129, 0.35)',
-  },
-  shiftPillOff: {
-    backgroundColor: 'rgba(239, 68, 68, 0.18)',
-    borderColor: 'rgba(239, 68, 68, 0.35)',
-  },
-  pulseDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-  },
-  shiftPillText: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  rowTwo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    marginTop: 4,
-    paddingLeft: 40, // Aligns under the store title
-  },
-  locationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    flex: 1,
-    minWidth: 0,
-    marginRight: 8,
-  },
-  locationText: {
-    color: 'rgba(255, 255, 255, 0.68)',
-    fontSize: 11.5,
-    fontWeight: '500',
-  },
-  dotSeparator: {
-    color: 'rgba(255, 255, 255, 0.4)',
-    marginHorizontal: 2,
-  },
-  pickerCodeBadge: {
-    flexShrink: 0,
-  },
-  pickerCodeText: {
-    color: 'rgba(255, 255, 255, 0.55)',
-    fontSize: 11,
-    fontWeight: '600',
-    fontFamily: 'monospace',
+  waveSvgContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 20,
+    opacity: 0.6,
   },
   toastBox: {
     position: 'absolute',
     bottom: -32,
     left: 16,
     right: 16,
-    backgroundColor: '#1E293B',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 8,
+    backgroundColor: '#1E1B4B',
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 999,

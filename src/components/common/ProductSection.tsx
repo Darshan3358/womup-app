@@ -31,6 +31,7 @@ export interface ProductSectionProps {
   onViewAll?: () => void;
   viewAllText?: string;
   isLoading?: boolean;
+  cartCount?: number;
 }
 
 const ProductSectionComponent: React.FC<ProductSectionProps> = ({
@@ -45,9 +46,10 @@ const ProductSectionComponent: React.FC<ProductSectionProps> = ({
   onViewAll,
   viewAllText = 'View All',
   isLoading = false,
+  cartCount,
 }) => {
   const { width } = useWindowDimensions();
-  const { blinkitCart, getBlinkitQty, updateBlinkitQty, isInWishlist, toggleWishlist, currentAreaName } = useApp();
+  const { blinkitCart, blinkitCartCount, getBlinkitQty, updateBlinkitQty, isInWishlist, toggleWishlist, currentAreaName } = useApp();
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
   const [pickerProduct, setPickerProduct] = useState<BlinkitProduct | null>(null);
 
@@ -288,7 +290,7 @@ const ProductSectionComponent: React.FC<ProductSectionProps> = ({
       </View>
     );
   }, [selectedVariants, cardWidth, isCompact, currentAreaName,
-      blinkitCart, getBlinkitQty, updateBlinkitQty, isInWishlist, toggleWishlist,
+      blinkitCart, blinkitCartCount, cartCount, getBlinkitQty, updateBlinkitQty, isInWishlist, toggleWishlist,
       onOpenProduct, handleSelectVariant]);
 
   const IconComponent = iconConfig?.icon;

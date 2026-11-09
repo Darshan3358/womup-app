@@ -21,24 +21,10 @@ export interface HeroBannerItem {
 
 export const HERO_SLIDES: HeroBannerItem[] = [
   {
-    id: 'hero_snack_attack',
-    type: 'deals',
-    image: require('../../../assets/banners/snack_attack_banner.png'),
-    bgColor: '#1E0638',
-  },
-  {
     id: 'hero_1',
     type: 'deals',
     image: require('../../../assets/home banner .png'),
     bgColor: '#F9ECF8',
-  },
-  {
-    id: 'hero_snacks',
-    type: 'category',
-    categoryName: 'Chips & Namkeen',
-    categoryId: 'c4',
-    image: require('../../../assets/banners/snacks_beverages.jpg'),
-    bgColor: '#0D47A1',
   },
   {
     id: 'hero_2',
@@ -102,8 +88,9 @@ const HeroBannerCarouselComponent: React.FC<HeroBannerCarouselProps> = ({ onBann
     }
   };
 
-  // Dynamic 2:1 aspect ratio matching the 1024x512 banner dimensions so the image fills edge-to-edge with zero empty space
-  const bannerHeight = Math.min(Math.round(bannerWidth * 0.5), 360);
+  // Dynamic 2:1 aspect ratio matching the 1024x512 banner dimensions so the entire image fits edge-to-edge
+  const bannerAspectRatio = 2.0;
+  const bannerHeight = Math.min(Math.round(bannerWidth / bannerAspectRatio), 360);
 
   return (
     <View style={styles.outerContainer}>

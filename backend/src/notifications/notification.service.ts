@@ -22,6 +22,7 @@ export interface CreateNotificationParams {
   entityId?: string;
   orderId?: string;
   actionType?: string;
+  actionPayload?: string;
   metadata?: Record<string, any>;
   dedupeKey?: string;
   deepLink?: string;
@@ -125,6 +126,7 @@ export class NotificationService {
         entityId,
         orderId,
         actionType,
+        actionPayload: params.actionPayload || actionType,
         metadata: { ...metadata, ...(data || {}) },
         data: { ...metadata, ...(data || {}) },
         dedupeKey,
@@ -175,6 +177,9 @@ export class NotificationService {
     } else if (recipientType === 'RIDER') {
       const targetRider = riderId || recipientId;
       this.trackingGateway.emitScopedNotification(`rider:${targetRider}`, formatted);
+    } else if (recipientType === 'VENDOR') {
+      const targetVendor = recipientId;
+      this.trackingGateway.emitScopedNotification(`vendor_${targetVendor}`, formatted);
     } else {
       // CUSTOMER
       this.trackingGateway.emitScopedNotification(`user:${recipientId}`, formatted);

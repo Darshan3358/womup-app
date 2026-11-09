@@ -308,26 +308,28 @@ export class DeliveryOrderService implements OnModuleInit {
       } catch (err) {}
     }
 
-    // Hyperlocal Rider Geofencing:
-    // If the rider is assigned to a fixed Dark Store Hub (partner.hubId), strictly limit orders to their home hub.
-    // Only search nearby active dark stores within 4.5 km if the rider has no assigned fixed hub.
-    if (!partner.hubId || allowedHubMap.size === 0) {
-      try {
-        const allActiveStores = await this.storeModel.find({ isActive: { $ne: false } });
-        for (const st of allActiveStores) {
-          if (st.location?.coordinates && st.location.coordinates.length === 2) {
-            const sLng = st.location.coordinates[0];
-            const sLat = st.location.coordinates[1];
-            const dist = this.calculateHaversineDistanceKm(riderLat, riderLng, sLat, sLng);
-            const maxRadius = Math.min(4.5, st.serviceRadiusKm || 4.0);
-            if (dist <= maxRadius) {
-              allowedHubMap.set(st._id.toString(), { store: st, distanceKm: dist, isOwnHub: false });
-            }
+    // Dynamic Nearest Hub Order Dispatch:
+    // Always include nearby active dark stores within 5.5 km of rider's live GPS coordinates,
+    // so riders dynamically receive orders from the store they are currently near!
+    try {
+      const allActiveStores = await this.storeModel.find({ isActive: { $ne: false } });
+      for (const st of allActiveStores) {
+        if (st.location?.coordinates && st.location.coordinates.length === 2) {
+          const sLng = st.location.coordinates[0];
+          const sLat = st.location.coordinates[1];
+          const dist = this.calculateHaversineDistanceKm(riderLat, riderLng, sLat, sLng);
+          const maxRadius = Math.max(5.0, Math.min(6.5, st.serviceRadiusKm || 5.0));
+          if (dist <= maxRadius) {
+            allowedHubMap.set(st._id.toString(), {
+              store: st,
+              distanceKm: dist,
+              isOwnHub: Boolean(partner.hubId && partner.hubId.toString() === st._id.toString()),
+            });
           }
         }
-      } catch (stErr: any) {
-        this.logger.warn(`Failed finding nearby stores for rider ${partner._id}: ${stErr?.message}`);
       }
+    } catch (stErr: any) {
+      this.logger.warn(`Failed finding nearby stores for rider ${partner._id}: ${stErr?.message}`);
     }
 
     const allowedHubIds = Array.from(allowedHubMap.keys())

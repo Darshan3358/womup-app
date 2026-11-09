@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,10 +12,26 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Path } from 'react-native-svg';
 import { useRider } from '../../context/RiderContext';
 import { RiderApiService } from '../../services/riderApi';
-import { COLORS } from '../../theme/colors';
+import { COLORS, GRADIENTS } from '../../theme/colors';
 import { OnlinePaymentModal } from '../../components/modals/OnlinePaymentModal';
+
+// Reusable mini sparkline wave for metric cards
+const SparklineWave: React.FC<{ color: string }> = ({ color }) => (
+  <View style={styles.sparklineContainer}>
+    <Svg width="100%" height={20} viewBox="0 0 80 20" style={{ overflow: 'visible' }}>
+      <Path
+        d="M 0 14 Q 15 4, 30 11 T 55 6 T 80 12"
+        fill="none"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
+      />
+    </Svg>
+  </View>
+);
 
 export const RiderDashboardScreen: React.FC = () => {
   const {
@@ -35,16 +51,13 @@ export const RiderDashboardScreen: React.FC = () => {
     refreshDashboard,
     detectedHubName,
     detectedAddress,
+    locationError,
     currentLocation,
-    availableHubs,
     detectLocation,
-    setSimulatedHub,
-    clearSelectedHub,
     riderUnreadCount,
     refreshRiderUnreadCount,
   } = useRider();
 
-  const [showHubModal, setShowHubModal] = useState(false);
   const [isDetecting, setIsDetecting] = useState(false);
   const [showPayAdminModal, setShowPayAdminModal] = useState(false);
 
@@ -53,18 +66,26 @@ export const RiderDashboardScreen: React.FC = () => {
     activeDelivery.stepStatus !== 'OFFERED'
   );
 
-  // Duty-state-aware GPS detection:
-  // Detects location once upon going online or starting an active delivery.
-  // Continuous GPS streaming during delivery is handled cleanly by RiderContext / LocationTrackerService,
-  // preventing redundant hardware GPS polling loops and unnecessary HTTP requests.
+  // Stable ref ensures 5s interval is never reset on re-renders
+  const detectLocationRef = useRef(detectLocation);
+  detectLocationRef.current = detectLocation;
+
   useEffect(() => {
     if (!isOnline && !isRealDelivery) {
       return;
     }
 
-    // Detect location once on duty state change
-    detectLocation();
-  }, [isOnline, isRealDelivery, detectLocation]);
+    // Pehli baar turant detect karo
+    detectLocationRef.current();
+
+    // Phir har 5 second me detect karo
+    const intervalId = setInterval(() => {
+      detectLocationRef.current();
+    }, 5000); // 5000 ms = 5 seconds
+
+    // Cleanup: Jab screen chhodein ya offline ho toh interval clear karein
+    return () => clearInterval(intervalId);
+  }, [isOnline, isRealDelivery]);
 
   const [refreshing, setRefreshing] = useState(false);
   const [pendingSettlementRequest, setPendingSettlementRequest] = useState<any | null>(null);
@@ -79,8 +100,7 @@ export const RiderDashboardScreen: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => { 
-    // Defer pending settlements check to avoid startup connection congestion
+  useEffect(() => {
     const timer = setTimeout(() => {
       checkPendingSettlements();
     }, 800);
@@ -98,9 +118,16 @@ export const RiderDashboardScreen: React.FC = () => {
   const isCashBlocked = Boolean(settlementSummary?.isOrderBlocked || netDueToAdmin >= cashLimit);
   const isPendingApproval = Boolean(profile && profile.status !== 'APPROVED');
 
-    return (
+  const riderFirstName = profile?.name ? profile.name.split(' ')[0] : 'Test';
+  const totalEarningsAmount = settlementSummary?.totalEarnings ?? settlementSummary?.netPayableToday ?? 0;
+  const todayDeliveredCount = settlementSummary?.todayCompleted ?? 0;
+  const cashInHandAmount = settlementSummary?.totalCodCollected ?? settlementSummary?.todayCod ?? 0;
+  const adminBalanceAmount = Math.abs(netDueToAdmin);
+
+  return (
     <ScrollView
       style={styles.container}
+      contentContainerStyle={styles.contentContainer}
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
@@ -112,9 +139,7 @@ export const RiderDashboardScreen: React.FC = () => {
               <Ionicons name="time" size={18} color="#FFFFFF" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.pendingAlertTitle}>
-                Account Under Review
-              </Text>
+              <Text style={styles.pendingAlertTitle}>Account Under Review</Text>
               <Text style={styles.pendingAlertSubtitle}>
                 Admin approval is pending. You cannot go online or accept orders yet.
               </Text>
@@ -153,109 +178,7 @@ export const RiderDashboardScreen: React.FC = () => {
         </View>
       )}
 
-      {/* 1. Header Greeting Bar (Wireframe Screen 4) */}
-      <View style={styles.topHeaderRow}>
-        <View style={styles.topGreetingLeft}>
-          <Text style={styles.helloTitle}>
-            Hello, {profile?.name ? profile.name.split(' ')[0] : 'Darshan'}
-          </Text>
-          <View style={styles.onlineBadgePill}>
-            <View style={[styles.statusDot, isOnline ? styles.onlineDot : styles.offlineDot]} />
-            <Text style={[styles.onlineBadgeText, !isOnline && { color: '#94A3B8' }]}>
-              {isOnline ? 'Online' : 'Offline'}
-            </Text>
-          </View>
-        </View>
-
-        <TouchableOpacity
-          style={styles.bellBtn}
-          onPress={() => setSubScreen('Notifications')}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="notifications-outline" size={20} color="#071B52" />
-          {riderUnreadCount > 0 && (
-            <View style={styles.bellBadge}>
-              <Text style={styles.bellBadgeText}>{riderUnreadCount > 99 ? '99+' : riderUnreadCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      {/* 2. Today's Earning Big Pink Card (Wireframe Screen 4) */}
-      <LinearGradient
-        colors={['#FF3B98', '#E11D48']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.todayEarningCard}
-      >
-        <View style={styles.earningLeft}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Ionicons name="cash-outline" size={16} color="#FFF" />
-            <Text style={styles.todayEarningLabel}>Today's Total Earning</Text>
-          </View>
-          <Text style={styles.todayEarningAmount}>
-            ₹ {settlementSummary?.totalEarnings ?? settlementSummary?.netPayableToday ?? 0}
-          </Text>
-          <Text style={styles.todayOrdersCount}>
-            {settlementSummary?.todayCompleted ?? 0} Orders Delivered
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          style={styles.viewDetailsPillBtn}
-          onPress={() => setCurrentTab('Earnings')}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.viewDetailsPillText}>Khata Details</Text>
-        </TouchableOpacity>
-      </LinearGradient>
-
-      {/* 3. Rider Khata 3-Metric Summary (SRS Flow) */}
-      <View style={styles.khataThreeColRow}>
-        <View style={styles.khataColCard}>
-          <Text style={styles.khataColLabel}>TODAY'S EARNING</Text>
-          <Text style={[styles.khataColValue, { color: '#059669' }]}>
-            ₹{settlementSummary?.totalEarnings ?? settlementSummary?.netPayableToday ?? 0}
-          </Text>
-          <Text style={styles.khataColSub}>Online + COD</Text>
-        </View>
-        <View style={styles.khataColCard}>
-          <Text style={styles.khataColLabel}>CASH IN HAND (COD)</Text>
-          <Text style={[styles.khataColValue, { color: '#071B52' }]}>
-            ₹{settlementSummary?.totalCodCollected ?? settlementSummary?.todayCod ?? 0}
-          </Text>
-          <Text style={styles.khataColSub}>Collected</Text>
-        </View>
-        <View style={[styles.khataColCard, isCashBlocked && styles.khataColCardAlert]}>
-          <Text style={[styles.khataColLabel, isCashBlocked && { color: '#DC2626' }]}>
-            {netDueToAdmin > 0 ? 'PENDING TO PAY' : 'ADMIN OWES'}
-          </Text>
-          <Text style={[styles.khataColValue, netDueToAdmin > 0 ? { color: '#DC2626' } : { color: '#059669' }]}>
-            ₹{Math.abs(netDueToAdmin)}
-          </Text>
-          <Text style={[styles.khataColSub, isCashBlocked && { color: '#DC2626', fontWeight: '700' }]}>
-            {isCashBlocked ? 'Locked (>= ₹500)' : 'Net Hisaab'}
-          </Text>
-        </View>
-      </View>
-
-      {/* 4. 3-Column Stats Row (Wireframe Screen 4) */}
-      <View style={styles.statsThreeColRow}>
-        <View style={styles.statColCard}>
-          <Text style={styles.statColValue}>{settlementSummary?.todayCompleted ?? 0}</Text>
-          <Text style={styles.statColLabel}>Completed</Text>
-        </View>
-        <View style={styles.statColCard}>
-          <Text style={styles.statColValue}>{isRealDelivery ? '1' : '0'}</Text>
-          <Text style={styles.statColLabel}>Ongoing</Text>
-        </View>
-        <View style={styles.statColCard}>
-          <Text style={styles.statColValue}>0</Text>
-          <Text style={styles.statColLabel}>Cancelled</Text>
-        </View>
-      </View>
-
-      {/* 🟡 PAYMENT VERIFICATION PENDING BANNER (SRS Step 3) */}
+      {/* 🟡 PAYMENT VERIFICATION PENDING BANNER */}
       {pendingSettlementRequest && (
         <View style={styles.pendingVerifCard}>
           <View style={styles.pendingVerifLeft}>
@@ -274,6 +197,310 @@ export const RiderDashboardScreen: React.FC = () => {
           </View>
         </View>
       )}
+
+      {/* 1. WELCOME SECTION (Greeting + 3D Rider Boy Illustration) */}
+      <View style={styles.welcomeRow}>
+        <View style={styles.welcomeTextColumn}>
+          <Text style={styles.welcomeGreetingTitle}>
+            Hello, {riderFirstName} 👋
+          </Text>
+          <Text style={styles.welcomeSubtitle}>
+            Ready to deliver today?
+          </Text>
+        </View>
+        <View style={styles.welcomeRiderImgWrap}>
+          <Image
+            source={require('../../../assets/ridermen2.png')}
+            style={styles.welcomeRiderImg}
+            resizeMode="contain"
+          />
+        </View>
+      </View>
+
+      {/* 2. MAIN TODAY'S TOTAL EARNINGS CARD */}
+      <LinearGradient
+        colors={['#FF21A7', '#C30CB6', '#7227DF', '#233DF0']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0.95 }}
+        style={styles.mainEarningsCard}
+      >
+        {/* Floating coins background decoration */}
+        <View style={styles.floatingCoinsWrap}>
+          <Text style={styles.floatingCoinOne}>🪙</Text>
+          <Text style={styles.floatingCoinTwo}>🪙</Text>
+        </View>
+
+        <View style={styles.earningsCardContent}>
+          {/* Left: 3D Wallet Icon Container */}
+          <View style={styles.walletIllustrationWrap}>
+            <View style={styles.walletInnerBox}>
+              <Ionicons name="wallet" size={24} color="#8428E8" />
+              <View style={styles.walletCoinPill}>
+                <Text style={styles.walletCoinPillText}>₹</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Center Info */}
+          <View style={styles.earningsCenterWrap}>
+            <View style={styles.earningsTitleRow}>
+              <Text style={styles.earningsLabelText}>Today's Total Earnings</Text>
+              <Ionicons name="information-circle-outline" size={15} color="rgba(255,255,255,0.8)" />
+            </View>
+            <Text style={styles.earningsAmountValue}>₹{totalEarningsAmount}</Text>
+            <View style={styles.deliveredCountRow}>
+              <Ionicons name="cube-outline" size={13} color="rgba(255,255,255,0.9)" />
+              <Text style={styles.deliveredCountText}>
+                {todayDeliveredCount} Orders Delivered
+              </Text>
+            </View>
+          </View>
+
+          {/* Right Action: Khata Details Pill Button */}
+          <TouchableOpacity
+            style={styles.khataDetailsBtn}
+            onPress={() => setCurrentTab('Earnings')}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.khataDetailsText}>Khata Details</Text>
+            <Ionicons name="arrow-forward" size={12} color="#10215A" style={{ marginLeft: 3 }} />
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
+
+      {/* 3. THREE FINANCIAL SUMMARY CARDS */}
+      <View style={styles.threeCardsRow}>
+        {/* Card 1: Today's Earning */}
+        <View style={styles.metricCard}>
+          <View style={[styles.metricIconCircle, { backgroundColor: '#FDF2F8' }]}>
+            <Text style={[styles.metricCurrencySymbol, { color: '#F51BA0' }]}>₹</Text>
+          </View>
+          <Text style={styles.metricLabelText}>Today's Earning</Text>
+          <Text style={styles.metricValueText}>₹{totalEarningsAmount}</Text>
+          <View style={styles.metricTrendRow}>
+            <Ionicons name="arrow-up" size={10} color="#06BF7B" />
+            <Text style={[styles.metricTrendText, { color: '#06BF7B' }]}>+0% vs yesterday</Text>
+          </View>
+          <SparklineWave color="#F51BA0" />
+        </View>
+
+        {/* Card 2: Cash In Hand */}
+        <View style={styles.metricCard}>
+          <View style={[styles.metricIconCircle, { backgroundColor: '#F4EAFE' }]}>
+            <Ionicons name="hand-right" size={16} color="#8428E8" />
+          </View>
+          <Text style={styles.metricLabelText}>Cash In Hand</Text>
+          <Text style={styles.metricValueText}>₹{cashInHandAmount}</Text>
+          <Text style={styles.metricSubText}>Collected</Text>
+          <SparklineWave color="#8428E8" />
+        </View>
+
+        {/* Card 3: Admin Owes */}
+        <View style={[styles.metricCard, isCashBlocked && styles.metricCardAlert]}>
+          <View style={[styles.metricIconCircle, { backgroundColor: '#DCFCE7' }]}>
+            <Ionicons name="people" size={16} color="#06BF7B" />
+          </View>
+          <Text style={[styles.metricLabelText, isCashBlocked && { color: '#DC2626' }]}>
+            {netDueToAdmin > 0 ? 'Pending to Pay' : 'Admin Owes'}
+          </Text>
+          <Text style={[styles.metricValueText, netDueToAdmin > 0 ? { color: '#DC2626' } : { color: '#10215A' }]}>
+            ₹{adminBalanceAmount}
+          </Text>
+          <Text style={[styles.metricSubText, isCashBlocked && { color: '#DC2626', fontWeight: '700' }]}>
+            {isCashBlocked ? 'Locked (>= ₹500)' : 'Net Khata'}
+          </Text>
+          <SparklineWave color={netDueToAdmin > 0 ? '#F43E53' : '#06BF7B'} />
+        </View>
+      </View>
+
+      {/* 4. THREE DELIVERY PERFORMANCE CARDS */}
+      <View style={styles.threeCardsRow}>
+        {/* Card 1: Completed */}
+        <View style={styles.metricCard}>
+          <View style={[styles.metricIconCircle, { backgroundColor: '#EFF6FF' }]}>
+            <Ionicons name="checkmark" size={17} color="#2676F4" />
+          </View>
+          <Text style={styles.metricLabelText}>Completed</Text>
+          <Text style={styles.metricValueText}>{todayDeliveredCount}</Text>
+          <Text style={styles.metricSubText}>Today</Text>
+          <SparklineWave color="#2676F4" />
+        </View>
+
+        {/* Card 2: Ongoing */}
+        <View style={styles.metricCard}>
+          <View style={[styles.metricIconCircle, { backgroundColor: '#FFF7ED' }]}>
+            <Ionicons name="time" size={16} color="#F28B37" />
+          </View>
+          <Text style={styles.metricLabelText}>Ongoing</Text>
+          <Text style={styles.metricValueText}>{isRealDelivery ? '1' : '0'}</Text>
+          <Text style={styles.metricSubText}>In Progress</Text>
+          <SparklineWave color="#F28B37" />
+        </View>
+
+        {/* Card 3: Cancelled */}
+        <View style={styles.metricCard}>
+          <View style={[styles.metricIconCircle, { backgroundColor: '#FAF5FF' }]}>
+            <Ionicons name="close" size={17} color="#8428E8" />
+          </View>
+          <Text style={styles.metricLabelText}>Cancelled</Text>
+          <Text style={styles.metricValueText}>0</Text>
+          <Text style={styles.metricSubText}>Today</Text>
+          <SparklineWave color="#8428E8" />
+        </View>
+      </View>
+
+      {/* 5. TWO PRIMARY ACTION BUTTONS (Go Offline + Order History) */}
+      <View style={styles.actionButtonsRow}>
+        {/* Green Go Offline / Go Online Button */}
+        <TouchableOpacity
+          style={styles.actionBtnOuter}
+          onPress={() => {
+            if (isPendingApproval) {
+              Alert.alert(
+                'Account Pending Approval',
+                'Your account and documents are currently under review by Admin. You cannot go online until approved.'
+              );
+              return;
+            }
+            toggleDutyStatus();
+          }}
+          activeOpacity={0.88}
+        >
+          <LinearGradient
+            colors={isPendingApproval ? ['#94A3B8', '#64748B'] : ['#06BF7B', '#059669']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.actionGradientBtn}
+          >
+            <View style={styles.actionBtnIconCircle}>
+              <Ionicons
+                name={isPendingApproval ? 'lock-closed' : isOnline ? 'pause' : 'play'}
+                size={16}
+                color={isPendingApproval ? '#94A3B8' : '#06BF7B'}
+              />
+            </View>
+            <Text style={styles.actionGradientBtnText}>
+              {isPendingApproval ? 'Approval Pending' : isOnline ? 'Go Offline' : 'Go Online'}
+            </Text>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        {/* Blue Order History Button */}
+        <TouchableOpacity
+          style={styles.actionBtnOuter}
+          onPress={() => setSubScreen('DutyHistory')}
+          activeOpacity={0.88}
+        >
+          <LinearGradient
+            colors={['#2676F4', '#1E40AF']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.actionGradientBtn}
+          >
+            <View style={styles.actionBtnIconCircle}>
+              <Ionicons name="reader-outline" size={16} color="#2676F4" />
+            </View>
+            <Text style={styles.actionGradientBtnText}>Order History →</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+
+      {/* 6. PROMOTIONAL BANNER: DELIVER MORE, EARN MORE! */}
+      <LinearGradient
+        colors={['#FF21A7', '#B5179E', '#7209B7', '#25105F']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0.9 }}
+        style={styles.promoBannerWrap}
+      >
+        <View style={styles.promoLeftColumn}>
+          <View style={styles.promoHeaderRow}>
+            <Text style={styles.promoGiftIcon}>🎁</Text>
+            <Text style={styles.promoTitleText}>Deliver More, Earn More!</Text>
+          </View>
+          <Text style={styles.promoSubtitleText}>
+            Complete more orders & boost your earnings today!
+          </Text>
+          <TouchableOpacity
+            style={styles.viewTipsPillBtn}
+            onPress={() => setSubScreen('DutyHistory')}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.viewTipsPillText}>View Tips →</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.promoRightImageWrap}>
+          <Image
+            source={require('../../../assets/BANNERSIDEBIKE.png')}
+            style={styles.promoBikeImage}
+            resizeMode="contain"
+          />
+        </View>
+      </LinearGradient>
+
+      {/* 7. LIVE GPS AND HUB INFORMATION CARD */}
+      <View style={[styles.liveGpsDarkCard, !detectedHubName && { borderColor: '#DC2626', borderWidth: 1.5 }]}>
+        {/* Top Header: LIVE GPS + Controls */}
+        <View style={styles.gpsCardHeaderRow}>
+          <View style={styles.liveGpsIndicatorRow}>
+            <View style={[styles.pulseDotGreen, !detectedHubName && { backgroundColor: '#DC2626' }]} />
+            <Text style={[styles.liveGpsHeaderTitle, !detectedHubName && { color: '#FCA5A5' }]}>
+              {detectedHubName ? 'LIVE GPS' : 'LOCATION ERROR'}
+            </Text>
+          </View>
+
+          <View style={styles.gpsControlButtonsRow}>
+            <TouchableOpacity
+              style={styles.autoGpsPillBtn}
+              onPress={async () => {
+                setIsDetecting(true);
+                await detectLocation();
+                setIsDetecting(false);
+              }}
+              disabled={isDetecting}
+              activeOpacity={0.75}
+            >
+              <Ionicons
+                name={isDetecting ? 'sync-outline' : 'flash'}
+                size={11}
+                color="#06BF7B"
+                style={{ marginRight: 3 }}
+              />
+              <Text style={styles.autoGpsPillText}>
+                {isDetecting ? '...' : 'Auto-GPS'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Hub / Area Name */}
+        <View style={styles.gpsLocationInfoRow}>
+          <Ionicons
+            name={detectedHubName ? "location" : "alert-circle"}
+            size={18}
+            color={detectedHubName ? "#2676F4" : "#DC2626"}
+            style={{ marginTop: 2, marginRight: 6 }}
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.gpsHubNameText, !detectedHubName && { color: '#FCA5A5' }]} numberOfLines={1}>
+              {detectedHubName ? detectedHubName.split('(')[0].trim() : (isDetecting ? 'Detecting Nearest Hub...' : 'NO SERVICEABLE HUB')}
+            </Text>
+            <Text style={[styles.gpsHubAddressText, !detectedHubName && { color: '#F87171' }]} numberOfLines={2}>
+              {detectedHubName
+                ? detectedAddress
+                : (locationError || (isDetecting ? 'Fetching your real GPS location...' : 'Please turn on GPS and move to an active delivery area.'))}
+            </Text>
+          </View>
+
+          {/* Mini Stylized Map Indicator Graphic */}
+          <View style={styles.miniMapGraphicWrap}>
+            <View style={styles.miniMapRouteLine} />
+            <View style={styles.miniMapPinMarker}>
+              <Ionicons name="location" size={18} color={detectedHubName ? "#F51BA0" : "#DC2626"} />
+            </View>
+          </View>
+        </View>
+      </View>
 
       {/* 🔴 ONLINE RIDER SETTLEMENT ACTION BUTTON (When Net Due > 0) */}
       {netDueToAdmin > 0 && (
@@ -333,201 +560,7 @@ export const RiderDashboardScreen: React.FC = () => {
         </TouchableOpacity>
       )}
 
-      {/* 4. Two Large Action Buttons: Go Online + Order History (Wireframe Screen 4) */}
-      <View style={styles.twoActionButtonsRow}>
-        <TouchableOpacity
-          style={[
-            styles.bigActionBtn,
-            isPendingApproval
-              ? { backgroundColor: '#94A3B8' }
-              : { backgroundColor: isOnline ? '#13B978' : '#059669' },
-          ]}
-          onPress={() => {
-            if (isPendingApproval) {
-              Alert.alert(
-                'Account Pending Approval',
-                'Your account and documents are currently under review by Admin. You cannot go online until approved.'
-              );
-              return;
-            }
-            toggleDutyStatus();
-          }}
-          activeOpacity={0.85}
-        >
-          <View style={styles.bigActionIconCircle}>
-            <Ionicons
-              name={isPendingApproval ? 'lock-closed' : isOnline ? 'pause' : 'play'}
-              size={20}
-              color={isPendingApproval ? '#94A3B8' : isOnline ? '#13B978' : '#059669'}
-            />
-          </View>
-          <Text style={styles.bigActionBtnText}>
-            {isPendingApproval ? 'Approval Pending' : isOnline ? 'Go Offline' : 'Go Online'}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.bigActionBtn, { backgroundColor: '#3B82F6' }]}
-          onPress={() => setSubScreen('DutyHistory')}
-          activeOpacity={0.85}
-        >
-          <View style={styles.bigActionIconCircle}>
-            <Ionicons name="receipt-outline" size={20} color="#3B82F6" />
-          </View>
-          <Text style={styles.bigActionBtnText}>Order History</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* 5. Better Rides More Earnings Banner Card (Wireframe Screen 4) */}
-      <View style={styles.promoBannerCard}>
-        <Image
-          source={require('../../../assets/rider_promo_banner.png')}
-          style={styles.promoBannerImage}
-          resizeMode="cover"
-        />
-        <View style={styles.promoBannerOverlay}>
-          <Text style={styles.promoBannerTitle}>Better Rides, More Earnings</Text>
-          <Text style={styles.promoBannerSubtitle}>Deliver with WormUp fleet & earn guaranteed incentives</Text>
-        </View>
-      </View>
-
-      {/* Location Bar & Telemetry */}
-      <View style={styles.heroCard}>
-
-        {/* GPS Live Telemetry & Address Card */}
-        <View style={styles.locationBar}>
-          {/* Top Bar: Live Status & Controls */}
-          <View style={styles.locationHeaderRow}>
-            <View style={styles.locationPulseWrap}>
-              <View style={[styles.locationPulseDot, !detectedHubName && { backgroundColor: '#F59E0B' }]} />
-              <Text style={[styles.locationBarLabel, !detectedHubName && { color: '#FDE68A' }]}>
-                {detectedHubName ? 'LIVE GPS' : 'LOCATION STATUS'}
-              </Text>
-            </View>
-            <View style={styles.locationBarBtns}>
-              <TouchableOpacity
-                style={[
-                  styles.detectGpsBtn,
-                  detectedHubName && { backgroundColor: 'rgba(16, 185, 129, 0.25)', borderColor: '#10B981', borderWidth: 1 },
-                ]}
-                onPress={async () => {
-                  setIsDetecting(true);
-                  await detectLocation();
-                  setIsDetecting(false);
-                }}
-                disabled={isDetecting}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name={isDetecting ? 'sync-outline' : detectedHubName ? 'checkmark-circle' : 'navigate-outline'}
-                  size={11}
-                  color={detectedHubName ? '#10B981' : COLORS.white}
-                  style={{ marginRight: 3 }}
-                />
-                <Text style={[styles.detectGpsBtnText, detectedHubName && { color: '#10B981', fontWeight: '800' }]}>
-                  {isDetecting ? '...' : detectedHubName ? 'Auto-GPS' : 'Detect'}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.switchHubBtn}
-                onPress={() => setShowHubModal(true)}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="business-outline" size={11} color={COLORS.white} style={{ marginRight: 3 }} />
-                <Text style={styles.switchHubBtnText}>Hubs</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Store / Hub + Distance */}
-          <View style={styles.locationStoreRow}>
-            <Ionicons
-              name={detectedHubName ? "location-sharp" : "alert-circle"}
-              size={14}
-              color={detectedHubName ? "#38BDF8" : "#F59E0B"}
-              style={{ marginRight: 3 }}
-            />
-            <Text
-              style={[
-                styles.locationStoreName,
-                !detectedHubName && { color: '#FDE68A', fontStyle: 'italic' }
-              ]}
-              numberOfLines={1}
-            >
-              {detectedHubName ? detectedHubName.split('(')[0].trim() : 'No Hub Selected'}
-            </Text>
-            <View
-              style={[
-                styles.locationDistanceBadge,
-                !detectedHubName && { backgroundColor: 'rgba(245, 158, 11, 0.25)', borderColor: 'rgba(245, 158, 11, 0.5)' }
-              ]}
-            >
-              <Text
-                style={[
-                  styles.locationDistanceText,
-                  !detectedHubName && { color: '#FDE68A', fontWeight: '700' }
-                ]}
-              >
-                {detectedHubName && detectedHubName.includes('(')
-                  ? detectedHubName.split('(')[1].replace(')', '').trim()
-                  : (detectedHubName ? '0.1 km away' : 'NOT CONNECTED')}
-              </Text>
-            </View>
-          </View>
-
-          {/* Live Street Address */}
-          <View style={styles.addressLineRow}>
-            <Ionicons
-              name={detectedAddress ? "home-outline" : "information-circle-outline"}
-              size={13}
-              color={detectedAddress ? "rgba(255, 255, 255, 0.75)" : "rgba(253, 230, 138, 0.85)"}
-              style={{ marginRight: 5, marginTop: 1 }}
-            />
-            <Text
-              style={[
-                styles.addressLineText,
-                !detectedAddress && { color: '#FDE68A' }
-              ]}
-              numberOfLines={2}
-            >
-              {detectedAddress || 'Tap "Detect" or "Hubs" to connect to an operational dark store'}
-            </Text>
-          </View>
-
-          {/* Footer with GPS Coords and Status */}
-          <View style={styles.locationFooterRow}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Ionicons name="locate-outline" size={11} color="rgba(255, 255, 255, 0.6)" />
-              <Text style={styles.coordsText}>
-                {currentLocation ? `${currentLocation.latitude.toFixed(4)}° N, ${currentLocation.longitude.toFixed(4)}° E` : 'GPS Location Not Detected'}
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.liveGpsPill,
-                !detectedHubName && { backgroundColor: 'rgba(245, 158, 11, 0.25)', borderColor: 'rgba(245, 158, 11, 0.5)' }
-              ]}
-            >
-              <View
-                style={[
-                  styles.gpsPulseDot,
-                  !detectedHubName && { backgroundColor: '#F59E0B' }
-                ]}
-              />
-              <Text
-                style={[
-                  styles.liveGpsPillText,
-                  !detectedHubName && { color: '#FDE68A' }
-                ]}
-              >
-                {detectedHubName ? 'DISPATCH READY' : 'NO HUB SELECTED'}
-              </Text>
-            </View>
-          </View>
-        </View>
-      </View>
-
-      {/* Incoming Job Offer Card (Priority Offer Gate) */}
+      {/* 8. INCOMING JOB OFFER CARD (Priority Offer Gate) */}
       {incomingJobOffer && (
         <View style={styles.offerCard}>
           <View style={styles.orderCardHeader}>
@@ -536,9 +569,9 @@ export const RiderDashboardScreen: React.FC = () => {
                 <View style={styles.offerPulseDot} />
                 <Text style={styles.offerPillText}>INCOMING JOB OFFER</Text>
               </View>
-              <View style={{ backgroundColor: '#ECFDF5', borderColor: '#A7F3D0', borderWidth: 1, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <View style={styles.deliveryOrderBadge}>
                 <Ionicons name="bicycle" size={11} color="#059669" />
-                <Text style={{ color: '#047857', fontWeight: '800', fontSize: 10 }}>DELIVERY ORDER</Text>
+                <Text style={styles.deliveryOrderBadgeText}>DELIVERY ORDER</Text>
               </View>
             </View>
             <Text style={styles.orderIdText}>{incomingJobOffer.orderNumber}</Text>
@@ -553,7 +586,7 @@ export const RiderDashboardScreen: React.FC = () => {
               <Text style={[styles.locTitle, { fontSize: 13 }]}>
                 {incomingJobOffer.storeName || 'Dark Store / Vendor'}
               </Text>
-              <Text style={[styles.locSubText, { color: '#334155', fontSize: 12, lineHeight: 16, marginTop: 2 }]}>
+              <Text style={styles.locSubText}>
                 {incomingJobOffer.storeAddress || 'Address details available upon dispatch'}
               </Text>
             </View>
@@ -566,7 +599,7 @@ export const RiderDashboardScreen: React.FC = () => {
               <Text style={[styles.locTitle, { fontSize: 13 }]}>
                 {incomingJobOffer.customerName || 'Customer'}
               </Text>
-              <Text style={[styles.locSubText, { color: '#334155', fontSize: 12, lineHeight: 16, marginTop: 2 }]}>
+              <Text style={styles.locSubText}>
                 {incomingJobOffer.customerAddress || 'Customer Address'}
               </Text>
             </View>
@@ -613,7 +646,7 @@ export const RiderDashboardScreen: React.FC = () => {
         </View>
       )}
 
-      {/* Active Delivery Card (if any real accepted delivery exists) */}
+      {/* 9. ACTIVE DELIVERY CARD */}
       {isRealDelivery && activeDelivery ? (
         <View style={styles.activeOrderCard}>
           <View style={styles.orderCardHeader}>
@@ -662,109 +695,76 @@ export const RiderDashboardScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       ) : !incomingJobOffer ? (
-        /* Idle Waiting Card */
-        <View style={styles.waitingCard}>
-          {!detectedHubName ? (
-            <>
-              <View style={[styles.radarIconWrap, { backgroundColor: '#FEF3C7' }]}>
-                <Ionicons name="location-outline" size={38} color="#D97706" />
-              </View>
-              <Text style={[styles.waitingTitle, { color: '#92400E' }]}>
-                No Hub Selected
-              </Text>
-              <Text style={styles.waitingSub}>
-                You haven't detected your GPS location or selected an operational hub yet. Please detect your live GPS or select an operating dark store hub to start receiving delivery dispatches.
-              </Text>
+        /* Out of Radius / Location Error State Card */
+        isOnline && !detectedHubName ? (
+          <View style={[styles.waitingCard, { borderColor: '#FCA5A5', backgroundColor: '#FEF2F2' }]}>
+            <View style={[styles.radarIconWrap, { backgroundColor: '#FEE2E2' }]}>
+              <Ionicons name="close-circle" size={36} color="#DC2626" />
+            </View>
+            <Text style={[styles.waitingTitle, { color: '#DC2626' }]}>
+              No Dark Store Nearby
+            </Text>
+            <Text style={[styles.waitingSub, { color: '#7F1D1D' }]}>
+              {locationError || 'You are outside our delivery radius (10 km). Please move closer to a serviceable dark store area to receive orders.'}
+            </Text>
+            <TouchableOpacity
+              style={[styles.testDispatchBtn, { borderColor: '#DC2626' }]}
+              onPress={async () => {
+                setIsDetecting(true);
+                await detectLocation();
+                setIsDetecting(false);
+              }}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="refresh" size={14} color="#DC2626" style={{ marginRight: 6 }} />
+              <Text style={[styles.testDispatchText, { color: '#DC2626' }]}>Retry Location</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          /* Idle Waiting State Card */
+          <View style={styles.waitingCard}>
+            <View style={styles.radarIconWrap}>
+              <Ionicons name="radio-outline" size={36} color="#F51BA0" />
+            </View>
+            <Text style={styles.waitingTitle}>
+              {isOnline ? 'Searching for Nearby Deliveries...' : 'You are currently offline'}
+            </Text>
+            <Text style={styles.waitingSub}>
+              {isOnline
+                ? `Ready at ${detectedHubName ? detectedHubName.split('(')[0].trim() : (profile?.city || 'Dark Store Hub')}. Orders dispatched by automated dark store system will appear here instantly.`
+                : 'Switch duty toggle online to receive delivery requests and start earning.'}
+            </Text>
 
-              <View style={{ flexDirection: 'row', gap: 10, marginTop: 14, width: '100%', justifyContent: 'center' }}>
-                <TouchableOpacity
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    backgroundColor: COLORS.navy,
-                    paddingHorizontal: 16,
-                    paddingVertical: 10,
-                    borderRadius: 8,
-                    gap: 6,
-                  }}
-                  onPress={async () => {
-                    setIsDetecting(true);
-                    await detectLocation();
-                    setIsDetecting(false);
-                  }}
-                  disabled={isDetecting}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="navigate-outline" size={14} color="#fff" />
-                  <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
-                    {isDetecting ? 'Detecting...' : 'Detect GPS Hub'}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    backgroundColor: COLORS.primary,
-                    paddingHorizontal: 16,
-                    paddingVertical: 10,
-                    borderRadius: 8,
-                    gap: 6,
-                  }}
-                  onPress={() => setShowHubModal(true)}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="business-outline" size={14} color="#fff" />
-                  <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
-                    Select Hub
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          ) : (
-            <>
-              <View style={styles.radarIconWrap}>
-                <Ionicons name="radio-outline" size={38} color={COLORS.primary} />
-              </View>
-              <Text style={styles.waitingTitle}>
-                {isOnline ? 'Searching for Nearby Deliveries...' : 'You are currently offline'}
-              </Text>
-              <Text style={styles.waitingSub}>
-                {isOnline
-                  ? `Ready at ${detectedHubName ? detectedHubName.split('(')[0].trim() : (profile?.city || 'Dark Store Hub')}. Orders dispatched by automated dark store system will appear here instantly.`
-                  : 'Switch duty toggle online to receive delivery requests and start earning.'}
-              </Text>
-
-              {isOnline ? (
-                <TouchableOpacity
-                  style={styles.testDispatchBtn}
-                  onPress={fetchNewOrder}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="refresh" size={14} color={COLORS.primary} style={{ marginRight: 6 }} />
-                  <Text style={styles.testDispatchText}>Check For New Order Dispatch</Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  style={[styles.goOnlineBtn, isPendingApproval && { backgroundColor: '#94A3B8' }]}
-                  onPress={() => {
-                    if (isPendingApproval) {
-                      Alert.alert(
-                        'Account Pending Approval',
-                        'Your account is currently under review by Admin. Please wait for verification.'
-                      );
-                      return;
-                    }
-                    toggleDutyStatus();
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name={isPendingApproval ? 'lock-closed' : 'power'} size={14} color="#fff" style={{ marginRight: 6 }} />
-                  <Text style={styles.goOnlineText}>{isPendingApproval ? 'Approval Pending' : 'Go Online Now'}</Text>
-                </TouchableOpacity>
-              )}
-            </>
-          )}
-        </View>
+            {isOnline ? (
+              <TouchableOpacity
+                style={styles.testDispatchBtn}
+                onPress={fetchNewOrder}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="refresh" size={14} color="#F51BA0" style={{ marginRight: 6 }} />
+                <Text style={styles.testDispatchText}>Check For New Order Dispatch</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={[styles.goOnlineBtn, isPendingApproval && { backgroundColor: '#94A3B8' }]}
+                onPress={() => {
+                  if (isPendingApproval) {
+                    Alert.alert(
+                      'Account Pending Approval',
+                      'Your account is currently under review by Admin. Please wait for verification.'
+                    );
+                    return;
+                  }
+                  toggleDutyStatus();
+                }}
+                activeOpacity={0.8}
+              >
+                <Ionicons name={isPendingApproval ? 'lock-closed' : 'power'} size={14} color="#fff" style={{ marginRight: 6 }} />
+                <Text style={styles.goOnlineText}>{isPendingApproval ? 'Approval Pending' : 'Go Online Now'}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )
       ) : null}
 
       {/* Available Jobs Board Notification Banner */}
@@ -775,199 +775,19 @@ export const RiderDashboardScreen: React.FC = () => {
           activeOpacity={0.85}
         >
           <View style={styles.availableJobsLeft}>
-            <View style={styles.availableJobsIconWrap}>
-              <Ionicons name="cube" size={20} color="#4F46E5" />
+            <View style={styles.availableBadgeCount}>
+              <Text style={styles.availableBadgeCountText}>{availableJobs.length}</Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.availableJobsTitle}>
-                {availableJobs.length} Delivery Job{availableJobs.length > 1 ? 's' : ''} Available
-              </Text>
-              <Text style={styles.availableJobsSub}>
-                Orders waiting nearby • Tap to view & accept
-              </Text>
+            <View>
+              <Text style={styles.availableJobsTitle}>New Deliveries Ready in Area</Text>
+              <Text style={styles.availableJobsSub}>Tap to view and accept batch orders</Text>
             </View>
           </View>
-          <View style={styles.availableJobsBadge}>
-            <Text style={styles.availableJobsBadgeText}>VIEW</Text>
-            <Ionicons name="chevron-forward" size={11} color="#fff" style={{ marginLeft: 3 }} />
-          </View>
+          <Ionicons name="chevron-forward" size={16} color={COLORS.secondaryText} />
         </TouchableOpacity>
       )}
 
-      {/* Today's KPI Metrics */}
-      <Text style={styles.sectionHeading}>Today's Operational Summary</Text>
-      <View style={styles.kpiGrid}>
-        <View style={styles.kpiCard}>
-          <Text style={styles.kpiValue}>{settlementSummary?.todayCompleted ?? 0}</Text>
-          <Text style={styles.kpiLabel}>Completed</Text>
-        </View>
-        <View style={styles.kpiCard}>
-          <Text style={styles.kpiValue}>{isRealDelivery ? '1' : '0'}</Text>
-          <Text style={styles.kpiLabel}>In Progress</Text>
-        </View>
-        <View style={styles.kpiCard}>
-          <Text style={[styles.kpiValue, { color: COLORS.onlineGreen }]}>
-            ₹{settlementSummary?.netPayableToday ?? 0}
-          </Text>
-          <Text style={styles.kpiLabel}>Earnings</Text>
-        </View>
-        <View style={styles.kpiCard}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-            <Text style={styles.kpiValue}>{profile?.rating ? profile.rating.toFixed(1) : '5.0'}</Text>
-            <Ionicons name="star" size={13} color="#F59E0B" />
-          </View>
-          <Text style={styles.kpiLabel}>Rating</Text>
-        </View>
-      </View>
-
-      {/* Quick Operational Actions */}
-      <Text style={styles.sectionHeading}>Quick Actions</Text>
-      <View style={styles.quickActionsList}>
-        <TouchableOpacity
-          style={styles.actionRow}
-          onPress={() => setSubScreen('DutyHistory')}
-          activeOpacity={0.7}
-        >
-          <View style={styles.actionLeft}>
-            <View style={styles.actionIconWrap}>
-              <Ionicons name="calendar-outline" size={18} color={COLORS.primary} />
-            </View>
-            <View>
-              <Text style={styles.actionTitle}>Duty Shifts & Attendance</Text>
-              <Text style={styles.actionDesc}>View past completed drops & times</Text>
-            </View>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color={COLORS.secondaryText} />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionRow}
-          onPress={() => setCurrentTab('Earnings')}
-          activeOpacity={0.7}
-        >
-          <View style={styles.actionLeft}>
-            <View style={styles.actionIconWrap}>
-              <Ionicons name="wallet-outline" size={18} color="#10B981" />
-            </View>
-            <View>
-              <Text style={styles.actionTitle}>Settlement & Bank Payouts</Text>
-              <Text style={styles.actionDesc}>Daily base pay, tips and bonuses</Text>
-            </View>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color={COLORS.secondaryText} />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionRow}
-          onPress={() => setSubScreen('BankSettlement')}
-          activeOpacity={0.7}
-        >
-          <View style={styles.actionLeft}>
-            <View style={styles.actionIconWrap}>
-              <Ionicons name="card-outline" size={18} color="#6366F1" />
-            </View>
-            <View>
-              <Text style={styles.actionTitle}>Manage Bank Account</Text>
-              <Text style={styles.actionDesc}>Verify IFSC, Account number or UPI ID</Text>
-            </View>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color={COLORS.secondaryText} />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionRow}
-          onPress={() => setCurrentTab('Help')}
-          activeOpacity={0.7}
-        >
-          <View style={styles.actionLeft}>
-            <View style={styles.actionIconWrap}>
-              <Ionicons name="headset-outline" size={18} color="#EC4899" />
-            </View>
-            <View>
-              <Text style={styles.actionTitle}>Dark Store Support</Text>
-              <Text style={styles.actionDesc}>Direct helpline & customer issue reporting</Text>
-            </View>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color={COLORS.secondaryText} />
-        </TouchableOpacity>
-      </View>
-
       <View style={styles.bottomSpacer} />
-
-      {/* Quick Hub Switcher Modal for Testing Any Store */}
-      <Modal
-        visible={showHubModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowHubModal(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.hubModalSheet}>
-            <View style={styles.hubModalHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.hubModalTitle}>Simulate Location / Switch Hub</Text>
-                <Text style={styles.hubModalSub}>
-                  Select any Dark Store area in Ahmedabad to test nearby order discovery
-                </Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowHubModal(false)} style={styles.closeModalBtn}>
-                <Ionicons name="close" size={20} color={COLORS.textMuted} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
-              {availableHubs.map((hub) => (
-                <TouchableOpacity
-                  key={hub.id}
-                  style={styles.hubItemCard}
-                  onPress={async () => {
-                    await setSimulatedHub(hub);
-                    setShowHubModal(false);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.hubItemName}>{hub.name}</Text>
-                    <Text style={styles.hubItemAddress}>{hub.address}</Text>
-                    <Text style={styles.hubItemCoords}>
-                      GPS: {hub.latitude}, {hub.longitude}
-                    </Text>
-                  </View>
-                  <View style={styles.hubSelectArrow}>
-                    <Text style={styles.hubSelectArrowText}>Select</Text>
-                    <Ionicons name="chevron-forward" size={10} color="#fff" style={{ marginLeft: 3 }} />
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-              <TouchableOpacity
-                style={[styles.realGpsRestoreBtn, { flex: 1, marginTop: 0 }]}
-                onPress={async () => {
-                  await detectLocation();
-                  setShowHubModal(false);
-                }}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="locate" size={14} color={COLORS.textPrimary} style={{ marginRight: 6 }} />
-                <Text style={styles.realGpsRestoreText}>Detect GPS</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.realGpsRestoreBtn, { flex: 1, marginTop: 0, borderColor: '#FCA5A5', backgroundColor: '#FEF2F2' }]}
-                onPress={async () => {
-                  await clearSelectedHub();
-                  setShowHubModal(false);
-                }}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="close-circle-outline" size={14} color="#DC2626" style={{ marginRight: 6 }} />
-                <Text style={[styles.realGpsRestoreText, { color: '#DC2626' }]}>Clear Hub</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       {/* Online UPI Settlement to Admin Modal */}
       <OnlinePaymentModal
@@ -986,1189 +806,482 @@ export const RiderDashboardScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
-    padding: 16,
+    backgroundColor: '#F8F9FD',
   },
-  pendingVerifCard: {
-    backgroundColor: '#FFFBEB',
-    borderWidth: 1.5,
-    borderColor: '#FCD34D',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#F59E0B',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  pendingVerifLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-    marginRight: 8,
-  },
-  pendingVerifIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#FEF3C7',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pendingVerifTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#92400E',
-    marginBottom: 2,
-  },
-  pendingVerifSubtitle: {
-    fontSize: 11,
-    color: '#B45309',
-    lineHeight: 15,
-  },
-  pendingVerifBadge: {
-    backgroundColor: '#F59E0B',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  pendingVerifBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-  },
-  payAdminActionBtn: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginBottom: 14,
-    shadowColor: '#DC2626',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  payAdminActionBtnBlocked: {
-    shadowColor: '#991B1B',
-    shadowOpacity: 0.45,
-    shadowRadius: 10,
-    elevation: 6,
-    borderWidth: 1.5,
-    borderColor: '#FCA5A5',
-  },
-  payAdminGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
+  contentContainer: {
     paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 90,
   },
-  payAdminLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
+  bottomSpacer: {
+    height: 20,
   },
-  payAdminIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  payAdminTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: -0.2,
-  },
-  payAdminSubtitle: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.9)',
-    marginTop: 2,
-    fontWeight: '500',
-  },
-  payAdminRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  payAdminBadge: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-  },
-  payAdminBadgeText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#DC2626',
-    letterSpacing: 0.5,
-  },
-  topHeaderRow: {
+
+  // 1. Welcome Section
+  welcomeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 16,
-    paddingTop: 4,
+    paddingTop: 2,
+    position: 'relative',
+    minHeight: 80,
   },
-  topGreetingLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+  welcomeTextColumn: {
+    flex: 1,
+    paddingRight: 8,
   },
-  helloTitle: {
+  welcomeGreetingTitle: {
     fontSize: 22,
-    fontWeight: '800',
-    color: '#071B52',
+    fontWeight: '900',
+    color: '#10215A',
     letterSpacing: -0.3,
   },
-  onlineBadgePill: {
+  welcomeSubtitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#657493',
+    marginTop: 3,
+  },
+  welcomeRiderImgWrap: {
+    width: 110,
+    height: 90,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  welcomeRiderImg: {
+    width: '100%',
+    height: '100%',
+  },
+
+  // 2. Main Today's Total Earnings Card
+  mainEarningsCard: {
+    borderRadius: 22,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    marginBottom: 14,
+    position: 'relative',
+    overflow: 'hidden',
+    shadowColor: '#7227DF',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  floatingCoinsWrap: {
+    position: 'absolute',
+    top: 8,
+    right: 90,
+    flexDirection: 'row',
+    gap: 12,
+    opacity: 0.9,
+  },
+  floatingCoinOne: {
+    fontSize: 18,
+    transform: [{ rotate: '15deg' }],
+  },
+  floatingCoinTwo: {
+    fontSize: 14,
+    transform: [{ rotate: '-10deg' }],
+    marginTop: 4,
+  },
+  earningsCardContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
-    gap: 6,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    justifyContent: 'space-between',
   },
-  onlineBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#13B978',
+  walletIllustrationWrap: {
+    marginRight: 12,
   },
-  bellBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  walletInnerBox: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 5,
+    elevation: 4,
     position: 'relative',
   },
-  bellBadge: {
+  walletCoinPill: {
     position: 'absolute',
-    top: -3,
-    right: -3,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#FF3B98',
-    paddingHorizontal: 4,
+    bottom: -4,
+    right: -4,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#F59E0B',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
     borderColor: '#FFFFFF',
   },
-  bellBadgeText: {
+  walletCoinPillText: {
     color: '#FFFFFF',
-    fontSize: 9,
-    fontWeight: '800',
+    fontSize: 10,
+    fontWeight: '900',
   },
-  todayEarningCard: {
-    borderRadius: 20,
-    padding: 20,
+  earningsCenterWrap: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  earningsTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 14,
-    shadowColor: '#FF3B98',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 6,
+    gap: 4,
   },
-  earningLeft: {
-    flex: 1,
-  },
-  todayEarningLabel: {
-    fontSize: 13,
-    fontWeight: '600',
+  earningsLabelText: {
     color: '#FFFFFF',
-    opacity: 0.9,
+    fontSize: 13,
+    fontWeight: '700',
+    opacity: 0.95,
   },
-  todayEarningAmount: {
+  earningsAmountValue: {
+    color: '#FFFFFF',
     fontSize: 32,
     fontWeight: '900',
-    color: '#FFFFFF',
-    marginTop: 4,
     letterSpacing: -0.5,
+    marginVertical: 1,
   },
-  todayOrdersCount: {
-    fontSize: 13,
-    fontWeight: '600',
+  deliveredCountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  deliveredCountText: {
     color: '#FFFFFF',
-    opacity: 0.9,
-    marginTop: 2,
+    fontSize: 12,
+    fontWeight: '600',
+    opacity: 0.92,
   },
-  viewDetailsPillBtn: {
+  khataDetailsBtn: {
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    borderRadius: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.12,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 3,
   },
-  viewDetailsPillText: {
-    fontSize: 13,
+  khataDetailsText: {
+    color: '#10215A',
+    fontSize: 12,
     fontWeight: '800',
-    color: '#FF3B98',
   },
-  statsThreeColRow: {
+
+  // 3 & 4. Three Cards Rows (Financial and Performance)
+  threeCardsRow: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 14,
+    marginBottom: 12,
   },
-  statColCard: {
+  metricCard: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 8,
-    alignItems: 'center',
+    borderRadius: 18,
+    padding: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    borderColor: '#F0D7FA',
+    shadowColor: '#10215A',
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+    shadowRadius: 6,
+    elevation: 2,
+    alignItems: 'flex-start',
   },
-  statColValue: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#071B52',
+  metricCardAlert: {
+    borderColor: '#FCA5A5',
+    backgroundColor: '#FFF5F5',
   },
-  statColLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#64748B',
-    marginTop: 2,
-  },
-  twoActionButtonsRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
-  bigActionBtn: {
-    flex: 1,
-    height: 52,
+  metricIconCircle: {
+    width: 32,
+    height: 32,
     borderRadius: 16,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    marginBottom: 6,
+  },
+  metricCurrencySymbol: {
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  metricLabelText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#10215A',
+    marginBottom: 2,
+  },
+  metricValueText: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#10215A',
+    letterSpacing: -0.3,
+  },
+  metricTrendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    marginTop: 2,
+  },
+  metricTrendText: {
+    fontSize: 9.5,
+    fontWeight: '700',
+  },
+  metricSubText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#657493',
+    marginTop: 2,
+  },
+  sparklineContainer: {
+    width: '100%',
+    height: 18,
+    marginTop: 2,
+  },
+
+  // 5. Action Buttons (Go Offline + Order History)
+  actionButtonsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginVertical: 4,
+    marginBottom: 14,
+  },
+  actionBtnOuter: {
+    flex: 1,
+    borderRadius: 24,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.12,
     shadowRadius: 6,
     elevation: 3,
   },
-  bigActionIconCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+  actionGradientBtn: {
+    height: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+  actionBtnIconCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  bigActionBtnText: {
-    fontSize: 15,
-    fontWeight: '800',
+  actionGradientBtnText: {
     color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
   },
-  heroCard: {
-    backgroundColor: COLORS.navy,
-    borderRadius: 20,
-    padding: 18,
-    marginBottom: 16,
-  },
-  greetingRow: {
+
+  // 6. Promotional Banner
+  promoBannerWrap: {
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
+    marginBottom: 14,
+    overflow: 'hidden',
+    shadowColor: '#7209B7',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  greetingLeft: {
+  promoLeftColumn: {
     flex: 1,
+    paddingRight: 8,
   },
-  greetingLabel: {
-    color: COLORS.secondaryText,
-    fontSize: 12,
+  promoHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  promoGiftIcon: {
+    fontSize: 15,
+  },
+  promoTitleText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  promoSubtitleText: {
+    color: 'rgba(255, 255, 255, 0.88)',
+    fontSize: 11,
+    lineHeight: 15,
+    marginBottom: 8,
     fontWeight: '500',
   },
-  riderName: {
-    color: COLORS.white,
-    fontSize: 20,
+  viewTipsPillBtn: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+    alignSelf: 'flex-start',
+  },
+  viewTipsPillText: {
+    color: '#25105F',
+    fontSize: 11,
     fontWeight: '800',
-    marginTop: 2,
   },
-  hubLocation: {
-    color: COLORS.hotPink,
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  vehicleBadge: {
-    backgroundColor: '#1E2260',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  vehicleIcon: {
-    fontSize: 18,
-  },
-  vehicleNumber: {
-    color: COLORS.white,
-    fontSize: 10,
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  dutyToggleBtn: {
-    flexDirection: 'row',
+  promoRightImageWrap: {
+    width: 120,
+    height: 85,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 14,
-    gap: 8,
   },
-  onlineBtn: {
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-    borderWidth: 1,
-    borderColor: COLORS.onlineGreen,
+  promoBikeImage: {
+    width: '100%',
+    height: '100%',
   },
-  offlineBtn: {
-    backgroundColor: 'rgba(156, 163, 175, 0.2)',
-    borderWidth: 1,
-    borderColor: COLORS.secondaryText,
-  },
-  statusDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  onlineDot: {
-    backgroundColor: COLORS.onlineGreen,
-  },
-  offlineDot: {
-    backgroundColor: COLORS.offlineGray,
-  },
-  dutyBtnText: {
-    color: COLORS.white,
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  offerCard: {
-    backgroundColor: '#FFF5F8',
+
+  // 7. Live GPS Card
+  liveGpsDarkCard: {
+    backgroundColor: '#0D153B',
     borderRadius: 20,
-    padding: 18,
-    borderWidth: 2,
-    borderColor: COLORS.error,
-    marginBottom: 20,
-    elevation: 6,
-    shadowColor: COLORS.error,
+    padding: 14,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
+    elevation: 4,
   },
-  offerPill: {
+  gpsCardHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFE3E8',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  liveGpsIndicatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
   },
-  offerPulseDot: {
+  pulseDotGreen: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: COLORS.error,
+    backgroundColor: '#06BF7B',
   },
-  offerPillText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: COLORS.error,
-    letterSpacing: 0.5,
-  },
-  offerActionsRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 6,
-  },
-  offerRejectBtn: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-    borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  offerRejectText: {
-    color: COLORS.textMuted,
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  offerAcceptBtn: {
-    flex: 2,
-    backgroundColor: COLORS.onlineGreen,
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-    shadowColor: COLORS.onlineGreen,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 5,
-  },
-  offerAcceptText: {
-    color: COLORS.white,
-    fontWeight: '900',
-    fontSize: 13,
-    letterSpacing: 0.5,
-  },
-  activeOrderCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 2,
-    borderColor: COLORS.hotPink,
-    marginBottom: 20,
-    elevation: 4,
-  },
-  orderCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  activePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.lightPink,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    gap: 6,
-  },
-  pulseDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: COLORS.hotPink,
-  },
-  activePillText: {
-    color: COLORS.hotPink,
-    fontWeight: '800',
-    fontSize: 11,
-  },
-  orderIdText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.navy,
-  },
-  orderRouteRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: COLORS.cardBackground,
-    padding: 12,
-    borderRadius: 14,
-    marginBottom: 12,
-  },
-  locationBlock: {
-    flex: 1,
-  },
-  locLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: COLORS.secondaryText,
-  },
-  locTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    marginTop: 2,
-  },
-  routeArrow: {
-    marginHorizontal: 8,
-    color: COLORS.hotPink,
-    fontWeight: '800',
-  },
-  orderMetaBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 14,
-  },
-  metaItem: {
-    fontSize: 12,
-    color: COLORS.textMuted,
-    fontWeight: '600',
-  },
-  metaPayout: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: COLORS.onlineGreen,
-  },
-  viewDeliveryBtn: {
-    backgroundColor: COLORS.hotPink,
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  viewDeliveryText: {
-    color: COLORS.white,
-    fontWeight: '800',
-    fontSize: 12,
-    letterSpacing: 0.5,
-  },
-  waitingCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 20,
-    padding: 24,
-    alignItems: 'center',
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  radarIconWrap: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#EEF2FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  radarEmoji: {
-    fontSize: 36,
-    marginBottom: 8,
-  },
-  waitingTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: COLORS.textPrimary,
-    marginBottom: 4,
-  },
-  waitingSub: {
-    fontSize: 12,
-    color: COLORS.textMuted,
-    textAlign: 'center',
-    lineHeight: 18,
-    marginBottom: 14,
-  },
-  testDispatchBtn: {
-    backgroundColor: COLORS.lightBlueLavender,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-  },
-  testDispatchText: {
-    color: COLORS.blue,
-    fontWeight: '700',
-    fontSize: 12,
-  },
-  goOnlineBtn: {
-    backgroundColor: COLORS.onlineGreen,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-  },
-  goOnlineText: {
-    color: COLORS.white,
-    fontWeight: '800',
-    fontSize: 12,
-  },
-  sectionHeading: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: COLORS.navy,
-    marginBottom: 12,
-  },
-  kpiGrid: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 20,
-  },
-  kpiCard: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-    borderRadius: 14,
-    padding: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  kpiValue: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: COLORS.navy,
-  },
-  kpiLabel: {
-    fontSize: 10,
-    color: COLORS.textMuted,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  quickActionsList: {
-    gap: 10,
-    marginBottom: 20,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: COLORS.white,
-    padding: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  actionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  actionIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionEmoji: {
-    fontSize: 22,
-  },
-  actionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-  },
-  actionDesc: {
-    fontSize: 11,
-    color: COLORS.textMuted,
-    marginTop: 1,
-  },
-  chevron: {
-    fontSize: 20,
-    color: COLORS.secondaryText,
-    fontWeight: '600',
-  },
-  bottomSpacer: {
-    height: 30,
-  },
-  availableJobsCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#EEF2FF',
-    borderWidth: 1.5,
-    borderColor: '#C7D2FE',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 16,
-    shadowColor: '#4F46E5',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  availableJobsLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  availableJobsIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#E0E7FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  availableJobsTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#3730A3',
-  },
-  availableJobsSub: {
-    fontSize: 11,
-    color: '#4338CA',
-    marginTop: 2,
-  },
-  availableJobsBadge: {
-    backgroundColor: '#4F46E5',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    marginLeft: 8,
-  },
-  availableJobsBadgeText: {
-    color: COLORS.white,
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  locationBar: {
-    marginTop: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    padding: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
-  },
-  locationHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  locationPulseWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  locationPulseDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: '#00E676',
-  },
-  locationBarLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: 'rgba(255, 255, 255, 0.85)',
-    letterSpacing: 0.6,
-  },
-  locationBarBtns: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  detectGpsBtn: {
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
-  },
-  detectGpsBtnText: {
-    color: COLORS.white,
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  switchHubBtn: {
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
-  },
-  switchHubBtnText: {
-    color: COLORS.white,
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  locationStoreRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
-  },
-  locationStoreIcon: {
-    fontSize: 13,
-  },
-  locationStoreName: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#38BDF8',
-    flex: 1,
-  },
-  locationDistanceBadge: {
-    backgroundColor: 'rgba(56, 189, 248, 0.2)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.35)',
-  },
-  locationDistanceText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#38BDF8',
-  },
-  addressLineRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 6,
-    marginTop: 2,
-    marginBottom: 8,
-  },
-  addressPinIcon: {
-    fontSize: 12,
-    marginTop: 1,
-  },
-  addressLineText: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.85)',
-    lineHeight: 16,
-    flex: 1,
-    fontWeight: '500',
-  },
-  locationFooterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 6,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  coordsText: {
-    fontSize: 10,
-    color: 'rgba(255, 255, 255, 0.65)',
-    fontFamily: 'monospace',
-  },
-  liveGpsPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(0, 230, 118, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 230, 118, 0.4)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  gpsPulseDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: '#00E676',
-  },
-  liveGpsPillText: {
-    color: '#00E676',
-    fontSize: 8,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  nearbyHubBadge: {
-    backgroundColor: '#FFF3E0',
-    borderColor: '#FF9800',
-    borderWidth: 1,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  nearbyHubBadgeText: {
-    color: '#E65100',
-    fontWeight: '800',
-    fontSize: 10,
-  },
-  ownHubBadge: {
-    backgroundColor: '#E8F5E9',
-    borderColor: '#4CAF50',
-    borderWidth: 1,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  ownHubBadgeText: {
-    color: '#2E7D32',
-    fontWeight: '800',
-    fontSize: 10,
-  },
-  locSubText: {
-    fontSize: 11,
-    color: COLORS.textMuted,
-    marginTop: 2,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  hubModalSheet: {
-    backgroundColor: COLORS.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 20,
-    maxHeight: '80%',
-  },
-  hubModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  hubModalTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: COLORS.textPrimary,
-  },
-  hubModalSub: {
-    fontSize: 11,
-    color: COLORS.textMuted,
-    marginTop: 2,
-  },
-  closeModalBtn: {
-    padding: 6,
-  },
-  closeModalText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.textMuted,
-  },
-  hubItemCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.cardBackground,
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  hubItemName: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-  },
-  hubItemAddress: {
-    fontSize: 11,
-    color: COLORS.textMuted,
-    marginTop: 2,
-  },
-  hubItemCoords: {
-    fontSize: 10,
-    color: COLORS.secondaryText,
-    marginTop: 2,
-    fontFamily: 'monospace',
-  },
-  hubSelectArrow: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    marginLeft: 8,
-  },
-  hubSelectArrowText: {
-    color: COLORS.white,
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  realGpsRestoreBtn: {
-    backgroundColor: '#F3F4F6',
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  realGpsRestoreText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-  },
-  promoBannerCard: {
-    marginHorizontal: 0,
-    marginTop: 0,
-    marginBottom: 14,
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: '#071B52',
-    height: 94,
-    position: 'relative',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 59, 152, 0.35)',
-    shadowColor: '#071B52',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  promoBannerImage: {
-    width: '100%',
-    height: '100%',
-    position: 'absolute',
-    top: 0,
-    left: 0,
-  },
-  promoBannerOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: 'rgba(7, 27, 82, 0.82)',
-  },
-  promoBannerTitle: {
-    fontSize: 13,
-    fontWeight: '800',
+  liveGpsHeaderTitle: {
     color: '#FFFFFF',
-    letterSpacing: 0.2,
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.5,
   },
-  promoBannerSubtitle: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#F472B6',
-    marginTop: 1,
-  },
-
-  // Red Lock & Khata Styles
-  redLockAlertBanner: {
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1.5,
-    borderColor: '#DC2626',
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 12,
+  gpsControlButtonsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
+    gap: 6,
   },
-  redLockAlertContent: {
-    flex: 1,
+  autoGpsPillBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    backgroundColor: 'rgba(6, 191, 123, 0.18)',
+    borderColor: '#06BF7B',
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
   },
-  redLockIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#DC2626',
+  autoGpsPillText: {
+    color: '#06BF7B',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  hubsPillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  hubsPillText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  gpsLocationInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  gpsHubNameText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  gpsHubAddressText: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 11.5,
+    lineHeight: 16,
+  },
+  miniMapGraphicWrap: {
+    width: 44,
+    height: 38,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
+    marginLeft: 8,
   },
-  redLockAlertTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#991B1B',
+  miniMapRouteLine: {
+    position: 'absolute',
+    width: 28,
+    height: 2,
+    backgroundColor: '#2676F4',
+    transform: [{ rotate: '25deg' }],
   },
-  redLockAlertSubtitle: {
-    fontSize: 11,
-    color: '#B91C1C',
-    marginTop: 2,
-    lineHeight: 15,
-  },
-  redLockSettleBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#DC2626',
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-  },
-  redLockSettleBtnText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#DC2626',
+  miniMapPinMarker: {
+    position: 'absolute',
+    top: 4,
+    right: 6,
   },
 
-  khataThreeColRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-  },
-  khataColCard: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    alignItems: 'center',
-  },
-  khataColCardAlert: {
-    borderColor: '#F87171',
-    backgroundColor: '#FFF5F5',
-  },
-  khataColLabel: {
-    fontSize: 8,
-    fontWeight: '800',
-    color: '#64748B',
-    textTransform: 'uppercase',
-    textAlign: 'center',
-  },
-  khataColValue: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#071B52',
-    marginTop: 3,
-  },
-  khataColSub: {
-    fontSize: 9,
-    color: '#94A3B8',
-    marginTop: 2,
-    fontWeight: '600',
-  },
+  // 8. Alerts & Administrative Notice Styles
   pendingReviewBanner: {
     backgroundColor: '#FFFBEB',
-    borderRadius: 16,
     borderWidth: 1.5,
     borderColor: '#FCD34D',
-    padding: 14,
-    marginHorizontal: 16,
-    marginTop: 14,
-    marginBottom: 4,
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 10,
-    shadowColor: '#D97706',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
   },
   pendingReviewContent: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    flex: 1,
+    marginRight: 8,
   },
   pendingIconCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#D97706',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F59E0B',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2180,21 +1293,559 @@ const styles = StyleSheet.create({
   pendingAlertSubtitle: {
     fontSize: 11,
     color: '#B45309',
-    marginTop: 2,
-    lineHeight: 15,
+    marginTop: 1,
   },
   pendingBadgePill: {
     backgroundColor: '#FEF3C7',
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#F59E0B',
+    paddingVertical: 3,
+    borderRadius: 6,
   },
   pendingBadgeText: {
     fontSize: 10,
-    fontWeight: '900',
+    fontWeight: '800',
     color: '#D97706',
+  },
+  redLockAlertBanner: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1.5,
+    borderColor: '#FCA5A5',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  redLockAlertContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+    marginRight: 8,
+  },
+  redLockIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#DC2626',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  redLockAlertTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#991B1B',
+  },
+  redLockAlertSubtitle: {
+    fontSize: 11,
+    color: '#B91C1C',
+    marginTop: 1,
+  },
+  redLockSettleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#DC2626',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
+  },
+  redLockSettleBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#DC2626',
+  },
+  pendingVerifCard: {
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1.5,
+    borderColor: '#FCD34D',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  pendingVerifLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+    marginRight: 8,
+  },
+  pendingVerifIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pendingVerifTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#92400E',
+  },
+  pendingVerifSubtitle: {
+    fontSize: 11,
+    color: '#B45309',
+    marginTop: 1,
+  },
+  pendingVerifBadge: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  pendingVerifBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#D97706',
+  },
+
+  // Pay Admin Button
+  payAdminActionBtn: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 14,
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  payAdminActionBtnBlocked: {
+    borderWidth: 2,
+    borderColor: '#DC2626',
+  },
+  payAdminGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+  },
+  payAdminLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+    marginRight: 8,
+  },
+  payAdminIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  payAdminTitle: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  payAdminSubtitle: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 10.5,
+    marginTop: 1,
+  },
+  payAdminRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  payAdminBadge: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  payAdminBadgeText: {
+    color: '#DC2626',
+    fontSize: 10,
+    fontWeight: '900',
+  },
+
+  // 9. Operational Cards (Incoming Offer, Active Delivery, Waiting)
+  offerCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 14,
+    borderWidth: 1.5,
+    borderColor: '#F51BA0',
+    shadowColor: '#F51BA0',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  orderCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  offerPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FDF2F8',
+    borderColor: '#F51BA0',
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    gap: 4,
+  },
+  offerPulseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#F51BA0',
+  },
+  offerPillText: {
+    color: '#F51BA0',
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  deliveryOrderBadge: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  deliveryOrderBadgeText: {
+    color: '#047857',
+    fontWeight: '800',
+    fontSize: 10,
+  },
+  orderIdText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#10215A',
+  },
+  orderRouteRow: {
+    marginBottom: 12,
+  },
+  locationBlock: {
+    flex: 1,
+  },
+  locLabel: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#657493',
     letterSpacing: 0.5,
+  },
+  locTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#10215A',
+    marginTop: 1,
+  },
+  locSubText: {
+    color: '#657493',
+    fontSize: 11.5,
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  orderMetaBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FD',
+    borderRadius: 10,
+    padding: 8,
+    gap: 6,
+    marginBottom: 12,
+  },
+  metaItem: {
+    fontSize: 11,
+    color: '#657493',
+    fontWeight: '600',
+  },
+  metaPayout: {
+    fontSize: 11,
+    color: '#06BF7B',
+    fontWeight: '800',
+  },
+  offerActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  offerRejectBtn: {
+    flex: 1,
+    height: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  offerRejectText: {
+    color: '#657493',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  offerAcceptBtn: {
+    flex: 2,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#06BF7B',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  offerAcceptText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 12,
+    letterSpacing: 0.5,
+  },
+
+  // Active Order Card
+  activeOrderCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 14,
+    borderWidth: 1.5,
+    borderColor: '#2676F4',
+    shadowColor: '#2676F4',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  activePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    borderColor: '#2676F4',
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    gap: 4,
+  },
+  pulseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#2676F4',
+  },
+  activePillText: {
+    color: '#2676F4',
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  viewDeliveryBtn: {
+    backgroundColor: '#2676F4',
+    height: 42,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  viewDeliveryText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+
+  // Waiting Card
+  waitingCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#F0D7FA',
+  },
+  radarIconWrap: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#FDF2F8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  waitingTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#10215A',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  waitingSub: {
+    fontSize: 12,
+    color: '#657493',
+    textAlign: 'center',
+    lineHeight: 17,
+    maxWidth: 290,
+    marginBottom: 12,
+  },
+  testDispatchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FDF2F8',
+    borderWidth: 1,
+    borderColor: '#F0D7FA',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  testDispatchText: {
+    color: '#F51BA0',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  goOnlineBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#06BF7B',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  goOnlineText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+
+  // Available Jobs Board Banner
+  availableJobsCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#F0D7FA',
+    marginBottom: 14,
+  },
+  availableJobsLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  availableBadgeCount: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#F51BA0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  availableBadgeCountText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  availableJobsTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#10215A',
+  },
+  availableJobsSub: {
+    fontSize: 11,
+    color: '#657493',
+  },
+
+  // Hub Switcher Modal
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  hubModalSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  hubModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  hubModalTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#10215A',
+  },
+  hubModalSub: {
+    fontSize: 11.5,
+    color: '#657493',
+    marginTop: 2,
+  },
+  closeModalBtn: {
+    padding: 4,
+  },
+  hubItemCard: {
+    backgroundColor: '#F8F9FD',
+    borderRadius: 12,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#EAEFF8',
+  },
+  hubItemName: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#10215A',
+  },
+  hubItemAddress: {
+    fontSize: 11,
+    color: '#657493',
+    marginTop: 2,
+  },
+  hubItemCoords: {
+    fontSize: 10,
+    color: '#9AA5BC',
+    marginTop: 2,
+  },
+  hubSelectArrow: {
+    backgroundColor: '#F51BA0',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  hubSelectArrowText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  realGpsRestoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    paddingVertical: 10,
+  },
+  realGpsRestoreText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#10215A',
   },
 });

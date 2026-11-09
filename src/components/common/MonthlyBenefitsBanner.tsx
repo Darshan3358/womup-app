@@ -22,7 +22,7 @@ export const MonthlyBenefitsBanner: React.FC<MonthlyBenefitsBannerProps> = ({ on
         <Image
           source={require('../../../assets/offer2000.png')}
           style={styles.bannerImage}
-          resizeMode="cover"
+          resizeMode="contain"
         />
       </TouchableOpacity>
     </View>

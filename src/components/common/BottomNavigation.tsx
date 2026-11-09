@@ -7,12 +7,8 @@ import {
   useWindowDimensions,
   Platform,
   Image,
-  ImageBackground,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons, Feather } from '@expo/vector-icons';
-import { COLORS } from '../../theme/colors';
-
 import { useApp } from '../../context/AppContext';
 
 export type BlinkitTabKey =
@@ -39,9 +35,6 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
   const { width } = useWindowDimensions();
   const { isAuthenticated } = useApp();
 
-  const isSmallDevice = width <= 360;
-
-  // 5 clean tabs: Home, Orders, Categories, Profile/Login, Local App
   const tabs: {
     key: BlinkitTabKey;
     label: string;
@@ -52,13 +45,12 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
     { key: 'Categories', label: 'Categories' },
     {
       key: 'Profile',
-      label: isAuthenticated ? 'Profile' : 'Login',
+      label: isAuthenticated ? 'Profile' : 'Profile',
     },
     { key: 'Local Shop', label: 'App', isWomupAppButton: true },
   ];
 
-  const bottomPadding = Math.max(insets.bottom, 6);
-  const barHeight = 58;
+  const bottomPadding = Math.max(insets.bottom, 10);
 
   const renderIcon = (tabKey: BlinkitTabKey, isActive: boolean) => {
     switch (tabKey) {
@@ -66,7 +58,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         return (
           <Image
             source={require('../../../assets/nav_home_ref.png')}
-            style={{ width: 24, height: 24 }}
+            style={[styles.tabIcon, !isActive && { tintColor: '#8886AE' }]}
             resizeMode="contain"
           />
         );
@@ -74,7 +66,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         return (
           <Image
             source={require('../../../assets/nav_orders_ref.png')}
-            style={{ width: 24, height: 24, tintColor: isActive ? '#E11D88' : undefined }}
+            style={[styles.tabIcon, { tintColor: isActive ? '#F20B87' : '#8886AE' }]}
             resizeMode="contain"
           />
         );
@@ -82,7 +74,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         return (
           <Image
             source={require('../../../assets/nav_categories_ref.png')}
-            style={{ width: 24, height: 24, tintColor: isActive ? '#E11D88' : undefined }}
+            style={[styles.tabIcon, { tintColor: isActive ? '#F20B87' : '#8886AE' }]}
             resizeMode="contain"
           />
         );
@@ -90,7 +82,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         return (
           <Image
             source={require('../../../assets/nav_login_ref.png')}
-            style={{ width: 24, height: 24, tintColor: isActive ? '#E11D88' : undefined }}
+            style={[styles.tabIcon, { tintColor: isActive ? '#F20B87' : '#8886AE' }]}
             resizeMode="contain"
           />
         );
@@ -100,28 +92,31 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
   };
 
   return (
-    <ImageBackground
-      source={require('../../../assets/womart_footer_wave.png')}
-      style={[styles.wrapper, { paddingBottom: bottomPadding }]}
-      resizeMode="cover"
+    <View
+      style={[styles.outerWrapper, { paddingBottom: bottomPadding }]}
+      pointerEvents="box-none"
     >
-      <View style={[styles.container, { height: barHeight }]}>
+      <View style={styles.navContainer} pointerEvents="auto">
         {tabs.map((tab) => {
           const isActive = Boolean(
             currentTab === tab.key ||
-            (tab.isWomupAppButton && (currentTab === 'Local Shop' || currentTab === 'App'))
+            (tab.isWomupAppButton &&
+              (currentTab === 'Local Shop' || currentTab === 'App'))
           );
 
-          const labelColor = isActive ? '#E11D88' : '#52525B';
+          const activeColor = '#F20B87';
+          const inactiveColor = '#657493';
+          const labelColor = isActive ? activeColor : inactiveColor;
 
-          // Special 3D Circular WOMUP Logo Button ("App" / Local Shop)
+          // 5th Item: Prominent Circular WOMUP Logo Button ("App")
           if (tab.isWomupAppButton) {
             return (
               <TouchableOpacity
                 key={tab.key}
                 activeOpacity={0.8}
                 onPress={() => onSelectTab('Local Shop')}
-                style={styles.womupAppTabItem}
+                style={styles.womupAppTabBtn}
+                accessibilityRole="tab"
                 accessibilityLabel="WOMUP Local Shop App"
               >
                 <View style={styles.womupAppHalo}>
@@ -131,7 +126,6 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                     resizeMode="contain"
                   />
                 </View>
-
                 <Text
                   style={[
                     styles.tabLabel,
@@ -147,13 +141,15 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
             );
           }
 
-          // Standard navigation tabs (Home, Orders, Categories, Login/Profile)
+          // Standard Navigation Tabs: Home, Orders, Categories, Profile
           return (
             <TouchableOpacity
               key={tab.key}
               activeOpacity={0.7}
               onPress={() => onSelectTab(tab.key)}
-              style={styles.tabItem}
+              style={styles.tabBtn}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isActive }}
               accessibilityLabel={`${tab.label} tab`}
             >
               <View style={styles.iconContainer}>
@@ -177,91 +173,107 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
           );
         })}
       </View>
-    </ImageBackground>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  wrapper: {
-    backgroundColor: '#FAF5FF',
+  outerWrapper: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 99,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 16,
     width: '100%',
-    maxWidth: '100%',
-    overflow: 'visible',
-    paddingTop: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  container: {
+  navContainer: {
     flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 36,
     alignItems: 'center',
     justifyContent: 'space-around',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    height: 66,
     width: '100%',
-    maxWidth: '100%',
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    paddingHorizontal: 8,
-    paddingTop: 8,
-    paddingBottom: 2,
+    maxWidth: 480,
+    borderWidth: 1.5,
+    borderColor: 'rgba(242, 11, 135, 0.12)',
     ...Platform.select({
-      web: {
-        boxShadow: '0 -4px 14px rgba(0, 0, 0, 0.06)',
-      } as any,
-      default: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -3 },
-        shadowOpacity: 0.06,
-        shadowRadius: 6,
+      ios: {
+        shadowColor: '#4327C9',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.12,
+        shadowRadius: 16,
+      },
+      android: {
         elevation: 8,
       },
+      web: {
+        boxShadow: '0 8px 24px rgba(67, 39, 201, 0.12), 0 2px 6px rgba(0, 0, 0, 0.04)',
+      } as any,
     }),
   },
-  tabItem: {
+  tabBtn: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 2,
+    height: '100%',
     position: 'relative',
+    paddingBottom: 2,
   },
   iconContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     height: 26,
+    marginBottom: 2,
+  },
+  tabIcon: {
+    width: 24,
+    height: 24,
   },
   tabLabel: {
     fontSize: 11,
     fontWeight: '600',
-    marginTop: 2,
+    marginTop: 1,
     letterSpacing: -0.2,
   },
   activeTabLabel: {
-    fontWeight: '700',
-    color: '#E11D88',
+    fontWeight: '800',
+    color: '#F20B87',
   },
   activeBar: {
-    width: 22,
+    position: 'absolute',
+    bottom: -2,
+    width: 24,
     height: 3,
     borderRadius: 1.5,
-    backgroundColor: '#E11D88',
-    marginTop: 3,
+    backgroundColor: '#F20B87',
   },
-  womupAppTabItem: {
+  womupAppTabBtn: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 2,
+    height: '100%',
     position: 'relative',
   },
   womupAppHalo: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 1,
   },
   womupAppIconImage: {
-    width: 42,
-    height: 42,
+    width: 40,
+    height: 40,
   },
   womupAppLabel: {
     fontWeight: '600',
-    marginTop: 1,
+    marginTop: 0,
   },
 });

@@ -69,6 +69,9 @@ export class Notification {
   @Prop({ type: String, required: false })
   actionType?: string;
 
+  @Prop({ type: String, required: false })
+  actionPayload?: string;
+
   @Prop({ type: Object, default: {} })
   metadata: Record<string, any>;
 

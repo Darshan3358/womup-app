@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { IsBoolean, IsNumber, IsOptional, IsString, Min, Max } from 'class-validator';
 import { RiderService } from './rider.service';
@@ -73,5 +73,26 @@ export class RiderController {
       return { success: false, message: 'Rider session not authenticated' };
     }
     return this.riderService.updateLocation(userId, body);
+  }
+
+  @Post('nearest-hub')
+  @ApiOperation({ summary: 'Find nearest active dark store hub for rider GPS within 10km radius' })
+  async getNearestHub(@Body() body: { latitude?: number; longitude?: number; lat?: number; lng?: number }) {
+    const lat = Number(body?.latitude ?? body?.lat);
+    const lng = Number(body?.longitude ?? body?.lng);
+    return this.riderService.getNearestHub(lat, lng);
+  }
+
+  @Get('nearest-hub')
+  @ApiOperation({ summary: 'Find nearest active dark store hub for rider GPS via GET' })
+  async getNearestHubGet(
+    @Query('lat') latQ?: string,
+    @Query('lng') lngQ?: string,
+    @Query('latitude') latQ2?: string,
+    @Query('longitude') lngQ2?: string,
+  ) {
+    const lat = Number(latQ ?? latQ2);
+    const lng = Number(lngQ ?? lngQ2);
+    return this.riderService.getNearestHub(lat, lng);
   }
 }

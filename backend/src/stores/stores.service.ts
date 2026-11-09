@@ -308,4 +308,64 @@ export class StoresService {
       };
     }
   }
+
+  /**
+   * Dynamic Nearest Hub Resolver for Riders:
+   * Finds the closest active Dark Store within a 10 km limit.
+   */
+  async getNearestHubForRider(lat: number, lng: number, maxRadiusKm = 10) {
+    if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) {
+      return {
+        success: false,
+        message: 'Invalid GPS coordinates provided.',
+      };
+    }
+
+    try {
+      const { stores, areas } = await this.getCachedStoresAndAreas();
+      const activeStores = stores.filter((s: any) => s.isActive !== false);
+
+      let closestStore: any = null;
+      let minDistance = Infinity;
+
+      for (const store of activeStores) {
+        const storeCoords = store.location?.coordinates;
+        if (!storeCoords || storeCoords.length < 2) continue;
+
+        const storeLng = storeCoords[0];
+        const storeLat = storeCoords[1];
+        const dist = haversineDistanceKm(lat, lng, storeLat, storeLng);
+
+        if (dist < minDistance) {
+          minDistance = dist;
+          closestStore = store;
+        }
+      }
+
+      if (closestStore && minDistance <= maxRadiusKm) {
+        const areaKey = closestStore.areaId ? closestStore.areaId.toString() : '';
+        const matchedArea = areaKey ? areas.get(areaKey) : null;
+        return {
+          success: true,
+          storeId: closestStore._id.toString(),
+          storeName: closestStore.name,
+          storeCode: closestStore.code,
+          address: closestStore.address || matchedArea?.name || closestStore.areaName || '',
+          areaName: matchedArea?.name || closestStore.areaName || closestStore.name,
+          distanceKm: Number(minDistance.toFixed(1)),
+          message: `Nearest active dark store: ${closestStore.name} (${minDistance.toFixed(1)} km away)`,
+        };
+      }
+
+      return {
+        success: false,
+        message: `No active dark store found within ${maxRadiusKm}km of your location.`,
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        message: err?.message || 'Error resolving nearest dark store.',
+      };
+    }
+  }
 }

@@ -640,5 +640,102 @@ export class RiderService {
       data: await this.adminGetRiderDetail(partner._id.toString()),
     };
   }
+
+  /**
+   * Resolve nearest active dark store hub within 10 km limit
+   */
+  async getNearestHub(lat: number, lng: number, maxRadiusKm = 10) {
+    if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) {
+      return {
+        success: false,
+        message: 'Invalid GPS coordinates provided.',
+      };
+    }
+
+    try {
+      // 1. Try MongoDB $near query with 2dsphere index (maxDistance in meters)
+      const nearestStore = await this.storeModel.findOne({
+        isActive: { $ne: false },
+        location: {
+          $near: {
+            $geometry: { type: 'Point', coordinates: [lng, lat] },
+            $maxDistance: maxRadiusKm * 1000,
+          },
+        },
+      }).exec();
+
+      if (nearestStore && nearestStore.location?.coordinates?.length >= 2) {
+        const sLng = nearestStore.location.coordinates[0];
+        const sLat = nearestStore.location.coordinates[1];
+        const dist = this.calculateHaversineDistanceKm(lat, lng, sLat, sLng);
+
+        if (dist <= maxRadiusKm) {
+          return {
+            success: true,
+            storeId: nearestStore._id.toString(),
+            storeName: nearestStore.name,
+            storeCode: nearestStore.code,
+            address: nearestStore.address || '',
+            distanceKm: Number(dist.toFixed(1)),
+            message: `Nearest active dark store: ${nearestStore.name} (${dist.toFixed(1)} km away)`,
+          };
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(`MongoDB $near store lookup failed, using in-memory fallback: ${err?.message}`);
+    }
+
+    // 2. In-memory Haversine fallback across active stores
+    try {
+      const activeStores = await this.storeModel.find({ isActive: { $ne: false } }).exec();
+      let closestStore: StoreDocument | null = null;
+      let minDistance = Infinity;
+
+      for (const store of activeStores) {
+        if (store.location?.coordinates && store.location.coordinates.length >= 2) {
+          const sLng = store.location.coordinates[0];
+          const sLat = store.location.coordinates[1];
+          const dist = this.calculateHaversineDistanceKm(lat, lng, sLat, sLng);
+          if (dist < minDistance) {
+            minDistance = dist;
+            closestStore = store;
+          }
+        }
+      }
+
+      if (closestStore && minDistance <= maxRadiusKm) {
+        return {
+          success: true,
+          storeId: closestStore._id.toString(),
+          storeName: closestStore.name,
+          storeCode: closestStore.code,
+          address: closestStore.address || '',
+          distanceKm: Number(minDistance.toFixed(1)),
+          message: `Nearest active dark store: ${closestStore.name} (${minDistance.toFixed(1)} km away)`,
+        };
+      }
+    } catch (err: any) {
+      this.logger.warn(`Store search fallback error: ${err?.message}`);
+    }
+
+    return {
+      success: false,
+      message: `No active dark store found within ${maxRadiusKm}km of your location.`,
+    };
+  }
+
+  private calculateHaversineDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371; // Earth's radius in km
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
 }
 

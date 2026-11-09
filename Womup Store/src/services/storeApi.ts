@@ -4,16 +4,28 @@ const isLocalWeb =
   typeof window !== 'undefined' &&
   (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1');
 
-const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL || 'https://womup-app-uquz.onrender.com/api/v1/store';
+export const getApiBaseUrl = (): string => {
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    const u = process.env.EXPO_PUBLIC_API_URL.replace(/\/+$/, '');
+    return u.endsWith('/store') ? u : `${u}/store`;
+  }
+  if (isLocalWeb) {
+    return 'http://localhost:5050/api/v1/store';
+  }
+  return 'https://womup-app-uquz.onrender.com/api/v1/store';
+};
 
-const LOCATION_API_BASE_URL = 'https://womup-app-uquz.onrender.com/api/v1/location';
+export const API_BASE_URL = getApiBaseUrl();
+
+const LOCATION_API_BASE_URL = isLocalWeb
+  ? 'http://localhost:5050/api/v1/location'
+  : 'https://womup-app-uquz.onrender.com/api/v1/location';
 
 export const TOKEN_STORAGE_KEY = '@womup_store_access_token';
 export const STAFF_STORAGE_KEY = '@womup_store_staff';
 
 export class StoreApiService {
-  private static async getHeaders(): Promise<HeadersInit> {
+  private static async getHeaders(): Promise<Record<string, string>> {
     const token = await AsyncStorage.getItem(TOKEN_STORAGE_KEY);
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -21,33 +33,69 @@ export class StoreApiService {
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
+    try {
+      const cachedStoreRaw = await AsyncStorage.getItem('@womup_store_session');
+      if (cachedStoreRaw) {
+        const s = JSON.parse(cachedStoreRaw);
+        if (s.id || s._id) headers['x-store-id'] = String(s.id || s._id);
+        if (s.code) headers['x-store-code'] = String(s.code);
+      }
+    } catch (_) {}
     return headers;
   }
 
   private static async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const headers = await this.getHeaders();
-    const url = `${API_BASE_URL}${endpoint}`;
+    const primaryBase = getApiBaseUrl();
+    const url = `${primaryBase}${endpoint}`;
 
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        ...headers,
-        ...(options.headers || {}),
-      },
-    });
+    try {
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          ...headers,
+          ...(options.headers || {}),
+        },
+      });
 
-    const resJson = await response.json();
+      const resJson = await response.json();
 
-    if (!response.ok) {
-      const msg = resJson.message || `API Error: ${response.status}`;
-      throw new Error(msg);
+      if (!response.ok) {
+        const msg = resJson.message || `API Error: ${response.status}`;
+        const err: any = new Error(msg);
+        err.status = response.status;
+        throw err;
+      }
+
+      // Auto-unwrap NestJS TransformInterceptor envelope
+      if (resJson && resJson.data !== undefined) {
+        return resJson.data as T;
+      }
+      return resJson as T;
+    } catch (primaryErr: any) {
+      // If local server unreachable and on web, try cloud fallback
+      if (primaryBase.includes('localhost') && !primaryErr.status) {
+        try {
+          const fallbackUrl = `https://womup-app-uquz.onrender.com/api/v1/store${endpoint}`;
+          const fallbackResp = await fetch(fallbackUrl, {
+            ...options,
+            headers: {
+              ...headers,
+              ...(options.headers || {}),
+            },
+          });
+          const fbJson = await fallbackResp.json();
+          if (!fallbackResp.ok) {
+            const err: any = new Error(fbJson.message || `API Error: ${fallbackResp.status}`);
+            err.status = fallbackResp.status;
+            throw err;
+          }
+          if (fbJson && fbJson.data !== undefined) return fbJson.data as T;
+          return fbJson as T;
+        } catch (_) {}
+      }
+      throw primaryErr;
     }
-
-    // Auto-unwrap NestJS TransformInterceptor envelope
-    if (resJson && resJson.data !== undefined) {
-      return resJson.data as T;
-    }
-    return resJson as T;
   }
 
   // Master Location APIs (for Registration)
@@ -184,14 +232,19 @@ export class StoreApiService {
     }>('/me');
   }
 
-  static async updateShift(isOnShift: boolean) {
+  static async updateShift(isOnShift: boolean, storeId?: string) {
+    const bodyData: any = { isOnShift };
+    if (storeId) {
+      bodyData.storeId = storeId;
+    }
     return this.request<{
       success: boolean;
       isOnShift: boolean;
       shiftStartedAt?: string;
+      message?: string;
     }>('/me/shift', {
       method: 'PATCH',
-      body: JSON.stringify({ isOnShift }),
+      body: JSON.stringify(bodyData),
     });
   }
 

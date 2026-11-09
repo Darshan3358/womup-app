@@ -1,4 +1,14 @@
+const isLocalWeb =
+  typeof window !== 'undefined' &&
+  (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1');
+
 const getNestApiBaseUrl = () => {
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
+  }
+  if (isLocalWeb) {
+    return 'http://localhost:5050/api/v1';
+  }
   return 'https://womup-app-uquz.onrender.com/api/v1';
 };
 

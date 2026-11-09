@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   LayoutDashboard,
@@ -7,7 +7,6 @@ import {
   Package,
   ShoppingBag,
 } from 'lucide-react-native';
-import { COLORS, RADIUS, SPACING } from '../../theme';
 import { useAdminState, ActiveTab } from '../../context/AdminStateContext';
 
 interface TabItem {
@@ -27,7 +26,7 @@ const TABS: TabItem[] = [
 export const BottomNav: React.FC = () => {
   const { activeTab, setActiveTab, setSubView } = useAdminState();
   const insets = useSafeAreaInsets();
-  const bottomPadding = Math.max(insets.bottom, 6);
+  const bottomPadding = Math.max(insets.bottom, 10);
 
   const handleTabPress = (key: ActiveTab) => {
     setSubView('none');
@@ -35,84 +34,126 @@ export const BottomNav: React.FC = () => {
   };
 
   return (
-    <View style={[styles.container, { height: 60 + bottomPadding, paddingBottom: bottomPadding }]}>
-      {TABS.map((tab) => {
-        const Icon = tab.icon;
-        const isActive = activeTab === tab.key;
-        return (
-          <TouchableOpacity
-            key={tab.key}
-            style={styles.tabButton}
-            onPress={() => handleTabPress(tab.key)}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.iconContainer, isActive && styles.activeIconContainer]}>
-              <Icon
-                size={22}
-                color={isActive ? '#F12A9B' : '#8E8CA7'}
-                strokeWidth={isActive ? 2.5 : 1.8}
-              />
-            </View>
-            <Text
-              style={[
-                styles.tabLabel,
-                { color: isActive ? '#F12A9B' : '#8E8CA7', fontWeight: isActive ? '700' : '500' },
-              ]}
-              numberOfLines={1}
+    <View
+      style={[styles.outerWrapper, { paddingBottom: bottomPadding }]}
+      pointerEvents="box-none"
+    >
+      <View style={styles.navContainer} pointerEvents="auto">
+        {TABS.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.key;
+          const activeColor = '#F20B87';
+          const inactiveColor = '#657493';
+          const labelColor = isActive ? activeColor : inactiveColor;
+
+          return (
+            <TouchableOpacity
+              key={tab.key}
+              style={styles.tabButton}
+              onPress={() => handleTabPress(tab.key)}
+              activeOpacity={0.7}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isActive }}
+              accessibilityLabel={`${tab.label} tab`}
             >
-              {tab.label}
-            </Text>
-            {isActive && <View style={styles.activeIndicator} />}
-          </TouchableOpacity>
-        );
-      })}
+              <View style={styles.iconContainer}>
+                <Icon
+                  size={22}
+                  color={isActive ? activeColor : '#8886AE'}
+                  strokeWidth={isActive ? 2.4 : 1.8}
+                />
+              </View>
+              <Text
+                style={[
+                  styles.tabLabel,
+                  { color: labelColor },
+                  isActive && styles.activeTabLabel,
+                ]}
+                numberOfLines={1}
+              >
+                {tab.label}
+              </Text>
+              {isActive && <View style={styles.activeBar} />}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    height: 64,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1.2,
-    borderTopColor: '#E7D9FF',
-    paddingHorizontal: 8,
-    justifyContent: 'space-around',
+  outerWrapper: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 99,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 16,
+    width: '100%',
     alignItems: 'center',
-    elevation: 10,
-    shadowColor: '#762DEB',
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    flexShrink: 0,
+    justifyContent: 'center',
+  },
+  navContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    height: 66,
+    width: '100%',
+    maxWidth: 480,
+    borderWidth: 1.5,
+    borderColor: 'rgba(242, 11, 135, 0.12)',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#4327C9',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.12,
+        shadowRadius: 16,
+      },
+      android: {
+        elevation: 8,
+      },
+      web: {
+        boxShadow: '0 8px 24px rgba(67, 39, 201, 0.12), 0 2px 6px rgba(0, 0, 0, 0.04)',
+      } as any,
+    }),
   },
   tabButton: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 2,
+    height: '100%',
     position: 'relative',
+    paddingBottom: 2,
   },
   iconContainer: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 16,
-  },
-  activeIconContainer: {
-    backgroundColor: 'rgba(241, 42, 155, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 26,
+    marginBottom: 2,
+    position: 'relative',
   },
   tabLabel: {
     fontSize: 11,
-    marginTop: 2,
+    fontWeight: '600',
+    marginTop: 1,
     letterSpacing: -0.2,
   },
-  activeIndicator: {
+  activeTabLabel: {
+    fontWeight: '800',
+    color: '#F20B87',
+  },
+  activeBar: {
     position: 'absolute',
-    bottom: -4,
-    width: 22,
+    bottom: -2,
+    width: 24,
     height: 3,
     borderRadius: 1.5,
-    backgroundColor: '#F12A9B',
+    backgroundColor: '#F20B87',
   },
 });

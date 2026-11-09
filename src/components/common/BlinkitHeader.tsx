@@ -208,9 +208,10 @@ const BlinkitHeaderComponent: React.FC<BlinkitHeaderProps> = ({
 
   return (
     <ImageBackground
-      source={require('../../../assets/womart_header_bg.png')}
+      source={require('../../../assets/HOMEHEADERIMAGE.png')}
       style={[styles.headerContainer, { paddingTop: Math.max(insets.top, 8) }]}
-      resizeMode="cover"
+      imageStyle={styles.headerBgImage}
+      resizeMode="stretch"
     >
       <View style={styles.containerInner}>
         {/* Row 1: Logo & Location (Left) | 3 Circle Action Icons (Right) */}
@@ -231,22 +232,20 @@ const BlinkitHeaderComponent: React.FC<BlinkitHeaderProps> = ({
 
             {/* Brand Title & Location Selector */}
             <View style={styles.locationTextColumn}>
-              <Text style={styles.brandTitleText}>WOMART</Text>
-
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => setLocationModalVisible(true)}
                 style={styles.locationRow}
                 accessibilityLabel="Select delivery address"
               >
-                <Ionicons name="location-sharp" size={13} color="#E11D88" style={{ marginRight: 3 }} />
+                <Ionicons name="location-sharp" size={13} color="#25105F" style={{ marginRight: 3 }} />
                 <Text style={styles.locationSubtitle} numberOfLines={1}>
                   {displayLocationText}
                 </Text>
                 <Feather
                   name="chevron-down"
                   size={14}
-                  color="#1E1B4B"
+                  color="#25105F"
                   style={{ marginLeft: 2 }}
                 />
               </TouchableOpacity>
@@ -299,28 +298,19 @@ const BlinkitHeaderComponent: React.FC<BlinkitHeaderProps> = ({
               </View>
             </TouchableOpacity>
 
-            {/* 3. Shopping Cart */}
+            {/* 3. Womup Wallet */}
             <TouchableOpacity
               activeOpacity={0.85}
-              onPress={() => {
-                if (!isAuthenticated) {
-                  openAuthPrompt('Please sign in or register to view your cart and checkout.', 'Your Cart');
-                } else {
-                  setActiveScreen('Blinkit_Cart');
-                }
-              }}
+              onPress={() => setActiveScreen('Blinkit_Money')}
               style={styles.actionIconButton}
-              accessibilityLabel="Shopping Cart"
+              accessibilityLabel="Womup Wallet"
             >
-              <Feather name="shopping-bag" size={17} color="#111827" />
-              <View style={styles.badgePill}>
-                <Text style={styles.badgeText}>{totalCartCount}</Text>
-              </View>
+              <Ionicons name="wallet-outline" size={19} color="#111827" />
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Row 2: Full-Width Search Bar */}
+        {/* Row 2: Search Bar & Cart Button */}
         <View style={styles.headerSearchRow}>
           <TouchableOpacity
             activeOpacity={0.9}
@@ -352,6 +342,27 @@ const BlinkitHeaderComponent: React.FC<BlinkitHeaderProps> = ({
               <Ionicons name="mic" size={19} color="#E11D88" />
             </TouchableOpacity>
           </TouchableOpacity>
+
+          {/* Cart Icon Button on the Search Bar Line */}
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => {
+              if (!isAuthenticated) {
+                openAuthPrompt('Please sign in or register to view your cart and checkout.', 'Your Cart');
+              } else {
+                setActiveScreen('Blinkit_Cart');
+              }
+            }}
+            style={styles.searchCartButton}
+            accessibilityLabel="Shopping Cart"
+          >
+            <Feather name="shopping-bag" size={19} color="#111827" />
+            {totalCartCount > 0 ? (
+              <View style={styles.badgePill}>
+                <Text style={styles.badgeText}>{totalCartCount}</Text>
+              </View>
+            ) : null}
+          </TouchableOpacity>
         </View>
 
         {children}
@@ -372,6 +383,11 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: '100%',
     overflow: 'hidden',
+  },
+  headerBgImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'stretch',
   },
   containerInner: {
     maxWidth: 1440,
@@ -398,13 +414,22 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   logoContainer: {
+    width: 42,
+    height: 42,
+    backgroundColor: '#25105F',
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
     flexShrink: 0,
+    shadowColor: 'rgba(0, 0, 0, 0.08)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   headerLogoImage: {
-    width: 38,
-    height: 38,
+    width: 30,
+    height: 30,
   },
   locationWrapper: {
     flexDirection: 'row',
@@ -437,7 +462,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   locationSubtitle: {
-    color: '#111827',
+    color: '#25105F',
     fontSize: 12.5,
     fontWeight: '700',
     lineHeight: 16,
@@ -467,6 +492,24 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     width: '100%',
     maxWidth: '100%',
+    gap: 8,
+  },
+  searchCartButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F3E8FF',
+    position: 'relative',
+    flexShrink: 0,
   },
   searchBar: {
     flex: 1,
