@@ -246,8 +246,8 @@ export const BlinkitMoneyScreen: React.FC = () => {
 
   const handleWithdrawSubmit = async () => {
     const amt = parseFloat(withdrawAmountInput);
-    if (isNaN(amt) || amt < 600) {
-      setWithdrawError('Minimum withdrawal amount is ₹600 as per policy.');
+    if (isNaN(amt) || amt < 800) {
+      setWithdrawError('Minimum withdrawal amount is ₹800 as per policy.');
       return;
     }
     const available = Number(user.availableIncome ?? 0);
@@ -602,7 +602,7 @@ export const BlinkitMoneyScreen: React.FC = () => {
                   <TouchableOpacity
                     style={styles.withdrawBtnStacked}
                     onPress={() => {
-                      setWithdrawAmountInput(user.availableIncome && user.availableIncome >= 600 ? String(user.availableIncome) : '');
+                      setWithdrawAmountInput(user.availableIncome && user.availableIncome >= 800 ? String(user.availableIncome) : '');
                       setWithdrawError('');
                       setWithdrawSuccessMsg('');
                       setWithdrawModalVisible(true);
@@ -1513,7 +1513,7 @@ export const BlinkitMoneyScreen: React.FC = () => {
         </View>
       </Modal>
 
-      {/* ── Withdrawal Modal (Min ₹600, 20% TDS, 80% Net Payout) ── */}
+      {/* ── Withdrawal Modal (Min ₹800, 20% TDS, 80% Net Payout) ── */}
       <Modal
         visible={isWithdrawModalVisible}
         transparent
@@ -1527,7 +1527,7 @@ export const BlinkitMoneyScreen: React.FC = () => {
               <View>
                 <Text style={[TYPOGRAPHY.headingMd, styles.modalHeading]}>Withdraw Income</Text>
                 <Text style={styles.withdrawSub}>
-                  Available: ₹{user.availableIncome ?? 0} • Minimum ₹600
+                  Available: ₹{user.availableIncome ?? 0} • Minimum ₹800
                 </Text>
               </View>
               <TouchableOpacity onPress={() => setWithdrawModalVisible(false)}>
@@ -1555,7 +1555,7 @@ export const BlinkitMoneyScreen: React.FC = () => {
               <TextInput
                 style={styles.amountInput}
                 keyboardType="numeric"
-                placeholder={Number(user.availableIncome || 0) >= 600 ? 'Enter amount (min ₹600)' : '0'}
+                placeholder={Number(user.availableIncome || 0) >= 800 ? 'Enter amount (min ₹800)' : '0'}
                 placeholderTextColor="#94A3B8"
                 value={withdrawAmountInput}
                 onChangeText={(t) => {
@@ -1565,12 +1565,12 @@ export const BlinkitMoneyScreen: React.FC = () => {
               />
             </View>
 
-            {/* Insufficient Balance Notice if available < 600 */}
-            {Number(user.availableIncome || 0) < 600 && (
+            {/* Insufficient Balance Notice if available < 800 */}
+            {Number(user.availableIncome || 0) < 800 && (
               <View style={{ backgroundColor: '#FEF2F2', borderColor: '#FCA5A5', borderWidth: 1, borderRadius: 8, padding: 10, marginVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Ionicons name="alert-circle" size={16} color="#DC2626" />
                 <Text style={{ color: '#991B1B', fontSize: 11, fontWeight: '600', flex: 1 }}>
-                  Minimum ₹600 required. Current available income is ₹{Number(user.availableIncome || 0).toLocaleString('en-IN')}.
+                  Minimum ₹800 required. Current available income is ₹{Number(user.availableIncome || 0).toLocaleString('en-IN')}.
                 </Text>
               </View>
             )}
@@ -1579,7 +1579,7 @@ export const BlinkitMoneyScreen: React.FC = () => {
             {(() => {
               const available = Number(user.availableIncome || 0);
               const amt = parseFloat(withdrawAmountInput) || 0;
-              if (amt > available && available >= 600) {
+              if (amt > available && available >= 800) {
                 return (
                   <View style={{ backgroundColor: '#FEF2F2', borderColor: '#FCA5A5', borderWidth: 1, borderRadius: 8, padding: 10, marginVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Ionicons name="alert-circle" size={16} color="#DC2626" />
@@ -1635,15 +1635,15 @@ export const BlinkitMoneyScreen: React.FC = () => {
             {(() => {
               const available = Number(user.availableIncome || 0);
               const amt = parseFloat(withdrawAmountInput) || 0;
-              const isAmountValid = amt >= 600 && amt <= available;
+              const isAmountValid = amt >= 800 && amt <= available;
 
               let buttonLabel = 'Submit Request to Admin';
-              if (available < 600) {
-                buttonLabel = 'Insufficient Balance (Min ₹600)';
+              if (available < 800) {
+                buttonLabel = 'Insufficient Balance (Min ₹800)';
               } else if (amt > available) {
                 buttonLabel = 'Insufficient Available Balance';
-              } else if (amt < 600) {
-                buttonLabel = 'Minimum ₹600 Required';
+              } else if (amt < 800) {
+                buttonLabel = 'Minimum ₹800 Required';
               }
 
               return (
@@ -1719,7 +1719,7 @@ export const BlinkitMoneyScreen: React.FC = () => {
                 </View>
                 <Text style={styles.historyBalanceValue}>₹{Number(incomeHistoryData?.availableBalance ?? user.availableIncome ?? 0).toFixed(2)}</Text>
                 <Text style={styles.historyBalanceSub}>
-                  Ready for instant bank withdrawal (Min ₹600) or grocery order checkout
+                  Ready for instant bank withdrawal (Min ₹800) or grocery order checkout
                 </Text>
               </View>
 

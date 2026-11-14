@@ -69,7 +69,7 @@ export class UsersController {
   }
 
   @Post('income/withdraw')
-  @ApiOperation({ summary: 'Withdraw income wallet balance (Min ₹600, 20% TDS, 80% net)' })
+  @ApiOperation({ summary: 'Withdraw income wallet balance (Min ₹800, 20% TDS, 80% net)' })
   async withdrawIncome(
     @CurrentUser() user: any,
     @Body() body: { amount: number; bankDetails?: any },

@@ -14,7 +14,7 @@ export class WithdrawalRequest {
   @Prop({ trim: true })
   userPhone?: string;
 
-  @Prop({ required: true, min: 600 })
+  @Prop({ required: true, min: 800 })
   amount: number; // Gross requested amount
 
   @Prop({ required: true, default: 0 })

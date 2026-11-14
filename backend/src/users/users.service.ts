@@ -427,7 +427,7 @@ export class UsersService {
     };
   }
 
-  // ── Customer Income Withdrawal Request (Min ₹600, 20% TDS, Admin Approval Workflow) ──
+  // ── Customer Income Withdrawal Request (Min ₹800, 20% TDS, Admin Approval Workflow) ──
   async withdrawIncome(userId: string, amount: number, bankDetails?: any) {
     await this.settleUserPendingIncome(userId);
     const user = await this.userModel.findById(userId);
@@ -438,9 +438,9 @@ export class UsersService {
       throw new BadRequestException('Please provide a valid withdrawal amount');
     }
 
-    // Rule 1: Minimum withdrawal ₹600
-    if (withdrawAmt < 600) {
-      throw new BadRequestException('Minimum withdrawal amount is ₹600 as per policy');
+    // Rule 1: Minimum withdrawal ₹800
+    if (withdrawAmt < 800) {
+      throw new BadRequestException('Minimum withdrawal amount is ₹800 as per policy');
     }
 
     // Rule 2: Must have sufficient availableIncome
