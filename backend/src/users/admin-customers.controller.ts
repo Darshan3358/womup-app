@@ -4,6 +4,7 @@ import {
   Post,
   Patch,
   Put,
+  Delete,
   Param,
   Query,
   Body,
@@ -92,6 +93,15 @@ export class AdminCustomersController {
   @ApiOperation({ summary: 'Update customer profile fields (PUT alias)' })
   async updateCustomerPut(@Param('id') id: string, @Body() body: any) {
     return this.usersService.adminUpdateCustomer(id, body);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete customer permanently' })
+  async deleteCustomer(
+    @Param('id') id: string,
+    @Query('phone') phone?: string,
+  ) {
+    return this.usersService.adminDeleteCustomer(id, phone);
   }
 
   @Post([':id/kyc-approve', ':id/approve-kyc', ':id/approve'])

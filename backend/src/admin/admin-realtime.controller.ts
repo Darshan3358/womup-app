@@ -564,33 +564,176 @@ export class AdminRealtimeController {
   }
 
   /**
-   * Delete Customer
+   * Delete Customer Permanently (Supports all admin path variants & phone fallback)
    */
-  @Delete('api/admin/customers/:id')
-  async deleteCustomer(@Param('id') id: string) {
+  @Delete([
+    'api/admin/customers/:id',
+    'api/admin/users/:id',
+    'admin/customers/:id',
+    'admin/users/:id',
+    'api/v1/admin/customers/:id',
+    'api/v1/admin/users/:id',
+  ])
+  async deleteCustomer(
+    @Param('id') id: string,
+    @Query('phone') phoneQuery?: string,
+    @Body('phone') phoneBody?: string,
+  ) {
     const db = this.db;
-    let userObjId: any;
-    try {
-      userObjId = new Types.ObjectId(id);
-    } catch {
-      return { success: false, error: 'Invalid customer ID' };
+    const phone = phoneQuery || phoneBody;
+
+    let userObjId: Types.ObjectId | null = null;
+    if (Types.ObjectId.isValid(id)) {
+      try {
+        userObjId = new Types.ObjectId(id);
+      } catch (_) {}
     }
 
-    await db.collection('users').deleteOne({
-      $or: [{ _id: userObjId }, { _id: id }],
-    });
-    await db.collection('addresses').deleteMany({
-      $or: [{ userId: userObjId }, { userId: id }],
-    });
-    await db.collection('cart').deleteMany({
-      $or: [{ userId: userObjId }, { userId: id }],
-    });
+    const filterOr: any[] = [{ _id: id }];
+    if (userObjId) filterOr.push({ _id: userObjId });
+    if (phone) {
+      filterOr.push({ phone }, { mobile: phone });
+      const cleanPhone = phone.replace(/^\+91/, '').trim();
+      filterOr.push({ phone: cleanPhone }, { phone: `+91${cleanPhone}` });
+    }
+    if (/^\+?\d{10,13}$/.test(id)) {
+      const cleanIdPhone = id.replace(/^\+91/, '').trim();
+      filterOr.push({ phone: id }, { phone: cleanIdPhone }, { phone: `+91${cleanIdPhone}` });
+    }
+
+    const existingUser = await db.collection('users').findOne({ $or: filterOr });
+    const resolvedUserId = existingUser?._id || userObjId;
+    const resolvedIdStr = existingUser?._id ? existingUser._id.toString() : id;
+
+    // 1. Delete user from users collection
+    await db.collection('users').deleteMany({ $or: filterOr });
+
+    // 2. Delete related records
+    const userRefs: any[] = [{ userId: id }, { userId: resolvedIdStr }];
+    if (resolvedUserId) userRefs.push({ userId: resolvedUserId });
+
+    await db.collection('addresses').deleteMany({ $or: userRefs }).catch(() => null);
+    await db.collection('cart').deleteMany({ $or: userRefs }).catch(() => null);
+    await db.collection('wallets').deleteMany({ $or: userRefs }).catch(() => null);
+    await db.collection('notifications').deleteMany({
+      $or: [{ recipientId: id }, { recipientId: resolvedIdStr }],
+    }).catch(() => null);
 
     try {
-      this.trackingGateway?.server?.emit('customer_deleted', { id });
+      this.trackingGateway?.server?.emit('customer_deleted', { id, userId: resolvedIdStr });
     } catch (_) {}
 
     return { success: true, message: 'Customer deleted successfully' };
+  }
+
+  /**
+   * Block / Unblock Customer
+   */
+  @Put([
+    'api/admin/users/:id/block',
+    'api/admin/customers/:id/block',
+    'admin/users/:id/block',
+    'admin/customers/:id/block',
+    'api/v1/admin/users/:id/block',
+    'api/v1/admin/customers/:id/block',
+  ])
+  @Post([
+    'api/admin/users/:id/block',
+    'api/admin/customers/:id/block',
+    'admin/users/:id/block',
+    'admin/customers/:id/block',
+    'api/v1/admin/users/:id/block',
+    'api/v1/admin/customers/:id/block',
+  ])
+  async toggleBlockCustomer(@Param('id') id: string, @Body() body: any) {
+    const db = this.db;
+    const isBlocked = body.isBlocked === true || body.isBlocked === 1 || body.status === 'Blocked';
+
+    let userObjId: Types.ObjectId | null = null;
+    if (Types.ObjectId.isValid(id)) {
+      try {
+        userObjId = new Types.ObjectId(id);
+      } catch (_) {}
+    }
+
+    const filterOr: any[] = [{ _id: id }];
+    if (userObjId) filterOr.push({ _id: userObjId });
+
+    await db.collection('users').updateOne(
+      { $or: filterOr },
+      {
+        $set: {
+          isBlocked: isBlocked ? 1 : 0,
+          isActive: !isBlocked,
+          status: isBlocked ? 'Blocked' : 'Active',
+          updatedAt: new Date(),
+        },
+      },
+    );
+
+    try {
+      this.trackingGateway?.server?.emit('customer_updated', {
+        id,
+        isBlocked: isBlocked ? 1 : 0,
+        status: isBlocked ? 'Blocked' : 'Active',
+      });
+    } catch (_) {}
+
+    return { success: true, isBlocked, message: isBlocked ? 'Customer blocked' : 'Customer unblocked' };
+  }
+
+  /**
+   * Update Customer Details
+   */
+  @Put([
+    'api/admin/users/:id',
+    'api/admin/customers/:id',
+    'admin/users/:id',
+    'admin/customers/:id',
+  ])
+  @Patch([
+    'api/admin/users/:id',
+    'api/admin/customers/:id',
+    'admin/users/:id',
+    'admin/customers/:id',
+  ])
+  async updateCustomerDetails(@Param('id') id: string, @Body() updates: any) {
+    const db = this.db;
+
+    let userObjId: Types.ObjectId | null = null;
+    if (Types.ObjectId.isValid(id)) {
+      try {
+        userObjId = new Types.ObjectId(id);
+      } catch (_) {}
+    }
+
+    const filterOr: any[] = [{ _id: id }];
+    if (userObjId) filterOr.push({ _id: userObjId });
+
+    const updateFields: any = { updatedAt: new Date() };
+    if (updates.name !== undefined) updateFields.name = updates.name;
+    if (updates.firstName !== undefined) updateFields.firstName = updates.firstName;
+    if (updates.surname !== undefined) updateFields.surname = updates.surname;
+    if (updates.phone !== undefined) updateFields.phone = updates.phone;
+    if (updates.email !== undefined) updateFields.email = updates.email;
+    if (updates.address !== undefined) updateFields.address = updates.address;
+    if (updates.status !== undefined) {
+      updateFields.status = updates.status;
+      updateFields.isBlocked = updates.status === 'Blocked' ? 1 : 0;
+      updateFields.isActive = updates.status !== 'Blocked';
+    }
+    if (updates.isBlocked !== undefined) {
+      updateFields.isBlocked = updates.isBlocked ? 1 : 0;
+      updateFields.isActive = !updates.isBlocked;
+    }
+
+    await db.collection('users').updateOne({ $or: filterOr }, { $set: updateFields });
+
+    try {
+      this.trackingGateway?.server?.emit('customer_updated', { id, ...updateFields });
+    } catch (_) {}
+
+    return { success: true, message: 'Customer updated successfully' };
   }
 
   /**

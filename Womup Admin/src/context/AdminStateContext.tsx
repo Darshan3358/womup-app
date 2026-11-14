@@ -193,7 +193,7 @@ interface AdminStateContextType {
   addCustomer: (data: Partial<Customer>) => void;
   updateCustomer: (id: string, data: Partial<Customer>) => void;
   toggleBlockCustomer: (id: string) => void;
-  deleteCustomer: (id: string) => Promise<boolean>;
+  deleteCustomer: (id: string, phone?: string) => Promise<boolean>;
   deleteRider: (id: string) => Promise<boolean>;
 
   updateZoneProductPrice: (productName: string, zoneName: string, newSellingPrice: number) => void;
@@ -1320,7 +1320,17 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setSelectedCustomer(newCustomer);
     logAudit('Customer Created', newCustomer.name, `Added new ${newCustomer.type} customer in ${newCustomer.zoneName}`);
     // Persist to live MongoDB
-    ApiService.addCustomer(newCustomer);
+    ApiService.addCustomer(newCustomer).then((res) => {
+      if (res?.id) {
+        const assignedId = res.id;
+        setCustomers((prev) =>
+          prev.map((c) => (c.id === newCustomer.id ? { ...c, id: assignedId } : c))
+        );
+        setSelectedCustomer((prev) =>
+          prev?.id === newCustomer.id ? { ...prev, id: assignedId } : prev
+        );
+      }
+    });
   };
 
   const updateCustomer = (id: string, data: Partial<Customer>) => {
@@ -1356,19 +1366,27 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     ApiService.toggleBlockCustomer(id, nextStatus === 'Blocked');
   };
 
-  const deleteCustomer = async (id: string): Promise<boolean> => {
+  const deleteCustomer = async (id: string, phone?: string): Promise<boolean> => {
     const cust = customers.find((c) => c.id === id);
-    const success = await ApiService.deleteCustomer(id);
-    if (success) {
-      setCustomers((prev) => prev.filter((c) => c.id !== id));
-      if (selectedCustomer && selectedCustomer.id === id) {
-        setSelectedCustomer(null);
-      }
-      if (cust) {
-        logAudit('Customer Deleted', cust.name, `Customer ${cust.name} (${cust.phone}) permanently deleted`);
-      }
+    const targetPhone = phone || cust?.phone;
+
+    // Immediately remove from local state so UI updates instantly
+    setCustomers((prev) =>
+      prev.filter((c) => c.id !== id && (!targetPhone || c.phone !== targetPhone))
+    );
+    if (selectedCustomer && (selectedCustomer.id === id || (targetPhone && selectedCustomer.phone === targetPhone))) {
+      setSelectedCustomer(null);
     }
-    return success;
+    if (cust) {
+      logAudit('Customer Deleted', cust.name, `Customer ${cust.name} (${cust.phone}) permanently deleted`);
+    }
+
+    // Persist to live MongoDB in background
+    try {
+      await ApiService.deleteCustomer(id, targetPhone);
+    } catch (_) {}
+
+    return true;
   };
 
   const deleteRider = async (id: string): Promise<boolean> => {

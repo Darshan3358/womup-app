@@ -1589,6 +1589,37 @@ export class UsersService {
   }
 
   /**
+   * Admin: Delete customer permanently
+   */
+  async adminDeleteCustomer(id: string, phone?: string): Promise<any> {
+    let userObjId: any = null;
+    if (Types.ObjectId.isValid(id)) {
+      try {
+        userObjId = new Types.ObjectId(id);
+      } catch (_) {}
+    }
+
+    const filterOr: any[] = [{ _id: id }];
+    if (userObjId) filterOr.push({ _id: userObjId });
+    if (phone) filterOr.push({ phone }, { mobile: phone });
+
+    const user = await this.userModel.findOne({ $or: filterOr });
+    const resolvedId = user?._id || userObjId;
+    const resolvedStr = user?._id ? user._id.toString() : id;
+
+    await this.userModel.deleteMany({ $or: filterOr });
+
+    try {
+      this.trackingGateway?.server?.emit('customer_deleted', { id, userId: resolvedStr });
+    } catch (_) {}
+
+    return {
+      success: true,
+      message: 'Customer deleted successfully',
+    };
+  }
+
+  /**
    * Submit Customer KYC (Aadhaar & Bank Details)
    */
   async submitCustomerKyc(userId: string, payload: any) {

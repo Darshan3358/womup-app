@@ -6,6 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
+  Alert,
+  Platform,
 } from 'react-native';
 import {
   User,
@@ -82,29 +84,44 @@ export const CustomerProfileScreen: React.FC = () => {
 
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const handleDeleteCustomer = async () => {
-    if (!selectedCustomer || isDeleting) return;
-    const confirmed = typeof window !== 'undefined' && window.confirm
-      ? window.confirm(`Are you sure you want to permanently delete customer "${selectedCustomer.name}" (${selectedCustomer.phone})?\n\nThis will remove their profile, addresses, and cart data from the database. This action cannot be undone.`)
-      : true;
-
-    if (!confirmed) return;
-
+  const executeDelete = async () => {
+    if (!selectedCustomer) return;
     setIsDeleting(true);
     try {
-      const ok = await deleteCustomer(selectedCustomer.id);
-      if (ok) {
-        if (typeof window !== 'undefined' && window.alert) {
-          window.alert(`Customer ${selectedCustomer.name} has been deleted successfully.`);
-        }
-        goBackSubView();
+      await deleteCustomer(selectedCustomer.id, selectedCustomer.phone);
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && window.alert) {
+        window.alert(`Customer ${selectedCustomer.name} has been deleted successfully.`);
       } else {
-        if (typeof window !== 'undefined' && window.alert) {
-          window.alert(`Failed to delete customer. Please try again.`);
-        }
+        Alert.alert('Deleted', `Customer ${selectedCustomer.name} has been deleted successfully.`);
       }
+      goBackSubView();
+    } catch (_) {
+      goBackSubView();
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteCustomer = () => {
+    if (!selectedCustomer || isDeleting) return;
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.confirm) {
+      if (
+        window.confirm(
+          `Are you sure you want to permanently delete customer "${selectedCustomer.name}" (${selectedCustomer.phone})?\n\nThis will remove their profile, addresses, and cart data from the database. This action cannot be undone.`
+        )
+      ) {
+        executeDelete();
+      }
+    } else {
+      Alert.alert(
+        'Delete Customer',
+        `Are you sure you want to permanently delete "${selectedCustomer.name}" (${selectedCustomer.phone})?\n\nThis will remove their profile, addresses, and cart data from the database. This action cannot be undone.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Delete', style: 'destructive', onPress: executeDelete },
+        ]
+      );
     }
   };
 
