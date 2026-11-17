@@ -1566,16 +1566,27 @@ export class UsersService {
    * Admin: Delete customer permanently
    */
   async adminDeleteCustomer(id: string, phone?: string): Promise<any> {
-    let userObjId: any = null;
-    if (Types.ObjectId.isValid(id)) {
+    let userObjId: Types.ObjectId | null = null;
+    if (Types.ObjectId.isValid(id) && /^[0-9a-fA-F]{24}$/.test(id)) {
       try {
         userObjId = new Types.ObjectId(id);
       } catch (_) {}
     }
 
-    const filterOr: any[] = [{ _id: id }];
-    if (userObjId) filterOr.push({ _id: userObjId });
-    if (phone) filterOr.push({ phone }, { mobile: phone });
+    const filterOr: any[] = [];
+    if (userObjId) {
+      filterOr.push({ _id: userObjId });
+    }
+    filterOr.push({ id }, { customId: id }, { customerId: id });
+    if (phone) {
+      filterOr.push({ phone }, { mobile: phone });
+      const cleanPhone = phone.replace(/^\+91/, '').trim();
+      filterOr.push({ phone: cleanPhone }, { phone: `+91${cleanPhone}` });
+    }
+    if (/^\+?\d{10,13}$/.test(id)) {
+      const cleanIdPhone = id.replace(/^\+91/, '').trim();
+      filterOr.push({ phone: id }, { phone: cleanIdPhone }, { phone: `+91${cleanIdPhone}` });
+    }
 
     const user = await this.userModel.findOne({ $or: filterOr });
     const resolvedId = user?._id || userObjId;

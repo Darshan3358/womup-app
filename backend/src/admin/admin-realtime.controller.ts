@@ -625,14 +625,15 @@ export class AdminRealtimeController {
     const phone = phoneQuery || phoneBody;
 
     let userObjId: Types.ObjectId | null = null;
-    if (Types.ObjectId.isValid(id)) {
+    if (Types.ObjectId.isValid(id) && /^[0-9a-fA-F]{24}$/.test(id)) {
       try {
         userObjId = new Types.ObjectId(id);
       } catch (_) {}
     }
 
-    const filterOr: any[] = [{ _id: id }];
+    const filterOr: any[] = [];
     if (userObjId) filterOr.push({ _id: userObjId });
+    filterOr.push({ id }, { customId: id }, { customerId: id });
     if (phone) {
       filterOr.push({ phone }, { mobile: phone });
       const cleanPhone = phone.replace(/^\+91/, '').trim();
@@ -692,14 +693,15 @@ export class AdminRealtimeController {
     const isBlocked = body.isBlocked === true || body.isBlocked === 1 || body.status === 'Blocked';
 
     let userObjId: Types.ObjectId | null = null;
-    if (Types.ObjectId.isValid(id)) {
+    if (Types.ObjectId.isValid(id) && /^[0-9a-fA-F]{24}$/.test(id)) {
       try {
         userObjId = new Types.ObjectId(id);
       } catch (_) {}
     }
 
-    const filterOr: any[] = [{ _id: id }];
+    const filterOr: any[] = [];
     if (userObjId) filterOr.push({ _id: userObjId });
+    filterOr.push({ id }, { customId: id }, { customerId: id });
 
     await db.collection('users').updateOne(
       { $or: filterOr },
@@ -743,14 +745,15 @@ export class AdminRealtimeController {
     const db = this.db;
 
     let userObjId: Types.ObjectId | null = null;
-    if (Types.ObjectId.isValid(id)) {
+    if (Types.ObjectId.isValid(id) && /^[0-9a-fA-F]{24}$/.test(id)) {
       try {
         userObjId = new Types.ObjectId(id);
       } catch (_) {}
     }
 
-    const filterOr: any[] = [{ _id: id }];
+    const filterOr: any[] = [];
     if (userObjId) filterOr.push({ _id: userObjId });
+    filterOr.push({ id }, { customId: id }, { customerId: id });
 
     const updateFields: any = { updatedAt: new Date() };
     if (updates.name !== undefined) updateFields.name = updates.name;

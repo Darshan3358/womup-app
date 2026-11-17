@@ -839,6 +839,7 @@ export const ApiService = {
       const q = phone ? `?phone=${encodeURIComponent(phone)}` : '';
       const endpoints = [
         `${API_BASE_URL}/api/admin/customers/${id}${q}`,
+        `${API_BASE_URL}/api/v1/admin/customers/${id}${q}`,
         `${API_BASE_URL}/api/admin/users/${id}${q}`,
         `${NEST_API_BASE_URL}/admin/customers/${id}${q}`,
       ];
