@@ -11,8 +11,8 @@ async function seed3LevelUsers() {
   const usersColl = db.collection('users');
   const walletsColl = db.collection('wallets');
   const addressesColl = db.collection('addresses');
-  const incomeTxColl = db.collection('incometransactions');
-  const coinTxColl = db.collection('cointransactions');
+  const incomeTxColl = db.collection('income_transactions');
+  const coinTxColl = db.collection('coin_transactions');
 
   // Find root admin as top sponsor for Level 1 user
   const rootAdmin = await usersColl.findOne({
@@ -404,3 +404,4 @@ seed3LevelUsers().catch(err => {
   console.error('Failed to seed 3-level users:', err);
   process.exit(1);
 });
+
