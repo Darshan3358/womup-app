@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, View, StatusBar, Platform } from 'react-native';
-import * as Updates from 'expo-updates';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { AdminStateProvider, useAdminState } from './src/context/AdminStateContext';
 import { Header } from './src/components/common/Header';
@@ -53,21 +52,6 @@ import { AdminLoginScreen } from './src/screens/AdminLoginScreen';
 const MainApp: React.FC = () => {
   const { activeTab, subView, isAdminAuthenticated, activeModal } = useAdminState();
   const [showSplash, setShowSplash] = useState(true);
-
-  useEffect(() => {
-    async function checkAutoUpdate() {
-      try {
-        if (!__DEV__) {
-          const update = await Updates.checkForUpdateAsync();
-          if (update.isAvailable) {
-            await Updates.fetchUpdateAsync();
-            await Updates.reloadAsync();
-          }
-        }
-      } catch (_) {}
-    }
-    checkAutoUpdate();
-  }, []);
 
   if (showSplash) {
     return (

@@ -174,12 +174,14 @@ export const CustomerProfileScreen: React.FC = () => {
               </View>
             ) : null}
 
-            <View style={[styles.refPill, { backgroundColor: '#EEF2FF', borderColor: '#C7D2FE' }]}>
-              <Text style={[styles.refPillLabel, { color: '#4F46E5' }]}>OTP: </Text>
-              <Text style={[styles.refPillCode, { color: '#4338CA', fontWeight: '800', letterSpacing: 1 }]}>
-                {selectedCustomer.customerOtp || selectedCustomer.otp || '123456'}
-              </Text>
-            </View>
+            {Boolean(selectedCustomer.customerOtp || selectedCustomer.otp) && (
+              <View style={[styles.refPill, { backgroundColor: '#EEF2FF', borderColor: '#C7D2FE' }]}>
+                <Text style={[styles.refPillLabel, { color: '#4F46E5' }]}>OTP: </Text>
+                <Text style={[styles.refPillCode, { color: '#4338CA', fontWeight: '800', letterSpacing: 1 }]}>
+                  {selectedCustomer.customerOtp || selectedCustomer.otp}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
       </View>
@@ -223,11 +225,15 @@ export const CustomerProfileScreen: React.FC = () => {
           <View style={styles.infoGroup}>
             <Text style={styles.label}>Registration OTP (Used on Signup)</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-              <View style={{ backgroundColor: '#EEF2FF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: '#C7D2FE' }}>
-                <Text style={{ fontWeight: '800', color: '#4338CA', fontSize: 16, letterSpacing: 2 }}>
-                  {selectedCustomer.customerOtp || selectedCustomer.otp || '123456'}
-                </Text>
-              </View>
+              {selectedCustomer.customerOtp || selectedCustomer.otp ? (
+                <View style={{ backgroundColor: '#EEF2FF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: '#C7D2FE' }}>
+                  <Text style={{ fontWeight: '800', color: '#4338CA', fontSize: 16, letterSpacing: 2 }}>
+                    {selectedCustomer.customerOtp || selectedCustomer.otp}
+                  </Text>
+                </View>
+              ) : (
+                <Text style={[styles.value, { color: COLORS.textMuted }]}>None / Not Available</Text>
+              )}
             </View>
           </View>
 

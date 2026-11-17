@@ -337,8 +337,8 @@ export const EditCustomerModal: React.FC = () => {
               <Text style={styles.label}>Registration OTP (Used on Signup)</Text>
               <View style={[styles.readOnlyInput, { marginTop: 4 }]}>
                 <Lock size={12} color={COLORS.textMuted} style={{ marginRight: 6, flexShrink: 0 }} />
-                <Text style={[styles.readOnlyText, { fontWeight: '700', color: COLORS.purple, letterSpacing: 2 }]}>
-                  {selectedCustomer.customerOtp || selectedCustomer.otp || '123456'}
+                <Text style={[styles.readOnlyText, { fontWeight: '700', color: (selectedCustomer.customerOtp || selectedCustomer.otp) ? COLORS.purple : COLORS.textMuted, letterSpacing: (selectedCustomer.customerOtp || selectedCustomer.otp) ? 2 : 0 }]}>
+                  {selectedCustomer.customerOtp || selectedCustomer.otp || 'None'}
                 </Text>
               </View>
             </View>

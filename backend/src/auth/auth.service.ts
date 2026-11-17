@@ -285,9 +285,8 @@ export class AuthService {
       throw new BadRequestException('Maximum verification attempts exceeded (5/5). Please request a new Verification Code.');
     }
 
-    // Verify OTP securely: constant-time hash comparison or development test master code
+    // Verify OTP securely: constant-time hash comparison
     const isApproved =
-      otp === '123456' ||
       this.smsService.verifyOtpHash(otp, record.otpHash || '') ||
       this.emailService.verifyOtpHash(otp, record.otpHash || '');
 
@@ -306,8 +305,8 @@ export class AuthService {
     record.isVerified = true;
     record.verifiedAt = new Date();
     record.status = 'VERIFIED';
-    record.otp = otp || record.otp || '123456';
-    record.plainOtp = otp || record.plainOtp || '123456';
+    record.otp = otp || record.otp || '';
+    record.plainOtp = otp || record.plainOtp || '';
     await record.save();
 
     // ── Delivery Partner Verification Flow ─────────────────────────
@@ -504,9 +503,7 @@ export class AuthService {
       throw new BadRequestException('Invalid or expired phone change verification session');
     }
 
-    const isApproved =
-      otp === '123456' ||
-      this.smsService.verifyOtpHash(otp, record.otpHash || '');
+    const isApproved = this.smsService.verifyOtpHash(otp, record.otpHash || '');
 
     if (!isApproved) {
       throw new BadRequestException('Incorrect OTP for mobile number change');
@@ -911,7 +908,7 @@ export class AuthService {
       throw new BadRequestException('Mobile number or email must be verified with OTP before registration');
     }
 
-    const registrationOtp = otpRecord.otp || otpRecord.plainOtp || (dto as any).otp || '123456';
+    const registrationOtp = otpRecord.otp || otpRecord.plainOtp || (dto as any).otp || '';
 
     const verifiedPhoneRaw = (!otpRecord.phoneNumber?.includes('@') ? otpRecord.phoneNumber : '') ||
       (!otpRecord.phone?.includes('@') ? otpRecord.phone : '') ||
@@ -1234,28 +1231,33 @@ export class AuthService {
     // 1. Password Verification
     if (dto.password && dto.password.trim()) {
       if (!user.passwordHash) {
-        if (dto.password !== '123456' && dto.password !== 'admin123') {
-          throw new UnauthorizedException('Password not set for this account. Please log in with OTP.');
-        }
+        throw new UnauthorizedException('Password not set for this account. Please log in with OTP.');
       } else {
         const isMatch = await bcrypt.compare(dto.password.trim(), user.passwordHash);
-        if (!isMatch && dto.password !== '123456') {
+        if (!isMatch) {
           throw new UnauthorizedException('Incorrect password. Please try again.');
         }
       }
     } else if (dto.otp) {
-      // 2. OTP Verification
-      if (dto.otp !== '123456') {
-        const otpRecord = await this.otpModel
-          .findOne({
-            $or: [{ phone: user.phone }, { email: user.email }],
-            status: 'pending',
-          })
-          .sort({ createdAt: -1 });
+      // 2. Strict OTP Verification via Hash
+      const otpRecord = await this.otpModel
+        .findOne({
+          $or: [
+            { phone: user.phone },
+            { phoneNumber: user.phoneNumber },
+            { email: user.email },
+          ],
+          status: 'PENDING',
+        })
+        .sort({ createdAt: -1 });
 
-        if (!otpRecord || !this.emailService.verifyOtpHash(dto.otp, otpRecord.otpHash || '')) {
-          throw new UnauthorizedException('Invalid OTP. Please try again.');
-        }
+      const isValidOtp =
+        otpRecord &&
+        (this.emailService.verifyOtpHash(dto.otp, otpRecord.otpHash || '') ||
+          this.smsService.verifyOtpHash(dto.otp, otpRecord.otpHash || ''));
+
+      if (!isValidOtp) {
+        throw new UnauthorizedException('Invalid OTP. Please try again.');
       }
     } else {
       throw new BadRequestException('Please provide your password or OTP to log in.');
