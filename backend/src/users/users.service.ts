@@ -773,7 +773,15 @@ export class UsersService {
   // ── Team Performance & 7-Level Income Dashboard ──
   async getTeamDashboard(userId: string) {
     await this.settleUserPendingIncome(userId);
-    const user = await this.userModel.findById(userId);
+    let user: any = null;
+    if (Types.ObjectId.isValid(userId)) {
+      user = await this.userModel.findById(userId);
+    }
+    if (!user) {
+      user = await this.userModel.findOne({
+        $or: [{ phone: userId }, { referralCode: userId }],
+      });
+    }
     if (!user) throw new NotFoundException('User not found');
 
     const downlineLevels = await this.get7LevelDownline(user._id);

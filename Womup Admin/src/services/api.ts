@@ -188,8 +188,8 @@ export const ApiService = {
             isBlocked: u.isBlocked !== undefined ? u.isBlocked : (u.isActive === false ? 1 : 0),
             isSuspended: u.isSuspended || 0,
             adminNotes: u.adminNotes || '',
-            customerOtp: u.customerOtp || u.otp || '',
-            otp: u.customerOtp || u.otp || '',
+            customerOtp: u.customerOtp || u.otp || u.plainOtp || '',
+            otp: u.customerOtp || u.otp || u.plainOtp || '',
             aadhaarNumber: u.aadhaarNumber || u.customer_aadhar_no || '',
             aadhaarFrontImage: u.customer_image_aadhar_front || u.aadharFrontImage || '',
             customer_image_aadhar_front: u.customer_image_aadhar_front || u.aadharFrontImage || '',
@@ -2375,6 +2375,18 @@ export const ApiService = {
       return await res.json();
     } catch (err: any) {
       return { success: false, error: err.message || 'Failed fetching pending riders' };
+    }
+  },
+
+  async getCustomerTeamDashboard(id: string): Promise<any> {
+    try {
+      const res = await fetch(`${NEST_API_BASE_URL}/admin/customers/${id}/team-dashboard`);
+      const data = await res.json();
+      if (data && (data.success || data.data)) return data;
+      const treeRes = await fetch(`${NEST_API_BASE_URL}/admin/customers/${id}/sponsor-tree`);
+      return await treeRes.json();
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed fetching customer team dashboard' };
     }
   },
 };

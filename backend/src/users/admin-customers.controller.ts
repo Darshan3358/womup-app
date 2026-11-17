@@ -162,4 +162,11 @@ export class AdminCustomersController {
   async getSponsorTree(@Param('id') id: string) {
     return this.usersService.adminGetSponsorTree(id);
   }
+
+  @Get(':id/team-dashboard')
+  @ApiOperation({ summary: 'Get 7-level team breakdown and downline details for a customer' })
+  async getCustomerTeamDashboard(@Param('id') id: string) {
+    const dashboard = await this.usersService.getTeamDashboard(id);
+    return { success: true, data: dashboard };
+  }
 }

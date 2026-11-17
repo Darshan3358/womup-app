@@ -176,4 +176,24 @@ export const CustomerService = {
       { id: 'z12', name: 'Ahmedabad' },
     ];
   },
+
+  /**
+   * Fetch 7-level team breakdown and downline performance for a customer
+   */
+  async getCustomerTeamDashboard(customerId: string): Promise<any> {
+    try {
+      const res = await fetch(`${BASE_URL}/admin/customers/${customerId}/team-dashboard`);
+      const data = await res.json();
+      if (data && (data.success || data.data)) {
+        return data;
+      }
+      // Fallback: try sponsor tree endpoint
+      const treeRes = await fetch(`${BASE_URL}/admin/customers/${customerId}/sponsor-tree`);
+      return await treeRes.json();
+    } catch (err: any) {
+      console.warn('[CustomerService] getCustomerTeamDashboard error:', err);
+      // Fallback to ApiService
+      return await ApiService.getCustomerTeamDashboard(customerId);
+    }
+  },
 };

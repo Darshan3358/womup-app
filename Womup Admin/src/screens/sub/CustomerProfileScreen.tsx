@@ -23,11 +23,14 @@ import {
   ChevronRight,
   FileText,
   Trash2,
+  Eye,
+  Users,
 } from 'lucide-react-native';
 import { COLORS, RADIUS, SPACING } from '../../theme';
 import { useAdminState } from '../../context/AdminStateContext';
 import { Order, PrintOrder } from '../../types/admin';
 import { KYCTab } from '../../components/KYCTab';
+import { CustomerLevelDetailModal } from '../modals/CustomerLevelDetailModal';
 
 export const CustomerProfileScreen: React.FC = () => {
   const {
@@ -47,6 +50,7 @@ export const CustomerProfileScreen: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'Profile' | 'Orders' | 'Wallet' | 'KYC'>('Orders');
   const [ordersSubTab, setOrdersSubTab] = useState<'All' | 'Store Orders'>('All');
+  const [showLevelModal, setShowLevelModal] = useState(false);
 
   if (!selectedCustomer) {
     return (
@@ -182,6 +186,15 @@ export const CustomerProfileScreen: React.FC = () => {
                 </Text>
               </View>
             )}
+
+            {Boolean(selectedCustomer.customerOtp || selectedCustomer.otp) && (
+              <View style={[styles.refPill, { backgroundColor: '#EEF2FF', borderColor: '#C7D2FE' }]}>
+                <Text style={[styles.refPillLabel, { color: '#4F46E5' }]}>OTP: </Text>
+                <Text style={[styles.refPillCode, { color: '#4338CA', fontWeight: '800', letterSpacing: 1 }]}>
+                  {selectedCustomer.customerOtp || selectedCustomer.otp}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
       </View>
@@ -220,6 +233,21 @@ export const CustomerProfileScreen: React.FC = () => {
           <View style={styles.infoGroup}>
             <Text style={styles.label}>Email Address</Text>
             <Text style={styles.value}>{selectedCustomer.email}</Text>
+          </View>
+
+          <View style={styles.infoGroup}>
+            <Text style={styles.label}>Registration OTP (Used on Signup)</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+              {selectedCustomer.customerOtp || selectedCustomer.otp ? (
+                <View style={{ backgroundColor: '#EEF2FF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: '#C7D2FE' }}>
+                  <Text style={{ fontWeight: '800', color: '#4338CA', fontSize: 16, letterSpacing: 2 }}>
+                    {selectedCustomer.customerOtp || selectedCustomer.otp}
+                  </Text>
+                </View>
+              ) : (
+                <Text style={[styles.value, { color: COLORS.textMuted }]}>None / Not Available</Text>
+              )}
+            </View>
           </View>
 
           <View style={styles.infoGroup}>
@@ -384,6 +412,14 @@ export const CustomerProfileScreen: React.FC = () => {
               <Text style={[styles.metricValue, { color: '#6D28D9' }]}>
                 Level {selectedCustomer.level ?? 1}
               </Text>
+              <TouchableOpacity
+                style={styles.viewLevelBtnInBox}
+                onPress={() => setShowLevelModal(true)}
+                activeOpacity={0.7}
+              >
+                <Eye size={11} color="#6D28D9" style={{ marginRight: 4 }} />
+                <Text style={styles.viewLevelBtnInBoxText}>View Level Detail</Text>
+              </TouchableOpacity>
             </View>
             <View style={[styles.metricBox, { backgroundColor: '#ECFDF5' }]}>
               <Text style={styles.metricLabel}>Direct Referrals</Text>
@@ -392,6 +428,19 @@ export const CustomerProfileScreen: React.FC = () => {
               </Text>
             </View>
           </View>
+
+          {/* Full 7-Level Detail Action Banner */}
+          <TouchableOpacity
+            style={styles.viewLevelDetailBannerBtn}
+            onPress={() => setShowLevelModal(true)}
+            activeOpacity={0.8}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Users size={15} color="#FFFFFF" />
+              <Text style={styles.viewLevelDetailBannerBtnText}>View Level Detail (7-Level Breakdown)</Text>
+            </View>
+            <ChevronRight size={15} color="#FFFFFF" />
+          </TouchableOpacity>
 
           {/* Referral Code & Sponsor ID Row */}
           <View style={[styles.metricsRow, { marginTop: 8 }]}>
@@ -483,6 +532,15 @@ export const CustomerProfileScreen: React.FC = () => {
           {isDeleting ? 'Deleting Customer...' : 'Delete Customer Permanently'}
         </Text>
       </TouchableOpacity>
+
+      {/* Customer 7-Level Downline Performance Modal */}
+      <CustomerLevelDetailModal
+        isOpen={showLevelModal}
+        customerId={selectedCustomer.id}
+        customerName={selectedCustomer.name}
+        customerCode={selectedCustomer.referralCode}
+        onClose={() => setShowLevelModal(false)}
+      />
     </ScrollView>
   );
 };
@@ -824,6 +882,36 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: COLORS.textPrimary,
     marginTop: 2,
+  },
+  viewLevelBtnInBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#DDD6FE',
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    borderRadius: 6,
+    marginTop: 6,
+  },
+  viewLevelBtnInBoxText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#6D28D9',
+  },
+  viewLevelDetailBannerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#6D28D9',
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  viewLevelDetailBannerBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   kycRow: {
     flexDirection: 'row',
