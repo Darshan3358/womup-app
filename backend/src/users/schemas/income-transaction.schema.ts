@@ -17,6 +17,9 @@ export class IncomeTransaction {
   @Prop({ required: true })
   amount: number; // e.g. ₹50
 
+  @Prop({ default: 0 })
+  coinsReward: number; // e.g. 400, 300, 200 SC credited at 12:00 AM midnight
+
   @Prop({ type: Types.ObjectId, ref: 'User' })
   sourceUserId?: Types.ObjectId; // Referred user
 

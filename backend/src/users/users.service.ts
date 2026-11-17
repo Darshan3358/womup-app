@@ -1092,41 +1092,29 @@ export class UsersService {
           continue;
         }
 
-        // 1. App Download Referral Income (Queued for Daily 12:00 AM IST distribution)
+        // 1. App Download & Referral Coins Income (Both Queued for Daily 12:00 AM IST Midnight distribution)
         await this.incomeTxModel.create({
           userId: sponsor._id,
           type: 'APP_DOWNLOAD',
           amount: tier.appIncome,
+          coinsReward: tier.coinIncome,
           sourceUserId: user._id,
           sourceVerificationStatus: 'VERIFIED',
           earnedAt: new Date(),
           availableFrom: new Date(),
           status: 'PENDING',
           isUsable: false,
-          description: `Level ${tier.level} App Download Income from verified referral: ${user.fullNameAsPerAadhaar || user.name}`,
+          description: `Level ${tier.level} App Download (₹${tier.appIncome}) & Shopping Coins (${tier.coinIncome} SC) from verified referral: ${user.fullNameAsPerAadhaar || user.name}`,
         });
 
         sponsor.pendingIncome = Number(((sponsor.pendingIncome || 0) + tier.appIncome).toFixed(2));
+        sponsor.pendingShoppingCoins = ((sponsor as any).pendingShoppingCoins || 0) + tier.coinIncome;
         sponsor.appDownloadIncome = Number(((sponsor.appDownloadIncome || 0) + tier.appIncome).toFixed(2));
         if (tier.level === 1) {
           sponsor.verifiedReferralsCount = (sponsor.verifiedReferralsCount || 0) + 1;
         }
 
-        // 2. Shopping Coin Income (One-time tier coins credited directly to shoppingCoins)
-        if (tier.coinIncome > 0) {
-          const coinBefore = sponsor.shoppingCoins || 0;
-          sponsor.shoppingCoins = coinBefore + tier.coinIncome;
-
-          await this.coinTxModel.create({
-            userId: sponsor._id,
-            type: 'EARN',
-            coins: tier.coinIncome,
-            balanceBefore: coinBefore,
-            balanceAfter: sponsor.shoppingCoins,
-            referenceType: 'TIER_COIN_INCOME',
-            description: `Level ${tier.level} Referral Shopping Coins Bonus from ${user.fullNameAsPerAadhaar || user.name}`,
-          });
-        }
+        // Coins are queued for 12:00 AM Cron Job distribution (NOT instant per updated business rule)
 
         await sponsor.save();
 

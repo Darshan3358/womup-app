@@ -45,6 +45,9 @@ export class User {
   @Prop({ default: 2000 }) // Welcome bonus: 2000 Shopping Coins per SRS
   shoppingCoins: number;
 
+  @Prop({ default: 0 })
+  pendingShoppingCoins: number; // Shopping coins earned today, credited at 12:00 AM midnight
+
   // Registration Address Details
   @Prop({ trim: true })
   registrationCity?: string;

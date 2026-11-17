@@ -215,107 +215,89 @@ async function seed3LevelUsers() {
   await incomeTxColl.deleteMany({ userId: { $in: testIds } });
   await coinTxColl.deleteMany({ userId: { $in: testIds } });
 
-  // ── Setup MLM Rewards according to the matrix:
-  // Level 1 reward: ₹20 + 400 coins
-  // Level 2 reward: ₹10 + 300 coins
-  // Level 3 reward: ₹5  + 200 coins
+  // ── Setup MLM Rewards according to the updated 12:00 AM Midnight Cron Rule:
+  // Level 1 reward: ₹20 + 400 coins (BOTH queued for 12 AM Cron)
+  // Level 2 reward: ₹10 + 300 coins (BOTH queued for 12 AM Cron)
+  // Level 3 reward: ₹5  + 200 coins (BOTH queued for 12 AM Cron)
 
-  // 1. User 1 gets Level 1 rewards from User 2 (₹20 pending + 400 coins instant)
+  // 1. User 1 gets Level 1 rewards from User 2 (₹20 pending + 400 coins pending)
   await incomeTxColl.insertOne({
     userId: u1Id,
     type: 'APP_DOWNLOAD',
     amount: 20,
+    coinsReward: 400,
     status: 'PENDING',
     isUsable: false,
     sourceUserId: u2Id,
     level: 1,
-    description: 'Level 1 App Download KYC Income from Test User Level 2 (Queued for 12:00 AM Cron)',
+    description: 'Level 1 App Download (₹20) & Shopping Coins (400 SC) from Test User Level 2 (Queued for 12:00 AM Cron)',
     createdAt: new Date(),
     updatedAt: new Date()
   });
-  await coinTxColl.insertOne({
-    userId: u1Id,
-    amount: 400,
-    type: 'CREDIT',
-    description: 'Level 1 Referral Coin Reward from Test User Level 2',
-    createdAt: new Date()
-  });
 
-  // 2. User 1 gets Level 2 rewards from User 3 (₹10 pending + 300 coins instant)
+  // 2. User 1 gets Level 2 rewards from User 3 (₹10 pending + 300 coins pending)
   await incomeTxColl.insertOne({
     userId: u1Id,
     type: 'APP_DOWNLOAD',
     amount: 10,
+    coinsReward: 300,
     status: 'PENDING',
     isUsable: false,
     sourceUserId: u3Id,
     level: 2,
-    description: 'Level 2 App Download KYC Income from Test User Level 3 (Queued for 12:00 AM Cron)',
+    description: 'Level 2 App Download (₹10) & Shopping Coins (300 SC) from Test User Level 3 (Queued for 12:00 AM Cron)',
     createdAt: new Date(),
     updatedAt: new Date()
   });
-  await coinTxColl.insertOne({
-    userId: u1Id,
-    amount: 300,
-    type: 'CREDIT',
-    description: 'Level 2 Referral Coin Reward from Test User Level 3',
-    createdAt: new Date()
-  });
 
-  // 3. User 2 gets Level 1 rewards from User 3 (₹20 pending + 400 coins instant)
+  // 3. User 2 gets Level 1 rewards from User 3 (₹20 pending + 400 coins pending)
   await incomeTxColl.insertOne({
     userId: u2Id,
     type: 'APP_DOWNLOAD',
     amount: 20,
+    coinsReward: 400,
     status: 'PENDING',
     isUsable: false,
     sourceUserId: u3Id,
     level: 1,
-    description: 'Level 1 App Download KYC Income from Test User Level 3 (Queued for 12:00 AM Cron)',
+    description: 'Level 1 App Download (₹20) & Shopping Coins (400 SC) from Test User Level 3 (Queued for 12:00 AM Cron)',
     createdAt: new Date(),
     updatedAt: new Date()
   });
-  await coinTxColl.insertOne({
-    userId: u2Id,
-    amount: 400,
-    type: 'CREDIT',
-    description: 'Level 1 Referral Coin Reward from Test User Level 3',
-    createdAt: new Date()
-  });
 
-  // Update user balances:
-  // User 1: Pending Income = ₹30 (₹20 + ₹10), Shopping Coins = 2000 (Welcome) + 400 + 300 = 2700 SC
+  // Update user balances (Pre-cron state: coins and cash are BOTH in pending state):
+  // User 1: Pending Income = ₹30 (₹20 + ₹10), Pending Coins = 700 SC (400 + 300), Base Coins = 2000 SC
   await usersColl.updateOne(
     { _id: u1Id },
-    { $set: { pendingIncome: 30, availableIncome: 0, walletBalance: 0, shoppingCoins: 2700 } }
+    { $set: { pendingIncome: 30, pendingShoppingCoins: 700, availableIncome: 0, walletBalance: 0, shoppingCoins: 2000 } }
   );
 
-  // User 2: Pending Income = ₹20, Shopping Coins = 2000 (Welcome) + 400 = 2400 SC
+  // User 2: Pending Income = ₹20, Pending Coins = 400 SC, Base Coins = 2000 SC
   await usersColl.updateOne(
     { _id: u2Id },
-    { $set: { pendingIncome: 20, availableIncome: 0, walletBalance: 0, shoppingCoins: 2400 } }
+    { $set: { pendingIncome: 20, pendingShoppingCoins: 400, availableIncome: 0, walletBalance: 0, shoppingCoins: 2000 } }
   );
 
-  // User 3: Pending Income = 0, Shopping Coins = 2000 SC
+  // User 3: Pending Income = 0, Pending Coins = 0, Base Coins = 2000 SC
   await usersColl.updateOne(
     { _id: u3Id },
-    { $set: { pendingIncome: 0, availableIncome: 0, walletBalance: 0, shoppingCoins: 2000 } }
+    { $set: { pendingIncome: 0, pendingShoppingCoins: 0, availableIncome: 0, walletBalance: 0, shoppingCoins: 2000 } }
   );
 
   // Ensure wallet collection documents are updated
   await walletsColl.updateOne(
     { userId: u1Id },
-    { $set: { userId: u1Id, pendingIncome: 30, balance: 0, shoppingCoins: 2700, updatedAt: new Date() } },
+    { $set: { userId: u1Id, pendingIncome: 30, pendingShoppingCoins: 700, balance: 0, shoppingCoins: 2000, updatedAt: new Date() } },
     { upsert: true }
   );
   await walletsColl.updateOne(
     { userId: u2Id },
-    { $set: { userId: u2Id, pendingIncome: 20, balance: 0, shoppingCoins: 2400, updatedAt: new Date() } },
+    { $set: { userId: u2Id, pendingIncome: 20, pendingShoppingCoins: 400, balance: 0, shoppingCoins: 2000, updatedAt: new Date() } },
     { upsert: true }
   );
   await walletsColl.updateOne(
     { userId: u3Id },
-    { $set: { userId: u3Id, pendingIncome: 0, balance: 0, shoppingCoins: 2000, updatedAt: new Date() } },
+    { $set: { userId: u3Id, pendingIncome: 0, pendingShoppingCoins: 0, balance: 0, shoppingCoins: 2000, updatedAt: new Date() } },
     { upsert: true }
   );
 
