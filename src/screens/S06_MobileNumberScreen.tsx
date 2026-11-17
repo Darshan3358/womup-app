@@ -36,7 +36,9 @@ export const S06_MobileNumberScreen: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
 
   // Register Form States (Mobile OTP or Email OTP per user choice)
-  const [registerMethod, setRegisterMethod] = useState<'PHONE' | 'EMAIL'>('PHONE');
+  // Feature flag: SMS gateway is currently inactive; Mobile Number registration is hidden (preserved, not removed). Set to true to re-enable.
+  const ENABLE_PHONE_REGISTRATION = false;
+  const [registerMethod, setRegisterMethod] = useState<'PHONE' | 'EMAIL'>('EMAIL');
   const [registerPhone, setRegisterPhone] = useState(
     user.phoneNumber ? user.phoneNumber.replace(/^\+91/, '').replace(/\D/g, '') : ''
   );
@@ -241,7 +243,7 @@ export const S06_MobileNumberScreen: React.FC = () => {
           <Text style={styles.subtitle}>
             {activeTab === 'SIGN_IN'
               ? 'Log in using your Mobile Number, Email, or Sponsor ID'
-              : registerMethod === 'EMAIL'
+              : registerMethod === 'EMAIL' || !ENABLE_PHONE_REGISTRATION
               ? 'Enter your email address to verify and get ₹2,000 coins'
               : 'Enter your 10-digit mobile number to verify and get ₹2,000 coins'}
           </Text>
@@ -253,8 +255,8 @@ export const S06_MobileNumberScreen: React.FC = () => {
             </Text>
           </View>
 
-          {activeTab === 'REGISTER' && (
-            /* Method Switcher for Register: Mobile or Email */
+          {activeTab === 'REGISTER' && ENABLE_PHONE_REGISTRATION && (
+            /* Method Switcher for Register: Mobile or Email (Preserved - hidden while SMS OTP gateway is inactive) */
             <View style={styles.methodSelectorContainer}>
               <TouchableOpacity
                 style={[
