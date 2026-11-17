@@ -332,6 +332,16 @@ export const EditCustomerModal: React.FC = () => {
                 />
               </View>
             </View>
+
+            <View style={[styles.fullWidthCol, { marginTop: 10 }]}>
+              <Text style={styles.label}>Registration OTP (Used on Signup)</Text>
+              <View style={[styles.readOnlyInput, { marginTop: 4 }]}>
+                <Lock size={12} color={COLORS.textMuted} style={{ marginRight: 6, flexShrink: 0 }} />
+                <Text style={[styles.readOnlyText, { fontWeight: '700', color: COLORS.purple, letterSpacing: 2 }]}>
+                  {selectedCustomer.customerOtp || selectedCustomer.otp || '123456'}
+                </Text>
+              </View>
+            </View>
           </View>
 
           {/* ════════════ SECTION 3: Address ════════════ */}

@@ -56,6 +56,8 @@ export interface Customer {
   isBlocked?: number;
   isSuspended?: number;
   adminNotes?: string;
+  customerOtp?: string;
+  otp?: string;
   aadhaarNumber?: string;
   aadhaarFrontImage?: string;
   customer_image_aadhar_front?: string;

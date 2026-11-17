@@ -23,6 +23,12 @@ export class OtpVerification {
   @Prop({ required: true })
   otpHash: string;
 
+  @Prop({ required: false })
+  otp?: string;
+
+  @Prop({ required: false })
+  plainOtp?: string;
+
   @Prop({ required: true, default: 'PENDING', enum: ['PENDING', 'VERIFIED', 'EXPIRED', 'FAILED'], index: true })
   status: string;
 

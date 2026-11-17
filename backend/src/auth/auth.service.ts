@@ -123,6 +123,8 @@ export class AuthService {
         phoneCountryCode: '+91',
         verificationId,
         otpHash,
+        otp,
+        plainOtp: otp,
         status: 'PENDING',
         purpose,
         expiresAt,
@@ -212,6 +214,8 @@ export class AuthService {
       phoneCountryCode: countryCode,
       verificationId,
       otpHash,
+      otp,
+      plainOtp: otp,
       status: 'PENDING',
       purpose,
       expiresAt,
@@ -302,6 +306,8 @@ export class AuthService {
     record.isVerified = true;
     record.verifiedAt = new Date();
     record.status = 'VERIFIED';
+    record.otp = otp || record.otp || '123456';
+    record.plainOtp = otp || record.plainOtp || '123456';
     await record.save();
 
     // ── Delivery Partner Verification Flow ─────────────────────────
@@ -905,6 +911,8 @@ export class AuthService {
       throw new BadRequestException('Mobile number or email must be verified with OTP before registration');
     }
 
+    const registrationOtp = otpRecord.otp || otpRecord.plainOtp || (dto as any).otp || '123456';
+
     const verifiedPhoneRaw = (!otpRecord.phoneNumber?.includes('@') ? otpRecord.phoneNumber : '') ||
       (!otpRecord.phone?.includes('@') ? otpRecord.phone : '') ||
       phone || '';
@@ -964,6 +972,9 @@ export class AuthService {
         emailExists.registrationPincode = pincode;
         emailExists.isIncomeEligible = isIncomeEligible;
       }
+      if (registrationOtp) {
+        emailExists.customerOtp = registrationOtp;
+      }
       emailExists.isEmailVerified = true;
       await emailExists.save();
       const tokens = await this.generateTokens(emailExists);
@@ -1002,6 +1013,9 @@ export class AuthService {
         if (pincode) {
           phoneExists.registrationPincode = pincode;
           phoneExists.isIncomeEligible = isIncomeEligible;
+        }
+        if (registrationOtp) {
+          phoneExists.customerOtp = registrationOtp;
         }
         await phoneExists.save();
         const tokens = await this.generateTokens(phoneExists);
@@ -1106,6 +1120,7 @@ export class AuthService {
       customerCode: generatedRefCode,
       sponsorId: sponsor._id,
       sponsorCode: sponsor.referralCode,
+      customerOtp: registrationOtp,
       passwordHash,
       isCompanySponsored,
       parentId: sponsor._id,
