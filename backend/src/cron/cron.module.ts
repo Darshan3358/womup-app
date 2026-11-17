@@ -27,3 +27,4 @@ import { TrackingModule } from '../tracking/tracking.module';
   exports: [DailyIncomeDistributionService],
 })
 export class CronModule {}
+

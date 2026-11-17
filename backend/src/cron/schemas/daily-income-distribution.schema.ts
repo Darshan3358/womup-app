@@ -57,3 +57,4 @@ export class DailyIncomeDistribution {
 
 export const DailyIncomeDistributionSchema =
   SchemaFactory.createForClass(DailyIncomeDistribution);
+
