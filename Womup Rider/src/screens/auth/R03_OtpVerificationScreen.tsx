@@ -82,7 +82,7 @@ export const R03_OtpVerificationScreen: React.FC = () => {
         >
           <Ionicons name="arrow-back" size={24} color={COLORS.navy} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Verify OTP</Text>
+        <Text style={styles.headerTitle}>Verify Code</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -128,7 +128,7 @@ export const R03_OtpVerificationScreen: React.FC = () => {
           </View>
         ) : null}
 
-        {/* Resend OTP */}
+        {/* Resend Verification Code */}
         <TouchableOpacity
           onPress={handleResend}
           disabled={timer > 0}
@@ -136,7 +136,7 @@ export const R03_OtpVerificationScreen: React.FC = () => {
           activeOpacity={0.7}
         >
           <Text style={[styles.resendText, timer > 0 && styles.resendTextDisabled]}>
-            {timer > 0 ? `Resend OTP (00:${timer < 10 ? `0${timer}` : timer})` : 'Resend OTP'}
+            {timer > 0 ? `Resend Code (00:${timer < 10 ? `0${timer}` : timer})` : 'Resend Verification Code'}
           </Text>
         </TouchableOpacity>
 

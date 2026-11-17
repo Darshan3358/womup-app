@@ -183,7 +183,7 @@ export const S10_LocationPermissionScreen: React.FC = () => {
             </View>
             <View style={styles.deniedInfoRow}>
               <Ionicons name="flash" size={17} color="#D97706" />
-              <Text style={styles.deniedInfoText}>Enables guaranteed 9-minute dark store delivery</Text>
+              <Text style={styles.deniedInfoText}>Enables accurate local store delivery to your address</Text>
             </View>
             <View style={styles.deniedInfoRow}>
               <Ionicons name="lock-closed" size={17} color="#DC2626" />

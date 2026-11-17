@@ -49,9 +49,9 @@ export const S05_Onboarding4Screen: React.FC = () => {
       </View>
 
       <View style={styles.bottomContent}>
-        <Text style={styles.title}>Fast Delivery at Your Doorstep</Text>
+        <Text style={styles.title}>Delivery at Your Doorstep</Text>
         <Text style={styles.description}>
-          Superfast delivery within minutes so you never run out of groceries and home supplies.
+          Fresh grocery and household essentials delivered right to your doorstep.
         </Text>
 
         <View style={styles.dotsRow}>

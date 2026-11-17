@@ -753,6 +753,15 @@ export class OrdersService {
       await this.inventoryService.confirmReservation(dto.reservationId);
     }
 
+    // Enforce COD Only as per SRS Requirement 1 (Structured so online payments can be re-enabled)
+    const ALLOW_ONLINE_PAYMENTS = false;
+    const requestedMethod = (dto.paymentMethod || 'COD').toUpperCase();
+    if (!ALLOW_ONLINE_PAYMENTS && requestedMethod !== 'COD' && requestedMethod !== 'CASH') {
+      throw new BadRequestException(
+        'Online payment methods are currently disabled. Only Cash on Delivery (COD) is accepted.',
+      );
+    }
+
     // 4. Handle Wallet Payment
     const user = await this.userModel.findById(uId);
     if (!user) throw new NotFoundException('User not found');
@@ -855,7 +864,7 @@ export class OrdersService {
       priceAdjustments,
       paymentMethod: dto.paymentMethod,
       paymentStatus: dto.paymentMethod === 'COD' ? 'PENDING' : 'COMPLETED',
-      deliverySlot: 'Instant 9 Minutes',
+      deliverySlot: 'Standard Doorstep Delivery',
       deliveryInstructions: dto.deliveryInstructions || 'Leave at door',
       estimatedArrival,
     });
@@ -1429,8 +1438,8 @@ export class OrdersService {
             const totalReferralCommission = Math.round((vegCommission + otherCommission) * 100) / 100;
 
             if (totalReferralCommission > 0) {
-              sponsor.availableIncome = Number(((sponsor.availableIncome || 0) + totalReferralCommission).toFixed(2));
-              sponsor.walletBalance = Number(((sponsor.walletBalance || 0) + totalReferralCommission).toFixed(2));
+              // SRS Requirement 2: Queued for Daily 12:00 AM IST distribution
+              sponsor.pendingIncome = Number(((sponsor.pendingIncome || 0) + totalReferralCommission).toFixed(2));
               await sponsor.save();
 
               await this.connection.collection('income_transactions').insertOne({
@@ -1441,14 +1450,14 @@ export class OrdersService {
                 sourceVerificationStatus: user.verificationStatus || 'VERIFIED',
                 earnedAt: new Date(),
                 availableFrom: new Date(),
-                status: 'AVAILABLE',
-                isUsable: true,
+                status: 'PENDING',
+                isUsable: false,
                 description: `Shopping Referral commission from ${user.fullNameAsPerAadhaar || user.name || 'Team member'} (Order #${order.orderNumber})`,
                 createdAt: new Date(),
                 updatedAt: new Date(),
               });
 
-              this.logger.log(`[Shopping Referral] Credited ₹${totalReferralCommission} to sponsor ${sponsor.name || sponsor._id} for order #${order.orderNumber}`);
+              this.logger.log(`[Shopping Referral] Queued ₹${totalReferralCommission} for daily 12 AM distribution to sponsor ${sponsor.name || sponsor._id} for order #${order.orderNumber}`);
 
               if (this.trackingGateway) {
                 this.trackingGateway.emitWalletUpdated(sponsor._id.toString(), {

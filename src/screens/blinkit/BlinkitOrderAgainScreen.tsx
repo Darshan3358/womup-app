@@ -217,8 +217,8 @@ export const BlinkitOrderAgainScreen: React.FC = () => {
       deliveryFee: 0,
       totalAmount: pOrd.totalAmount,
       deliveryAddress: selectedAddress,
-      deliverySlot: 'Express (10 minutes)',
-      paymentMethod: 'Online / Cash on Delivery',
+      deliverySlot: 'Standard Delivery',
+      paymentMethod: 'Cash on Delivery',
       deliveryPartner: undefined,
     };
     setCurrentOrder(printTrackingObj);
@@ -230,8 +230,8 @@ export const BlinkitOrderAgainScreen: React.FC = () => {
       {/* Pinned Navy Header with Search & Integrated Order Type Tabs */}
       <BlinkitHeader
         variant="gradient"
-        etaLabel="Delivery in"
-        etaTime="9 minutes"
+        etaLabel="Standard"
+        etaTime="Doorstep Delivery"
         searchPlaceholder='Search "past items, snacks, milk"'
         showCategoryTabs={false}
       />
@@ -279,7 +279,7 @@ export const BlinkitOrderAgainScreen: React.FC = () => {
             <Ionicons name="receipt-outline" size={54} color={COLORS.purple} style={{ marginBottom: 12 }} />
             <Text style={[TYPOGRAPHY.headingLg, styles.onboardingHeading]}>No Orders Yet</Text>
             <Text style={[TYPOGRAPHY.bodySm, styles.onboardingSubtext]}>
-              You haven't placed any orders yet. Browse products and get fresh items delivered in 9 minutes!
+              You haven't placed any orders yet. Browse products and get fresh items delivered directly to your doorstep!
             </Text>
             <TouchableOpacity
               activeOpacity={0.85}

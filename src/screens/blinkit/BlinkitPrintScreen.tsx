@@ -445,8 +445,8 @@ export const BlinkitPrintScreen: React.FC = () => {
         deliveryFee: 0,
         totalAmount: totalCost,
         deliveryAddress: selectedAddress,
-        deliverySlot: 'Express (10 minutes)',
-        paymentMethod: 'Cash on Delivery / Online',
+        deliverySlot: 'Standard Delivery',
+        paymentMethod: 'Cash on Delivery',
         deliveryPartner: undefined,
       };
 

@@ -154,7 +154,7 @@ export const MyProfileScreen: React.FC<MyProfileScreenProps> = ({
               icon: 'document-text-outline',
               label: 'Shopping Coin Terms & Rules',
               sub: '1 Coin = ₹1 cash value rules & expiry',
-              onPress: () => Alert.alert('Coin Rules', '• 1 Coin = ₹1.00\n• Coins never expire for active users\n• Redeemable on local shops and 9-min delivery.'),
+              onPress: () => Alert.alert('Coin Rules', '• 1 Coin = ₹1.00\n• Coins never expire for active users\n• Redeemable on local shops and grocery orders.'),
             },
             {
               icon: 'shield-checkmark-outline',

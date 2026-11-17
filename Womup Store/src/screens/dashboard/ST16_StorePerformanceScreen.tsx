@@ -67,7 +67,7 @@ export const ST16_StorePerformanceScreen: React.FC = () => {
               <Text style={[styles.statValue, { color: COLORS.primary }]}>
                 {storeMetrics?.slaCompliance != null ? `${storeMetrics.slaCompliance}%` : '100%'}
               </Text>
-              <Text style={styles.statSub}>9-min guaranteed</Text>
+              <Text style={styles.statSub}>On-time delivery</Text>
             </View>
 
             <View style={styles.statCard}>

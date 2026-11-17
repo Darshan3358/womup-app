@@ -84,7 +84,7 @@ export const S07_OtpVerificationScreen: React.FC = () => {
         setAuthVerificationId(res.verificationId);
         setResendSuccess(true);
       } else {
-        setError(res.message || 'Failed to resend OTP');
+        setError(res.message || 'Failed to resend Verification Code');
       }
     }
   };
@@ -95,7 +95,7 @@ export const S07_OtpVerificationScreen: React.FC = () => {
       setError('');
       if (!authVerificationId) {
         setLoading(false);
-        setError('Verification session expired. Please go back and request OTP again.');
+        setError('Verification session expired. Please go back and request Verification Code again.');
         return;
       }
 
@@ -134,7 +134,7 @@ export const S07_OtpVerificationScreen: React.FC = () => {
           setActiveScreen('C08_CreateAccount');
         }
       } else {
-        setError(res.message || 'Incorrect OTP. Please try again.');
+        setError(res.message || 'Incorrect Verification Code. Please try again.');
       }
     }
   };
@@ -158,15 +158,15 @@ export const S07_OtpVerificationScreen: React.FC = () => {
         </Text>
         <Text style={styles.subtitle}>
           {isEmailAuth
-            ? 'Enter the six-digit OTP sent to your registered email'
-            : 'Enter the six-digit OTP sent to your registered number'}
+            ? 'Enter the six-digit Verification Code sent to your registered email'
+            : 'Enter the six-digit Verification Code sent to your registered number'}
         </Text>
 
         {/* Verification Target Badge */}
         <View style={styles.sentBadge}>
           <Ionicons name={isEmailAuth ? 'mail' : 'chatbubble-ellipses'} size={16} color="#059669" />
           <Text style={styles.sentBadgeText}>
-            {isEmailAuth ? 'OTP sent via Email to ' : 'OTP sent via SMS to '}
+            {isEmailAuth ? 'Verification Code sent via Email to ' : 'Verification Code sent via SMS to '}
             <Text style={styles.phoneBold}>{displayTarget}</Text>
           </Text>
         </View>
@@ -204,18 +204,18 @@ export const S07_OtpVerificationScreen: React.FC = () => {
         <View style={styles.resendRow}>
           {timer > 0 ? (
             <Text style={styles.resendText}>
-              Resend OTP in <Text style={styles.timerBold}>00:{timer < 10 ? `0${timer}` : timer}</Text>
+              Resend Code in <Text style={styles.timerBold}>00:{timer < 10 ? `0${timer}` : timer}</Text>
             </Text>
           ) : (
             <TouchableOpacity onPress={handleResend}>
-              <Text style={styles.resendAction}>Resend OTP</Text>
+              <Text style={styles.resendAction}>Resend Verification Code</Text>
             </TouchableOpacity>
           )}
         </View>
 
         {resendSuccess && (
           <Text style={styles.resendSuccessText}>
-            ✓ New OTP sent to {displayTarget}!
+            ✓ Verification Code sent successfully to {displayTarget}!
           </Text>
         )}
 

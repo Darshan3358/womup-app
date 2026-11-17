@@ -137,7 +137,7 @@ export const ST10_PackingScreen: React.FC = () => {
       <Text style={styles.sectionTitle}>2. BAG SECURITY BARCODE</Text>
       <View style={styles.barcodeTicket}>
         <View style={styles.barcodeTop}>
-          <Text style={styles.brandTitle}>WORM UP QUICK COMMERCE</Text>
+          <Text style={styles.brandTitle}>WORM UP STORE</Text>
           <Text style={styles.tagline}>AHMEDABAD DARK STORE</Text>
         </View>
 

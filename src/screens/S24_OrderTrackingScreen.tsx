@@ -1303,7 +1303,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
               <View style={styles.paymentMethodRow}>
                 <Ionicons name="card-outline" size={14} color={COLORS.textMuted} style={{ marginRight: 6 }} />
                 <Text style={styles.paymentMethodText}>
-                  Paid via {activeOrder?.paymentMethod || 'Online / Cash on Delivery'}
+                  Payment Mode: {activeOrder?.paymentMethod || 'Cash on Delivery'}
                 </Text>
               </View>
             </View>

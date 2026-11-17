@@ -91,7 +91,7 @@ export const ST03_OtpVerificationScreen: React.FC = () => {
     const ok = await verifyOtp(pendingEmail, otpCode);
     setLocalLoading(false);
     if (!ok) {
-      setLocalError(error || 'Invalid OTP code. Please check your email and try again.');
+      setLocalError(error || 'Invalid Verification Code. Please check your email and try again.');
     }
   };
 
@@ -123,7 +123,7 @@ export const ST03_OtpVerificationScreen: React.FC = () => {
           </View>
           <Text style={styles.title}>Security Code Verification</Text>
           <Text style={styles.subtitle}>
-            Enter 6-digit OTP code sent to{' '}
+            Enter 6-digit Verification Code sent to{' '}
             <Text style={{ color: COLORS.primary, fontWeight: '700' }}>
               {pendingEmail ? maskEmail(pendingEmail) : 'your registered email'}
             </Text>
@@ -185,7 +185,7 @@ export const ST03_OtpVerificationScreen: React.FC = () => {
             ) : (
               <TouchableOpacity onPress={handleResend} style={styles.resendBtn}>
                 <Ionicons name="refresh" size={16} color={COLORS.primary} />
-                <Text style={styles.resendBtnText}>RESEND OTP EMAIL</Text>
+                <Text style={styles.resendBtnText}>RESEND VERIFICATION CODE</Text>
               </TouchableOpacity>
             )}
           </View>

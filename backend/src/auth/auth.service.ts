@@ -82,7 +82,7 @@ export class AuthService {
         createdAt: { $gte: fifteenMinutesAgo },
       });
       if (recentSendsCount >= 3) {
-        throw new BadRequestException('Maximum OTP requests reached (3 per 15 mins). Please wait before trying again.');
+        throw new BadRequestException('Maximum Verification Code requests reached (3 per 15 mins). Please wait before trying again.');
       }
 
       // 2. Resend Cooldown: 30 seconds
@@ -97,7 +97,7 @@ export class AuthService {
         const secondsSinceLast = (Date.now() - new Date(latestPending.lastSentAt).getTime()) / 1000;
         if (secondsSinceLast < 30) {
           const remaining = Math.ceil(30 - secondsSinceLast);
-          throw new BadRequestException(`Please wait ${remaining} seconds before requesting a new OTP.`);
+          throw new BadRequestException(`Please wait ${remaining} seconds before requesting a new Verification Code.`);
         }
       }
 
@@ -144,7 +144,7 @@ export class AuthService {
 
       return {
         success: true,
-        message: `OTP sent successfully to ${email}`,
+        message: `Verification Code sent successfully to ${email}`,
         verificationId,
         status: 'PENDING',
         expiresInSeconds: 300,
@@ -173,7 +173,7 @@ export class AuthService {
       createdAt: { $gte: fifteenMinutesAgo },
     });
     if (recentSendsCount >= 3) {
-      throw new BadRequestException('Maximum OTP requests reached (3 per 15 mins). Please wait before trying again.');
+      throw new BadRequestException('Maximum Verification Code requests reached (3 per 15 mins). Please wait before trying again.');
     }
 
     // b) Resend cooldown: 30 seconds
@@ -188,7 +188,7 @@ export class AuthService {
       const secondsSinceLast = (Date.now() - new Date(latestPending.lastSentAt).getTime()) / 1000;
       if (secondsSinceLast < 30) {
         const remaining = Math.ceil(30 - secondsSinceLast);
-        throw new BadRequestException(`Please wait ${remaining} seconds before requesting a new OTP.`);
+        throw new BadRequestException(`Please wait ${remaining} seconds before requesting a new Verification Code.`);
       }
     }
 
@@ -225,7 +225,7 @@ export class AuthService {
 
     return {
       success: true,
-      message: `OTP sent successfully to ${fullNumber}`,
+      message: `Verification Code sent successfully to ${fullNumber}`,
       verificationId,
       status: 'PENDING',
       expiresInSeconds: 300,
@@ -260,7 +260,7 @@ export class AuthService {
     }
 
     if (!record) {
-      throw new BadRequestException('Invalid or expired verification session. Please request a new OTP.');
+      throw new BadRequestException('Invalid or expired verification session. Please request a new Verification Code.');
     }
 
     if (record.status !== 'PENDING' || record.isVerified) {
@@ -270,7 +270,7 @@ export class AuthService {
     if (record.expiresAt < new Date()) {
       record.status = 'EXPIRED';
       await record.save();
-      throw new BadRequestException('OTP has expired. Please request a new code.');
+      throw new BadRequestException('Verification Code has expired. Please request a new code.');
     }
 
     // Maximum 5 verification attempts per SRS Section 11
@@ -278,7 +278,7 @@ export class AuthService {
     if (currentAttempts >= 5) {
       record.status = 'FAILED';
       await record.save();
-      throw new BadRequestException('Maximum verification attempts exceeded (5/5). Please request a new OTP.');
+      throw new BadRequestException('Maximum verification attempts exceeded (5/5). Please request a new Verification Code.');
     }
 
     // Verify OTP securely: constant-time hash comparison or development test master code
@@ -294,7 +294,7 @@ export class AuthService {
       const remainingAttempts = 5 - (currentAttempts + 1);
       throw new BadRequestException(
         remainingAttempts > 0
-          ? `Incorrect OTP. ${remainingAttempts} attempts remaining.`
+          ? `Incorrect Verification Code. ${remainingAttempts} attempts remaining.`
           : 'Maximum verification attempts exceeded. Please request a new code.',
       );
     }
@@ -457,7 +457,7 @@ export class AuthService {
     }
 
     if (!targetPhone && !targetEmail) {
-      throw new BadRequestException('Please provide a mobile number, email, or verificationId to resend OTP');
+      throw new BadRequestException('Please provide a mobile number, email, or verificationId to resend Verification Code');
     }
 
     if (targetEmail) {

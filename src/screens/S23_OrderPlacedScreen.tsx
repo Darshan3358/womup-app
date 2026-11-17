@@ -183,7 +183,7 @@ export const S23_OrderPlacedScreen: React.FC = () => {
 
           {/* Bottom Glowing 5-Second Progress Bar */}
           <View style={[styles.videoFooter, { bottom: insets.bottom + 24 }]}>
-            <Text style={styles.videoFooterTitle}>Placing your 9-minute order...</Text>
+            <Text style={styles.videoFooterTitle}>Placing your order...</Text>
             <View style={styles.progressBarTrack}>
               <Animated.View
                 style={[
@@ -223,7 +223,7 @@ export const S23_OrderPlacedScreen: React.FC = () => {
             Your order <Text style={styles.orderNumberBold}>{orderNum}</Text> has been placed.
           </Text>
           <Text style={styles.note}>
-            Delivery partner will be assigned shortly and order delivered in 9 minutes.
+            Delivery partner will be assigned shortly and order delivered to your doorstep.
           </Text>
 
           {/* Mini Order Summary Card */}

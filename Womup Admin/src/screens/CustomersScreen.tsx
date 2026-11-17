@@ -11,6 +11,7 @@ import {
   Modal,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import {
   Search,
@@ -430,21 +431,35 @@ export const CustomersScreen: React.FC = () => {
   };
 
   const handleDeleteCustomerFromList = async (customerId: string, customerName: string) => {
-    const confirmed = typeof window !== 'undefined' && window.confirm
-      ? window.confirm(`Are you sure you want to permanently delete customer "${customerName}"?\n\nThis action cannot be undone.`)
-      : true;
+    const cust = customers.find((c) => c.id === customerId);
+    const targetPhone = cust?.phone;
 
-    if (!confirmed) return;
-
-    const ok = await deleteCustomer(customerId);
-    if (ok) {
-      if (typeof window !== 'undefined' && window.alert) {
+    const performDelete = async () => {
+      await deleteCustomer(customerId, targetPhone);
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && window.alert) {
         window.alert(`Customer "${customerName}" deleted successfully.`);
+      } else {
+        Alert.alert('Deleted', `Customer "${customerName}" deleted successfully.`);
+      }
+    };
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.confirm) {
+      if (
+        window.confirm(
+          `Are you sure you want to permanently delete customer "${customerName}"?\n\nThis action cannot be undone.`
+        )
+      ) {
+        await performDelete();
       }
     } else {
-      if (typeof window !== 'undefined' && window.alert) {
-        window.alert(`Failed to delete customer. Please try again.`);
-      }
+      Alert.alert(
+        'Delete Customer',
+        `Are you sure you want to permanently delete customer "${customerName}"?\n\nThis action cannot be undone.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Delete', style: 'destructive', onPress: performDelete },
+        ]
+      );
     }
   };
 

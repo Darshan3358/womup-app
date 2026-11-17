@@ -200,7 +200,7 @@ export const LocationPickerModal: React.FC = () => {
           <View style={styles.header}>
             <View>
               <Text style={styles.title}>Choose delivery location</Text>
-              <Text style={styles.subtitle}>Select your location for 9-minute delivery</Text>
+              <Text style={styles.subtitle}>Select your location for doorstep delivery</Text>
             </View>
             <TouchableOpacity
               onPress={() => setLocationModalVisible(false)}
@@ -322,7 +322,7 @@ export const LocationPickerModal: React.FC = () => {
                             <View style={styles.warningBox}>
                               <Ionicons name="alert-circle-outline" size={14} color="#DC2626" />
                               <Text style={styles.warningBoxText}>
-                                Wom Up 9-minute delivery is not yet available at your GPS location. Please select a saved address.
+                                Wom Up delivery is not yet available at your GPS location. Please select a saved address.
                               </Text>
                             </View>
                           ) : gpsResolvedArea ? (

@@ -83,8 +83,8 @@ const DEFAULT_FALLBACK_PRODUCT: Product = {
   rating: 4.8,
   reviewCount: 50,
   stock: 100,
-  deliveryMinutes: 9,
-  description: 'Fresh quality products delivered in 9 minutes.',
+  deliveryMinutes: 15,
+  description: 'Fresh quality products delivered directly to you.',
   imageUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&q=80',
 };
 
@@ -1247,9 +1247,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           tip: raw.tip || 0,
           totalAmount: raw.totalAmount || raw.pricing?.total || 0,
           deliveryAddress: raw.deliveryAddress || selectedAddress,
-          deliverySlot: raw.deliverySlot || 'Today, within 9 minutes',
+          deliverySlot: raw.deliverySlot || 'Standard Delivery',
           paymentMethod: raw.paymentMethod || 'COD',
-          estimatedArrival: raw.estimatedArrival || '9 min',
+          estimatedArrival: raw.estimatedArrival || 'On Schedule',
           deliveryOtp: raw.deliveryOtp || '4821',
           deliveryPartner: livePartner && livePartner.fullName ? {
             name: livePartner.fullName || livePartner.name,
@@ -2235,9 +2235,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         tip: liveData.tip ?? (options?.tip || 0),
         totalAmount: liveData.totalAmount || (isBlinkit ? Math.max(0, blinkitCartTotal + (typeof options?.deliveryFee === 'number' ? options.deliveryFee : 39) + 5 - couponDiscount - appliedCoins + (options?.tip || 0)) : cartSummary.totalPayable),
         deliveryAddress: selectedAddress,
-        deliverySlot: 'Today, within 9 minutes',
+        deliverySlot: 'Standard Delivery',
         paymentMethod,
-        estimatedArrival: '9 min',
+        estimatedArrival: 'On Schedule',
         deliveryOtp: liveData.deliveryOtp || '4821',
         deliveryPartner: livePartner && livePartner.fullName ? {
           name: livePartner.fullName || livePartner.name,

@@ -9,7 +9,7 @@ export class AppController {
   getRoot() {
     return {
       status: 'online',
-      message: '🚀 Worm Up Quick-Commerce API is running live!',
+      message: '🚀 Worm Up Platform API is running live!',
       version: '1.0.0',
       docs: '/api/docs',
       timestamp: new Date().toISOString(),

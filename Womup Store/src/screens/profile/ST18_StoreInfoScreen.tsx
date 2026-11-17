@@ -155,7 +155,7 @@ export const ST18_StoreInfoScreen: React.FC = () => {
               <Ionicons name="flash-outline" size={18} color="#10B981" />
               <Text style={styles.infoLabel}>Target Delivery ETA</Text>
             </View>
-            <Text style={[styles.infoVal, { color: '#10B981', fontWeight: '700' }]}>9 Minutes</Text>
+            <Text style={[styles.infoVal, { color: '#10B981', fontWeight: '700' }]}>Standard Delivery</Text>
           </View>
 
           <View style={styles.divider} />

@@ -18,8 +18,8 @@ export const WHY_CHOOSE_ITEMS = [
   },
   {
     id: '2',
-    title: 'Quick Delivery',
-    sub: 'In 9 Minutes',
+    title: 'Doorstep Delivery',
+    sub: 'Fresh & Fast',
     iconType: 'feather' as const,
     iconName: 'zap',
   },

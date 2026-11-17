@@ -394,7 +394,7 @@ export const BlinkitProfileScreen: React.FC = () => {
   };
 
   const handleShareApp = async () => {
-    const shareMessage = `Hey! I get fresh groceries, snacks and prints delivered in 9 minutes with WOMART! 🚀\nUse my referral code ${user.referralCode || 'WOMUP50'} to get ₹50 off your first order.\nDownload now: https://womup.app/invite`;
+    const shareMessage = `Hey! I get fresh groceries, snacks and prints delivered with WOMART! 🚀\nUse my referral code ${user.referralCode || 'WOMUP50'} to get ₹50 off your first order.\nDownload now: https://womup.app/invite`;
     try {
       if (Platform.OS === 'web') {
         if (typeof navigator !== 'undefined' && navigator.clipboard) {
@@ -470,8 +470,8 @@ export const BlinkitProfileScreen: React.FC = () => {
   // Recipe sample data with ingredients for 1-click cart addition
   const SAMPLE_RECIPES = [
     {
-      title: 'Paneer Butter Masala (10 Mins)',
-      time: '10 mins',
+      title: 'Paneer Butter Masala',
+      time: '20 mins',
       difficulty: 'Easy',
       ingredientsCount: 3,
       items: [
@@ -1024,7 +1024,7 @@ export const BlinkitProfileScreen: React.FC = () => {
             <View style={styles.modalHeaderRow}>
               <View>
                 <Text style={styles.sheetTitle}>Bookmarked Recipes 🍳</Text>
-                <Text style={styles.sheetSub}>Quick 10-minute chef meals with 1-click grocery ordering</Text>
+                <Text style={styles.sheetSub}>Delicious chef meals with 1-click grocery ordering</Text>
               </View>
               <TouchableOpacity onPress={() => setRecipesModalVisible(false)} style={styles.sheetCloseBtn}>
                 <Ionicons name="close" size={20} color={COLORS.navy} />
@@ -1181,7 +1181,7 @@ export const BlinkitProfileScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
             <Text style={styles.sheetSub}>
-              Uploaded doctor prescriptions for verified pharmacy order fulfillment in 10 minutes.
+              Uploaded doctor prescriptions for verified pharmacy order fulfillment.
             </Text>
 
             <ScrollView style={{ maxHeight: 220 }} showsVerticalScrollIndicator={false}>
@@ -1349,7 +1349,7 @@ export const BlinkitProfileScreen: React.FC = () => {
             <Text style={[styles.inputFieldLabel, { marginTop: 16 }]}>Active Promo Coupons</Text>
             {[
               { code: 'FLAT50', title: '₹50 Flat Off', desc: 'On orders above ₹299' },
-              { code: 'FREEDEL', title: 'Free 9-Min Delivery', desc: 'On any grocery order' },
+              { code: 'FREEDEL', title: 'Free Delivery', desc: 'On any grocery order' },
               { code: 'PRINT10', title: 'Free 3 Print Pages', desc: 'On first print store job' },
             ].map((coupon) => (
               <View key={coupon.code} style={styles.couponRow}>
@@ -1468,12 +1468,12 @@ export const BlinkitProfileScreen: React.FC = () => {
             </View>
 
             <Text style={styles.aboutStoryText}>
-              Womup is India's fastest hyperlocal grocery & print store network. We combine state-of-the-art dark stores, electric delivery fleet, and 10-minute instant document printing to bring essential everyday items straight to your doorstep.
+              Womup is India's leading hyperlocal grocery & print store network. We combine state-of-the-art dark stores, electric delivery fleet, and document printing to bring essential everyday items straight to your doorstep.
             </Text>
 
             <View style={styles.aboutPillsGrid}>
-              <View style={styles.aboutPill}><Text style={styles.aboutPillText}>⚡ 9-Min Delivery</Text></View>
-              <View style={styles.aboutPill}><Text style={styles.aboutPillText}>🌱 100% Electric Fleet</Text></View>
+              <View style={styles.aboutPill}><Text style={styles.aboutPillText}>🌱 Doorstep Delivery</Text></View>
+              <View style={styles.aboutPill}><Text style={styles.aboutPillText}>⚡ 100% Electric Fleet</Text></View>
               <View style={styles.aboutPill}><Text style={styles.aboutPillText}>🖨️ 300 DPI Print Store</Text></View>
               <View style={styles.aboutPill}><Text style={styles.aboutPillText}>🔒 TLS Encrypted</Text></View>
             </View>
@@ -1686,7 +1686,7 @@ export const BlinkitProfileScreen: React.FC = () => {
 
             <ScrollView showsVerticalScrollIndicator={false}>
               {[
-                { q: 'How fast is delivery?', a: 'Grocery and everyday items arrive in 9-10 minutes from our nearest micro-fulfillment center.' },
+                { q: 'How fast is delivery?', a: 'Grocery and everyday items are delivered promptly from our nearest fulfillment center to your doorstep.' },
                 { q: 'How does document printing work?', a: 'Upload PDF or photos under Print store. Documents are printed at 300 DPI, sealed in a tamper-proof envelope, and purged after delivery for complete privacy.' },
                 { q: 'What is the refund policy for damaged goods?', a: 'Instant 100% refund to your Womup Money wallet or original payment source within 2 hours of raising an issue.' },
                 { q: 'Can I change my delivery address after ordering?', a: 'Since orders are packed within 60 seconds, address changes should be communicated directly to your rider via the live tracking call button.' },

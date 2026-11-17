@@ -124,7 +124,7 @@ export const MyCoinWalletScreen: React.FC<MyCoinWalletScreenProps> = ({ onGoBack
             <View style={{ flex: 1 }}>
               <Text style={styles.stepTitle}>Redeem on Next Orders</Text>
               <Text style={styles.stepSub}>
-                Use coins on WOMUP 9-Min delivery or any partner store billing.
+                Use coins on WOMUP delivery orders or any partner store billing.
               </Text>
             </View>
           </View>

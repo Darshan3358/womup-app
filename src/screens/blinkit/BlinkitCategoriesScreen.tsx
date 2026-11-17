@@ -65,8 +65,8 @@ export const BlinkitCategoriesScreen: React.FC = () => {
       {/* Pinned Gradient Header with Search */}
       <BlinkitHeader
         variant="gradient"
-        etaLabel="Delivery in"
-        etaTime="9 minutes"
+        etaLabel="Standard"
+        etaTime="Doorstep Delivery"
         searchPlaceholder='Search "atta, dal, snacks, milk"'
         showCategoryTabs={false}
       />
@@ -76,7 +76,7 @@ export const BlinkitCategoriesScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {renderSection('Grocery & Kitchen', 'Fresh essentials delivered in 9 minutes', MAIN_CATEGORY_GRID)}
+        {renderSection('Grocery & Kitchen', 'Fresh essentials delivered to your doorstep', MAIN_CATEGORY_GRID)}
         {renderSection('Snacks & Drinks', 'Munchies, cold beverages & sweets', SNACKS_DRINKS_GRID)}
         {renderSection('Beauty & Personal Care', 'Skincare, haircare & hygiene favorites', BEAUTY_GRID)}
         {renderSection('Household Essentials', 'Home, kitchen & cleaning supplies', HOUSEHOLD_GRID)}

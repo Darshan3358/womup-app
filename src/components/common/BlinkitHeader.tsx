@@ -35,8 +35,8 @@ interface BlinkitHeaderProps {
 
 const BlinkitHeaderComponent: React.FC<BlinkitHeaderProps> = ({
   variant = 'gradient',
-  etaLabel = 'Delivery in',
-  etaTime = '9 minutes',
+  etaLabel = 'Standard',
+  etaTime = 'Doorstep Delivery',
   searchPlaceholder = 'Search "milk, chips, maggi"',
   activeCategoryTab = 'Home',
   onSelectCategoryTab,
@@ -183,8 +183,7 @@ const BlinkitHeaderComponent: React.FC<BlinkitHeaderProps> = ({
       return 'LOCATION UNAVAILABLE';
     }
     if (isAvailable) {
-      const eta = deliveryEtaMinutes ? `${deliveryEtaMinutes} MINS` : (etaTime || '9 MINS');
-      return `${etaLabel} ${eta}`.toUpperCase();
+      return 'DOORSTEP DELIVERY';
     }
     if (isUnavailable) {
       return 'DELIVERY UNAVAILABLE';

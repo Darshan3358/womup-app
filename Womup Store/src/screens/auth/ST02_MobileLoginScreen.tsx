@@ -49,7 +49,7 @@ export const ST02_EmailLoginScreen: React.FC = () => {
           </View>
           <Text style={styles.title}>Dark Store Staff Login</Text>
           <Text style={styles.subtitle}>
-            Enter registered email to receive OTP on your inbox
+            Enter registered email to receive Verification Code on your inbox
           </Text>
         </View>
 
@@ -91,7 +91,7 @@ export const ST02_EmailLoginScreen: React.FC = () => {
               <ActivityIndicator color="#FFF" />
             ) : (
               <>
-                <Text style={styles.loginBtnText}>SEND OTP TO EMAIL</Text>
+                <Text style={styles.loginBtnText}>SEND VERIFICATION CODE</Text>
                 <Ionicons name="arrow-forward" size={18} color="#FFF" />
               </>
             )}

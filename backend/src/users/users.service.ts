@@ -90,35 +90,10 @@ export class UsersService {
   }
 
   async settleUserPendingIncome(userId: string) {
-    try {
-      const uId = Types.ObjectId.isValid(userId) ? new Types.ObjectId(userId) : null;
-      if (!uId) return;
-
-      const user = await this.userModel.findById(uId);
-      if (!user) return;
-
-      // Auto-unlock pending income into availableIncome and walletBalance
-      if ((user.pendingIncome || 0) > 0) {
-        const amountToMove = user.pendingIncome;
-        user.availableIncome = Number(((user.availableIncome || 0) + amountToMove).toFixed(2));
-        user.walletBalance = Number(((user.walletBalance || 0) + amountToMove).toFixed(2));
-        user.pendingIncome = 0;
-        await user.save();
-
-        await this.incomeTxModel.updateMany(
-          { userId: uId, status: 'PENDING' },
-          { $set: { status: 'AVAILABLE', isUsable: true, availableFrom: new Date() } },
-        );
-
-        this.trackingGateway.emitWalletUpdated(uId.toString(), {
-          pendingIncome: 0,
-          availableIncome: user.availableIncome,
-          walletBalance: user.walletBalance,
-        });
-      }
-    } catch (e) {
-      // Non-blocking
-    }
+    // SRS Requirement 2: Daily Income Distribution - 12:00 AM Cron Job
+    // Users receive their eligible incomes only once per day at 12:00 AM IST via DailyIncomeDistributionService.
+    // Income is distributed atomically during the midnight cron job and does not auto-settle on profile reads.
+    return;
   }
 
   async getProfile(userId: string) {
@@ -1117,7 +1092,7 @@ export class UsersService {
           continue;
         }
 
-        // 1. App Download Income (Available immediately upon KYC approval)
+        // 1. App Download Referral Income (Queued for Daily 12:00 AM IST distribution)
         await this.incomeTxModel.create({
           userId: sponsor._id,
           type: 'APP_DOWNLOAD',
@@ -1126,13 +1101,12 @@ export class UsersService {
           sourceVerificationStatus: 'VERIFIED',
           earnedAt: new Date(),
           availableFrom: new Date(),
-          status: 'AVAILABLE',
-          isUsable: true,
+          status: 'PENDING',
+          isUsable: false,
           description: `Level ${tier.level} App Download Income from verified referral: ${user.fullNameAsPerAadhaar || user.name}`,
         });
 
-        sponsor.availableIncome = Number(((sponsor.availableIncome || 0) + tier.appIncome).toFixed(2));
-        sponsor.walletBalance = Number(((sponsor.walletBalance || 0) + tier.appIncome).toFixed(2));
+        sponsor.pendingIncome = Number(((sponsor.pendingIncome || 0) + tier.appIncome).toFixed(2));
         sponsor.appDownloadIncome = Number(((sponsor.appDownloadIncome || 0) + tier.appIncome).toFixed(2));
         if (tier.level === 1) {
           sponsor.verifiedReferralsCount = (sponsor.verifiedReferralsCount || 0) + 1;

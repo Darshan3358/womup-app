@@ -432,7 +432,9 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     }
   }, [currentAreaName, currentStoreName, addressSource]);
 
-  const [selectedPayment, setSelectedPayment] = useState<'upi' | 'card' | 'cod'>('upi');
+  // Configurable flag so online payments can be re-enabled in the future without code rewrite
+  const ENABLE_ONLINE_PAYMENTS = false;
+  const [selectedPayment, setSelectedPayment] = useState<'upi' | 'card' | 'cod'>('cod');
   const [razorpayOrder, setRazorpayOrder] = useState<any>(null);
   const [isRazorpayModalOpen, setIsRazorpayModalOpen] = useState(false);
   const [selectedTestUpi, setSelectedTestUpi] = useState<'success@razorpay' | 'failure@razorpay' | 'card'>('success@razorpay');
@@ -514,6 +516,11 @@ export const BlinkitCheckoutScreen: React.FC = () => {
   }, [liveCheckoutState]);
 
   const handleSelectPayment = (pm: 'upi' | 'card' | 'cod') => {
+    if (!ENABLE_ONLINE_PAYMENTS && pm !== 'cod') {
+      setSelectedPayment('cod');
+      emitCheckoutChange({ paymentMethod: 'COD' });
+      return;
+    }
     setSelectedPayment(pm);
     emitCheckoutChange({ paymentMethod: pm.toUpperCase() });
   };
@@ -826,16 +833,17 @@ export const BlinkitCheckoutScreen: React.FC = () => {
 
   const executePlaceOrder = async () => {
     if (isSubmitting || isRazorpayVerifying) return;
-    const paymentMethod = useWalletBalance && finalPayable === 0 ? 'WOMUP_WALLET' : selectedPayment.toUpperCase();
+    const effectiveMethod = !ENABLE_ONLINE_PAYMENTS ? 'COD' : selectedPayment.toUpperCase();
+    const paymentMethod = useWalletBalance && finalPayable === 0 ? 'WOMUP_WALLET' : effectiveMethod;
 
     // 1. Direct flow for Womup Wallet or Cash On Delivery
-    if (paymentMethod === 'WOMUP_WALLET' || paymentMethod === 'COD') {
+    if (paymentMethod === 'WOMUP_WALLET' || paymentMethod === 'COD' || !ENABLE_ONLINE_PAYMENTS) {
       setIsSubmitting(true);
       try {
         if (useCoins) {
           setAppliedCoins(coinsDeduction);
         }
-        await placeOrder(paymentMethod, {
+        await placeOrder('COD', {
           tip: tipAmount,
           deliveryFee: deliveryFee,
           deliveryInstructions: deliveryInstruction,
@@ -1029,7 +1037,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
               <Text style={styles.choiceCoords}>
                 {activeLat && activeLng ? `Lat: ${Number(activeLat).toFixed(4)}, Lng: ${Number(activeLng).toFixed(4)}` : 'Detecting GPS...'}
               </Text>
-              <Text style={styles.choiceSub}>⚡ Instant 9-min Express Delivery</Text>
+              <Text style={styles.choiceSub}>🌱 Standard Doorstep Delivery</Text>
             </TouchableOpacity>
 
             {/* CHOICE B: SAVED ADDRESS (Dynamic from MongoDB profile) */}
@@ -1425,75 +1433,80 @@ export const BlinkitCheckoutScreen: React.FC = () => {
             </View>
           ) : (
             <>
-              {/* UPI Option */}
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => handleSelectPayment('upi')}
-                style={styles.paymentOptionRow}
-              >
-                <View style={styles.paymentOptionLeft}>
-                  <View style={[styles.paymentIconBox, { backgroundColor: '#EEF2FF' }]}>
-                    <Ionicons name="flash" size={18} color="#4F46E5" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                      <Text style={[TYPOGRAPHY.bodyMdMedium, styles.paymentTitle]}>
-                        UPI (Google Pay, PhonePe, Paytm)
-                      </Text>
-                      <View style={{ backgroundColor: '#EEF2FF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#C7D2FE' }}>
-                        <Text style={{ fontSize: 9, fontWeight: '800', color: '#4338CA' }}>RAZORPAY</Text>
+              {/* Online Payment Options (Structured so they can be re-enabled via ENABLE_ONLINE_PAYMENTS) */}
+              {ENABLE_ONLINE_PAYMENTS && (
+                <>
+                  {/* UPI Option */}
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => handleSelectPayment('upi')}
+                    style={styles.paymentOptionRow}
+                  >
+                    <View style={styles.paymentOptionLeft}>
+                      <View style={[styles.paymentIconBox, { backgroundColor: '#EEF2FF' }]}>
+                        <Ionicons name="flash" size={18} color="#4F46E5" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <Text style={[TYPOGRAPHY.bodyMdMedium, styles.paymentTitle]}>
+                            UPI (Google Pay, PhonePe, Paytm)
+                          </Text>
+                          <View style={{ backgroundColor: '#EEF2FF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#C7D2FE' }}>
+                            <Text style={{ fontSize: 9, fontWeight: '800', color: '#4338CA' }}>RAZORPAY</Text>
+                          </View>
+                        </View>
+                        <Text style={styles.walletBalText}>Fast & secure 1-tap checkout via Razorpay</Text>
                       </View>
                     </View>
-                    <Text style={styles.walletBalText}>Fast & secure 1-tap checkout via Razorpay</Text>
-                  </View>
-                </View>
-                <View
-                  style={[
-                    styles.radioOuter,
-                    selectedPayment === 'upi' && styles.radioOuterActive,
-                  ]}
-                >
-                  {selectedPayment === 'upi' && <View style={styles.radioInner} />}
-                </View>
-              </TouchableOpacity>
+                    <View
+                      style={[
+                        styles.radioOuter,
+                        selectedPayment === 'upi' && styles.radioOuterActive,
+                      ]}
+                    >
+                      {selectedPayment === 'upi' && <View style={styles.radioInner} />}
+                    </View>
+                  </TouchableOpacity>
 
-              <View style={styles.divider} />
+                  <View style={styles.divider} />
 
-              {/* Credit / Debit Cards */}
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => handleSelectPayment('card')}
-                style={styles.paymentOptionRow}
-              >
-                <View style={styles.paymentOptionLeft}>
-                  <View style={[styles.paymentIconBox, { backgroundColor: '#F0F9FF' }]}>
-                    <Ionicons name="card-outline" size={18} color="#0284C7" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                      <Text style={[TYPOGRAPHY.bodyMdMedium, styles.paymentTitle]}>
-                        Credit / Debit Card
-                      </Text>
-                      <View style={{ backgroundColor: '#F0F9FF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#BAE6FD' }}>
-                        <Text style={{ fontSize: 9, fontWeight: '800', color: '#0369A1' }}>RAZORPAY</Text>
+                  {/* Credit / Debit Cards */}
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => handleSelectPayment('card')}
+                    style={styles.paymentOptionRow}
+                  >
+                    <View style={styles.paymentOptionLeft}>
+                      <View style={[styles.paymentIconBox, { backgroundColor: '#F0F9FF' }]}>
+                        <Ionicons name="card-outline" size={18} color="#0284C7" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <Text style={[TYPOGRAPHY.bodyMdMedium, styles.paymentTitle]}>
+                            Credit / Debit Card
+                          </Text>
+                          <View style={{ backgroundColor: '#F0F9FF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#BAE6FD' }}>
+                            <Text style={{ fontSize: 9, fontWeight: '800', color: '#0369A1' }}>RAZORPAY</Text>
+                          </View>
+                        </View>
+                        <Text style={styles.walletBalText}>Visa, MasterCard, RuPay powered by Razorpay</Text>
                       </View>
                     </View>
-                    <Text style={styles.walletBalText}>Visa, MasterCard, RuPay powered by Razorpay</Text>
-                  </View>
-                </View>
-                <View
-                  style={[
-                    styles.radioOuter,
-                    selectedPayment === 'card' && styles.radioOuterActive,
-                  ]}
-                >
-                  {selectedPayment === 'card' && <View style={styles.radioInner} />}
-                </View>
-              </TouchableOpacity>
+                    <View
+                      style={[
+                        styles.radioOuter,
+                        selectedPayment === 'card' && styles.radioOuterActive,
+                      ]}
+                    >
+                      {selectedPayment === 'card' && <View style={styles.radioInner} />}
+                    </View>
+                  </TouchableOpacity>
 
-              <View style={styles.divider} />
+                  <View style={styles.divider} />
+                </>
+              )}
 
-              {/* Cash on Delivery */}
+              {/* Cash on Delivery (COD Only as per SRS) */}
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => handleSelectPayment('cod')}
@@ -1505,9 +1518,9 @@ export const BlinkitCheckoutScreen: React.FC = () => {
                   </View>
                   <View>
                     <Text style={[TYPOGRAPHY.bodyMdMedium, styles.paymentTitle]}>
-                      Cash on Delivery
+                      Cash on Delivery (COD)
                     </Text>
-                    <Text style={styles.walletBalText}>Pay cash or UPI at delivery doorstep</Text>
+                    <Text style={styles.walletBalText}>Pay cash at your doorstep when order arrives</Text>
                   </View>
                 </View>
                 <View
@@ -1803,7 +1816,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
           <View style={[styles.videoBottomBanner, { paddingBottom: Math.max(insets.bottom, 24) }]}>
             <Text style={styles.videoBannerTitle}>Order Confirmed! 🎉</Text>
             <Text style={styles.videoBannerSub}>
-              Preparing your items for lightning-fast delivery in 9 mins
+              Preparing your items for doorstep delivery
             </Text>
           </View>
         </Animated.View>
@@ -1830,7 +1843,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
               </Text>
             ) : null}
             <Text style={[TYPOGRAPHY.bodyMd, styles.successEta]}>
-              Arriving in 9 minutes ⚡
+              Order Confirmed & Preparing 📦
             </Text>
             <Text style={styles.successDesc}>
               Your items are being packed at the nearest Womup dark store.

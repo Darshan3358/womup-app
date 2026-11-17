@@ -170,7 +170,7 @@ export const DeliveryVerificationModal: React.FC = () => {
               </View>
               <Text style={styles.title}>Customer Delivery PIN</Text>
               <Text style={styles.subtitle}>
-                Ask {activeDelivery?.customerName || 'the customer'} for the 4-digit OTP shown in their app
+                Ask {activeDelivery?.customerName || 'the customer'} for the 4-digit Verification Code shown in their app
               </Text>
             </View>
 

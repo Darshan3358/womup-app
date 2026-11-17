@@ -300,7 +300,7 @@ export const BlinkitHomeScreen: React.FC = () => {
         return (
           <ProductSection
             id="fast_delivery"
-            title="9-Minute Delivery"
+            title="Fresh Grocery & Essentials"
             subtitle="In stock at your nearest dark store"
             products={fastDeliveryList}
             onOpenProduct={handleOpenProductDetail}
@@ -331,7 +331,7 @@ export const BlinkitHomeScreen: React.FC = () => {
           <ProductSection
             id="fresh_veggies"
             title="Fresh Vegetables & Fruits"
-            subtitle="Farm fresh, delivered in 9 minutes"
+            subtitle="Farm fresh, delivered directly to your doorstep"
             products={freshVegFruitsList}
             onOpenProduct={handleOpenProductDetail}
             onViewAll={() => handleSelectCategory('Vegetables & Fruits', 'c1')}

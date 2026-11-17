@@ -100,7 +100,7 @@ export const S06_MobileNumberScreen: React.FC = () => {
   const handleOtpLogin = async () => {
     const cleanId = identifier.trim();
     if (!cleanId) {
-      setError('Please enter your mobile number or email to receive an OTP');
+      setError('Please enter your mobile number or email to receive a Verification Code');
       return;
     }
     const isEmail = cleanId.includes('@');
@@ -121,7 +121,7 @@ export const S06_MobileNumberScreen: React.FC = () => {
       }
       setActiveScreen('C07_OtpVerification');
     } else {
-      setError(res.message || 'Failed to send OTP. Please check your credentials.');
+      setError(res.message || 'Failed to send Verification Code. Please check your credentials.');
     }
   };
 
@@ -147,7 +147,7 @@ export const S06_MobileNumberScreen: React.FC = () => {
         });
         setActiveScreen('C07_OtpVerification');
       } else {
-        setError(res.message || 'Failed to send OTP. Please try again.');
+        setError(res.message || 'Failed to send Verification Code. Please try again.');
       }
     } else {
       // EMAIL OTP REGISTRATION
@@ -171,7 +171,7 @@ export const S06_MobileNumberScreen: React.FC = () => {
         });
         setActiveScreen('C07_OtpVerification');
       } else {
-        setError(res.message || 'Failed to send OTP to email. Please try again.');
+        setError(res.message || 'Failed to send Verification Code to email. Please try again.');
       }
     }
   };
@@ -397,7 +397,7 @@ export const S06_MobileNumberScreen: React.FC = () => {
                 activeOpacity={0.7}
               >
                 <Ionicons name="chatbubble-ellipses-outline" size={16} color={COLORS.hotPink} />
-                <Text style={styles.fallbackOtpText}>Forgot Password? Login with OTP</Text>
+                <Text style={styles.fallbackOtpText}>Forgot Password? Login with Verification Code</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -476,9 +476,9 @@ export const S06_MobileNumberScreen: React.FC = () => {
               {/* Error Message */}
               {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-              {/* Send OTP Button */}
+              {/* Send Verification Code Button */}
               <GradientButton
-                title="Send Verification OTP"
+                title="Send Verification Code"
                 onPress={handleRegisterOtp}
                 loading={loading}
                 style={styles.button}
@@ -488,8 +488,8 @@ export const S06_MobileNumberScreen: React.FC = () => {
                 <Ionicons name="shield-checkmark-outline" size={16} color="#059669" />
                 <Text style={styles.registerHintText}>
                   {registerMethod === 'PHONE'
-                    ? 'A 6-digit OTP will be sent via SMS to verify your mobile number. You will receive 2,000 Shopping Coins upon joining!'
-                    : 'A 6-digit OTP will be sent to your email to verify your address. You will receive 2,000 Shopping Coins upon joining!'}
+                    ? 'A 6-digit Verification Code will be sent via SMS to verify your mobile number. You will receive 2,000 Shopping Coins upon joining!'
+                    : 'A 6-digit Verification Code will be sent to your email to verify your address. You will receive 2,000 Shopping Coins upon joining!'}
                 </Text>
               </View>
             </View>

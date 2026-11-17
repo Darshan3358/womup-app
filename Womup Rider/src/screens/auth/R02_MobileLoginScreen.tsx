@@ -97,9 +97,9 @@ export const R02_MobileLoginScreen: React.FC = () => {
     try {
       await requestOtp(cleanEmail);
       setOtpSent(true);
-      setSuccessMsg(`6-digit OTP sent to ${cleanEmail}`);
+      setSuccessMsg(`6-digit Verification Code sent to ${cleanEmail}`);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Unable to send OTP. Please check your network.');
+      setErrorMsg(err.message || 'Unable to send Verification Code. Please check your network.');
     } finally {
       setLoading(false);
     }
@@ -109,7 +109,7 @@ export const R02_MobileLoginScreen: React.FC = () => {
   const handleOtpLogin = async () => {
     const cleanEmail = email.trim().toLowerCase();
     if (!otpCode || otpCode.trim().length !== 6) {
-      setErrorMsg('Please enter the 6-digit OTP code');
+      setErrorMsg('Please enter the 6-digit Verification Code');
       return;
     }
 
@@ -119,7 +119,7 @@ export const R02_MobileLoginScreen: React.FC = () => {
     try {
       await loginWithEmailOtp(cleanEmail, otpCode.trim());
     } catch (err: any) {
-      setErrorMsg(err.message || 'Invalid or expired OTP. Please try again.');
+      setErrorMsg(err.message || 'Invalid or expired Verification Code. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -139,7 +139,7 @@ export const R02_MobileLoginScreen: React.FC = () => {
     try {
       const res = await forgotPassword(cleanEmail);
       setForgotStep('RESET');
-      setForgotSuccess(res.message || 'OTP sent to your email. Check inbox & spam.');
+      setForgotSuccess(res.message || 'Verification Code sent to your email. Check inbox & spam.');
     } catch (err: any) {
       setForgotError(err.message || 'Could not send reset code. Please check email.');
     } finally {
@@ -150,7 +150,7 @@ export const R02_MobileLoginScreen: React.FC = () => {
   // Handle Forgot Password - Reset Password
   const handleForgotResetPassword = async () => {
     if (!forgotOtp || forgotOtp.trim().length !== 6) {
-      setForgotError('Please enter the 6-digit OTP');
+      setForgotError('Please enter the 6-digit Verification Code');
       return;
     }
     if (!newPassword || newPassword.length < 6) {
@@ -176,7 +176,7 @@ export const R02_MobileLoginScreen: React.FC = () => {
         setSuccessMsg('Password updated! Please log in with your new password.');
       }, 1500);
     } catch (err: any) {
-      setForgotError(err.message || 'Failed to reset password. Please check OTP.');
+      setForgotError(err.message || 'Failed to reset password. Please check Verification Code.');
     } finally {
       setForgotLoading(false);
     }
@@ -206,12 +206,12 @@ export const R02_MobileLoginScreen: React.FC = () => {
 
           {/* Heading */}
           <Text style={styles.heading}>
-            {loginMode === 'PASSWORD' ? 'Rider Login' : 'OTP Login'}
+            {loginMode === 'PASSWORD' ? 'Rider Login' : 'Verification Code Login'}
           </Text>
           <Text style={styles.subHeading}>
             {loginMode === 'PASSWORD'
               ? 'Enter your registered email and password'
-              : 'Sign in securely using email OTP verification'}
+              : 'Sign in securely using email Verification Code'}
           </Text>
 
           {/* Form Fields Card */}
@@ -302,10 +302,10 @@ export const R02_MobileLoginScreen: React.FC = () => {
               </View>
             ) : null}
 
-            {/* OTP Input (when loginMode === 'OTP' and OTP is sent) */}
+            {/* Verification Code Input (when loginMode === 'OTP' and code is sent) */}
             {loginMode === 'OTP' && otpSent ? (
               <View style={{ marginTop: 16 }}>
-                <Text style={styles.inputLabel}>6-DIGIT EMAIL OTP *</Text>
+                <Text style={styles.inputLabel}>6-DIGIT VERIFICATION CODE *</Text>
                 <View style={styles.inputRow}>
                   <View style={styles.inputIconBox}>
                     <Ionicons name="key-outline" size={18} color={COLORS.navy} />
@@ -329,7 +329,7 @@ export const R02_MobileLoginScreen: React.FC = () => {
                   onPress={handleSendOtp}
                   disabled={loading}
                 >
-                  <Text style={styles.resendOtpText}>Didn't receive code? Resend OTP</Text>
+                  <Text style={styles.resendOtpText}>Didn't receive code? Resend Code</Text>
                 </TouchableOpacity>
               </View>
             ) : null}
@@ -377,8 +377,8 @@ export const R02_MobileLoginScreen: React.FC = () => {
                       {loginMode === 'PASSWORD'
                         ? 'Login'
                         : otpSent
-                        ? 'Verify & Login'
-                        : 'Send OTP to Email'}
+                        ? 'Verify Code & Login'
+                        : 'Send Verification Code'}
                     </Text>
                     <Ionicons name="arrow-forward" size={18} color={COLORS.white} />
                   </View>
@@ -395,7 +395,7 @@ export const R02_MobileLoginScreen: React.FC = () => {
               <View style={styles.orLine} />
             </View>
 
-            {/* Secondary Action: Login with Email OTP / Password */}
+            {/* Secondary Action: Login with Verification Code / Password */}
             <TouchableOpacity
               style={styles.secondaryButton}
               onPress={() => {
@@ -413,7 +413,7 @@ export const R02_MobileLoginScreen: React.FC = () => {
                 color={COLORS.navy}
               />
               <Text style={styles.secondaryButtonText}>
-                {loginMode === 'PASSWORD' ? 'Login with Email OTP' : 'Login with Password'}
+                {loginMode === 'PASSWORD' ? 'Login with Verification Code' : 'Login with Password'}
               </Text>
             </TouchableOpacity>
 

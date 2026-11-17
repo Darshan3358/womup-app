@@ -14,6 +14,7 @@ import { AdminRealtimeController } from './admin-realtime.controller';
 import { TrackingModule } from '../tracking/tracking.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { UsersModule } from '../users/users.module';
+import { CronModule } from '../cron/cron.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { UsersModule } from '../users/users.module';
     TrackingModule,
     NotificationsModule,
     forwardRef(() => UsersModule),
+    forwardRef(() => CronModule),
   ],
   controllers: [AdminApprovalsController, AdminRealtimeController],
   providers: [AdminApprovalsService],

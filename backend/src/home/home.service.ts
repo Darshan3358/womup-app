@@ -108,7 +108,7 @@ export class HomeService {
       },
       {
         id: 'fast_delivery',
-        title: '9-Minute Delivery',
+        title: 'Fresh Grocery & Essentials',
         subtitle: 'In stock at your nearest dark store',
         icon: '⚡',
         viewAllFilter: 'fast',
@@ -118,7 +118,7 @@ export class HomeService {
       {
         id: 'fresh_veggies',
         title: 'Fresh Vegetables & Fruits',
-        subtitle: 'Farm fresh, delivered in 9 minutes',
+        subtitle: 'Farm fresh, delivered directly to your doorstep',
         icon: '🌱',
         categoryName: 'Vegetables & Fruits',
         viewAllFilter: 'c1',

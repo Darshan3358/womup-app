@@ -17,6 +17,7 @@ import { Connection, Types } from 'mongoose';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { TrackingGateway } from '../tracking/tracking.gateway';
 import { clearHomeCache } from '../home/home-cache';
+import { DailyIncomeDistributionService } from '../cron/daily-income-distribution.service';
 import * as bcrypt from 'bcryptjs';
 
 @ApiTags('Admin Realtime Data & Platform Sync')
@@ -25,6 +26,7 @@ export class AdminRealtimeController {
   constructor(
     @InjectConnection() private readonly connection: Connection,
     @Optional() private readonly trackingGateway?: TrackingGateway,
+    @Optional() private readonly dailyIncomeService?: DailyIncomeDistributionService,
   ) {}
 
   private get db() {
@@ -43,6 +45,46 @@ export class AdminRealtimeController {
       database: 'wormup',
       timestamp: new Date().toISOString(),
     };
+  }
+
+  /**
+   * Daily Income Distribution - Get Execution History
+   */
+  @Get([
+    'api/v1/admin/income-distribution/daily',
+    'api/admin/income-distribution/daily',
+    'admin/income-distribution/daily',
+  ])
+  @ApiOperation({ summary: 'Get daily income distribution records and status' })
+  async getDailyIncomeDistribution(@Query('limit') limit?: string) {
+    if (!this.dailyIncomeService) {
+      return { success: false, message: 'Daily income distribution service unavailable' };
+    }
+    const history = await this.dailyIncomeService.getDistributionHistory(
+      limit ? parseInt(limit, 10) : 30,
+    );
+    const latest = await this.dailyIncomeService.getLatestDistribution();
+    return {
+      success: true,
+      latest,
+      history,
+    };
+  }
+
+  /**
+   * Daily Income Distribution - Trigger Manual Execution
+   */
+  @Post([
+    'api/v1/admin/income-distribution/run-daily',
+    'api/admin/income-distribution/run-daily',
+    'admin/income-distribution/run-daily',
+  ])
+  @ApiOperation({ summary: 'Trigger daily income distribution manually (12 AM Cron)' })
+  async runDailyIncomeDistributionManually() {
+    if (!this.dailyIncomeService) {
+      return { success: false, message: 'Daily income distribution service unavailable' };
+    }
+    return this.dailyIncomeService.runDailyDistribution(true);
   }
 
   /**

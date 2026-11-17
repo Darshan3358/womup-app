@@ -27,6 +27,7 @@ import { LocalShopsModule } from './local-shops/local-shops.module';
 import { PaymentsModule } from './payments/payments.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AdminModule } from './admin/admin.module';
+import { CronModule } from './cron/cron.module';
 
 @Module({
   imports: [
@@ -71,6 +72,7 @@ import { AdminModule } from './admin/admin.module';
     PaymentsModule,
     NotificationsModule,
     AdminModule,
+    CronModule,
   ],
   controllers: [AppController],
 })

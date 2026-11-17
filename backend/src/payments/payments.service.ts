@@ -76,6 +76,16 @@ export class PaymentsService {
    * Amount converted to paise (₹1,000 = 100000 paise)
    */
   async createRazorpayOrder(dto: CreateRazorpayOrderDto) {
+    // SRS Requirement 1: Payment Method - COD Only
+    // Keep COD as the only available payment method. Block online payment creation.
+    // Structured with flag so online payments can be easily enabled in the future.
+    const ALLOW_ONLINE_PAYMENTS = false;
+    if (!ALLOW_ONLINE_PAYMENTS) {
+      throw new BadRequestException(
+        'Online payments are currently disabled. Only Cash on Delivery (COD) is supported.',
+      );
+    }
+
     const { vendorId, billAmount, customerId, customerName, customerPhone, customerEmail } = dto;
 
     if (!billAmount || billAmount <= 0) {

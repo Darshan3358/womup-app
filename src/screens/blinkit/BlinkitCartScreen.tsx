@@ -215,7 +215,7 @@ export const BlinkitCartScreen: React.FC = () => {
           <Text style={styles.emptyCartEmoji}>🛒</Text>
           <Text style={[TYPOGRAPHY.headingLg, styles.emptyHeading]}>Your cart is empty</Text>
           <Text style={[TYPOGRAPHY.bodySm, styles.emptySubtext]}>
-            Explore thousands of items delivered in 9 minutes!
+            Explore thousands of fresh items delivered to your doorstep!
           </Text>
           <TouchableOpacity
             activeOpacity={0.85}
@@ -266,7 +266,7 @@ export const BlinkitCartScreen: React.FC = () => {
         >
           <View style={styles.etaLeft}>
             <AppIcon name="clock" size={18} color={COLORS.primary} />
-            <Text style={styles.etaTitle}>Delivery in 9 minutes</Text>
+            <Text style={styles.etaTitle}>Doorstep Delivery</Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, justifyContent: 'flex-end', marginLeft: 8 }}>
             <Text style={styles.etaLocationText} numberOfLines={1}>

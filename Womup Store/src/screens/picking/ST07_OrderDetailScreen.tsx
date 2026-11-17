@@ -62,7 +62,7 @@ export const ST07_OrderDetailScreen: React.FC = () => {
             <View style={{ flex: 1, marginRight: 10 }}>
               <Text style={styles.orderNumber}>{activeOrder.orderNumber}</Text>
               <Text style={styles.deliverySlot}>
-                Slot: {activeOrder.deliverySlot || 'Instant 9-min'}
+                Slot: {activeOrder.deliverySlot || 'Standard Delivery'}
               </Text>
             </View>
 

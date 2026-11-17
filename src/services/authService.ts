@@ -48,12 +48,12 @@ export const AuthService = {
       return {
         success: true,
         verificationId,
-        message: data.message || res.message || 'OTP sent successfully',
+        message: data.message || res.message || 'Verification Code sent successfully',
       };
     }
     return {
       success: false,
-      message: res.message || data?.message || 'Failed to send OTP. Please check your details.',
+      message: res.message || data?.message || 'Failed to send Verification Code. Please check your details.',
     };
   },
 
@@ -82,12 +82,12 @@ export const AuthService = {
       return {
         success: true,
         verificationId: resolvedVerificationId,
-        message: data.message || res.message || 'OTP resent successfully',
+        message: data.message || res.message || 'Verification Code resent successfully',
       };
     }
     return {
       success: false,
-      message: res.message || data?.message || 'Failed to resend OTP',
+      message: res.message || data?.message || 'Failed to resend Verification Code',
     };
   },
 
@@ -134,7 +134,7 @@ export const AuthService = {
     }
     return {
       success: false,
-      message: res.message || (res.data as any)?.message || 'Failed to verify OTP',
+      message: res.message || (res.data as any)?.message || 'Failed to verify Code',
     };
   },
 

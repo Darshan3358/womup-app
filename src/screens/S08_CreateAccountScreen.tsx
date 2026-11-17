@@ -436,7 +436,7 @@ export const S08_CreateAccountScreen: React.FC = () => {
     } else {
       Alert.alert(
         'Email Verification Required',
-        'Please verify your email with OTP before creating your account.',
+        'Please verify your email with Verification Code before creating your account.',
         [{ text: 'Verify Email', onPress: () => setActiveScreen('C06_MobileNumber') }]
       );
       return;

@@ -78,7 +78,7 @@ export const AuthPromptModal: React.FC = () => {
               <View style={styles.perksList}>
                 <View style={styles.perkItem}>
                   <Ionicons name="flash" size={16} color={COLORS.hotPink} style={styles.perkIcon} />
-                  <Text style={styles.perkText}>Lightning fast 9-minute instant delivery</Text>
+                  <Text style={styles.perkText}>Fresh grocery & daily essentials to your doorstep</Text>
                 </View>
                 <View style={styles.perkItem}>
                   <Ionicons name="gift" size={16} color={COLORS.hotPink} style={styles.perkIcon} />

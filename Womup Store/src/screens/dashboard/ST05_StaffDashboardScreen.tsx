@@ -262,7 +262,7 @@ export const ST05_StaffDashboardScreen: React.FC = () => {
         <View style={styles.motivationContent}>
           <Text style={styles.motivationTitle}>Keep it up! ⭐</Text>
           <Text style={styles.motivationSubtitle}>
-            Your performance is great today. Fulfilling 9-min SLA smoothly.
+            Your performance is great today. Fulfilling customer orders smoothly.
           </Text>
         </View>
         <TouchableOpacity
