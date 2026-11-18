@@ -136,10 +136,10 @@ export const S26_AccountScreen: React.FC = () => {
     },
     {
       title: 'Help & Support',
-      subtitle: 'FAQs, live chat, call center',
+      subtitle: '24x7 Helpline, WhatsApp, FAQs & Tickets',
       icon: 'help-circle-outline',
       color: COLORS.darkBlue,
-      action: () => Alert.alert('Support', '24x7 Customer Support is available at support@womup.in'),
+      action: () => setActiveScreen('Blinkit_Support'),
     },
     {
       title: 'Settings',

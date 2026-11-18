@@ -755,11 +755,11 @@ export const BlinkitProfileScreen: React.FC = () => {
 
             <TouchableOpacity
               activeOpacity={0.8}
-              onPress={() => setHelpModalVisible(true)}
+              onPress={() => setActiveScreen('Blinkit_Support')}
               style={styles.quickActionCard}
             >
-              <AppIcon name="message-circle" size={24} color={COLORS.primary} />
-              <Text style={styles.quickActionLabel}>Need help?</Text>
+              <AppIcon name="headphones" size={24} color={COLORS.primary} />
+              <Text style={styles.quickActionLabel}>Customer Support</Text>
             </TouchableOpacity>
           </View>
 
@@ -838,6 +838,12 @@ export const BlinkitProfileScreen: React.FC = () => {
               label: 'Share the app',
               badge: 'Earn ₹20',
               onPress: handleShareApp,
+            },
+            {
+              icon: 'headphones',
+              label: '24x7 Customer Support & Help',
+              badge: 'Live',
+              onPress: () => setActiveScreen('Blinkit_Support'),
             },
             {
               icon: 'help-circle',

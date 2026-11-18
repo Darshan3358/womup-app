@@ -259,6 +259,9 @@ export type ScreenId =
   | 'Local_Home'
   | 'MyTeam'
   | 'Blinkit_MyTeam'
+  | 'Support'
+  | 'Blinkit_Support'
+  | 'CustomerSupport'
   | 'C27_KYC'
   | 'KYC';
 

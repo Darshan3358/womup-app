@@ -30,6 +30,9 @@ const GUEST_ALLOWED_SCREENS = [
   'C16_ProductDetails',
   'C17_Search',
   'C18_FilterSort',
+  'Support',
+  'Blinkit_Support',
+  'CustomerSupport',
 ];
 
 // Blinkit Screens
@@ -44,6 +47,7 @@ import { BlinkitCartScreen } from '../screens/blinkit/BlinkitCartScreen';
 import { BlinkitCheckoutScreen } from '../screens/blinkit/BlinkitCheckoutScreen';
 import { BlinkitWishlistScreen } from '../screens/blinkit/BlinkitWishlistScreen';
 import { MyTeamScreen } from '../screens/MyTeamScreen';
+import { SupportScreen } from '../screens/SupportScreen';
 import { LocalShopHomeScreen } from '../local-shop-module/screens/LocalShopHomeScreen';
 import { AuthPromptModal } from '../components/common/AuthPromptModal';
 
@@ -215,6 +219,10 @@ export const RootNavigator: React.FC = () => {
       case 'MyTeam':
       case 'Blinkit_MyTeam':
         return <MyTeamScreen />;
+      case 'Support':
+      case 'Blinkit_Support':
+      case 'CustomerSupport':
+        return <SupportScreen />;
 
       // Legacy screens
       case 'C01_Splash':
