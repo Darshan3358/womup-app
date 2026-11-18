@@ -1300,45 +1300,6 @@ export const BlinkitCheckoutScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* 3. Delivery Partner Tip Selection */}
-        <View style={styles.cardSection}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-            <Text style={[TYPOGRAPHY.bodyMdMedium, styles.subSectionTitle, { marginBottom: 0 }]}>
-              💝 Tip your delivery partner
-            </Text>
-            {tipAmount > 0 && (
-              <TouchableOpacity onPress={() => setTipAmount(0)} activeOpacity={0.7}>
-                <Text style={{ fontSize: 12, color: COLORS.error, fontWeight: '700' }}>Clear</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-          <Text style={{ fontSize: 12, color: COLORS.textMuted, marginBottom: 12 }}>
-            100% of your tip goes directly to your rider partner.
-          </Text>
-          <View style={styles.tipButtonsRow}>
-            {TIP_OPTIONS.map((amt) => (
-              <TouchableOpacity
-                key={amt}
-                activeOpacity={0.75}
-                onPress={() => handleSelectTip(amt)}
-                style={[
-                  styles.tipPill,
-                  tipAmount === amt && styles.tipPillActive,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.tipPillText,
-                    tipAmount === amt && styles.tipPillTextActive,
-                  ]}
-                >
-                  {amt === 0 ? 'No tip' : `₹${amt}`}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
         {/* 4. Discounts & Wallet Section */}
         <View style={styles.cardSection}>
           <Text style={[TYPOGRAPHY.bodyMdMedium, styles.subSectionTitle]}>
