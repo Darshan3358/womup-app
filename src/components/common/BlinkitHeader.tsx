@@ -196,8 +196,11 @@ const BlinkitHeaderComponent: React.FC<BlinkitHeaderProps> = ({
     if (locationError || (!isAvailable && !hasValidLocation)) {
       return null;
     }
-    if (isAvailable && currentStoreName) {
-      return currentStoreName.replace(/^🟢\s*/, '').trim();
+    if (isAvailable) {
+      if (currentStoreName) {
+        return currentStoreName.replace(/^🟢\s*/, '').trim();
+      }
+      return deliveryEtaMinutes ? `Delivery in ${deliveryEtaMinutes} mins` : 'Delivering in 9 mins';
     }
     if (isUnavailable && hasValidLocation) {
       return 'Outside delivery area';
@@ -253,11 +256,11 @@ const BlinkitHeaderComponent: React.FC<BlinkitHeaderProps> = ({
                 <View
                   style={[
                     styles.storeStatusDot,
-                    (isUnavailable && !hasValidLocation) ? { backgroundColor: '#EF4444' } : { backgroundColor: '#10B981' },
+                    isUnavailable ? { backgroundColor: '#EF4444' } : { backgroundColor: '#10B981' },
                   ]}
                 />
                 <Text style={styles.locationTitle} numberOfLines={1}>
-                  {storeStatusText || 'Outside delivery area'}
+                  {storeStatusText || (isAvailable ? 'Delivering in 9 mins' : (isUnavailable ? 'Outside delivery area' : 'Checking serviceability…'))}
                 </Text>
               </View>
             </View>

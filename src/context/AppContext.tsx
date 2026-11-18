@@ -404,9 +404,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let targetLat = typeof address.latitude === 'number' && !isNaN(address.latitude) ? address.latitude : undefined;
     let targetLng = typeof address.longitude === 'number' && !isNaN(address.longitude) ? address.longitude : undefined;
 
-    // Check if the address specifies a known area (e.g. "Prahlad Nagar")
+    // Check if the address specifies a known area (e.g. "Prahlad Nagar" or "Thaltej")
     const matchedArea = matchAreaByName(address.areaLandmark || address.street || address.houseFlat || address.city);
     if (matchedArea) {
+      // Instantly mark serviceable with default store metadata so UI immediately shows serviceable
+      setCurrentAreaId(matchedArea.id || 'thaltej_area');
+      setCurrentAreaName(matchedArea.name);
+      setCurrentCityName(matchedArea.city || 'Ahmedabad');
+      setCurrentStoreId(matchedArea.storeId || 'store_thaltej');
+      setCurrentStoreName(matchedArea.storeName || `Wom Up ${matchedArea.name} Dark Store`);
+      setIsServiceable(true);
+      setDeliveryEtaMinutes(9);
+
       if (targetLat === undefined || targetLng === undefined) {
         targetLat = matchedArea.lat;
         targetLng = matchedArea.lng;
@@ -425,6 +434,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const queryStr = `${address.houseFlat || ''} ${address.street || ''} ${address.areaLandmark || ''} ${address.city || ''}`;
       const matched = matchAreaByName(queryStr);
       if (matched) {
+        setCurrentAreaId(matched.id || 'thaltej_area');
+        setCurrentAreaName(matched.name);
+        setCurrentCityName(matched.city || 'Ahmedabad');
+        setCurrentStoreId(matched.storeId || 'store_thaltej');
+        setCurrentStoreName(matched.storeName || `Wom Up ${matched.name} Dark Store`);
+        setIsServiceable(true);
+        setDeliveryEtaMinutes(9);
         targetLat = matched.lat;
         targetLng = matched.lng;
       }
@@ -1736,16 +1752,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
             const shortLabel = savedAddress.readableAddress || savedAddress.houseFlat || savedAddress.areaLandmark || savedAddress.city;
             setDeliveryLocation(`${savedAddress.type || 'Home'} — ${shortLabel}`);
-            if (savedAddress.latitude && savedAddress.longitude) {
+            const matched = matchAreaByName(savedAddress.areaLandmark || savedAddress.street || savedAddress.houseFlat || savedAddress.city);
+            if (matched) {
+              initialLat = matched.lat;
+              initialLng = matched.lng;
+              setCurrentAreaId(matched.id || 'thaltej_area');
+              setCurrentAreaName(matched.name);
+              setCurrentCityName(matched.city || 'Ahmedabad');
+              setCurrentStoreId(matched.storeId || 'store_thaltej');
+              setCurrentStoreName(matched.storeName || `Wom Up ${matched.name} Dark Store`);
+              setIsServiceable(true);
+              setDeliveryEtaMinutes(9);
+            } else if (savedAddress.latitude && savedAddress.longitude) {
               initialLat = Number(savedAddress.latitude);
               initialLng = Number(savedAddress.longitude);
-            }
-            if (!initialLat || !initialLng) {
-              const matched = matchAreaByName(savedAddress.areaLandmark || savedAddress.street || savedAddress.houseFlat || savedAddress.city);
-              if (matched) {
-                initialLat = matched.lat;
-                initialLng = matched.lng;
-              }
             }
             hasRestoredSavedAddress = true;
           } else {
