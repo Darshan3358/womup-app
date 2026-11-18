@@ -75,6 +75,14 @@ export class AuthService {
         throw new BadRequestException('Please provide a valid email address');
       }
 
+      // Check if email is already registered for SIGNUP
+      if (dto.purpose === 'SIGNUP' || dto.purpose === 'REGISTER') {
+        const existingUser = await this.userModel.findOne({ email });
+        if (existingUser) {
+          throw new ConflictException('This email is already registered. Please login.');
+        }
+      }
+
       // 1. Rate Limiting for Email: max 3 sends per 15 minutes
       const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
       const recentSendsCount = await this.otpModel.countDocuments({
@@ -166,6 +174,16 @@ export class AuthService {
     }
 
     const purpose = dto.purpose || 'LOGIN';
+
+    // Check if phone number is already registered for SIGNUP
+    if (purpose === 'SIGNUP' || purpose === 'REGISTER') {
+      const existingUser = await this.userModel.findOne({
+        $or: [{ phone: tenDigit }, { phone: fullNumber }, { phoneNumber: fullNumber }],
+      });
+      if (existingUser) {
+        throw new ConflictException('This mobile number is already registered. Please login.');
+      }
+    }
 
     // 1. Rate Limiting per Section 11 of SRS:
     // a) Maximum 3 sends per phone per 15 minutes
@@ -386,6 +404,14 @@ export class AuthService {
     });
 
     if (user) {
+      if (record.purpose === 'SIGNUP' || record.purpose === 'REGISTER' || purpose === 'SIGNUP' || purpose === 'REGISTER') {
+        throw new ConflictException(
+          record.email || (record.phone && record.phone.includes('@'))
+            ? 'This email is already registered. Please login.'
+            : 'This mobile number is already registered. Please login.'
+        );
+      }
+
       if (user.role === Role.DELIVERY_PARTNER) {
         throw new ConflictException(
           'This account is registered as a Delivery Rider. Please use the Rider App.',
@@ -953,88 +979,27 @@ export class AuthService {
       preferredCityName = cityDoc.name;
     }
 
-    // ── Smart Account Linking & Uniqueness ────────────────────────
-    // 1. If account with this email already exists, update & log in
-    const emailExists = await this.userModel.findOne({ email });
-    if (emailExists) {
-      if (name && name !== 'Customer') emailExists.name = name;
-      if (phone && (!emailExists.phone || emailExists.phone.startsWith('email_'))) {
-        emailExists.phone = phone;
+    // ── Check Existing Account Uniqueness ────────────────────────
+    if (email) {
+      const emailExists = await this.userModel.findOne({ email });
+      if (emailExists) {
+        throw new ConflictException('This email is already registered. Please login.');
       }
-      if (validCityObjectId) {
-        emailExists.preferredCityId = validCityObjectId;
-        emailExists.preferredCityName = preferredCityName;
-      }
-      if (pincode) {
-        emailExists.registrationPincode = pincode;
-        emailExists.isIncomeEligible = isIncomeEligible;
-      }
-      if (registrationOtp) {
-        emailExists.customerOtp = registrationOtp;
-      }
-      emailExists.isEmailVerified = true;
-      await emailExists.save();
-      const tokens = await this.generateTokens(emailExists);
-      return {
-        message: 'Account linked successfully',
-        user: {
-          id: emailExists._id.toString(),
-          name: emailExists.name,
-          phone: emailExists.phone,
-          email: emailExists.email,
-          preferredCityId: emailExists.preferredCityId?.toString(),
-          preferredCityName: emailExists.preferredCityName,
-          walletBalance: emailExists.walletBalance,
-          shoppingCoins: emailExists.shoppingCoins,
-          verificationStatus: emailExists.verificationStatus,
-          aadhaarVerified: emailExists.aadhaarVerified,
-          sponsorCode: emailExists.sponsorCode,
-          isIncomeEligible: emailExists.isIncomeEligible,
-          role: emailExists.role,
-        },
-        ...tokens,
-      };
     }
 
-    // 2. If an account with this phone number already exists, link verified email & log in
-    if (phone) {
-      const phoneExists = await this.userModel.findOne({ phone });
+    const checkPhone = verifiedTenDigit || phone;
+    if (checkPhone) {
+      const cleanPhoneDigits = checkPhone.replace(/\D/g, '').slice(-10);
+      const phoneExists = await this.userModel.findOne({
+        $or: [
+          { phone: cleanPhoneDigits },
+          { phone: `+91${cleanPhoneDigits}` },
+          { phoneNumber: `+91${cleanPhoneDigits}` },
+          { phoneNumber: cleanPhoneDigits },
+        ],
+      });
       if (phoneExists) {
-        phoneExists.email = email;
-        phoneExists.isEmailVerified = true;
-        if (name && name !== 'Customer') phoneExists.name = name;
-        if (validCityObjectId) {
-          phoneExists.preferredCityId = validCityObjectId;
-          phoneExists.preferredCityName = preferredCityName;
-        }
-        if (pincode) {
-          phoneExists.registrationPincode = pincode;
-          phoneExists.isIncomeEligible = isIncomeEligible;
-        }
-        if (registrationOtp) {
-          phoneExists.customerOtp = registrationOtp;
-        }
-        await phoneExists.save();
-        const tokens = await this.generateTokens(phoneExists);
-        return {
-          message: 'Account verified and linked successfully',
-          user: {
-            id: phoneExists._id.toString(),
-            name: phoneExists.name,
-            phone: phoneExists.phone,
-            email: phoneExists.email,
-            preferredCityId: phoneExists.preferredCityId?.toString(),
-            preferredCityName: phoneExists.preferredCityName,
-            walletBalance: phoneExists.walletBalance,
-            shoppingCoins: phoneExists.shoppingCoins,
-            verificationStatus: phoneExists.verificationStatus,
-            aadhaarVerified: phoneExists.aadhaarVerified,
-            sponsorCode: phoneExists.sponsorCode,
-            isIncomeEligible: phoneExists.isIncomeEligible,
-            role: phoneExists.role,
-          },
-          ...tokens,
-        };
+        throw new ConflictException('This mobile number is already registered. Please login.');
       }
     }
     // ───────────────────────────────────────────────────────────────

@@ -418,7 +418,13 @@ export const S08_CreateAccountScreen: React.FC = () => {
           const isConflict = res.message?.includes('already registered') || res.message?.includes('already exists') || res.message?.includes('Delivery') || res.message?.includes('Store') || res.message?.includes('Vendor');
           Alert.alert(
             isConflict ? 'Account Already Exists' : 'Registration Notice',
-            res.message || 'Could not complete registration. Please verify your details and try again.'
+            res.message || 'Could not complete registration. Please verify your details and try again.',
+            isConflict
+              ? [
+                  { text: 'Go to Sign In', onPress: () => setActiveScreen('C06_MobileNumber') },
+                  { text: 'Cancel', style: 'cancel' },
+                ]
+              : [{ text: 'OK' }]
           );
           return;
         }
@@ -429,7 +435,13 @@ export const S08_CreateAccountScreen: React.FC = () => {
         const isConflict = msg.includes('already registered') || msg.includes('already exists') || msg.includes('Delivery') || msg.includes('Store') || msg.includes('Vendor');
         Alert.alert(
           isConflict ? 'Account Already Exists' : 'Registration Error',
-          msg
+          msg,
+          isConflict
+            ? [
+                { text: 'Go to Sign In', onPress: () => setActiveScreen('C06_MobileNumber') },
+                { text: 'Cancel', style: 'cancel' },
+              ]
+            : [{ text: 'OK' }]
         );
         return;
       }

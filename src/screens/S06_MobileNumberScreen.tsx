@@ -9,6 +9,7 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -149,7 +150,25 @@ export const S06_MobileNumberScreen: React.FC = () => {
         });
         setActiveScreen('C07_OtpVerification');
       } else {
-        setError(res.message || 'Failed to send Verification Code. Please try again.');
+        const isConflict = res.message?.includes('already registered') || res.message?.includes('already exists');
+        if (isConflict) {
+          Alert.alert(
+            'Account Already Exists',
+            res.message || 'This mobile number is already registered. Please login.',
+            [
+              {
+                text: 'Go to Sign In',
+                onPress: () => {
+                  setActiveTab('SIGN_IN');
+                  setIdentifier(cleanDigits);
+                },
+              },
+              { text: 'Cancel', style: 'cancel' },
+            ]
+          );
+        } else {
+          setError(res.message || 'Failed to send Verification Code. Please try again.');
+        }
       }
     } else {
       // EMAIL OTP REGISTRATION
@@ -173,7 +192,25 @@ export const S06_MobileNumberScreen: React.FC = () => {
         });
         setActiveScreen('C07_OtpVerification');
       } else {
-        setError(res.message || 'Failed to send Verification Code to email. Please try again.');
+        const isConflict = res.message?.includes('already registered') || res.message?.includes('already exists');
+        if (isConflict) {
+          Alert.alert(
+            'Account Already Exists',
+            res.message || 'This email is already registered. Please login.',
+            [
+              {
+                text: 'Go to Sign In',
+                onPress: () => {
+                  setActiveTab('SIGN_IN');
+                  setIdentifier(cleanEmail);
+                },
+              },
+              { text: 'Cancel', style: 'cancel' },
+            ]
+          );
+        } else {
+          setError(res.message || 'Failed to send Verification Code to email. Please try again.');
+        }
       }
     }
   };
