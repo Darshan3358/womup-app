@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, GRADIENTS } from '../../theme/colors';
 import { AppIcon } from './AppIcon';
@@ -12,8 +13,9 @@ interface FloatingCartPillProps {
 }
 
 export const FloatingCartPill: React.FC<FloatingCartPillProps> = ({
-  bottomOffset = 72,
+  bottomOffset = 84,
 }) => {
+  const insets = useSafeAreaInsets();
   const {
     blinkitCartCount,
     blinkitCartTotal,
@@ -27,6 +29,11 @@ export const FloatingCartPill: React.FC<FloatingCartPillProps> = ({
     isAuthenticated,
     openAuthPrompt,
   } = useApp();
+
+  // Floating Cart Pill should float above the BottomNavigation bar.
+  // Standard tab bar height is 66 + bottom padding (Math.max(insets.bottom, 10)).
+  // We ensure it never dips below (insets.bottom + 80px) to prevent overlap.
+  const effectiveBottom = Math.max(bottomOffset, (insets.bottom || 0) + 80);
 
   // Pre-warm dynamic delivery fee calculation cache before user navigates to cart
   useEffect(() => {
@@ -71,7 +78,7 @@ export const FloatingCartPill: React.FC<FloatingCartPillProps> = ({
   if (blinkitCartCount <= 0) return null;
 
   return (
-    <View style={[styles.wrapper, { bottom: bottomOffset }]}>
+    <View style={[styles.wrapper, { bottom: effectiveBottom }]}>
       <TouchableOpacity
         activeOpacity={0.85}
         onPress={() => {
@@ -118,7 +125,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 16,
     right: 16,
-    zIndex: 999,
+    zIndex: 9999,
+    elevation: 10,
   },
   touchable: {
     borderRadius: 999,

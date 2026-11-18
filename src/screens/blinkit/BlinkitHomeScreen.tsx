@@ -532,8 +532,8 @@ export const BlinkitHomeScreen: React.FC = () => {
         removeClippedSubviews={true}
       />
 
-      {/* Floating "View Cart" Pill Button */}
-      <FloatingCartPill bottomOffset={20} />
+      {/* Floating "View Cart" Pill Button above bottom navigation bar */}
+      <FloatingCartPill bottomOffset={84} />
     </View>
   );
 };

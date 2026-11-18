@@ -296,8 +296,8 @@ export const BlinkitOrderAgainScreen: React.FC = () => {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Persistent Floating View Cart pill */}
-      <FloatingCartPill bottomOffset={20} />
+      {/* Persistent Floating View Cart pill above bottom navigation */}
+      <FloatingCartPill bottomOffset={84} />
     </View>
   );
 };

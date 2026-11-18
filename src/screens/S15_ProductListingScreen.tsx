@@ -155,8 +155,8 @@ export const S15_ProductListingScreen: React.FC = () => {
         </ScrollView>
       )}
 
-      {/* Floating View Cart Pill */}
-      <FloatingCartPill bottomOffset={20} />
+      {/* Floating View Cart Pill above bottom navigation */}
+      <FloatingCartPill bottomOffset={84} />
     </View>
   );
 };

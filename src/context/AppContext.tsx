@@ -366,6 +366,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     if (addr) {
       StorageService.saveItem(StorageService.KEYS.SELECTED_ADDRESS, addr);
+      // Auto-resolve area & serviceability if this is a saved address with location data
+      if (addr.type !== 'Current') {
+        let targetLat = typeof addr.latitude === 'number' && !isNaN(addr.latitude) ? addr.latitude : undefined;
+        let targetLng = typeof addr.longitude === 'number' && !isNaN(addr.longitude) ? addr.longitude : undefined;
+        if (targetLat === undefined || targetLng === undefined) {
+          const matched = matchAreaByName(addr.areaLandmark || addr.street || addr.houseFlat || addr.city);
+          if (matched) {
+            targetLat = matched.lat;
+            targetLng = matched.lng;
+          }
+        }
+        if (targetLat !== undefined && targetLng !== undefined) {
+          LocationService.resolveArea(targetLat, targetLng, false).then((res) => {
+            if (res && (res.serviceable || (res.areaId && res.storeId))) {
+              setCurrentAreaId(res.areaId);
+              setCurrentAreaName(res.areaName);
+              setCurrentCityName(res.city || 'Ahmedabad');
+              setCurrentStoreId(res.storeId || null);
+              setCurrentStoreName(res.storeName || null);
+              setIsServiceable(true);
+              if (res.deliveryMinutes) {
+                setDeliveryEtaMinutes(res.deliveryMinutes);
+              }
+            }
+          }).catch(() => {});
+        }
+      }
     }
   }, []);
 
@@ -444,7 +471,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setCurrentCityName(area.city || user.preferredCityName || 'Ahmedabad');
           setCurrentStoreId(area.storeId || null);
           setCurrentStoreName(area.storeName || null);
-          setIsServiceable(area.serviceable === true);
+          const isSrv = area.serviceable === true || Boolean(area.areaId && area.storeId);
+          setIsServiceable(isSrv);
           setDeliveryEtaMinutes(area.deliveryMinutes || 9);
 
           // Refresh products catalog for this new area and store
@@ -1712,6 +1740,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               initialLat = Number(savedAddress.latitude);
               initialLng = Number(savedAddress.longitude);
             }
+            if (!initialLat || !initialLng) {
+              const matched = matchAreaByName(savedAddress.areaLandmark || savedAddress.street || savedAddress.houseFlat || savedAddress.city);
+              if (matched) {
+                initialLat = matched.lat;
+                initialLng = matched.lng;
+              }
+            }
             hasRestoredSavedAddress = true;
           } else {
             // Wipe stale temporary GPS marker from previous sessions so stale Surat is removed
@@ -1812,7 +1847,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                       setCurrentCityName(area.city || user.preferredCityName || 'Ahmedabad');
                       setCurrentStoreId(area.storeId || null);
                       setCurrentStoreName(area.storeName || null);
-                      setIsServiceable(area.serviceable === true);
+                      const isSrv = area.serviceable === true || Boolean(area.areaId && area.storeId);
+          setIsServiceable(isSrv);
                       setDeliveryEtaMinutes(area.deliveryMinutes || 9);
                     }
                   }
@@ -1835,7 +1871,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setCurrentCityName(areaRes.city || user.preferredCityName || 'Ahmedabad');
             setCurrentStoreId(areaRes.storeId || null);
             setCurrentStoreName(areaRes.storeName || null);
-            setIsServiceable(areaRes.serviceable === true);
+            const isSrv = areaRes.serviceable === true || Boolean(areaRes.areaId && areaRes.storeId);
+            setIsServiceable(isSrv);
             setDeliveryEtaMinutes(areaRes.deliveryMinutes || 9);
             initialAreaId = areaRes.areaId;
             initialStoreId = areaRes.storeId;

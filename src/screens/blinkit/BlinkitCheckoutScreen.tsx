@@ -23,6 +23,7 @@ import { AppIcon } from '../../components/common/AppIcon';
 import { ShieldCheck, CheckCircle2, MapPin, Compass, Home as HomeIcon, Check, Plus, X, ArrowRight } from 'lucide-react-native';
 import { CartService } from '../../services/cartService';
 import { LocationService } from '../../services/locationService';
+import { matchAreaByName } from '../../data/areas';
 import { LocalShopApi } from '../../local-shop-module/api/localShopApi';
 import { resolveImageThumbnail } from '../../utils/imageUrl';
 import { useApp } from '../../context/AppContext';
@@ -108,6 +109,8 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     emitCheckoutChange,
     setLocationModalVisible,
     isServiceable,
+    setIsServiceable,
+    setActiveDeliveryAddress,
     syncCartFromSummary,
   } = useApp();
 
@@ -278,7 +281,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
       const loc = await LocationService.resolveArea(latitude, longitude, true);
       if (loc && loc.areaId && loc.storeId) {
         setCurrentArea(loc.areaId, loc.areaName);
-        setCurrentStore(loc.storeId, loc.storeName || loc.areaName);
+        setCurrentStore(loc.storeId || null, loc.storeName || loc.areaName || null);
         if (loc.deliveryMinutes) {
           setDeliveryEtaMinutes(loc.deliveryMinutes);
         }
@@ -322,8 +325,16 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     isManualSelectionRef.current = true;
 
     const addr = targetAddr || activeSavedAddr || savedAddrs[0];
-    const lat = addr?.latitude;
-    const lng = addr?.longitude;
+    let lat = addr?.latitude;
+    let lng = addr?.longitude;
+
+    if (!lat || !lng) {
+      const matched = matchAreaByName(addr?.areaLandmark || addr?.street || addr?.houseFlat || addr?.city);
+      if (matched) {
+        lat = matched.lat;
+        lng = matched.lng;
+      }
+    }
 
     if (!lat || !lng) {
       Alert.alert('Error', 'Saved address has invalid coordinates. Please add a new address.');
@@ -361,6 +372,11 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     setSelectedAddress(fullAddr as any);
     CartService.clearCache(); // Clear old cache
 
+    // Authoritative global context sync across all screens
+    if (typeof setActiveDeliveryAddress === 'function') {
+      setActiveDeliveryAddress(fullAddr as any).catch(() => {});
+    }
+
     emitCheckoutChange({
       selectedAddressType: 'SAVED',
       addressId: addr?.id || addr?._id || 'addr_saved',
@@ -374,9 +390,10 @@ export const BlinkitCheckoutScreen: React.FC = () => {
 
     try {
       const loc = await LocationService.resolveArea(lat, lng, true);
-      if (loc && loc.areaId && loc.storeId) {
+      if (loc && (loc.serviceable || (loc.areaId && loc.storeId))) {
         setCurrentArea(loc.areaId, loc.areaName);
-        setCurrentStore(loc.storeId, loc.storeName || loc.areaName);
+        setCurrentStore(loc.storeId || null, loc.storeName || loc.areaName || null);
+        setIsServiceable(true);
         if (loc.deliveryMinutes) {
           setDeliveryEtaMinutes(loc.deliveryMinutes);
         }
@@ -393,6 +410,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
         }
       } else {
         setAreaDetectionStatus({ isServiceable: false, areaName: 'Unknown', storeName: 'None' });
+        setIsServiceable(false);
       }
     } catch (error) {
       console.error('Failed to resolve saved address area:', error);
@@ -415,6 +433,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
           areaName: target.areaLandmark || currentAreaName || '',
           storeName: currentStoreName || 'Wom Up Dark Store',
         });
+        setIsServiceable(true);
       }
       return;
     }
@@ -818,7 +837,11 @@ export const BlinkitCheckoutScreen: React.FC = () => {
 
   const handlePlaceOrderClick = () => {
     if (isSubmitting || isRazorpayVerifying || isCalculatingFee) return;
-    if (!isServiceable || areaDetectionStatus?.isServiceable === false) {
+    const isDeliveryBlocked = areaDetectionStatus
+      ? areaDetectionStatus.isServiceable === false
+      : isServiceable === false;
+
+    if (isDeliveryBlocked) {
       Alert.alert(
         'Delivery Unavailable',
         'Sorry, WOMART is not serviceable in your area. We are expanding soon!'
@@ -1672,29 +1695,37 @@ export const BlinkitCheckoutScreen: React.FC = () => {
           <Text style={styles.bottomPriceSub}>AMOUNT PAYABLE</Text>
         </View>
 
-        <TouchableOpacity
-          activeOpacity={0.85}
-          onPress={handlePlaceOrderClick}
-          style={[
-            styles.placeOrderBtn,
-            (isSubmitting || isRazorpayVerifying || isCalculatingFee || !isServiceable || areaDetectionStatus?.isServiceable === false) && {
-              opacity: 0.6,
-              backgroundColor: '#94A3B8',
-            },
-          ]}
-          disabled={isSubmitting || isRazorpayVerifying || isCalculatingFee || !isServiceable || areaDetectionStatus?.isServiceable === false}
-          accessibilityLabel="Place Order"
-        >
-          {(isSubmitting || isRazorpayVerifying) ? (
-            <ActivityIndicator color={COLORS.white} size="small" />
-          ) : isCalculatingFee ? (
-            <Text style={styles.placeOrderBtnText}>Calculating Total...</Text>
-          ) : (!isServiceable || areaDetectionStatus?.isServiceable === false) ? (
-            <Text style={styles.placeOrderBtnText}>Delivery Unavailable</Text>
-          ) : (
-            <Text style={styles.placeOrderBtnText}>Place Order • ₹{finalPayable} ➔</Text>
-          )}
-        </TouchableOpacity>
+        {(() => {
+          const isOrderBlockedByServiceability = areaDetectionStatus
+            ? areaDetectionStatus.isServiceable === false
+            : isServiceable === false;
+
+          return (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={handlePlaceOrderClick}
+              style={[
+                styles.placeOrderBtn,
+                (isSubmitting || isRazorpayVerifying || isCalculatingFee || isOrderBlockedByServiceability) && {
+                  opacity: 0.6,
+                  backgroundColor: '#94A3B8',
+                },
+              ]}
+              disabled={isSubmitting || isRazorpayVerifying || isCalculatingFee || isOrderBlockedByServiceability}
+              accessibilityLabel="Place Order"
+            >
+              {(isSubmitting || isRazorpayVerifying) ? (
+                <ActivityIndicator color={COLORS.white} size="small" />
+              ) : isCalculatingFee ? (
+                <Text style={styles.placeOrderBtnText}>Calculating Total...</Text>
+              ) : isOrderBlockedByServiceability ? (
+                <Text style={styles.placeOrderBtnText}>Delivery Unavailable</Text>
+              ) : (
+                <Text style={styles.placeOrderBtnText}>Place Order • ₹{finalPayable} ➔</Text>
+              )}
+            </TouchableOpacity>
+          );
+        })()}
       </View>
 
       {/* 1. Full-Screen Order Celebration Video (First 5 Seconds Only) */}

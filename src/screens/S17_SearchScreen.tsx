@@ -246,8 +246,8 @@ export const S17_SearchScreen: React.FC = () => {
         initialQuery={query}
       />
 
-      {/* Floating View Cart Pill */}
-      <FloatingCartPill bottomOffset={20} />
+      {/* Floating View Cart Pill above bottom navigation */}
+      <FloatingCartPill bottomOffset={84} />
     </View>
   );
 };
