@@ -864,29 +864,36 @@ export class UsersService {
     const earnedIncome = isEligible ? totalPotentialIncome : 0;
     const lockedIncome = isEligible ? 0 : totalPotentialIncome;
 
+    const totalsObj = {
+      isEligible,
+      earnedIncome,
+      lockedIncome,
+      totalTeamSize,
+      totalVegetableGMV: Number(totalVegetableGMV.toFixed(2)),
+      totalOtherGMV: Number(totalOtherGMV.toFixed(2)),
+      vegetableIncomeRate: '3%',
+      vegetableIncome,
+      otherIncomeRate: '0.4%',
+      otherIncome,
+      totalPotentialIncome,
+    };
+
     return {
       personalStatus: {
         monthlyPurchaseValue: personalPurchase,
+        personalPurchase,
         requiredPurchase: 2000,
         isPersonalActive,
         isPersonalKyc,
+        kycVerified: isPersonalKyc,
         direct5ActiveCount,
         requiredDirectActive: 5,
-        isEligibleForTeamIncome: isEligible,
-      },
-      teamSummary: {
         isEligible,
-        earnedIncome,
-        lockedIncome,
+        isEligibleForTeamIncome: isEligible,
         totalTeamSize,
-        totalVegetableGMV: Number(totalVegetableGMV.toFixed(2)),
-        totalOtherGMV: Number(totalOtherGMV.toFixed(2)),
-        vegetableIncomeRate: '3%',
-        vegetableIncome,
-        otherIncomeRate: '0.4%',
-        otherIncome,
-        totalPotentialIncome,
       },
+      teamSummary: totalsObj,
+      totals: totalsObj,
       levelBreakdown,
       recentStatements,
     };

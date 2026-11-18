@@ -145,8 +145,11 @@ export const CustomerLevelDetailModal: React.FC<CustomerLevelDetailModalProps> =
   if (!isOpen) return null;
 
   const personalStatus = dashboardData?.personalStatus;
-  const totals = dashboardData?.totals;
-  const isEligible = personalStatus?.isEligible ?? false;
+  const totals = dashboardData?.totals || dashboardData?.teamSummary;
+  const isKycVerified = Boolean(personalStatus?.kycVerified ?? personalStatus?.isPersonalKyc);
+  const isPersonalActive = Boolean(personalStatus?.isPersonalActive);
+  const personalPurchase = personalStatus?.personalPurchase ?? personalStatus?.monthlyPurchaseValue ?? 0;
+  const isEligible = Boolean(personalStatus?.isEligible ?? personalStatus?.isEligibleForTeamIncome ?? dashboardData?.teamSummary?.isEligible);
 
   // Build 7 rows fallback if data is still loading or partially empty
   const levelBreakdown: LevelRow[] =
@@ -227,7 +230,7 @@ export const CustomerLevelDetailModal: React.FC<CustomerLevelDetailModalProps> =
                 <View style={styles.qualCard}>
                   <Text style={styles.qualLabel}>1. KYC Status</Text>
                   <View style={styles.qualRow}>
-                    {personalStatus?.kycVerified ? (
+                    {isKycVerified ? (
                       <>
                         <CheckCircle2 size={13} color="#16A34A" />
                         <Text style={[styles.qualVal, { color: '#16A34A' }]}>Verified</Text>
@@ -245,7 +248,7 @@ export const CustomerLevelDetailModal: React.FC<CustomerLevelDetailModalProps> =
                 <View style={styles.qualCard}>
                   <Text style={styles.qualLabel}>2. Personal Active</Text>
                   <View style={styles.qualRow}>
-                    {personalStatus?.isPersonalActive ? (
+                    {isPersonalActive ? (
                       <>
                         <CheckCircle2 size={13} color="#16A34A" />
                         <Text style={[styles.qualVal, { color: '#16A34A' }]}>Active</Text>
@@ -254,7 +257,7 @@ export const CustomerLevelDetailModal: React.FC<CustomerLevelDetailModalProps> =
                       <>
                         <XCircle size={13} color="#DC2626" />
                         <Text style={[styles.qualVal, { color: '#DC2626' }]}>
-                          ₹{personalStatus?.personalPurchase ?? 0}/2k
+                          ₹{personalPurchase}/2k
                         </Text>
                       </>
                     )}
