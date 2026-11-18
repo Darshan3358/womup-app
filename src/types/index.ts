@@ -257,6 +257,8 @@ export type ScreenId =
   | 'Blinkit_OrderSuccess'
   | 'Blinkit_Wishlist'
   | 'Local_Home'
+  | 'MyTeam'
+  | 'Blinkit_MyTeam'
   | 'C27_KYC'
   | 'KYC';
 

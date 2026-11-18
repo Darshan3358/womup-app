@@ -580,7 +580,7 @@ export const BlinkitProfileScreen: React.FC = () => {
 
   const renderSectionCard = (
     title: string,
-    rows: { icon: IconName; label: string; badge?: string; isDestructive?: boolean; onPress?: () => void }[]
+    rows: { icon: IconName; label: string; subtitle?: string; badge?: string; isDestructive?: boolean; onPress?: () => void }[]
   ) => (
     <View style={styles.sectionGroup}>
       <Text style={[TYPOGRAPHY.sectionTitle, styles.sectionHeaderTitle]}>{title}</Text>
@@ -600,15 +600,23 @@ export const BlinkitProfileScreen: React.FC = () => {
                   size={18}
                   color={row.isDestructive ? COLORS.error : COLORS.textPrimary}
                 />
-                <Text
-                  style={[
-                    TYPOGRAPHY.bodyMd,
-                    styles.rowLabel,
-                    row.isDestructive && { color: COLORS.error, fontWeight: '600' },
-                  ]}
-                >
-                  {row.label}
-                </Text>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text
+                    style={[
+                      TYPOGRAPHY.bodyMd,
+                      styles.rowLabel,
+                      row.isDestructive && { color: COLORS.error, fontWeight: '600' },
+                      { marginLeft: 0 },
+                    ]}
+                  >
+                    {row.label}
+                  </Text>
+                  {row.subtitle ? (
+                    <Text style={{ fontSize: 11, color: COLORS.secondaryText, marginTop: 1 }}>
+                      {row.subtitle}
+                    </Text>
+                  ) : null}
+                </View>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 {row.badge ? (
@@ -758,6 +766,13 @@ export const BlinkitProfileScreen: React.FC = () => {
 
           {/* Section 1: Your Information */}
           {renderSectionCard('Your information', [
+            {
+              icon: 'users',
+              label: 'My Team / My Network',
+              subtitle: 'Track your referrals and team earnings',
+              badge: '7 Levels',
+              onPress: () => setActiveScreen('MyTeam'),
+            },
             {
               icon: 'map-pin',
               label: 'Address book',

@@ -65,6 +65,16 @@ export const S26_AccountScreen: React.FC = () => {
 
   const menuItems = [
     {
+      title: 'My Team / My Network',
+      subtitle: 'Track your referrals and team earnings',
+      badge: '7 Levels',
+      badgeColor: COLORS.primary,
+      badgeBg: '#EEF2FF',
+      icon: 'people-outline',
+      color: COLORS.primary,
+      action: () => setActiveScreen('MyTeam'),
+    },
+    {
       title: 'My Addresses',
       subtitle: `${user.savedAddresses?.length || 0} saved address${(user.savedAddresses?.length || 0) === 1 ? '' : 'es'}`,
       icon: 'location-outline',

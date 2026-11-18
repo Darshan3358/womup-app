@@ -59,7 +59,11 @@ export type IconName =
   | 'map-pin'
   | 'credit-card'
   | 'trash'
-  | 'check-circle';
+  | 'check-circle'
+  | 'users'
+  | 'sliders'
+  | 'arrow-down-left'
+  | 'package';
 
 interface AppIconProps {
   name: IconName;
@@ -173,6 +177,14 @@ export const AppIcon: React.FC<AppIconProps> = ({
       return <Feather name="trash-2" size={size} color={color} />;
     case 'check-circle':
       return <Feather name="check-circle" size={size} color={color} />;
+    case 'users':
+      return <Feather name="users" size={size} color={color} />;
+    case 'sliders':
+      return <Feather name="sliders" size={size} color={color} />;
+    case 'arrow-down-left':
+      return <Feather name="arrow-down-left" size={size} color={color} />;
+    case 'package':
+      return <Feather name="package" size={size} color={color} />;
     default:
       return <Feather name="circle" size={size} color={color} />;
   }

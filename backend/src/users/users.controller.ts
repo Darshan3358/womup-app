@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -82,6 +82,38 @@ export class UsersController {
   async getTeamDashboard(@CurrentUser() user: any) {
     const dashboard = await this.usersService.getTeamDashboard(user.id);
     return { success: true, data: dashboard };
+  }
+
+  @Get('my-team')
+  @ApiOperation({ summary: 'Get 7-level team directory with filtering by level, search, and sort' })
+  async getMyTeam(
+    @CurrentUser() user: any,
+    @Query('level') level?: string,
+    @Query('search') search?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('targetUserId') targetUserId?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.usersService.getMyTeam(user.id, {
+      level,
+      search,
+      sortBy,
+      targetUserId,
+      page,
+      limit,
+    });
+  }
+
+  @Get('team-member-transactions/:targetUserId')
+  @ApiOperation({ summary: 'Get transactions and purchase ledger for a downline team member' })
+  async getTeamMemberTransactions(
+    @CurrentUser() user: any,
+    @Param('targetUserId') targetUserId: string,
+    @Query('targetUserId') targetUserIdQuery?: string,
+  ) {
+    const resolvedId = targetUserId || targetUserIdQuery || user.id;
+    return this.usersService.getTeamMemberTransactions(user.id, resolvedId);
   }
 
   @Post('calculate-team-income')

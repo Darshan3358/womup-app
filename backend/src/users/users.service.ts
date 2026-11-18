@@ -892,6 +892,217 @@ export class UsersService {
     };
   }
 
+  // ── My Team / My Network (Level 1 to 7 Directory with Filter, Search, Sort & Breakdown) ──
+  async getMyTeam(
+    userId: string,
+    options: {
+      level?: string;
+      search?: string;
+      sortBy?: string;
+      targetUserId?: string;
+      page?: number;
+      limit?: number;
+    } = {},
+  ) {
+    let rootUserId: Types.ObjectId;
+    if (options.targetUserId && Types.ObjectId.isValid(options.targetUserId)) {
+      rootUserId = new Types.ObjectId(options.targetUserId);
+    } else if (Types.ObjectId.isValid(userId)) {
+      rootUserId = new Types.ObjectId(userId);
+    } else {
+      const u = await this.userModel.findOne({
+        $or: [{ phone: userId }, { referralCode: userId }],
+      });
+      if (!u) throw new NotFoundException('User not found');
+      rootUserId = u._id;
+    }
+
+    const targetUser = await this.userModel.findById(rootUserId);
+    if (!targetUser) throw new NotFoundException('User not found');
+
+    const downlineLevels = await this.get7LevelDownline(rootUserId);
+
+    // Calculate level counts for summary:
+    const levelCounts: Record<string, number> = {
+      all: downlineLevels.reduce((sum, lvl) => sum + lvl.length, 0),
+      l1: downlineLevels[0]?.length || 0,
+      l2: downlineLevels[1]?.length || 0,
+      l3: downlineLevels[2]?.length || 0,
+      l4: downlineLevels[3]?.length || 0,
+      l5: downlineLevels[4]?.length || 0,
+      l6: downlineLevels[5]?.length || 0,
+      l7: downlineLevels[6]?.length || 0,
+    };
+
+    // Filter by selected level:
+    let selectedMembers: Array<{ member: any; level: number }> = [];
+    const levelFilter = options.level ? options.level.toLowerCase().trim() : 'all';
+
+    if (levelFilter === 'all' || !levelFilter) {
+      downlineLevels.forEach((lvl, idx) => {
+        lvl.forEach((m) => selectedMembers.push({ member: m, level: idx + 1 }));
+      });
+    } else {
+      const targetLvlNum = parseInt(levelFilter.replace('level', '').replace('l', '').trim(), 10);
+      if (!isNaN(targetLvlNum) && targetLvlNum >= 1 && targetLvlNum <= 7) {
+        (downlineLevels[targetLvlNum - 1] || []).forEach((m) => {
+          selectedMembers.push({ member: m, level: targetLvlNum });
+        });
+      } else {
+        downlineLevels.forEach((lvl, idx) => {
+          lvl.forEach((m) => selectedMembers.push({ member: m, level: idx + 1 }));
+        });
+      }
+    }
+
+    // Filter by search query if present:
+    if (options.search && options.search.trim().length > 0) {
+      const q = options.search.trim().toLowerCase();
+      selectedMembers = selectedMembers.filter(({ member }) => {
+        const name = (member.fullNameAsPerAadhaar || member.fullName || member.name || '').toLowerCase();
+        const code = (member.referralCode || (member as any).customerCode || '').toLowerCase();
+        const phone = (member.phone || member.phoneNumber || '').toLowerCase();
+        return name.includes(q) || code.includes(q) || phone.includes(q);
+      });
+    }
+
+    // Sort:
+    const sortBy = options.sortBy || 'newest';
+    if (sortBy === 'highest_shopping') {
+      selectedMembers.sort((a, b) => (b.member.monthlyPurchaseValue || 0) - (a.member.monthlyPurchaseValue || 0));
+    } else if (sortBy === 'oldest') {
+      selectedMembers.sort((a, b) => new Date(a.member.createdAt || 0).getTime() - new Date(b.member.createdAt || 0).getTime());
+    } else {
+      // newest
+      selectedMembers.sort((a, b) => new Date(b.member.createdAt || 0).getTime() - new Date(a.member.createdAt || 0).getTime());
+    }
+
+    const totalFiltered = selectedMembers.length;
+    const page = Math.max(1, Number(options.page) || 1);
+    const limit = Math.max(1, Math.min(100, Number(options.limit) || 20));
+    const startIndex = (page - 1) * limit;
+    const paginated = selectedMembers.slice(startIndex, startIndex + limit);
+
+    // Map output records:
+    const users = paginated.map(({ member, level }) => {
+      const cleanCode = (member.referralCode || (member as any).customerCode || `WOM${member._id.toString().slice(-6).toUpperCase()}`)
+        .replace(/^WORMUP/i, 'WOMUP')
+        .replace(/^WORM/i, 'WOM');
+
+      const name = member.fullNameAsPerAadhaar || member.fullName || member.name || 'Womup Member';
+      const isVerified = member.verificationStatus === 'VERIFIED' || member.customerKycStatus === 2 || !!member.aadhaarVerified;
+      const totalShopping = Number((member.monthlyPurchaseValue || 0).toFixed(2));
+      const isActive = totalShopping >= 2000 || member.isActive === true;
+
+      return {
+        id: member._id.toString(),
+        name,
+        userCode: cleanCode,
+        referralCode: cleanCode,
+        phone: member.phone || member.phoneNumber || '',
+        level,
+        levelLabel: `Level ${level}`,
+        totalShopping,
+        monthlyVegetablePurchase: Number((member.monthlyVegetablePurchase || 0).toFixed(2)),
+        monthlyOtherPurchase: Number((member.monthlyOtherPurchase || 0).toFixed(2)),
+        status: isActive ? 'Active' : 'Inactive',
+        isActive,
+        isVerified,
+        joinedAt: member.createdAt || new Date(),
+        avatarInitial: (name.trim().charAt(0) || 'U').toUpperCase(),
+      };
+    });
+
+    return {
+      success: true,
+      data: {
+        targetUser: {
+          id: targetUser._id.toString(),
+          name: targetUser.fullNameAsPerAadhaar || (targetUser as any).fullName || targetUser.name || 'Womup Member',
+          userCode: (targetUser.referralCode || (targetUser as any).customerCode || '').replace(/^WORMUP/i, 'WOMUP').replace(/^WORM/i, 'WOM'),
+        },
+        users,
+        totalUsers: totalFiltered,
+        levelCounts,
+        page,
+        limit,
+        totalPages: Math.ceil(totalFiltered / limit),
+      },
+    };
+  }
+
+  // ── Team Member Transactions & Order History ──
+  async getTeamMemberTransactions(loggedInUserId: string, targetUserId: string) {
+    if (!Types.ObjectId.isValid(targetUserId)) {
+      throw new BadRequestException('Invalid user ID');
+    }
+    const member = await this.userModel.findById(targetUserId);
+    if (!member) {
+      throw new NotFoundException('Member not found');
+    }
+
+    const cleanCode = (member.referralCode || (member as any).customerCode || `WOM${member._id.toString().slice(-6).toUpperCase()}`)
+      .replace(/^WORMUP/i, 'WOMUP')
+      .replace(/^WORM/i, 'WOM');
+
+    // 1. Income generated for logged in user by this member
+    let userObjId: Types.ObjectId | null = null;
+    if (Types.ObjectId.isValid(loggedInUserId)) {
+      userObjId = new Types.ObjectId(loggedInUserId);
+    } else {
+      const u = await this.userModel.findOne({
+        $or: [{ phone: loggedInUserId }, { referralCode: loggedInUserId }],
+      });
+      if (u) userObjId = u._id;
+    }
+
+    const incomeTxs = userObjId
+      ? await this.incomeTxModel.find({
+          userId: userObjId,
+          sourceUserId: member._id,
+        }).sort({ createdAt: -1 }).limit(30).lean()
+      : [];
+
+    // 2. Member's shopping orders
+    const orders = await this.userModel.db.collection('orders').find({
+      userId: member._id,
+      status: { $in: ['DELIVERED', 'COMPLETED', 'PLACED', 'PACKED', 'OUT_FOR_DELIVERY'] },
+    }).sort({ createdAt: -1 }).limit(10).toArray();
+
+    const totalIncomeFromMember = incomeTxs.reduce((sum, tx) => sum + (tx.amount || 0), 0);
+
+    return {
+      success: true,
+      data: {
+        member: {
+          id: member._id.toString(),
+          name: member.fullNameAsPerAadhaar || (member as any).fullName || member.name || 'Womup Member',
+          userCode: cleanCode,
+          phone: member.phone || (member as any).phoneNumber || '',
+          totalShopping: Number((member.monthlyPurchaseValue || 0).toFixed(2)),
+          totalIncomeGenerated: Number(totalIncomeFromMember.toFixed(2)),
+          isVerified: member.verificationStatus === 'VERIFIED' || member.customerKycStatus === 2 || !!member.aadhaarVerified,
+          joinedAt: (member as any).createdAt || new Date(),
+        },
+        incomeTransactions: incomeTxs.map((t: any) => ({
+          id: t._id.toString(),
+          type: t.type,
+          amount: t.amount,
+          status: t.status,
+          date: t.earnedAt || t.createdAt,
+          description: t.description || `Income earned from ${member.name}`,
+        })),
+        shoppingOrders: orders.map((o: any) => ({
+          orderNumber: o.orderNumber || `#${o._id.toString().slice(-6)}`,
+          amount: o.totalAmount || 0,
+          status: o.status,
+          date: o.createdAt || new Date(),
+          itemsCount: o.items?.length || 0,
+        })),
+      },
+    };
+  }
+
   // ── Month-End Team Purchase Income Calculation Engine (Cron / Admin) ──
   async calculateMonthlyTeamPurchaseIncome(targetMonth?: string) {
     const now = new Date();

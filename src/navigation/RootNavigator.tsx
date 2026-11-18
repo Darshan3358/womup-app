@@ -43,6 +43,7 @@ import { BlinkitProductDetailScreen } from '../screens/blinkit/BlinkitProductDet
 import { BlinkitCartScreen } from '../screens/blinkit/BlinkitCartScreen';
 import { BlinkitCheckoutScreen } from '../screens/blinkit/BlinkitCheckoutScreen';
 import { BlinkitWishlistScreen } from '../screens/blinkit/BlinkitWishlistScreen';
+import { MyTeamScreen } from '../screens/MyTeamScreen';
 import { LocalShopHomeScreen } from '../local-shop-module/screens/LocalShopHomeScreen';
 import { AuthPromptModal } from '../components/common/AuthPromptModal';
 
@@ -211,6 +212,9 @@ export const RootNavigator: React.FC = () => {
         return <BlinkitCheckoutScreen />;
       case 'Blinkit_Wishlist':
         return <BlinkitWishlistScreen />;
+      case 'MyTeam':
+      case 'Blinkit_MyTeam':
+        return <MyTeamScreen />;
 
       // Legacy screens
       case 'C01_Splash':
