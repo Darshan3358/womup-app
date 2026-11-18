@@ -26,6 +26,7 @@ import { AddressService } from '../../services/addressService';
 import { AuthService } from '../../services/authService';
 import { SettingsService } from '../../services/settingsService';
 import { KycBankVerificationModal } from '../../components/common/KycBankVerificationModal';
+import * as Clipboard from 'expo-clipboard';
 
 export const BlinkitProfileScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -166,6 +167,26 @@ export const BlinkitProfileScreen: React.FC = () => {
   });
   // Derive display value directly from user.birthday — always in sync after save
   const savedBirthday = user.birthday || null;
+
+  // User referral ID & copy state
+  const myReferralCode = (
+    user.referralCode ||
+    (user as any).customerCode ||
+    (user as any).userCode ||
+    ''
+  ).replace(/^WORMUP/i, 'WOMUP').replace(/^WORM/i, 'WOM');
+
+  const [copiedReferral, setCopiedReferral] = useState(false);
+
+  const handleCopyReferralId = async () => {
+    if (!myReferralCode) return;
+    try {
+      await Clipboard.setStringAsync(myReferralCode);
+      setCopiedReferral(true);
+      setTimeout(() => setCopiedReferral(false), 2000);
+      Alert.alert('Referral ID Copied! 📋', `Your referral ID (${myReferralCode}) has been copied to your clipboard.`);
+    } catch (_) {}
+  };
 
   // GST Details
   const [gstin, setGstin] = useState('');
@@ -640,7 +661,7 @@ export const BlinkitProfileScreen: React.FC = () => {
               {user.phoneNumber ? `+91 ${user.phoneNumber}` : '+91 98765 43210'}
             </Text>
 
-            {/* SRS Verification Status & Sponsor Pill */}
+            {/* SRS Verification Status, Sponsor Pill & User Referral ID Pill */}
             <View style={styles.profileBadgeRow}>
               <View
                 style={[
@@ -682,30 +703,27 @@ export const BlinkitProfileScreen: React.FC = () => {
                   <Text style={styles.sponsorPillText}>Sponsor: {user.sponsorCode.replace(/^WORMUP/i, 'WOMUP')}</Text>
                 </View>
               ) : null}
+
+              {Boolean(myReferralCode) && (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={handleCopyReferralId}
+                  style={styles.referralPill}
+                >
+                  <Ionicons name="gift-outline" size={12} color="#4338CA" />
+                  <Text style={styles.referralPillText}>Ref ID: {myReferralCode}</Text>
+                  <Ionicons
+                    name={copiedReferral ? 'checkmark-circle' : 'copy-outline'}
+                    size={11}
+                    color="#4338CA"
+                  />
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </LinearGradient>
 
         <View style={styles.bodyContent}>
-          {/* Birthday Banner */}
-          <View style={styles.birthdayCard}>
-            <View style={styles.birthdayLeft}>
-              <Text style={styles.birthdayTitle}>
-                {savedBirthday ? `Birthday: ${savedBirthday} 🎂` : 'Add your birthday'}
-              </Text>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => setBirthdayModalVisible(true)}
-                style={styles.birthdayLinkBtn}
-              >
-                <Text style={styles.birthdayLinkText}>
-                  {savedBirthday ? 'Update details ▸' : 'Enter details & get 50 coins ▸'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.birthdayCakeEmoji}>🎂</Text>
-          </View>
-
           {/* Quick Actions Row: 3 Equal Cards */}
           <View style={styles.quickActionsRow}>
             <TouchableOpacity
@@ -1874,6 +1892,8 @@ const styles = StyleSheet.create({
   profileBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
     gap: 8,
     marginTop: 8,
   },
@@ -1913,6 +1933,23 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#FFFFFF',
     fontWeight: '600',
+  },
+  referralPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  referralPillText: {
+    fontSize: 11,
+    color: '#4338CA',
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   bodyContent: {
     paddingHorizontal: 16,
