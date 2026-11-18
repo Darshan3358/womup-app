@@ -1063,12 +1063,50 @@ export class UsersService {
         }).sort({ createdAt: -1 }).limit(30).lean()
       : [];
 
-    // 2. Member's shopping orders
-    const orders = await this.userModel.db.collection('orders').find({
+    // 2. Member's detailed orders: BOTH Home Delivery & Offline Store orders
+    const homeOrders = await this.userModel.db.collection('orders').find({
       userId: member._id,
-      status: { $in: ['DELIVERED', 'COMPLETED', 'PLACED', 'PACKED', 'OUT_FOR_DELIVERY'] },
-    }).sort({ createdAt: -1 }).limit(10).toArray();
+      status: { $nin: ['CANCELLED'] },
+    }).sort({ createdAt: -1 }).limit(30).toArray();
 
+    const offlineTxs = await this.userModel.db.collection('vendor_transactions').find({
+      $or: [
+        { customerId: member._id },
+        ...((member.phone || (member as any).phoneNumber) ? [{ customerPhone: member.phone || (member as any).phoneNumber }] : []),
+      ],
+      status: { $in: ['SUCCESS', 'VERIFIED'] },
+    }).sort({ createdAt: -1 }).limit(30).toArray();
+
+    const shoppingOrders = [
+      ...homeOrders.map((o: any) => ({
+        id: o._id.toString(),
+        orderType: 'HOME_DELIVERY',
+        orderTypeLabel: 'Home Delivery 🚚',
+        orderNumber: o.orderNumber || `#WUP-${o._id.toString().slice(-6)}`,
+        storeName: 'WOMART Express (Home Delivery)',
+        amount: Number((o.totalAmount || 0).toFixed(2)),
+        pointsUsed: Number(o.coinsUsed ?? o.coinsDiscount ?? 0),
+        status: o.status || 'DELIVERED',
+        date: o.createdAt || new Date(),
+      })),
+      ...offlineTxs.map((v: any) => ({
+        id: v._id.toString(),
+        orderType: 'OFFLINE_STORE',
+        orderTypeLabel: 'Offline Store 🏬',
+        orderNumber: v.orderNumber || `#VTX-${v._id.toString().slice(-6)}`,
+        storeName: v.vendorName || 'Offline Partner Store',
+        amount: Number((v.billAmount || 0).toFixed(2)),
+        pointsUsed: Number(v.coinsUsed || 0),
+        status: v.status || 'SUCCESS',
+        date: v.createdAt || new Date(),
+      })),
+    ];
+
+    // Sort by date descending (newest first)
+    shoppingOrders.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    const totalShoppingFromOrders = shoppingOrders.reduce((sum, o) => sum + o.amount, 0);
+    const totalPointsUsedByMember = shoppingOrders.reduce((sum, o) => sum + o.pointsUsed, 0);
     const totalIncomeFromMember = incomeTxs.reduce((sum, tx) => sum + (tx.amount || 0), 0);
 
     return {
@@ -1079,7 +1117,10 @@ export class UsersService {
           name: member.fullNameAsPerAadhaar || (member as any).fullName || member.name || 'Womup Member',
           userCode: cleanCode,
           phone: member.phone || (member as any).phoneNumber || '',
-          totalShopping: Number((member.monthlyPurchaseValue || 0).toFixed(2)),
+          totalShopping: Number((member.monthlyPurchaseValue || totalShoppingFromOrders || 0).toFixed(2)),
+          totalPointsUsed: totalPointsUsedByMember,
+          homeOrdersCount: homeOrders.length,
+          offlineOrdersCount: offlineTxs.length,
           totalIncomeGenerated: Number(totalIncomeFromMember.toFixed(2)),
           isVerified: member.verificationStatus === 'VERIFIED' || member.customerKycStatus === 2 || !!member.aadhaarVerified,
           joinedAt: (member as any).createdAt || new Date(),
@@ -1092,13 +1133,7 @@ export class UsersService {
           date: t.earnedAt || t.createdAt,
           description: t.description || `Income earned from ${member.name}`,
         })),
-        shoppingOrders: orders.map((o: any) => ({
-          orderNumber: o.orderNumber || `#${o._id.toString().slice(-6)}`,
-          amount: o.totalAmount || 0,
-          status: o.status,
-          date: o.createdAt || new Date(),
-          itemsCount: o.items?.length || 0,
-        })),
+        shoppingOrders,
       },
     };
   }

@@ -39,6 +39,9 @@ export interface MemberTransactionDetails {
     userCode: string;
     phone: string;
     totalShopping: number;
+    totalPointsUsed: number;
+    homeOrdersCount: number;
+    offlineOrdersCount: number;
     totalIncomeGenerated: number;
     isVerified: boolean;
     joinedAt: string;
@@ -52,11 +55,15 @@ export interface MemberTransactionDetails {
     description: string;
   }>;
   shoppingOrders: Array<{
+    id: string;
+    orderType: 'HOME_DELIVERY' | 'OFFLINE_STORE';
+    orderTypeLabel: string;
     orderNumber: string;
+    storeName: string;
     amount: number;
+    pointsUsed: number;
     status: string;
     date: string;
-    itemsCount: number;
   }>;
 }
 
@@ -89,3 +96,4 @@ export const TeamService = {
     return api.get<MemberTransactionDetails>(`/users/team-member-transactions/${targetUserId}`);
   },
 };
+

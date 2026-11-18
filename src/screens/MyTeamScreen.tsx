@@ -53,6 +53,7 @@ export const MyTeamScreen: React.FC = () => {
   const [selectedMemberTx, setSelectedMemberTx] = useState<MemberTransactionDetails | null>(null);
   const [txModalVisible, setTxModalVisible] = useState<boolean>(false);
   const [loadingTx, setLoadingTx] = useState<boolean>(false);
+  const [txOrderFilter, setTxOrderFilter] = useState<'ALL' | 'HOME' | 'OFFLINE'>('ALL');
 
   // Search debounce
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -515,15 +516,151 @@ export const MyTeamScreen: React.FC = () => {
                   </View>
                   <View style={styles.txStatDivider} />
                   <View style={styles.txStatBox}>
-                    <Text style={styles.txStatLabel}>Your Income Earned</Text>
+                    <Text style={styles.txStatLabel}>Points Redeemed</Text>
+                    <Text style={[styles.txStatValue, { color: '#B45309' }]}>
+                      🪙 {selectedMemberTx.member.totalPointsUsed || 0}
+                    </Text>
+                  </View>
+                  <View style={styles.txStatDivider} />
+                  <View style={styles.txStatBox}>
+                    <Text style={styles.txStatLabel}>Your Income</Text>
                     <Text style={[styles.txStatValue, { color: COLORS.success }]}>
                       ₹{selectedMemberTx.member.totalIncomeGenerated.toLocaleString('en-IN')}
                     </Text>
                   </View>
                 </View>
 
-                {/* Income Transactions Section */}
-                <Text style={styles.txSectionHeader}>Earnings from this Member</Text>
+                {/* Filter Tabs for Orders: All, Home Delivery, Offline Store */}
+                <View style={styles.txTabContainer}>
+                  <TouchableOpacity
+                    style={[styles.txTabBtn, txOrderFilter === 'ALL' && styles.txTabBtnActive]}
+                    onPress={() => setTxOrderFilter('ALL')}
+                  >
+                    <Text style={[styles.txTabText, txOrderFilter === 'ALL' && styles.txTabTextActive]}>
+                      All Orders ({selectedMemberTx.shoppingOrders.length})
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.txTabBtn, txOrderFilter === 'HOME' && styles.txTabBtnActive]}
+                    onPress={() => setTxOrderFilter('HOME')}
+                  >
+                    <Text style={[styles.txTabText, txOrderFilter === 'HOME' && styles.txTabTextActive]}>
+                      Home Delivery ({selectedMemberTx.member.homeOrdersCount || 0})
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.txTabBtn, txOrderFilter === 'OFFLINE' && styles.txTabBtnActive]}
+                    onPress={() => setTxOrderFilter('OFFLINE')}
+                  >
+                    <Text style={[styles.txTabText, txOrderFilter === 'OFFLINE' && styles.txTabTextActive]}>
+                      Offline Store ({selectedMemberTx.member.offlineOrdersCount || 0})
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Detail-Wise Orders List (Home Delivery & Offline Store) */}
+                <Text style={styles.txSectionHeader}>Order & Points Details</Text>
+                {(() => {
+                  const filteredOrders = selectedMemberTx.shoppingOrders.filter((ord) => {
+                    if (txOrderFilter === 'HOME') return ord.orderType === 'HOME_DELIVERY';
+                    if (txOrderFilter === 'OFFLINE') return ord.orderType === 'OFFLINE_STORE';
+                    return true;
+                  });
+
+                  if (filteredOrders.length === 0) {
+                    return (
+                      <View style={styles.txEmptyBlock}>
+                        <Text style={styles.txEmptyText}>
+                          {txOrderFilter === 'HOME'
+                            ? 'No home delivery orders found for this member.'
+                            : txOrderFilter === 'OFFLINE'
+                            ? 'No offline store purchases recorded for this member.'
+                            : 'No orders recorded yet.'}
+                        </Text>
+                      </View>
+                    );
+                  }
+
+                  return filteredOrders.map((ord, idx) => {
+                    const isHome = ord.orderType === 'HOME_DELIVERY';
+                    return (
+                      <View key={ord.id || idx} style={styles.orderDetailCard}>
+                        {/* Top: Order Type Badge & Order ID */}
+                        <View style={styles.orderDetailTop}>
+                          <View
+                            style={[
+                              styles.orderTypeBadge,
+                              isHome ? styles.orderTypeHome : styles.orderTypeOffline,
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.orderTypeBadgeText,
+                                isHome ? styles.orderTypeHomeText : styles.orderTypeOfflineText,
+                              ]}
+                            >
+                              {ord.orderTypeLabel}
+                            </Text>
+                          </View>
+                          <Text style={styles.orderDetailId}>{ord.orderNumber}</Text>
+                        </View>
+
+                        {/* Store / Destination & Date */}
+                        <View style={styles.orderStoreRow}>
+                          <Text style={styles.orderStoreName} numberOfLines={1}>
+                            {ord.storeName}
+                          </Text>
+                          <Text style={styles.orderDetailDate}>
+                            {new Date(ord.date).toLocaleDateString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            })}
+                          </Text>
+                        </View>
+
+                        {/* Divider */}
+                        <View style={styles.orderCardDivider} />
+
+                        {/* Order Amount & Points Used */}
+                        <View style={styles.orderAmountAndPointsRow}>
+                          <View>
+                            <Text style={styles.orderAmountLabel}>Order Amount</Text>
+                            <Text style={styles.orderAmountValue}>₹{ord.amount.toLocaleString('en-IN')}</Text>
+                          </View>
+
+                          <View style={styles.pointsBadgeWrapper}>
+                            <Text style={styles.pointsLabel}>Points Used</Text>
+                            <View
+                              style={[
+                                styles.pointsUsedPill,
+                                ord.pointsUsed > 0 ? styles.pointsUsedPositive : styles.pointsUsedZero,
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.pointsUsedPillText,
+                                  ord.pointsUsed > 0 ? styles.pointsPositiveText : styles.pointsZeroText,
+                                ]}
+                              >
+                                {ord.pointsUsed > 0
+                                  ? `🪙 ${ord.pointsUsed} Points (-₹${ord.pointsUsed})`
+                                  : '0 Points Used'}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+                      </View>
+                    );
+                  });
+                })()}
+
+                {/* Earnings from this Member Section */}
+                <Text style={[styles.txSectionHeader, { marginTop: 18 }]}>
+                  Referral & Level Earnings from this Member
+                </Text>
                 {selectedMemberTx.incomeTransactions.length === 0 ? (
                   <View style={styles.txEmptyBlock}>
                     <Text style={styles.txEmptyText}>No direct income transactions recorded yet.</Text>
@@ -556,32 +693,6 @@ export const MyTeamScreen: React.FC = () => {
                         >
                           {tx.status}
                         </Text>
-                      </View>
-                    </View>
-                  ))
-                )}
-
-                {/* Shopping Orders Section */}
-                <Text style={styles.txSectionHeader}>Member Purchases ({selectedMemberTx.shoppingOrders.length})</Text>
-                {selectedMemberTx.shoppingOrders.length === 0 ? (
-                  <View style={styles.txEmptyBlock}>
-                    <Text style={styles.txEmptyText}>No recent orders placed by this member.</Text>
-                  </View>
-                ) : (
-                  selectedMemberTx.shoppingOrders.map((ord, idx) => (
-                    <View key={idx} style={styles.orderItemCard}>
-                      <View style={styles.orderLeft}>
-                        <AppIcon name="package" size={16} color={COLORS.primary} />
-                        <View style={{ marginLeft: 8 }}>
-                          <Text style={styles.orderNum}>{ord.orderNumber}</Text>
-                          <Text style={styles.orderSub}>
-                            {ord.itemsCount} items • {new Date(ord.date).toLocaleDateString('en-IN')}
-                          </Text>
-                        </View>
-                      </View>
-                      <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={styles.orderAmount}>₹{ord.amount}</Text>
-                        <Text style={styles.orderStatus}>{ord.status}</Text>
                       </View>
                     </View>
                   ))
@@ -1188,40 +1299,149 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFBEB',
     color: '#D97706',
   },
-  orderItemCard: {
+  txTabContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    gap: 8,
+    marginBottom: 14,
+  },
+  txTabBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  txTabBtnActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  txTabText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.secondaryText,
+  },
+  txTabTextActive: {
+    color: COLORS.white,
+  },
+  orderDetailCard: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 12,
-    marginBottom: 8,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
   },
-  orderLeft: {
+  orderDetailTop: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 6,
   },
-  orderNum: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
+  orderTypeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
-  orderSub: {
+  orderTypeHome: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  orderTypeOffline: {
+    backgroundColor: '#F0FDFA',
+    borderWidth: 1,
+    borderColor: '#99F6E4',
+  },
+  orderTypeBadgeText: {
     fontSize: 11,
-    color: COLORS.secondaryText,
-    marginTop: 2,
+    fontWeight: '700',
   },
-  orderAmount: {
-    fontSize: 14,
+  orderTypeHomeText: {
+    color: '#1D4ED8',
+  },
+  orderTypeOfflineText: {
+    color: '#0F766E',
+  },
+  orderDetailId: {
+    fontSize: 12,
     fontWeight: '700',
     color: COLORS.textPrimary,
   },
-  orderStatus: {
+  orderStoreRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  orderStoreName: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: COLORS.secondaryText,
+    flex: 1,
+    marginRight: 8,
+  },
+  orderDetailDate: {
     fontSize: 11,
-    color: COLORS.primary,
-    fontWeight: '600',
-    marginTop: 2,
+    color: COLORS.secondaryText,
+  },
+  orderCardDivider: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    marginVertical: 8,
+  },
+  orderAmountAndPointsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  orderAmountLabel: {
+    fontSize: 11,
+    color: COLORS.secondaryText,
+    marginBottom: 2,
+  },
+  orderAmountValue: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.textPrimary,
+  },
+  pointsBadgeWrapper: {
+    alignItems: 'flex-end',
+  },
+  pointsLabel: {
+    fontSize: 11,
+    color: COLORS.secondaryText,
+    marginBottom: 2,
+  },
+  pointsUsedPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  pointsUsedPositive: {
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  pointsUsedZero: {
+    backgroundColor: '#F1F5F9',
+  },
+  pointsUsedPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  pointsPositiveText: {
+    color: '#B45309',
+  },
+  pointsZeroText: {
+    color: COLORS.secondaryText,
   },
 });
