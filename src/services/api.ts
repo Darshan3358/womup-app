@@ -75,7 +75,8 @@ class ApiClient {
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    const timeoutMs = endpoint.includes('/orders') ? 45000 : 30000;
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
       const res = await fetch(url, {
@@ -156,12 +157,16 @@ class ApiClient {
       if (err.name === 'AbortError') {
         return {
           success: false,
-          message: 'Connection timed out. Please try again.',
+          message: 'Connection timed out. Please check your network and try again.',
         };
       }
+      const rawMsg = err.message || '';
+      const friendlyMsg = rawMsg.toLowerCase().includes('failed to fetch')
+        ? 'Could not connect to server. Please check your internet connection and try again.'
+        : (rawMsg || 'Network connection failed');
       return {
         success: false,
-        message: err.message || 'Network connection failed',
+        message: friendlyMsg,
       };
     }
   }

@@ -1100,29 +1100,41 @@ export class UsersService {
           continue;
         }
 
-        // 1. App Download & Referral Coins Income (Both Queued for Daily 12:00 AM IST Midnight distribution)
+        // 1. App Download Cash Income (Queued for Daily 12:00 AM IST Midnight distribution)
         await this.incomeTxModel.create({
           userId: sponsor._id,
           type: 'APP_DOWNLOAD',
           amount: tier.appIncome,
-          coinsReward: tier.coinIncome,
+          coinsReward: 0,
           sourceUserId: user._id,
           sourceVerificationStatus: 'VERIFIED',
           earnedAt: new Date(),
           availableFrom: new Date(),
           status: 'PENDING',
           isUsable: false,
-          description: `Level ${tier.level} App Download (₹${tier.appIncome}) & Shopping Coins (${tier.coinIncome} SC) from verified referral: ${user.fullNameAsPerAadhaar || user.name}`,
+          description: `Level ${tier.level} App Download (₹${tier.appIncome}) from verified referral: ${user.fullNameAsPerAadhaar || user.name}`,
         });
 
         sponsor.pendingIncome = Number(((sponsor.pendingIncome || 0) + tier.appIncome).toFixed(2));
-        sponsor.pendingShoppingCoins = ((sponsor as any).pendingShoppingCoins || 0) + tier.coinIncome;
         sponsor.appDownloadIncome = Number(((sponsor.appDownloadIncome || 0) + tier.appIncome).toFixed(2));
         if (tier.level === 1) {
           sponsor.verifiedReferralsCount = (sponsor.verifiedReferralsCount || 0) + 1;
         }
 
-        // Coins are queued for 12:00 AM Cron Job distribution (NOT instant per updated business rule)
+        // 2. Shopping Coins Income (Instant Reward)
+        const coinBefore = sponsor.shoppingCoins || 0;
+        sponsor.shoppingCoins = coinBefore + tier.coinIncome;
+
+        await this.coinTxModel.create({
+          userId: sponsor._id,
+          type: 'EARN',
+          coins: tier.coinIncome,
+          balanceBefore: coinBefore,
+          balanceAfter: sponsor.shoppingCoins,
+          referenceType: 'REFERRAL_REWARD',
+          status: 'COMPLETED',
+          description: `Level ${tier.level} Referral Shopping Coins (${tier.coinIncome} SC) from verified referral: ${user.fullNameAsPerAadhaar || user.name}`,
+        });
 
         await sponsor.save();
 

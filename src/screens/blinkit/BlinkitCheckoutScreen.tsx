@@ -768,6 +768,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
             deliveryFee: deliveryFee,
             deliveryInstructions: deliveryInstruction,
             walletDeduction: useWalletBalance ? walletDeduction : 0,
+            coinsDeduction: useCoins ? coinsDeduction : 0,
           });
           setIsRazorpayVerifying(false);
           setIsSubmitting(false);
@@ -776,6 +777,8 @@ export const BlinkitCheckoutScreen: React.FC = () => {
         } catch (orderErr: any) {
           setIsRazorpayVerifying(false);
           setIsSubmitting(false);
+          setUseCoins(false);
+          setAppliedCoins(0);
           Alert.alert(
             'Order Placement Failed',
             orderErr?.message || 'Delivery is currently not available for your address. If amount was deducted, auto-refund will be initiated.'
@@ -848,10 +851,13 @@ export const BlinkitCheckoutScreen: React.FC = () => {
           deliveryFee: deliveryFee,
           deliveryInstructions: deliveryInstruction,
           walletDeduction: useWalletBalance ? walletDeduction : 0,
+          coinsDeduction: useCoins ? coinsDeduction : 0,
         });
         startCelebrationVideo();
       } catch (error: any) {
         console.error('Failed to place order:', error);
+        setUseCoins(false);
+        setAppliedCoins(0);
         const errMsg = error?.message || '';
         if (errMsg.toLowerCase().includes('price change')) {
           Alert.alert(

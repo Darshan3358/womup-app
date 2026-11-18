@@ -154,12 +154,6 @@ export class DailyIncomeDistributionService {
           }
 
           let userTotal = Number((userReferral + userLevel + userOther).toFixed(2));
-          let userCoins = 0;
-          for (const tx of userTxs) {
-            if ((tx as any).coinsReward && (tx as any).coinsReward > 0) {
-              userCoins += Number((tx as any).coinsReward);
-            }
-          }
 
           // If user had pendingIncome on their model greater than the sum of transactions (legacy fallback)
           if ((user.pendingIncome || 0) > userTotal && userTxs.length === 0) {
@@ -167,29 +161,12 @@ export class DailyIncomeDistributionService {
             userOther = userTotal;
           }
 
-          if (userTotal <= 0 && userCoins <= 0) continue;
+          if (userTotal <= 0) continue;
 
-          // Atomic: Update user wallet balances
+          // Atomic: Update user wallet balances (Cash distribution only; Coins are credited instantly)
           user.availableIncome = Number(((user.availableIncome || 0) + userTotal).toFixed(2));
           user.walletBalance = Number(((user.walletBalance || 0) + userTotal).toFixed(2));
           user.pendingIncome = Math.max(0, Number(((user.pendingIncome || 0) - userTotal).toFixed(2)));
-
-          // Atomic: Distribute Shopping Coins if any were queued for midnight
-          if (userCoins > 0) {
-            const coinBefore = user.shoppingCoins || 0;
-            user.shoppingCoins = coinBefore + userCoins;
-            (user as any).pendingShoppingCoins = Math.max(0, (((user as any).pendingShoppingCoins || 0) - userCoins));
-
-            await this.coinTxModel.create({
-              userId: user._id,
-              type: 'EARN',
-              coins: userCoins,
-              balanceBefore: coinBefore,
-              balanceAfter: user.shoppingCoins,
-              referenceType: 'TIER_COIN_INCOME',
-              description: `Daily 12:00 AM Midnight Referral Shopping Coins Credit (${userCoins} SC)`,
-            });
-          }
 
           user.lastIncomeCreditedAt = new Date();
           await user.save();
@@ -217,7 +194,6 @@ export class DailyIncomeDistributionService {
               availableIncome: user.availableIncome,
               walletBalance: user.walletBalance,
               shoppingCoins: user.shoppingCoins,
-              pendingShoppingCoins: (user as any).pendingShoppingCoins,
             });
           } catch (_) {}
 
@@ -231,7 +207,6 @@ export class DailyIncomeDistributionService {
             userId: userIdStr,
             userName: user.name || 'User',
             totalAmount: userTotal,
-            totalCoins: userCoins,
             referralAmount: Number(userReferral.toFixed(2)),
             levelAmount: Number(userLevel.toFixed(2)),
             otherAmount: Number(userOther.toFixed(2)),

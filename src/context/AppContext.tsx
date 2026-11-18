@@ -124,7 +124,7 @@ interface AppContextType {
   orders: Order[];
   currentOrder: Order | null;
   setCurrentOrder: (order: Order | null) => void;
-  placeOrder: (paymentMethod: string, options?: { tip?: number; deliveryInstructions?: string; walletDeduction?: number; deliveryFee?: number }) => Promise<Order>;
+  placeOrder: (paymentMethod: string, options?: { tip?: number; deliveryInstructions?: string; walletDeduction?: number; deliveryFee?: number; coinsDeduction?: number }) => Promise<Order>;
 
   // Product Selection for Details / Listing
   selectedProduct: Product;
@@ -2142,7 +2142,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const placeOrder = async (
     paymentMethod: string,
-    options?: { tip?: number; deliveryInstructions?: string; walletDeduction?: number; deliveryFee?: number },
+    options?: { tip?: number; deliveryInstructions?: string; walletDeduction?: number; deliveryFee?: number; coinsDeduction?: number },
   ): Promise<Order> => {
     const isBlinkit = blinkitCartCount > 0;
     const activeList = isBlinkit ? blinkitCartList : cart;
@@ -2168,7 +2168,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     // Deduct coins if redeemed (strictly NO coins earned on order placement)
-    const coinsToDeduct = !isBlinkit ? cartSummary.shoppingCoinDiscount : appliedCoins;
+    const coinsToDeduct = typeof options?.coinsDeduction === 'number'
+      ? options.coinsDeduction
+      : (!isBlinkit ? cartSummary.shoppingCoinDiscount : appliedCoins);
+
     if (coinsToDeduct > 0) {
       setUser((prev) => ({
         ...prev,
@@ -2196,6 +2199,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deliveryFee: typeof options?.deliveryFee === 'number' ? options.deliveryFee : (isBlinkit ? 25 : cartSummary.deliveryFee),
         handlingFee: isBlinkit ? 5 : cartSummary.handlingFee,
         deliveryInstructions: options?.deliveryInstructions || 'Ring bell & leave at door',
+        coinsUsed: coinsToDeduct > 0 ? coinsToDeduct : undefined,
+        coinsDiscount: coinsToDeduct > 0 ? coinsToDeduct : undefined,
         address: {
           houseFlat: selectedAddress.houseFlat || resolvedAreaName,
           areaLandmark: selectedAddress.areaLandmark || resolvedAreaName,
@@ -2228,12 +2233,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         subtotal: liveData.itemSubtotal || (isBlinkit ? blinkitCartTotal : cartSummary.subtotalSelling),
         discount: liveData.discount ?? (isBlinkit ? Math.max(0, blinkitMrpTotal - blinkitCartTotal) : cartSummary.productDiscount),
         couponDiscount: liveData.couponDiscount ?? (isBlinkit ? couponDiscount : 0),
-        shoppingCoinsUsed: liveData.coinsUsed ?? (isBlinkit ? appliedCoins : cartSummary.shoppingCoinDiscount),
-        coinsDiscount: liveData.coinsDiscount ?? (isBlinkit ? appliedCoins : cartSummary.shoppingCoinDiscount),
+        shoppingCoinsUsed: liveData.coinsUsed ?? (isBlinkit ? (coinsToDeduct || appliedCoins) : cartSummary.shoppingCoinDiscount),
+        coinsDiscount: liveData.coinsDiscount ?? (isBlinkit ? (coinsToDeduct || appliedCoins) : cartSummary.shoppingCoinDiscount),
         deliveryFee: liveData.deliveryFee ?? (typeof options?.deliveryFee === 'number' ? options.deliveryFee : (isBlinkit ? 39 : cartSummary.deliveryFee)),
         handlingFee: liveData.handlingFee ?? (isBlinkit ? 5 : cartSummary.handlingFee),
         tip: liveData.tip ?? (options?.tip || 0),
-        totalAmount: liveData.totalAmount || (isBlinkit ? Math.max(0, blinkitCartTotal + (typeof options?.deliveryFee === 'number' ? options.deliveryFee : 39) + 5 - couponDiscount - appliedCoins + (options?.tip || 0)) : cartSummary.totalPayable),
+        totalAmount: liveData.totalAmount || (isBlinkit ? Math.max(0, blinkitCartTotal + (typeof options?.deliveryFee === 'number' ? options.deliveryFee : 39) + 5 - couponDiscount - (coinsToDeduct || appliedCoins) + (options?.tip || 0)) : cartSummary.totalPayable),
         deliveryAddress: selectedAddress,
         deliverySlot: 'Standard Delivery',
         paymentMethod,
@@ -2251,10 +2256,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (options?.walletDeduction && options.walletDeduction > 0) {
         setWalletBalance(initialWallet);
       }
-      setUser((prev) => ({
-        ...prev,
+      const restoredUser = {
+        ...user,
         shoppingCoins: initialCoins,
-      }));
+      };
+      setUser(restoredUser);
+      StorageService.saveItem(StorageService.KEYS.USER, restoredUser);
+      setAppliedCoins(0);
       throw err;
     }
 

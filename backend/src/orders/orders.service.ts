@@ -229,8 +229,8 @@ export class OrdersService {
     let itemSubtotal = 0;
     let mrpTotal = 0;
     let couponDiscount = 0;
-    let coinsUsed = 0;
-    let coinDiscount = 0;
+    let coinsUsed = typeof dto.coinsUsed === 'number' ? Math.max(0, dto.coinsUsed) : 0;
+    let coinDiscount = typeof dto.coinsDiscount === 'number' ? Math.max(0, dto.coinsDiscount) : coinsUsed;
     let deliveryFee = 0;
     let handlingFee = 5;
     let tip = 0;
@@ -284,7 +284,7 @@ export class OrdersService {
       if (typeof dto.deliveryFee === 'number' && dto.deliveryFee >= 0) {
         deliveryFee = dto.deliveryFee;
       }
-      totalAmount = Math.max(0, itemSubtotal + deliveryFee + handlingFee + tip);
+      totalAmount = Math.max(0, itemSubtotal + deliveryFee + handlingFee + tip - couponDiscount - coinDiscount);
     } else {
       const summary = await this.cartService.getCartSummary(userId);
       if (!summary.items || summary.items.length === 0) {
@@ -756,9 +756,9 @@ export class OrdersService {
     // Enforce COD Only as per SRS Requirement 1 (Structured so online payments can be re-enabled)
     const ALLOW_ONLINE_PAYMENTS = false;
     const requestedMethod = (dto.paymentMethod || 'COD').toUpperCase();
-    if (!ALLOW_ONLINE_PAYMENTS && requestedMethod !== 'COD' && requestedMethod !== 'CASH') {
+    if (!ALLOW_ONLINE_PAYMENTS && requestedMethod !== 'COD' && requestedMethod !== 'CASH' && requestedMethod !== 'WALLET' && requestedMethod !== 'WOMUP_WALLET') {
       throw new BadRequestException(
-        'Online payment methods are currently disabled. Only Cash on Delivery (COD) is accepted.',
+        'Online payment methods are currently disabled. Only Cash on Delivery (COD) and Womup Wallet are accepted.',
       );
     }
 
@@ -766,7 +766,7 @@ export class OrdersService {
     const user = await this.userModel.findById(uId);
     if (!user) throw new NotFoundException('User not found');
 
-    if (dto.paymentMethod === 'WALLET') {
+    if (requestedMethod === 'WALLET' || requestedMethod === 'WOMUP_WALLET') {
       if (user.walletBalance < totalAmount) {
         throw new BadRequestException(
           `Insufficient wallet balance (Current: ₹${user.walletBalance}, Required: ₹${totalAmount})`,
@@ -791,19 +791,23 @@ export class OrdersService {
 
     // 5. Handle Shopping Coins deduction
     if (coinsUsed > 0) {
-      const beforeCoins = user.shoppingCoins;
-      user.shoppingCoins -= coinsUsed;
-      await user.save();
+      const beforeCoins = user.shoppingCoins || 0;
+      const actualDeduct = Math.min(beforeCoins, coinsUsed);
+      if (actualDeduct > 0) {
+        user.shoppingCoins = Math.max(0, beforeCoins - actualDeduct);
+        await user.save();
 
-      await this.coinTxModel.create({
-        userId: uId,
-        type: 'SPEND',
-        coins: coinsUsed,
-        balanceBefore: beforeCoins,
-        balanceAfter: user.shoppingCoins,
-        referenceType: 'ORDER',
-        description: 'Coins redeemed for discount at checkout',
-      });
+        await this.coinTxModel.create({
+          userId: uId,
+          type: 'SPEND',
+          coins: actualDeduct,
+          balanceBefore: beforeCoins,
+          balanceAfter: user.shoppingCoins,
+          referenceType: 'ORDER',
+          status: 'COMPLETED',
+          description: `Coins redeemed for discount at checkout`,
+        });
+      }
     }
 
     // 6. Create Order with snapshot records in MongoDB Atlas

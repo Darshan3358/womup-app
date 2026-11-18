@@ -149,6 +149,8 @@ export const OrderService = {
     tip?: number;
     deliveryFee?: number;
     handlingFee?: number;
+    coinsUsed?: number;
+    coinsDiscount?: number;
     items?: {
       productId: string;
       quantity: number;

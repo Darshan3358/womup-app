@@ -56,6 +56,14 @@ export class CreateOrderDto {
   @IsOptional()
   deliveryFee?: number;
 
+  @ApiProperty({ example: 100, required: false, description: 'Shopping coins redeemed for discount' })
+  @IsOptional()
+  coinsUsed?: number;
+
+  @ApiProperty({ example: 100, required: false, description: 'Shopping coins discount amount in rupees' })
+  @IsOptional()
+  coinsDiscount?: number;
+
   @IsOptional()
   handlingFee?: number;
 
