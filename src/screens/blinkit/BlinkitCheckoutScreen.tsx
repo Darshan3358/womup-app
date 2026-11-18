@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../theme/colors';
 import { TYPOGRAPHY } from '../../theme/typography';
 import { AppIcon } from '../../components/common/AppIcon';
-import { ShieldCheck, CheckCircle2, MapPin, Compass, Home as HomeIcon, Check, Plus, X, ArrowRight } from 'lucide-react-native';
+import { ShieldCheck, CheckCircle2, MapPin, Compass, Home as HomeIcon, Check, Plus, X, ArrowRight, AlertCircle } from 'lucide-react-native';
 import { CartService } from '../../services/cartService';
 import { LocationService } from '../../services/locationService';
 import { matchAreaByName } from '../../data/areas';
@@ -229,12 +229,22 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     isServiceable: boolean;
     areaName: string;
     storeName: string;
-  } | null>({
-    isServiceable: true,
-    areaName: isSavedInitially
-      ? (activeAddr?.areaLandmark || currentAreaName || '')
-      : (currentAreaName || ''),
-    storeName: currentStoreName || '',
+  } | null>(() => {
+    if (isServiceable === true && currentAreaName) {
+      return {
+        isServiceable: true,
+        areaName: currentAreaName,
+        storeName: currentStoreName || 'Wom Up Dark Store',
+      };
+    }
+    if (isServiceable === false) {
+      return {
+        isServiceable: false,
+        areaName: currentAreaName || 'Current Location',
+        storeName: 'None',
+      };
+    }
+    return null;
   });
 
   // Explicit selection mode flag: 'saved' ignores background GPS updates to prevent auto-changing
@@ -248,10 +258,17 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     setAddressSource('gps');
     isManualSelectionRef.current = true;
 
-    // 1. Real GPS location fetch karo
+    // 1. Instantly CLEAR stale area & store detection to prevent state pollution
+    setAreaDetectionStatus(null);
+    setCurrentStore(null, null);
+    setIsServiceable(null);
+
+    // 2. Real GPS location fetch karo
     const detectedLoc = await LocationService.getCurrentLocation();
     if (!detectedLoc) {
       Alert.alert('Location Error', 'Unable to fetch current GPS location. Please enter address manually.');
+      setAreaDetectionStatus({ isServiceable: false, areaName: 'Unknown', storeName: 'None' });
+      setIsServiceable(false);
       return;
     }
 
@@ -261,27 +278,28 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     setSelectedAddressType('CURRENT_GPS');
     setHouseFlat('GPS Location');
     setStreet(readableAddress || 'Detected via GPS');
-    setAreaLandmark(city || '');
+    setAreaLandmark(city || readableAddress || 'Current Location');
     setPincode(detPin || '');
     setDeliveryLocation(`Current Location — ${readableAddress || 'Detected via GPS'}`);
-    setDeliveryEtaMinutes(9);
 
     emitCheckoutChange({
       selectedAddressType: 'CURRENT_GPS',
       houseFlat: 'GPS Location',
       street: readableAddress || 'Detected via GPS',
-      areaLandmark: city || '',
+      areaLandmark: city || readableAddress || '',
       pincode: detPin || '',
       recipientName: customerName,
       phoneNumber: customerPhone,
     });
 
-    // 2. Backend se area & store resolve karo
+    // 3. Backend se real GPS coordinates ke liye serviceability verify karo
     try {
       const loc = await LocationService.resolveArea(latitude, longitude, true);
-      if (loc && loc.areaId && loc.storeId) {
+      const isSrv = Boolean(loc && (loc.serviceable || (loc.areaId && loc.storeId)));
+      if (isSrv && loc) {
         setCurrentArea(loc.areaId, loc.areaName);
         setCurrentStore(loc.storeId || null, loc.storeName || loc.areaName || null);
+        setIsServiceable(true);
         if (loc.deliveryMinutes) {
           setDeliveryEtaMinutes(loc.deliveryMinutes);
         }
@@ -307,22 +325,41 @@ export const BlinkitCheckoutScreen: React.FC = () => {
         };
         setSelectedAddress(gpsAddr);
 
-        // 3. Server par cart location update karo (Price sync is the key)
+        // Server par cart location update karo
         const updatedCart = await CartService.setCartLocation(loc.areaId, loc.storeId);
         if (updatedCart) {
-          syncCartFromSummary(updatedCart); // UI me prices update honge
+          syncCartFromSummary(updatedCart);
         }
       } else {
-        setAreaDetectionStatus({ isServiceable: false, areaName: 'Unknown', storeName: 'None' });
+        // Outside serviceable area (e.g. Bhachau)
+        setCurrentStore(null, null);
+        setIsServiceable(false);
+        setAreaDetectionStatus({
+          isServiceable: false,
+          areaName: loc?.areaName || city || readableAddress || 'Outside delivery area',
+          storeName: 'None',
+        });
       }
     } catch (error) {
       console.error('Failed to resolve GPS area:', error);
+      setCurrentStore(null, null);
+      setIsServiceable(false);
+      setAreaDetectionStatus({
+        isServiceable: false,
+        areaName: city || readableAddress || 'Outside delivery area',
+        storeName: 'None',
+      });
     }
   };
 
   const handleSelectSavedAddr = async (targetAddr?: any) => {
     setAddressSource('saved');
     isManualSelectionRef.current = true;
+
+    // 1. Instantly CLEAR stale area & store detection to prevent state pollution
+    setAreaDetectionStatus(null);
+    setCurrentStore(null, null);
+    setIsServiceable(null);
 
     const addr = targetAddr || activeSavedAddr || savedAddrs[0];
     let lat = addr?.latitude;
@@ -338,6 +375,8 @@ export const BlinkitCheckoutScreen: React.FC = () => {
 
     if (!lat || !lng) {
       Alert.alert('Error', 'Saved address has invalid coordinates. Please add a new address.');
+      setAreaDetectionStatus({ isServiceable: false, areaName: 'Invalid Coordinates', storeName: 'None' });
+      setIsServiceable(false);
       return;
     }
 
@@ -390,7 +429,8 @@ export const BlinkitCheckoutScreen: React.FC = () => {
 
     try {
       const loc = await LocationService.resolveArea(lat, lng, true);
-      if (loc && (loc.serviceable || (loc.areaId && loc.storeId))) {
+      const isSrv = Boolean(loc && (loc.serviceable || (loc.areaId && loc.storeId)));
+      if (isSrv && loc) {
         setCurrentArea(loc.areaId, loc.areaName);
         setCurrentStore(loc.storeId || null, loc.storeName || loc.areaName || null);
         setIsServiceable(true);
@@ -409,31 +449,37 @@ export const BlinkitCheckoutScreen: React.FC = () => {
           syncCartFromSummary(updatedCart);
         }
       } else {
-        setAreaDetectionStatus({ isServiceable: false, areaName: 'Unknown', storeName: 'None' });
+        setCurrentStore(null, null);
         setIsServiceable(false);
+        setAreaDetectionStatus({
+          isServiceable: false,
+          areaName: loc?.areaName || areaV || 'Selected Address',
+          storeName: 'None',
+        });
       }
     } catch (error) {
       console.error('Failed to resolve saved address area:', error);
+      setCurrentStore(null, null);
+      setIsServiceable(false);
+      setAreaDetectionStatus({
+        isServiceable: false,
+        areaName: areaV || 'Selected Address',
+        storeName: 'None',
+      });
     }
   };
 
-  // Auto-sync form and selector cards when addressSource or context updates
+  // Auto-sync form and selector cards when addressSource updates
   useEffect(() => {
-    // If user has selected a saved address, DO NOT let background GPS updates overwrite it!
+    // If user has selected a saved address, sync form fields only
     if (addressSource === 'saved') {
       const target = activeSavedAddr || (selectedAddress?.type !== 'Current' ? selectedAddress : null);
       if (target) {
         setSelectedAddressType('SAVED');
         setHouseFlat(cleanHouseFlat(target.houseFlat));
         setStreet(target.street || '');
-        setAreaLandmark(target.areaLandmark || currentAreaName || '');
+        setAreaLandmark(target.areaLandmark || '');
         setPincode(target.pincode || '');
-        setAreaDetectionStatus({
-          isServiceable: true,
-          areaName: target.areaLandmark || currentAreaName || '',
-          storeName: currentStoreName || 'Wom Up Dark Store',
-        });
-        setIsServiceable(true);
       }
       return;
     }
@@ -441,15 +487,10 @@ export const BlinkitCheckoutScreen: React.FC = () => {
       setSelectedAddressType('CURRENT_GPS');
       setHouseFlat(selectedAddress?.houseFlat || 'GPS Location');
       setStreet(selectedAddress?.street || selectedAddress?.readableAddress || '');
-      setAreaLandmark(selectedAddress?.areaLandmark || currentAreaName || '');
+      setAreaLandmark(selectedAddress?.areaLandmark || '');
       setPincode(selectedAddress?.pincode || '');
-      setAreaDetectionStatus({
-        isServiceable: true,
-        areaName: selectedAddress?.areaLandmark || currentAreaName || '',
-        storeName: currentStoreName || 'Wom Up Dark Store',
-      });
     }
-  }, [currentAreaName, currentStoreName, addressSource]);
+  }, [addressSource]);
 
   // Configurable flag so online payments can be re-enabled in the future without code rewrite
   const ENABLE_ONLINE_PAYMENTS = false;
@@ -1223,14 +1264,21 @@ export const BlinkitCheckoutScreen: React.FC = () => {
                   placeholder="e.g. Thaltej, Tragad..."
                 />
                 {/* 🎯 Authoritative Live Area & Store Detection Badge */}
-                {areaDetectionStatus?.isServiceable && (
+                {areaDetectionStatus?.isServiceable ? (
                   <View style={styles.detectedBadge}>
                     <CheckCircle2 size={12} color="#16A34A" />
                     <Text style={styles.detectedBadgeText}>
                       ✓ {areaDetectionStatus.areaName} detected (Serving from {areaDetectionStatus.storeName})
                     </Text>
                   </View>
-                )}
+                ) : areaDetectionStatus && areaDetectionStatus.isServiceable === false ? (
+                  <View style={[styles.detectedBadge, { backgroundColor: '#FEE2E2', borderColor: '#FCA5A5' }]}>
+                    <AlertCircle size={12} color="#DC2626" />
+                    <Text style={[styles.detectedBadgeText, { color: '#B91C1C' }]}>
+                      ⚠️ Delivery unavailable in {areaDetectionStatus.areaName || areaLandmark || 'this area'}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
               <View style={[styles.inputGroup, { flex: 0.8 }]}>
                 <Text style={styles.inputLabel}>Pincode</Text>
@@ -2113,12 +2161,21 @@ export const BlinkitCheckoutScreen: React.FC = () => {
                 <Text style={styles.confirmMetaVal}>{pincode || '380015'}, Ahmedabad</Text>
               </View>
 
-              <View style={styles.confirmStoreRow}>
-                <CheckCircle2 size={13} color="#16A34A" />
-                <Text style={styles.confirmStoreText}>
-                  Serving from <Text style={{ fontWeight: '700', color: '#166534' }}>{areaDetectionStatus?.storeName || currentStoreName || 'Dark Store'}</Text>
-                </Text>
-              </View>
+              {areaDetectionStatus?.isServiceable ? (
+                <View style={styles.confirmStoreRow}>
+                  <CheckCircle2 size={13} color="#16A34A" />
+                  <Text style={styles.confirmStoreText}>
+                    Serving from <Text style={{ fontWeight: '700', color: '#166534' }}>{areaDetectionStatus.storeName || currentStoreName || 'Dark Store'}</Text>
+                  </Text>
+                </View>
+              ) : areaDetectionStatus && areaDetectionStatus.isServiceable === false ? (
+                <View style={[styles.confirmStoreRow, { backgroundColor: '#FEE2E2', borderColor: '#FCA5A5' }]}>
+                  <AlertCircle size={13} color="#DC2626" />
+                  <Text style={[styles.confirmStoreText, { color: '#B91C1C' }]}>
+                    Delivery is not available in this location.
+                  </Text>
+                </View>
+              ) : null}
             </View>
 
             {/* Delivery fee info note */}
