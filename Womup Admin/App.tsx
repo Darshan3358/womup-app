@@ -24,6 +24,12 @@ import { CategoryManagementScreen } from './src/screens/CategoryManagementScreen
 import { PayoutRatesScreen } from './src/screens/PayoutRatesScreen';
 import { WalletsRevenueScreen } from './src/screens/WalletsRevenueScreen';
 import { ApprovalHubScreen } from './src/screens/ApprovalHubScreen';
+import { GpsLocationRequestsScreen } from './src/screens/GpsLocationRequestsScreen';
+import { BannerPromotionScreen } from './src/screens/BannerPromotionScreen';
+import { PointsPurchaseReportScreen } from './src/screens/PointsPurchaseReportScreen';
+import { SupportRequestsScreen } from './src/screens/SupportRequestsScreen';
+import { ReferralTreeScreen } from './src/screens/ReferralTreeScreen';
+import { VendorCollectionsScreen } from './src/screens/VendorCollectionsScreen';
 
 // Sub Views
 import { CustomerProfileScreen } from './src/screens/sub/CustomerProfileScreen';
@@ -127,6 +133,18 @@ const MainApp: React.FC = () => {
         return <PayoutRatesScreen />;
       case 'Wallets':
         return <WalletsRevenueScreen />;
+      case 'GpsRequests':
+        return <GpsLocationRequestsScreen />;
+      case 'Banners':
+        return <BannerPromotionScreen />;
+      case 'PointsReport':
+        return <PointsPurchaseReportScreen />;
+      case 'Support':
+        return <SupportRequestsScreen />;
+      case 'ReferralTree':
+        return <ReferralTreeScreen />;
+      case 'VendorCollections':
+        return <VendorCollectionsScreen />;
       default:
         return <DashboardScreen />;
     }

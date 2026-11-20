@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,8 +7,21 @@ import {
   TouchableOpacity,
   Modal,
   TextInput,
+  Platform,
 } from 'react-native';
-import { MapPin, Search, X, Check } from 'lucide-react-native';
+import {
+  MapPin,
+  Search,
+  X,
+  Check,
+  Users,
+  Store,
+  ShoppingBag,
+  Bike,
+  ChevronRight,
+  TrendingUp,
+  Layers,
+} from 'lucide-react-native';
 import { COLORS } from '../theme';
 import { useAdminState } from '../context/AdminStateContext';
 import { AdminWelcomeCard } from '../components/dashboard/AdminWelcomeCard';
@@ -18,6 +31,7 @@ import { ZoneGmvShareCard, ZoneShareItem } from '../components/dashboard/ZoneGmv
 import { QuickActionsCard } from '../components/dashboard/QuickActionsCard';
 import { SystemStatusCard } from '../components/dashboard/SystemStatusCard';
 import { DashboardKpiSkeleton } from '../components/common/Skeleton';
+import { ApiService } from '../services/api';
 
 export const DashboardScreen: React.FC = () => {
   const {
@@ -37,6 +51,13 @@ export const DashboardScreen: React.FC = () => {
   const [selectedCityId, setSelectedCityId] = useState<string>('ALL');
   const [selectedAreaId, setSelectedAreaId] = useState<string>('ALL');
   const [dateFilter, setDateFilter] = useState<'Today' | 'All Time'>('All Time');
+  const [vendorsList, setVendorsList] = useState<any[]>([]);
+
+  useEffect(() => {
+    ApiService.getVendors().then((res) => {
+      if (res.success && res.data) setVendorsList(res.data);
+    }).catch(() => {});
+  }, []);
 
   // Modals for filters
   const [showCityPicker, setShowCityPicker] = useState(false);
@@ -278,6 +299,49 @@ export const DashboardScreen: React.FC = () => {
     }));
   }, [filteredOrders, zones, activeCities]);
 
+  // Item 4: Real-Time Area Telemetry Breakdown (Vendors & Customers by Area)
+  const areaBreakdownData = useMemo(() => {
+    const list = (availableAreas.length > 0 ? availableAreas : zones).slice(0, 10);
+    return list.map((zone) => {
+      const zName = (zone.name || '').toLowerCase();
+      const zoneCusts = customers.filter(
+        (c) =>
+          (c.zoneName && c.zoneName.toLowerCase() === zName) ||
+          (c.address && c.address.toLowerCase().includes(zName))
+      );
+      const activeCusts = zoneCusts.filter(
+        (c) =>
+          (c as any).personalStatus === 'ACTIVE' ||
+          (c.spend || (c as any).currentMonthShoppingGmv || 0) >= 2000
+      );
+      const zoneVendors = vendorsList.filter(
+        (v) =>
+          (v.address && v.address.toLowerCase().includes(zName)) ||
+          (v.city && v.city.toLowerCase().includes(zName)) ||
+          ((zone as any).pincode && v.pincode === (zone as any).pincode) ||
+          (zone.pincodes && zone.pincodes.includes(v.pincode))
+      );
+      const zoneOrders = filteredOrders.filter(
+        (o) =>
+          (o.areaId && (zone.id === o.areaId || zone._id === o.areaId)) ||
+          (o.zoneName && zone.name.toLowerCase() === (zone.name || '').toLowerCase()) ||
+          (o.address && o.address.toLowerCase().includes(zName))
+      );
+      const gmv = zoneOrders.reduce((sum, o) => sum + (o.total || 0), 0);
+
+      return {
+        areaId: zone.id || zone._id,
+        areaName: zone.name,
+        cityName: zone.cityName || zone.city || 'Ahmedabad',
+        pincode: (zone as any).pincode || zone.pincodes?.[0] || '',
+        totalCustomers: zoneCusts.length,
+        activeCustomers: activeCusts.length,
+        totalVendors: zoneVendors.length,
+        gmv,
+      };
+    });
+  }, [availableAreas, zones, customers, vendorsList, filteredOrders]);
+
   return (
     <ScrollView
       style={styles.container}
@@ -335,6 +399,162 @@ export const DashboardScreen: React.FC = () => {
         }}
         onLiveOrders={() => setActiveTab('Orders')}
       />
+
+      {/* Item 9: 4 Core Operation Consoles (Customer, Vendor, Purchase/Orders, Agent/Fleet) */}
+      <View style={styles.consoleSection}>
+        <Text style={styles.sectionHeading}>CORE OPERATION HUBS</Text>
+        <View style={styles.consoleGrid}>
+          {/* Customer Console */}
+          <TouchableOpacity
+            style={[styles.consoleCard, { borderTopColor: '#7C3AED' }]}
+            onPress={() => setActiveTab('Users')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.consoleHeader}>
+              <View style={[styles.consoleIconBox, { backgroundColor: '#EDE9FE' }]}>
+                <Users size={16} color="#7C3AED" />
+              </View>
+              <Text style={styles.consoleTitle}>Customer Hub</Text>
+            </View>
+            <Text style={styles.consoleCount}>{customers.length} Customers</Text>
+            <Text style={styles.consoleSub}>KYC, Downline MLM & Profiles</Text>
+            <View style={styles.consoleAction}>
+              <Text style={[styles.consoleActionText, { color: '#7C3AED' }]}>Manage Users</Text>
+              <ChevronRight size={12} color="#7C3AED" />
+            </View>
+          </TouchableOpacity>
+
+          {/* Vendor Console */}
+          <TouchableOpacity
+            style={[styles.consoleCard, { borderTopColor: '#059669' }]}
+            onPress={() => setActiveTab('Vendors')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.consoleHeader}>
+              <View style={[styles.consoleIconBox, { backgroundColor: '#DCFCE7' }]}>
+                <Store size={16} color="#059669" />
+              </View>
+              <Text style={styles.consoleTitle}>Vendor Hub</Text>
+            </View>
+            <Text style={styles.consoleCount}>{vendorsList.length} Merchants</Text>
+            <Text style={styles.consoleSub}>QR Collections & Commission</Text>
+            <View style={styles.consoleAction}>
+              <Text style={[styles.consoleActionText, { color: '#059669' }]}>Manage Vendors</Text>
+              <ChevronRight size={12} color="#059669" />
+            </View>
+          </TouchableOpacity>
+
+          {/* Purchase & Orders Console */}
+          <TouchableOpacity
+            style={[styles.consoleCard, { borderTopColor: '#DB2777' }]}
+            onPress={() => setActiveTab('Orders')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.consoleHeader}>
+              <View style={[styles.consoleIconBox, { backgroundColor: '#FCE7F3' }]}>
+                <ShoppingBag size={16} color="#DB2777" />
+              </View>
+              <Text style={styles.consoleTitle}>Purchase Hub</Text>
+            </View>
+            <Text style={styles.consoleCount}>{filteredOrders.length} Orders</Text>
+            <Text style={styles.consoleSub}>Dark Store Inventory & 11 Stages</Text>
+            <View style={styles.consoleAction}>
+              <Text style={[styles.consoleActionText, { color: '#DB2777' }]}>Track Orders</Text>
+              <ChevronRight size={12} color="#DB2777" />
+            </View>
+          </TouchableOpacity>
+
+          {/* Agent & Fleet Console */}
+          <TouchableOpacity
+            style={[styles.consoleCard, { borderTopColor: '#2563EB' }]}
+            onPress={() => setActiveTab('Staff')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.consoleHeader}>
+              <View style={[styles.consoleIconBox, { backgroundColor: '#DBEAFE' }]}>
+                <Bike size={16} color="#2563EB" />
+              </View>
+              <Text style={styles.consoleTitle}>Agent Hub</Text>
+            </View>
+            <Text style={styles.consoleCount}>{liveFleetCount} On Duty</Text>
+            <Text style={styles.consoleSub}>Pickers, Riders & Fleet Dispatch</Text>
+            <View style={styles.consoleAction}>
+              <Text style={[styles.consoleActionText, { color: '#2563EB' }]}>View Fleet</Text>
+              <ChevronRight size={12} color="#2563EB" />
+            </View>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Item 4: Area-wise Vendors & Customers Telemetry Card */}
+      <View style={styles.areaSectionCard}>
+        <View style={styles.areaHeaderRow}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={styles.areaIconBox}>
+              <MapPin size={16} color="#0284C7" />
+            </View>
+            <View>
+              <Text style={styles.areaCardTitle}>Area Breakdown: Vendors & Customers</Text>
+              <Text style={styles.areaCardSubtitle}>
+                Operational territory density across dark store sectors
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity onPress={() => setShowAreaPicker(true)} style={styles.areaPickerPill}>
+            <Text style={styles.areaPickerPillText}>
+              {currentArea ? currentArea.name : 'All Areas'}
+            </Text>
+            <ChevronRight size={12} color={COLORS.purple} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.areaTable}>
+          {areaBreakdownData.length === 0 ? (
+            <Text style={styles.emptyAreaText}>No area breakdown data available</Text>
+          ) : (
+            areaBreakdownData.map((item, idx) => (
+              <View key={item.areaId || idx} style={styles.areaTableRow}>
+                <View style={styles.areaNameCol}>
+                  <Text style={styles.areaNameText}>{item.areaName}</Text>
+                  <Text style={styles.areaCityText}>
+                    {item.cityName} {item.pincode ? `• PIN ${item.pincode}` : ''}
+                  </Text>
+                </View>
+
+                <View style={styles.areaMetricsGrid}>
+                  <View style={styles.areaMetricCol}>
+                    <Text style={styles.areaMetricLabel}>Customers</Text>
+                    <Text style={[styles.areaMetricVal, { color: COLORS.navy }]}>
+                      {item.totalCustomers}
+                    </Text>
+                  </View>
+
+                  <View style={styles.areaMetricCol}>
+                    <Text style={styles.areaMetricLabel}>Active (₹2k+)</Text>
+                    <Text style={[styles.areaMetricVal, { color: '#16A34A' }]}>
+                      {item.activeCustomers}
+                    </Text>
+                  </View>
+
+                  <View style={styles.areaMetricCol}>
+                    <Text style={styles.areaMetricLabel}>Local Vendors</Text>
+                    <Text style={[styles.areaMetricVal, { color: '#D97706' }]}>
+                      {item.totalVendors}
+                    </Text>
+                  </View>
+
+                  <View style={styles.areaMetricCol}>
+                    <Text style={styles.areaMetricLabel}>Area GMV</Text>
+                    <Text style={[styles.areaMetricVal, { color: COLORS.purple }]}>
+                      ₹{item.gmv.toLocaleString()}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            ))
+          )}
+        </View>
+      </View>
 
       {/* 6. System Status Card (Live WebSocket & DB Status) */}
       <SystemStatusCard
@@ -629,4 +849,174 @@ const styles = StyleSheet.create({
     color: '#762DEB',
     fontWeight: '700',
   },
+  consoleSection: {
+    marginTop: 14,
+  },
+  sectionHeading: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 0.8,
+    marginBottom: 8,
+  },
+  consoleGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  consoleCard: {
+    flex: 1,
+    minWidth: 150,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderTopWidth: 3,
+    padding: 12,
+    ...Platform.select({
+      web: { boxShadow: '0 2px 6px rgba(0,0,0,0.03)' },
+      default: { elevation: 1 },
+    }),
+  },
+  consoleHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  consoleIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  consoleTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#1E293B',
+  },
+  consoleCount: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: COLORS.navy,
+  },
+  consoleSub: {
+    fontSize: 10,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  consoleAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderColor: '#F1F5F9',
+    paddingTop: 6,
+  },
+  consoleActionText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  areaSectionCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 14,
+    marginTop: 14,
+    ...Platform.select({
+      web: { boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
+      default: { elevation: 2 },
+    }),
+  },
+  areaHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  areaIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#E0F2FE',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  areaCardTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: COLORS.navy,
+  },
+  areaCardSubtitle: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  areaPickerPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    backgroundColor: '#F3E8FF',
+  },
+  areaPickerPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.purple,
+  },
+  areaTable: {
+    gap: 8,
+  },
+  emptyAreaText: {
+    fontSize: 12,
+    color: '#94A3B8',
+    textAlign: 'center',
+    paddingVertical: 12,
+  },
+  areaTableRow: {
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  areaNameCol: {
+    marginBottom: 4,
+  },
+  areaNameText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: COLORS.navy,
+  },
+  areaCityText: {
+    fontSize: 10,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  areaMetricsGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    flexWrap: 'wrap',
+  },
+  areaMetricCol: {
+    minWidth: 60,
+  },
+  areaMetricLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#64748B',
+    textTransform: 'uppercase',
+  },
+  areaMetricVal: {
+    fontSize: 12,
+    fontWeight: '900',
+    marginTop: 1,
+  },
 });
+

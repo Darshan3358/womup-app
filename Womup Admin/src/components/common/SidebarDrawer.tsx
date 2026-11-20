@@ -32,6 +32,7 @@ import {
   Layers,
   FolderTree,
   Wallet,
+  LifeBuoy,
 } from 'lucide-react-native';
 import { COLORS, GRADIENTS, RADIUS, SPACING } from '../../theme';
 import { useAdminState, ActiveTab, ActiveSubView } from '../../context/AdminStateContext';
@@ -332,6 +333,72 @@ export const SidebarDrawer: React.FC = () => {
                   <ChevronRight size={16} color={COLORS.secondaryText} />
                 </TouchableOpacity>
 
+                {/* 3b. Customer Referral Tree */}
+                <TouchableOpacity
+                  style={[
+                    styles.menuItem,
+                    activeTab === 'ReferralTree' && subView === 'none' && styles.menuItemActive,
+                  ]}
+                  onPress={() => handleNavigateTab('ReferralTree')}
+                  activeOpacity={0.75}
+                >
+                  <View
+                    style={[
+                      styles.iconContainer,
+                      activeTab === 'ReferralTree' && subView === 'none' && styles.iconActive,
+                    ]}
+                  >
+                    <FolderTree
+                      size={18}
+                      color={
+                        activeTab === 'ReferralTree' && subView === 'none' ? COLORS.white : '#7C3AED'
+                      }
+                    />
+                  </View>
+                  <Text
+                    style={[
+                      styles.menuLabel,
+                      activeTab === 'ReferralTree' && subView === 'none' && styles.menuLabelActive,
+                    ]}
+                  >
+                    Referral Tree Explorer
+                  </Text>
+                  <ChevronRight size={16} color={COLORS.secondaryText} />
+                </TouchableOpacity>
+
+                {/* 3c. GPS & Pincode Requests */}
+                <TouchableOpacity
+                  style={[
+                    styles.menuItem,
+                    activeTab === 'GpsRequests' && subView === 'none' && styles.menuItemActive,
+                  ]}
+                  onPress={() => handleNavigateTab('GpsRequests')}
+                  activeOpacity={0.75}
+                >
+                  <View
+                    style={[
+                      styles.iconContainer,
+                      activeTab === 'GpsRequests' && subView === 'none' && styles.iconActive,
+                    ]}
+                  >
+                    <MapPin
+                      size={18}
+                      color={
+                        activeTab === 'GpsRequests' && subView === 'none' ? COLORS.white : '#0284C7'
+                      }
+                    />
+                  </View>
+                  <Text
+                    style={[
+                      styles.menuLabel,
+                      activeTab === 'GpsRequests' && subView === 'none' && styles.menuLabelActive,
+                    ]}
+                  >
+                    📍 GPS & Pincode Requests
+                  </Text>
+                  <ChevronRight size={16} color={COLORS.secondaryText} />
+                </TouchableOpacity>
+
                 {/* 4. Area Dynamic Pricing */}
                 <TouchableOpacity
                   style={[
@@ -501,6 +568,39 @@ export const SidebarDrawer: React.FC = () => {
                   <ChevronRight size={16} color={COLORS.secondaryText} />
                 </TouchableOpacity>
 
+                {/* 8b. App Banners & Promotions */}
+                <TouchableOpacity
+                  style={[
+                    styles.menuItem,
+                    activeTab === 'Banners' && subView === 'none' && styles.menuItemActive,
+                  ]}
+                  onPress={() => handleNavigateTab('Banners')}
+                  activeOpacity={0.75}
+                >
+                  <View
+                    style={[
+                      styles.iconContainer,
+                      activeTab === 'Banners' && subView === 'none' && styles.iconActive,
+                    ]}
+                  >
+                    <Megaphone
+                      size={18}
+                      color={
+                        activeTab === 'Banners' && subView === 'none' ? COLORS.white : '#DB2777'
+                      }
+                    />
+                  </View>
+                  <Text
+                    style={[
+                      styles.menuLabel,
+                      activeTab === 'Banners' && subView === 'none' && styles.menuLabelActive,
+                    ]}
+                  >
+                    App Banners & Promotions
+                  </Text>
+                  <ChevronRight size={16} color={COLORS.secondaryText} />
+                </TouchableOpacity>
+
                 {/* 9. Dark Stores & Hubs */}
                 <TouchableOpacity
                   style={[
@@ -563,6 +663,41 @@ export const SidebarDrawer: React.FC = () => {
                     ]}
                   >
                     Local Store Vendors
+                  </Text>
+                  <ChevronRight size={16} color={COLORS.secondaryText} />
+                </TouchableOpacity>
+
+                {/* 10b. Vendor Collections & Settlements */}
+                <TouchableOpacity
+                  style={[
+                    styles.menuItem,
+                    activeTab === 'VendorCollections' && subView === 'none' && styles.menuItemActive,
+                  ]}
+                  onPress={() => handleNavigateTab('VendorCollections')}
+                  activeOpacity={0.75}
+                >
+                  <View
+                    style={[
+                      styles.iconContainer,
+                      activeTab === 'VendorCollections' && subView === 'none' && styles.iconActive,
+                    ]}
+                  >
+                    <Coins
+                      size={18}
+                      color={
+                        activeTab === 'VendorCollections' && subView === 'none'
+                          ? COLORS.white
+                          : '#059669'
+                      }
+                    />
+                  </View>
+                  <Text
+                    style={[
+                      styles.menuLabel,
+                      activeTab === 'VendorCollections' && subView === 'none' && styles.menuLabelActive,
+                    ]}
+                  >
+                    Vendor Collections & Payouts
                   </Text>
                   <ChevronRight size={16} color={COLORS.secondaryText} />
                 </TouchableOpacity>
@@ -818,6 +953,72 @@ export const SidebarDrawer: React.FC = () => {
                     style={[styles.menuLabel, subView === 'AuditLogs' && styles.menuLabelActive]}
                   >
                     Security & Audit Logs
+                  </Text>
+                  <ChevronRight size={16} color={COLORS.secondaryText} />
+                </TouchableOpacity>
+
+                {/* 18. Points Purchase Report */}
+                <TouchableOpacity
+                  style={[
+                    styles.menuItem,
+                    activeTab === 'PointsReport' && subView === 'none' && styles.menuItemActive,
+                  ]}
+                  onPress={() => handleNavigateTab('PointsReport')}
+                  activeOpacity={0.75}
+                >
+                  <View
+                    style={[
+                      styles.iconContainer,
+                      activeTab === 'PointsReport' && subView === 'none' && styles.iconActive,
+                    ]}
+                  >
+                    <Coins
+                      size={18}
+                      color={
+                        activeTab === 'PointsReport' && subView === 'none' ? COLORS.white : '#DB2777'
+                      }
+                    />
+                  </View>
+                  <Text
+                    style={[
+                      styles.menuLabel,
+                      activeTab === 'PointsReport' && subView === 'none' && styles.menuLabelActive,
+                    ]}
+                  >
+                    Points Purchase Report
+                  </Text>
+                  <ChevronRight size={16} color={COLORS.secondaryText} />
+                </TouchableOpacity>
+
+                {/* 19. Customer Support Requests */}
+                <TouchableOpacity
+                  style={[
+                    styles.menuItem,
+                    activeTab === 'Support' && subView === 'none' && styles.menuItemActive,
+                  ]}
+                  onPress={() => handleNavigateTab('Support')}
+                  activeOpacity={0.75}
+                >
+                  <View
+                    style={[
+                      styles.iconContainer,
+                      activeTab === 'Support' && subView === 'none' && styles.iconActive,
+                    ]}
+                  >
+                    <LifeBuoy
+                      size={18}
+                      color={
+                        activeTab === 'Support' && subView === 'none' ? COLORS.white : '#7C3AED'
+                      }
+                    />
+                  </View>
+                  <Text
+                    style={[
+                      styles.menuLabel,
+                      activeTab === 'Support' && subView === 'none' && styles.menuLabelActive,
+                    ]}
+                  >
+                    Customer Support Requests
                   </Text>
                   <ChevronRight size={16} color={COLORS.secondaryText} />
                 </TouchableOpacity>

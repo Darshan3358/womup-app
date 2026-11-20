@@ -94,7 +94,7 @@ export const CustomersScreen: React.FC = () => {
 
   const [activeTabMode, setActiveTabMode] = useState<'CUSTOMERS' | 'RIDERS'>('CUSTOMERS');
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeCustomerFilter, setActiveCustomerFilter] = useState<'All' | 'Active' | 'Blocked'>('All');
+  const [activeCustomerFilter, setActiveCustomerFilter] = useState<'All' | 'Active' | 'Blocked' | 'Pending KYC'>('All');
   const [activeRiderFilter, setActiveRiderFilter] = useState<'All' | 'Online' | 'Approved' | 'Pending'>('All');
   const [selectedCityId, setSelectedCityId] = useState<string>('ALL');
   const [selectedAreaId, setSelectedAreaId] = useState<string>('ALL');
@@ -183,7 +183,14 @@ export const CustomersScreen: React.FC = () => {
       c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       c.phone.includes(searchQuery) ||
       c.id.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = activeCustomerFilter === 'All' || c.status === activeCustomerFilter;
+    let matchesFilter = activeCustomerFilter === 'All' || c.status === activeCustomerFilter;
+    if (activeCustomerFilter === 'Pending KYC') {
+      matchesFilter =
+        c.kycStatus === 'Pending' ||
+        (c as any).kycStatus === 'Submitted' ||
+        (c as any).kycStatus === 'Under Review' ||
+        (c as any).verificationStatus === 'PENDING';
+    }
     if (!matchesSearch || !matchesFilter) return false;
 
     const { cityName, areaName } = resolveCustomerHierarchy(c);
@@ -574,7 +581,7 @@ export const CustomersScreen: React.FC = () => {
         {/* Filter Pills */}
         {activeTabMode === 'CUSTOMERS' ? (
           <View style={styles.filterRow}>
-            {(['All', 'Active', 'Blocked'] as const).map((filter) => {
+            {(['All', 'Active', 'Blocked', 'Pending KYC'] as const).map((filter) => {
               const isSelected = activeCustomerFilter === filter;
               return (
                 <TouchableOpacity
@@ -642,7 +649,49 @@ export const CustomersScreen: React.FC = () => {
                         <Text style={styles.corpText}>CORP</Text>
                       </View>
                     )}
+                    {/* Item 6: Pending KYC Verification Tag */}
+                    {(() => {
+                      const isPendingKyc =
+                        c.kycStatus === 'Pending' ||
+                        (c as any).kycStatus === 'Submitted' ||
+                        (c as any).kycStatus === 'Under Review' ||
+                        (c as any).verificationStatus === 'PENDING';
+                      const isApprovedKyc =
+                        c.kycStatus === 'Verified' ||
+                        (c as any).kycStatus === 'Approved' ||
+                        (c as any).verificationStatus === 'VERIFIED';
+                      if (isPendingKyc) {
+                        return (
+                          <View style={styles.pendingKycBadgeInline}>
+                            <Text style={styles.pendingKycBadgeInlineText}>🟡 KYC Pending</Text>
+                          </View>
+                        );
+                      }
+                      if (isApprovedKyc) {
+                        return (
+                          <View style={styles.verifiedKycBadgeInline}>
+                            <Text style={styles.verifiedKycBadgeInlineText}>🟢 KYC Verified</Text>
+                          </View>
+                        );
+                      }
+                      return null;
+                    })()}
                   </View>
+
+                  {/* Item 7: Active Tag with Monthly Spend in User Card */}
+                  {(() => {
+                    const currentMonthlySpend = c.spend || (c as any).currentMonthShoppingGmv || 0;
+                    const isSpendActive = (c as any).personalStatus === 'ACTIVE' || currentMonthlySpend >= 2000;
+                    return (
+                      <View style={[styles.activeStatusCardTag, isSpendActive ? styles.activeStatusCardTagGreen : styles.activeStatusCardTagGray]}>
+                        <Text style={[styles.activeStatusCardTagText, isSpendActive ? styles.activeStatusCardTagTextGreen : styles.activeStatusCardTagTextGray]}>
+                          {isSpendActive
+                            ? `🟢 ACTIVE (₹${currentMonthlySpend.toLocaleString()} / ₹2,000)`
+                            : `⚪ INACTIVE (₹${currentMonthlySpend.toLocaleString()} / ₹2,000)`}
+                        </Text>
+                      </View>
+                    );
+                  })()}
 
                   <View style={styles.metaRow}>
                     <Phone size={11} color={COLORS.textMuted} style={{ marginRight: 4, flexShrink: 0 }} />
@@ -1764,6 +1813,59 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: '#34D399',
+  },
+  pendingKycBadgeInline: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  pendingKycBadgeInlineText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#B45309',
+  },
+  verifiedKycBadgeInline: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+  },
+  verifiedKycBadgeInlineText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#15803D',
+  },
+  activeStatusCardTag: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginVertical: 2,
+  },
+  activeStatusCardTagGreen: {
+    backgroundColor: '#DCFCE7',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+  },
+  activeStatusCardTagGray: {
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  activeStatusCardTagText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  activeStatusCardTagTextGreen: {
+    color: '#15803D',
+  },
+  activeStatusCardTagTextGray: {
+    color: '#64748B',
   },
   filtersBar: {
     flexDirection: 'row',

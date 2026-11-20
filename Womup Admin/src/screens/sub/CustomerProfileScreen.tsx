@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Image,
   Alert,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import {
   User,
@@ -25,12 +26,17 @@ import {
   Trash2,
   Eye,
   Users,
+  Coins,
+  TrendingUp,
+  ArrowUpRight,
+  Clock,
 } from 'lucide-react-native';
 import { COLORS, RADIUS, SPACING } from '../../theme';
 import { useAdminState } from '../../context/AdminStateContext';
 import { Order, PrintOrder } from '../../types/admin';
 import { KYCTab } from '../../components/KYCTab';
 import { CustomerLevelDetailModal } from '../modals/CustomerLevelDetailModal';
+import { NEST_API_BASE_URL } from '../../services/api';
 
 export const CustomerProfileScreen: React.FC = () => {
   const {
@@ -48,9 +54,32 @@ export const CustomerProfileScreen: React.FC = () => {
     updateCustomer,
   } = useAdminState();
 
-  const [activeTab, setActiveTab] = useState<'Profile' | 'Orders' | 'Wallet' | 'KYC'>('Orders');
+  const [activeTab, setActiveTab] = useState<'Profile' | 'Orders' | 'Wallet' | 'KYC' | 'Token & Income History'>('Orders');
   const [ordersSubTab, setOrdersSubTab] = useState<'All' | 'Store Orders'>('All');
   const [showLevelModal, setShowLevelModal] = useState(false);
+  const [tokenHistory, setTokenHistory] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'Token & Income History' && selectedCustomer) {
+      const fetchCoinHistory = async () => {
+        try {
+          setLoadingHistory(true);
+          const custId = selectedCustomer.id || (selectedCustomer as any)._id;
+          const res = await fetch(`${NEST_API_BASE_URL}/coins/user/${custId}/history`);
+          if (res.ok) {
+            const data = await res.json();
+            setTokenHistory(data.transactions || []);
+          }
+        } catch (e) {
+          console.warn('Failed fetching coin history for profile:', e);
+        } finally {
+          setLoadingHistory(false);
+        }
+      };
+      fetchCoinHistory();
+    }
+  }, [activeTab, selectedCustomer]);
 
   if (!selectedCustomer) {
     return (
@@ -201,7 +230,7 @@ export const CustomerProfileScreen: React.FC = () => {
 
       {/* Sub Tabs */}
       <View style={styles.tabRow}>
-        {(['Profile', 'Orders', 'Wallet', 'KYC'] as const).map((tab) => {
+        {(['Profile', 'Orders', 'Wallet', 'KYC', 'Token & Income History'] as const).map((tab) => {
           const isSelected = activeTab === tab;
           return (
             <TouchableOpacity
@@ -482,6 +511,105 @@ export const CustomerProfileScreen: React.FC = () => {
             updateCustomer(selectedCustomer.id, { kycStatus: newStatus })
           }
         />
+      )}
+
+      {/* Item 8: Token (Shopping Coins) & MLM Income Use History */}
+      {activeTab === 'Token & Income History' && (
+        <View style={styles.card}>
+          <View style={styles.cardHeaderRow}>
+            <Text style={styles.cardTitle}>Shopping Coins & Income History</Text>
+            <View style={styles.tokenBalanceBadge}>
+              <Text style={styles.tokenBalanceText}>
+                Balance: {selectedCustomer.shoppingCoinBalance ?? 0} SC
+              </Text>
+            </View>
+          </View>
+
+          {/* Quick Balance Summary Box */}
+          <View style={styles.tokenSummaryGrid}>
+            <View style={[styles.tokenSummaryCard, { backgroundColor: '#FDF2F8' }]}>
+              <Text style={styles.tokenSummaryLabel}>Shopping Coins</Text>
+              <Text style={[styles.tokenSummaryVal, { color: '#BE185D' }]}>
+                {selectedCustomer.shoppingCoinBalance ?? 0} SC
+              </Text>
+              <Text style={styles.tokenSummarySub}>1 SC = ₹1.00</Text>
+            </View>
+
+            <View style={[styles.tokenSummaryCard, { backgroundColor: '#EDE9FE' }]}>
+              <Text style={styles.tokenSummaryLabel}>Wallet Cash</Text>
+              <Text style={[styles.tokenSummaryVal, { color: '#6D28D9' }]}>
+                ₹{selectedCustomer.walletBalance ?? 0}
+              </Text>
+              <Text style={styles.tokenSummarySub}>Withdrawable</Text>
+            </View>
+
+            <View style={[styles.tokenSummaryCard, { backgroundColor: '#ECFDF5' }]}>
+              <Text style={styles.tokenSummaryLabel}>App Download Income</Text>
+              <Text style={[styles.tokenSummaryVal, { color: '#059669' }]}>
+                ₹{selectedCustomer.appDownloadIncome ?? 0}
+              </Text>
+              <Text style={styles.tokenSummarySub}>Referral bonus</Text>
+            </View>
+          </View>
+
+          <Text style={[styles.cardTitle, { marginTop: SPACING.md, fontSize: 13 }]}>
+            Shopping Coins Activity Ledger
+          </Text>
+
+          {loadingHistory ? (
+            <View style={{ padding: 24, alignItems: 'center' }}>
+              <ActivityIndicator size="small" color="#BE185D" />
+              <Text style={{ fontSize: 11, color: '#64748B', marginTop: 6 }}>
+                Loading coin transactions...
+              </Text>
+            </View>
+          ) : tokenHistory.length === 0 ? (
+            <View style={{ padding: 20, alignItems: 'center' }}>
+              <Coins size={28} color="#CBD5E1" />
+              <Text style={{ fontSize: 12, color: '#94A3B8', marginTop: 6 }}>
+                No shopping coin transactions found for this customer yet.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.tokenTxList}>
+              {tokenHistory.map((tx) => {
+                const isEarn = tx.type === 'EARN';
+                return (
+                  <View key={tx._id || tx.id} style={styles.tokenTxRow}>
+                    <View style={styles.tokenTxLeft}>
+                      <View style={[styles.tokenTxIconBox, isEarn ? styles.tokenTxIconEarn : styles.tokenTxIconSpend]}>
+                        <Coins size={14} color={isEarn ? '#16A34A' : '#DC2626'} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.tokenTxDesc} numberOfLines={1}>
+                          {tx.description}
+                        </Text>
+                        <Text style={styles.tokenTxDate}>
+                          {new Date(tx.createdAt).toLocaleDateString('en-IN', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.tokenTxRight}>
+                      <Text style={[styles.tokenTxCoins, isEarn ? styles.tokenTxEarn : styles.tokenTxSpend]}>
+                        {isEarn ? '+' : '-'}{tx.coins} SC
+                      </Text>
+                      <Text style={styles.tokenTxBalanceAfter}>
+                        Bal: {tx.balanceAfter} SC
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+        </View>
       )}
 
       {/* Customer Metrics */}
@@ -989,5 +1117,102 @@ const styles = StyleSheet.create({
     color: '#DC2626',
     fontWeight: '700',
     fontSize: 14,
+  },
+  tokenBalanceBadge: {
+    backgroundColor: '#FCE7F3',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  tokenBalanceText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#BE185D',
+  },
+  tokenSummaryGrid: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+  },
+  tokenSummaryCard: {
+    flex: 1,
+    borderRadius: RADIUS.md,
+    padding: 10,
+    alignItems: 'center',
+  },
+  tokenSummaryLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  tokenSummaryVal: {
+    fontSize: 14,
+    fontWeight: '900',
+    marginTop: 2,
+  },
+  tokenSummarySub: {
+    fontSize: 9,
+    color: '#94A3B8',
+    marginTop: 1,
+  },
+  tokenTxList: {
+    marginTop: 8,
+  },
+  tokenTxRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  tokenTxLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+    marginRight: 8,
+  },
+  tokenTxIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tokenTxIconEarn: {
+    backgroundColor: '#DCFCE7',
+  },
+  tokenTxIconSpend: {
+    backgroundColor: '#FEE2E2',
+  },
+  tokenTxDesc: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.navy,
+  },
+  tokenTxDate: {
+    fontSize: 10,
+    color: '#94A3B8',
+    marginTop: 1,
+  },
+  tokenTxRight: {
+    alignItems: 'flex-end',
+  },
+  tokenTxCoins: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  tokenTxEarn: {
+    color: '#15803D',
+  },
+  tokenTxSpend: {
+    color: '#DC2626',
+  },
+  tokenTxBalanceAfter: {
+    fontSize: 10,
+    color: '#94A3B8',
+    marginTop: 1,
   },
 });

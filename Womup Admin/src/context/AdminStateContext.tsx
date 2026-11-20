@@ -39,6 +39,12 @@ export type ActiveTab =
   | 'Categories'
   | 'PayoutRates'
   | 'Wallets'
+  | 'GpsRequests'
+  | 'Banners'
+  | 'PointsReport'
+  | 'Support'
+  | 'ReferralTree'
+  | 'VendorCollections'
   | 'More';
 
 export type ActiveSubView =

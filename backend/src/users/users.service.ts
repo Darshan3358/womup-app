@@ -9,6 +9,7 @@ import { TeamPurchaseIncome, TeamPurchaseIncomeDocument } from './schemas/team-p
 import { ApprovedPincode, ApprovedPincodeDocument } from '../areas/schemas/approved-pincode.schema';
 import { WithdrawalRequest, WithdrawalRequestDocument } from './schemas/withdrawal-request.schema';
 import { PincodeChangeRequest, PincodeChangeRequestDocument } from './schemas/pincode-change-request.schema';
+import { CustomerSupportTicket, CustomerSupportTicketDocument } from './schemas/customer-support-ticket.schema';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { DeliveryPartner, DeliveryPartnerDocument } from '../delivery/schemas/delivery-partner.schema';
 import { Vendor, VendorDocument } from '../local-shops/schemas/vendor.schema';
@@ -57,6 +58,9 @@ export class UsersService {
     @InjectModel(Vendor.name)
     private vendorModel: Model<VendorDocument>,
     private readonly trackingGateway: TrackingGateway,
+    @Optional()
+    @InjectModel(CustomerSupportTicket.name)
+    private supportTicketModel?: Model<CustomerSupportTicketDocument>,
     @Optional() private readonly notificationService?: NotificationService,
   ) {}
 
@@ -2224,6 +2228,164 @@ export class UsersService {
       success: true,
       message: `Pincode change request rejected: ${req.adminNotes}`,
       data: req,
+    };
+  }
+
+  /**
+   * Customer Support Ticket Workflows (Item 5)
+   */
+  async createSupportTicket(data: {
+    userId?: string;
+    customerName?: string;
+    customerPhone?: string;
+    customerEmail?: string;
+    category?: string;
+    subject: string;
+    message: string;
+    orderNumber?: string;
+    proofUrl?: string;
+    priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  }) {
+    if (!this.supportTicketModel) {
+      throw new BadRequestException('Support service unavailable');
+    }
+    if (!data.subject || !data.message) {
+      throw new BadRequestException('Subject and message are required');
+    }
+
+    let user: any = null;
+    if (data.userId) {
+      try {
+        user = await this.userModel.findById(data.userId).lean();
+      } catch (e) {}
+    }
+    if (!user && data.customerPhone) {
+      user = await this.userModel.findOne({ phone: data.customerPhone }).lean();
+    }
+
+    const ticketNumber = `TIC-${Math.floor(100000 + Math.random() * 900000)}`;
+    const ticket = new this.supportTicketModel({
+      userId: user?._id || (data.userId ? new Types.ObjectId(data.userId) : undefined),
+      ticketNumber,
+      customerName: data.customerName || user?.name || 'Customer',
+      customerPhone: data.customerPhone || user?.phone || '',
+      customerEmail: data.customerEmail || user?.email || '',
+      category: data.category || 'General Query',
+      subject: data.subject,
+      message: data.message,
+      orderNumber: data.orderNumber || '',
+      proofUrl: data.proofUrl || '',
+      status: 'OPEN',
+      priority: data.priority || 'MEDIUM',
+    });
+
+    await ticket.save();
+    return {
+      success: true,
+      ticketNumber,
+      message: 'Support ticket raised successfully',
+      ticket,
+    };
+  }
+
+  async getAdminSupportTickets(query: {
+    status?: string;
+    category?: string;
+    search?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    if (!this.supportTicketModel) {
+      return { success: true, counts: { total: 0, open: 0, inProgress: 0, resolved: 0 }, tickets: [], pagination: { total: 0, page: 1, limit: 50, totalPages: 1 } };
+    }
+
+    const filter: any = {};
+    if (query.status && query.status !== 'ALL') {
+      filter.status = query.status.toUpperCase();
+    }
+    if (query.category && query.category !== 'ALL') {
+      filter.category = query.category;
+    }
+    if (query.search) {
+      filter.$or = [
+        { ticketNumber: { $regex: query.search, $options: 'i' } },
+        { customerName: { $regex: query.search, $options: 'i' } },
+        { customerPhone: { $regex: query.search, $options: 'i' } },
+        { subject: { $regex: query.search, $options: 'i' } },
+        { orderNumber: { $regex: query.search, $options: 'i' } },
+      ];
+    }
+    if (query.startDate || query.endDate) {
+      filter.createdAt = {};
+      if (query.startDate) filter.createdAt.$gte = new Date(query.startDate);
+      if (query.endDate) {
+        const end = new Date(query.endDate);
+        end.setHours(23, 59, 59, 999);
+        filter.createdAt.$lte = end;
+      }
+    }
+
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(query.limit) || 50));
+    const skip = (page - 1) * limit;
+
+    const [tickets, total] = await Promise.all([
+      this.supportTicketModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean().exec(),
+      this.supportTicketModel.countDocuments(filter).exec(),
+    ]);
+
+    const statusCounts = await this.supportTicketModel.aggregate([
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+    ]);
+
+    const counts: Record<string, number> = { OPEN: 0, IN_PROGRESS: 0, RESOLVED: 0, CLOSED: 0 };
+    statusCounts.forEach((s) => {
+      if (s._id) counts[s._id] = s.count;
+    });
+
+    return {
+      success: true,
+      counts: {
+        total,
+        open: counts.OPEN || 0,
+        inProgress: counts.IN_PROGRESS || 0,
+        resolved: (counts.RESOLVED || 0) + (counts.CLOSED || 0),
+      },
+      tickets,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async updateSupportTicketStatus(
+    id: string,
+    update: { status?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED'; adminResponse?: string; resolvedBy?: string },
+  ) {
+    if (!this.supportTicketModel) {
+      throw new BadRequestException('Support service unavailable');
+    }
+
+    const updateDoc: any = {};
+    if (update.status) updateDoc.status = update.status;
+    if (update.adminResponse) updateDoc.adminResponse = update.adminResponse;
+    if (update.resolvedBy) updateDoc.resolvedBy = update.resolvedBy;
+    if (update.status === 'RESOLVED' || update.status === 'CLOSED') {
+      updateDoc.resolvedAt = new Date();
+    }
+
+    const ticket = await this.supportTicketModel.findByIdAndUpdate(id, { $set: updateDoc }, { new: true }).exec();
+    if (!ticket) throw new NotFoundException('Support ticket not found');
+
+    return {
+      success: true,
+      message: `Ticket #${ticket.ticketNumber} updated to ${ticket.status}`,
+      ticket,
     };
   }
 }

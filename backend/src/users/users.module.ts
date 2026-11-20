@@ -8,12 +8,14 @@ import { CoinTransaction, CoinTransactionSchema } from '../coins/schemas/coin-tr
 import { TeamPurchaseIncome, TeamPurchaseIncomeSchema } from './schemas/team-purchase-income.schema';
 import { WithdrawalRequest, WithdrawalRequestSchema } from './schemas/withdrawal-request.schema';
 import { PincodeChangeRequest, PincodeChangeRequestSchema } from './schemas/pincode-change-request.schema';
+import { CustomerSupportTicket, CustomerSupportTicketSchema } from './schemas/customer-support-ticket.schema';
 import { DeliveryPartner, DeliveryPartnerSchema } from '../delivery/schemas/delivery-partner.schema';
 import { Vendor, VendorSchema } from '../local-shops/schemas/vendor.schema';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { WishlistController } from './wishlist.controller';
 import { AdminCustomersController } from './admin-customers.controller';
+import { CustomerSupportController } from './customer-support.controller';
 import { TrackingModule } from '../tracking/tracking.module';
 
 @Module({
@@ -27,12 +29,18 @@ import { TrackingModule } from '../tracking/tracking.module';
       { name: TeamPurchaseIncome.name, schema: TeamPurchaseIncomeSchema },
       { name: WithdrawalRequest.name, schema: WithdrawalRequestSchema },
       { name: PincodeChangeRequest.name, schema: PincodeChangeRequestSchema },
+      { name: CustomerSupportTicket.name, schema: CustomerSupportTicketSchema },
       { name: DeliveryPartner.name, schema: DeliveryPartnerSchema },
       { name: Vendor.name, schema: VendorSchema },
     ]),
     TrackingModule,
   ],
-  controllers: [UsersController, WishlistController, AdminCustomersController],
+  controllers: [
+    UsersController,
+    WishlistController,
+    AdminCustomersController,
+    CustomerSupportController,
+  ],
   providers: [UsersService],
   exports: [UsersService],
 })

@@ -28,6 +28,7 @@ import { COLORS, RADIUS, SPACING } from '../theme';
 import { useAdminState } from '../context/AdminStateContext';
 import { Order, OrderStage } from '../types/admin';
 import { OrderListSkeleton } from '../components/common/Skeleton';
+import { DateRangeFilter, DateFilterRange } from '../components/common/DateRangeFilter';
 
 export const OrdersScreen: React.FC = () => {
   const {
@@ -46,6 +47,7 @@ export const OrdersScreen: React.FC = () => {
   const [selectedAreaId, setSelectedAreaId] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [dateFilter, setDateFilter] = useState<'All' | 'Today' | 'This Week'>('All');
+  const [dateRange, setDateRange] = useState<DateFilterRange>({ preset: 'All Time' });
   const [orderSearch, setOrderSearch] = useState('');
 
   // Modals for filters
@@ -177,8 +179,18 @@ export const OrdersScreen: React.FC = () => {
       if (!matchArea) return false;
     }
 
-    // 5. Date Filter
-    if (dateFilter === 'Today') {
+    // 5. Date Filter (Item 12 Universal Date Filter)
+    if (dateRange.startDate) {
+      const orderDate = new Date(o.timestamp);
+      const start = new Date(dateRange.startDate);
+      start.setHours(0, 0, 0, 0);
+      if (orderDate < start) return false;
+      if (dateRange.endDate) {
+        const end = new Date(dateRange.endDate);
+        end.setHours(23, 59, 59, 999);
+        if (orderDate > end) return false;
+      }
+    } else if (dateFilter === 'Today') {
       const orderDate = new Date(o.timestamp);
       const today = new Date();
       if (orderDate.toDateString() !== today.toDateString()) return false;
@@ -336,6 +348,13 @@ export const OrdersScreen: React.FC = () => {
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* Universal Date Range Filter */}
+        <DateRangeFilter
+          currentPreset={dateRange.preset}
+          onFilterChange={setDateRange}
+          compact
+        />
 
         {/* Status Filter Horizontal Pills */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>

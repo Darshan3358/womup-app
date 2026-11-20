@@ -23,7 +23,20 @@ export class CoinTransaction {
   @Prop({ required: true })
   balanceAfter: number;
 
-  @Prop({ enum: ['ORDER', 'REFERRAL', 'PROMOTION', 'ADMIN_ADJUSTMENT', 'SIGNUP_BONUS', 'TIER_COIN_INCOME', 'VENDOR_REDEEM', 'LOCAL_STORE'], default: 'ORDER' })
+  @Prop({
+    enum: [
+      'ORDER',
+      'REFERRAL',
+      'PROMOTION',
+      'ADMIN_ADJUSTMENT',
+      'SIGNUP_BONUS',
+      'TIER_COIN_INCOME',
+      'VENDOR_REDEEM',
+      'LOCAL_STORE',
+      'PURCHASE',
+    ],
+    default: 'ORDER',
+  })
   referenceType: string;
 
   @Prop()
@@ -31,6 +44,12 @@ export class CoinTransaction {
 
   @Prop({ required: true })
   description: string;
+
+  @Prop({ default: 0 })
+  amountPaid?: number;
+
+  @Prop({ default: 'UPI' })
+  paymentMethod?: string;
 }
 
 export const CoinTransactionSchema = SchemaFactory.createForClass(CoinTransaction);
