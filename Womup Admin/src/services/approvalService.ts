@@ -12,9 +12,11 @@ export interface ApprovalSummary {
   orders: number;
   withdrawals: number;
   rateChanges: number;
+  pincodeChanges?: number;
   totalPending: number;
   categories?: {
     customerKyc: ApprovalCategorySummary;
+    pincodeChanges?: ApprovalCategorySummary;
     riders: ApprovalCategorySummary;
     darkStores: ApprovalCategorySummary;
     vendors: ApprovalCategorySummary;

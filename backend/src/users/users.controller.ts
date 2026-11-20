@@ -169,4 +169,19 @@ export class UsersController {
       body.appVersion,
     );
   }
+
+  @Post('pincode-change-request')
+  @ApiOperation({ summary: 'Request registration pincode change with reason and proof document' })
+  async requestPincodeChange(
+    @CurrentUser() user: any,
+    @Body() body: { requestedPincode: string; reason?: string; note?: string; proofDocumentUrl?: string },
+  ) {
+    return this.usersService.createPincodeChangeRequest(user.id, body);
+  }
+
+  @Get('pincode-change-request')
+  @ApiOperation({ summary: 'Get current user pincode change requests history' })
+  async getMyPincodeRequests(@CurrentUser() user: any) {
+    return this.usersService.getMyPincodeChangeRequests(user.id);
+  }
 }

@@ -8,6 +8,7 @@ import { CoinTransaction, CoinTransactionDocument } from '../coins/schemas/coin-
 import { TeamPurchaseIncome, TeamPurchaseIncomeDocument } from './schemas/team-purchase-income.schema';
 import { ApprovedPincode, ApprovedPincodeDocument } from '../areas/schemas/approved-pincode.schema';
 import { WithdrawalRequest, WithdrawalRequestDocument } from './schemas/withdrawal-request.schema';
+import { PincodeChangeRequest, PincodeChangeRequestDocument } from './schemas/pincode-change-request.schema';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { DeliveryPartner, DeliveryPartnerDocument } from '../delivery/schemas/delivery-partner.schema';
 import { Vendor, VendorDocument } from '../local-shops/schemas/vendor.schema';
@@ -49,6 +50,8 @@ export class UsersService {
     private approvedPincodeModel: Model<ApprovedPincodeDocument>,
     @InjectModel(WithdrawalRequest.name)
     private withdrawalRequestModel: Model<WithdrawalRequestDocument>,
+    @InjectModel(PincodeChangeRequest.name)
+    private pincodeRequestModel: Model<PincodeChangeRequestDocument>,
     @InjectModel(DeliveryPartner.name)
     private partnerModel: Model<DeliveryPartnerDocument>,
     @InjectModel(Vendor.name)
@@ -1340,54 +1343,69 @@ export class UsersService {
       const isVerifiedSponsor = sponsor.verificationStatus === 'VERIFIED' || sponsor.customerKycStatus === 2 || sponsor.aadhaarVerified;
 
       if (isVerifiedSponsor) {
-        // Idempotency: avoid duplicate rewards for the same user & sponsor
-        const existingTx = await this.incomeTxModel.findOne({
-          userId: sponsor._id,
-          type: 'APP_DOWNLOAD',
-          sourceUserId: user._id,
-        });
+        // 1. App Download Cash Income (₹20, ₹10, ₹5)
+        // Rule: ONLY eligible pincode users generate App Download Rs income for sponsors!
+        if (user.isIncomeEligible) {
+          // Idempotency: avoid duplicate rewards for the same user & sponsor
+          const existingTx = await this.incomeTxModel.findOne({
+            userId: sponsor._id,
+            type: 'APP_DOWNLOAD',
+            sourceUserId: user._id,
+          });
 
-        if (existingTx) {
-          this.logger.log(`[MLM KYC] App Download reward already credited to sponsor ${sponsor._id} for referral ${user._id}`);
-          currentSponsorId = sponsor.referredBy || (sponsor.isCompanySponsored ? undefined : sponsor.sponsorId);
-          continue;
-        }
+          if (!existingTx) {
+            // Queued for Daily 12:00 AM IST Midnight distribution
+            await this.incomeTxModel.create({
+              userId: sponsor._id,
+              type: 'APP_DOWNLOAD',
+              amount: tier.appIncome,
+              coinsReward: 0,
+              sourceUserId: user._id,
+              sourceVerificationStatus: 'VERIFIED',
+              earnedAt: new Date(),
+              availableFrom: new Date(),
+              status: 'PENDING',
+              isUsable: false,
+              description: `Level ${tier.level} App Download (₹${tier.appIncome}) from verified referral: ${user.fullNameAsPerAadhaar || user.name}`,
+            });
 
-        // 1. App Download Cash Income (Queued for Daily 12:00 AM IST Midnight distribution)
-        await this.incomeTxModel.create({
-          userId: sponsor._id,
-          type: 'APP_DOWNLOAD',
-          amount: tier.appIncome,
-          coinsReward: 0,
-          sourceUserId: user._id,
-          sourceVerificationStatus: 'VERIFIED',
-          earnedAt: new Date(),
-          availableFrom: new Date(),
-          status: 'PENDING',
-          isUsable: false,
-          description: `Level ${tier.level} App Download (₹${tier.appIncome}) from verified referral: ${user.fullNameAsPerAadhaar || user.name}`,
-        });
-
-        sponsor.pendingIncome = Number(((sponsor.pendingIncome || 0) + tier.appIncome).toFixed(2));
-        sponsor.appDownloadIncome = Number(((sponsor.appDownloadIncome || 0) + tier.appIncome).toFixed(2));
-        if (tier.level === 1) {
-          sponsor.verifiedReferralsCount = (sponsor.verifiedReferralsCount || 0) + 1;
+            sponsor.pendingIncome = Number(((sponsor.pendingIncome || 0) + tier.appIncome).toFixed(2));
+            sponsor.appDownloadIncome = Number(((sponsor.appDownloadIncome || 0) + tier.appIncome).toFixed(2));
+            if (tier.level === 1) {
+              sponsor.verifiedReferralsCount = (sponsor.verifiedReferralsCount || 0) + 1;
+            }
+          } else {
+            this.logger.log(`[MLM KYC] App Download reward already credited to sponsor ${sponsor._id} for referral ${user._id}`);
+          }
+        } else {
+          this.logger.log(`[MLM KYC] User ${user.name} (${user._id}) is in non-eligible pincode (${user.registrationPincode}). Skipping App Download Rs reward.`);
         }
 
         // 2. Shopping Coins Income (Instant Reward)
-        const coinBefore = sponsor.shoppingCoins || 0;
-        sponsor.shoppingCoins = coinBefore + tier.coinIncome;
-
-        await this.coinTxModel.create({
+        // Rule: Shopping Coins do NOT require pincode eligibility.
+        // Check if already credited at registration time:
+        const existingCoinTx = await this.coinTxModel.findOne({
           userId: sponsor._id,
-          type: 'EARN',
-          coins: tier.coinIncome,
-          balanceBefore: coinBefore,
-          balanceAfter: sponsor.shoppingCoins,
-          referenceType: 'REFERRAL_REWARD',
-          status: 'COMPLETED',
-          description: `Level ${tier.level} Referral Shopping Coins (${tier.coinIncome} SC) from verified referral: ${user.fullNameAsPerAadhaar || user.name}`,
+          referenceId: user._id.toString(),
+          referenceType: { $in: ['REFERRAL', 'REFERRAL_REWARD'] },
         });
+
+        if (!existingCoinTx) {
+          const coinBefore = sponsor.shoppingCoins || 0;
+          sponsor.shoppingCoins = coinBefore + tier.coinIncome;
+
+          await this.coinTxModel.create({
+            userId: sponsor._id,
+            type: 'EARN',
+            coins: tier.coinIncome,
+            balanceBefore: coinBefore,
+            balanceAfter: sponsor.shoppingCoins,
+            referenceType: 'REFERRAL_REWARD',
+            referenceId: user._id.toString(),
+            status: 'COMPLETED',
+            description: `Level ${tier.level} Referral Shopping Coins (${tier.coinIncome} SC) from referral: ${user.fullNameAsPerAadhaar || user.name}`,
+          });
+        }
 
         await sponsor.save();
 
@@ -2036,6 +2054,176 @@ export class UsersService {
           bankProofUrl,
         },
       },
+    };
+  }
+
+  // ── PINCODE CHANGE REQUEST WORKFLOW ──
+
+  async createPincodeChangeRequest(
+    userId: string,
+    dto: { requestedPincode: string; reason?: string; note?: string; proofDocumentUrl?: string },
+  ) {
+    const cleanPin = String(dto.requestedPincode || '').trim();
+    if (!cleanPin || cleanPin.length !== 6 || !/^\d{6}$/.test(cleanPin)) {
+      throw new BadRequestException('Please provide a valid 6-digit PIN code.');
+    }
+
+    const user = await this.userModel.findById(userId);
+    if (!user) {
+      throw new NotFoundException('User account not found.');
+    }
+
+    const currentPincode = user.registrationPincode || user.customerPincode || '';
+    if (currentPincode === cleanPin) {
+      throw new BadRequestException(`Your registered pincode is already ${cleanPin}.`);
+    }
+
+    const isEligible = await this.evaluatePincodeEligibility(cleanPin);
+    const proofUrl = sanitizePublicDocUrl(dto.proofDocumentUrl || '');
+
+    const request = await this.pincodeRequestModel.create({
+      userId: user._id,
+      userName: user.fullNameAsPerAadhaar || user.name || 'Customer',
+      userPhone: user.phoneNumber || user.phone || '',
+      userEmail: user.email || '',
+      currentPincode,
+      requestedPincode: cleanPin,
+      reason: dto.note || dto.reason || 'Address location updated',
+      proofDocumentUrl: proofUrl,
+      status: 'PENDING',
+      isEligiblePincode: isEligible,
+    });
+
+    this.logger.log(`[Pincode Request] User ${user.name} (${user._id}) requested pincode change from ${currentPincode} to ${cleanPin}. Eligible: ${isEligible}`);
+
+    return {
+      success: true,
+      message: 'Pincode change request submitted successfully. It will be reviewed by admin.',
+      data: request,
+    };
+  }
+
+  async getMyPincodeChangeRequests(userId: string) {
+    const list = await this.pincodeRequestModel.find({ userId: new Types.ObjectId(userId) }).sort({ createdAt: -1 });
+    return { success: true, data: list };
+  }
+
+  async getAllPincodeChangeRequests(query: any = {}) {
+    const filter: any = {};
+    if (query.status) {
+      filter.status = query.status.toUpperCase();
+    }
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(query.limit) || 50));
+    const skip = (page - 1) * limit;
+
+    const [items, total] = await Promise.all([
+      this.pincodeRequestModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      this.pincodeRequestModel.countDocuments(filter),
+    ]);
+
+    return { items, total };
+  }
+
+  async approvePincodeChangeRequest(requestId: string, adminId = 'SUPER_ADMIN', adminNotes?: string) {
+    const req = await this.pincodeRequestModel.findById(requestId);
+    if (!req) {
+      throw new NotFoundException(`Pincode change request #${requestId} not found`);
+    }
+
+    if (req.status === 'APPROVED') {
+      return { success: true, message: 'Request was already approved', data: req };
+    }
+
+    const user = await this.userModel.findById(req.userId);
+    if (!user) {
+      throw new NotFoundException(`User #${req.userId} not found`);
+    }
+
+    const newPin = (req.requestedPincode || '').trim();
+    user.registrationPincode = newPin;
+    user.customerPincode = newPin;
+
+    const isEligible = await this.evaluatePincodeEligibility(newPin);
+    user.isIncomeEligible = isEligible;
+    await user.save();
+
+    req.status = 'APPROVED';
+    req.adminNotes = adminNotes || req.adminNotes || 'Approved by Admin';
+    req.reviewedBy = adminId;
+    req.reviewedAt = new Date();
+    req.isEligiblePincode = isEligible;
+    await req.save();
+
+    this.logger.log(`[Pincode Change Approved] User ${user.name} (${user._id}) pincode updated to ${newPin}. isIncomeEligible: ${isEligible}`);
+
+    // If user is eligible and KYC verified, distribute App Download Rs income (₹20, ₹10, ₹5) to upline sponsors
+    const isUserVerified = user.verificationStatus === 'VERIFIED' || user.customerKycStatus === 2 || user.aadhaarVerified;
+    if (isEligible && isUserVerified) {
+      this.logger.log(`[Pincode Change] User ${user.name} is now income eligible & KYC verified. Triggering MLM App Download rewards.`);
+      await this.distributeKycRewards(user);
+    }
+
+    this.trackingGateway.emitWalletUpdated(user._id.toString(), {
+      isIncomeEligible: user.isIncomeEligible,
+      registrationPincode: user.registrationPincode,
+    });
+
+    if (this.notificationService) {
+      this.notificationService.create({
+        recipientType: 'CUSTOMER',
+        recipientId: user._id.toString(),
+        role: 'CUSTOMER',
+        customerId: user._id.toString(),
+        type: 'SYSTEM',
+        title: '📍 Pincode Change Approved',
+        message: `Your registration pincode has been updated to ${newPin}.${isEligible ? ' You are now in an eligible service zone!' : ''}`,
+        entityType: 'USER',
+        entityId: user._id.toString(),
+        actionType: 'ACCOUNT_STATUS',
+        dedupeKey: `PINCODE_APPROVED:${req._id.toString()}`,
+      }).catch(err => this.logger.warn(`Failed sending notification: ${err.message}`));
+    }
+
+    return {
+      success: true,
+      message: `Pincode change approved. User pincode updated to ${newPin}. Income eligibility: ${isEligible ? 'ELIGIBLE' : 'INELIGIBLE'}`,
+      data: req,
+    };
+  }
+
+  async rejectPincodeChangeRequest(requestId: string, reason?: string, adminId = 'SUPER_ADMIN') {
+    const req = await this.pincodeRequestModel.findById(requestId);
+    if (!req) {
+      throw new NotFoundException(`Pincode change request #${requestId} not found`);
+    }
+
+    req.status = 'REJECTED';
+    req.adminNotes = reason || 'Address proof verification failed';
+    req.reviewedBy = adminId;
+    req.reviewedAt = new Date();
+    await req.save();
+
+    if (this.notificationService) {
+      this.notificationService.create({
+        recipientType: 'CUSTOMER',
+        recipientId: req.userId.toString(),
+        role: 'CUSTOMER',
+        customerId: req.userId.toString(),
+        type: 'SYSTEM',
+        title: '📍 Pincode Change Rejected',
+        message: `Your pincode change request was rejected: ${req.adminNotes}`,
+        entityType: 'USER',
+        entityId: req.userId.toString(),
+        actionType: 'ACCOUNT_STATUS',
+        dedupeKey: `PINCODE_REJECTED:${req._id.toString()}`,
+      }).catch(err => this.logger.warn(`Failed sending notification: ${err.message}`));
+    }
+
+    return {
+      success: true,
+      message: `Pincode change request rejected: ${req.adminNotes}`,
+      data: req,
     };
   }
 }

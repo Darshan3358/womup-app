@@ -1431,7 +1431,13 @@ export class OrdersService {
       this.logger.log(`[MLM GMV] Credited order #${order.orderNumber} to user ${user.name} (${user._id}): +₹${vegGmv} Veg GMV, +₹${otherGmv} Other GMV. New Total Monthly Spend: ₹${user.monthlyPurchaseValue}`);
 
       // Shopping Referral Commission (3% Veg GMV, 0.4% Other GMV)
-      // Rule: Shopping Referral -> KYC: No | Active: No (Direct sponsor gets commission without needing KYC or active purchase)
+      // Rule: ONLY users registered in eligible pincodes generate referral shopping commission for their sponsors!
+      if (!user.isIncomeEligible) {
+        this.logger.log(`[MLM GMV] User ${user.name} (${user._id}) is in non-eligible pincode (${user.registrationPincode || 'NONE'}). Skipping MLM commission.`);
+        return;
+      }
+
+      // Direct sponsor gets commission without needing KYC or active purchase
       const sponsorId = user.referredBy || (user.isCompanySponsored ? undefined : user.sponsorId);
       if (sponsorId) {
         try {

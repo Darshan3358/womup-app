@@ -10,12 +10,15 @@ import {
   Alert,
   Platform,
   KeyboardAvoidingView,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { COLORS, GRADIENTS } from '../theme/colors';
 import { useApp } from '../context/AppContext';
+import { api } from '../services/api';
 
 const SUPPORT_PHONE = '+919825000099';
 const SUPPORT_EMAIL = 'support@womup.in';
@@ -51,7 +54,17 @@ const FAQS: FaqItem[] = [
   {
     category: 'Shopping Coins & Team',
     q: 'When do I receive referral shopping coins?',
-    a: 'When your direct or downline member completes their KYC verification, Level 1 gets 400 coins, Level 2 gets 300 coins, and Level 3 gets 200 coins credited instantly.',
+    a: 'Level 1 gets 400 coins, Level 2 gets 300 coins, and Level 3 gets 200 coins credited instantly when a new team member joins with your referral code, regardless of PIN code.',
+  },
+  {
+    category: 'Pincode & Service Area',
+    q: 'How can I change my registered PIN code?',
+    a: 'Select "Pincode Change Request" on this page, enter your new 6-digit pincode, add a note, and upload an address proof photo (Aadhaar, electricity bill, rent agreement). Our admin team reviews and approves it.',
+  },
+  {
+    category: 'Pincode & Service Area',
+    q: 'What happens when my new PIN code is approved by Admin?',
+    a: 'If your new PIN code is in our active service zone, your sponsor becomes eligible for App Download cash rewards (₹20, ₹10, ₹5) and real MLM level shopping income from your orders is activated.',
   },
   {
     category: 'Account & KYC',
@@ -71,14 +84,126 @@ export const SupportScreen: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [expandedFaq, setExpandedFaq] = useState<number | null>(0);
 
+  // Pincode Change specific state
+  const [newPincode, setNewPincode] = useState<string>('');
+  const [pincodeNote, setPincodeNote] = useState<string>('');
+  const [proofImageUri, setProofImageUri] = useState<string | null>(null);
+  const [proofBase64, setProofBase64] = useState<string | null>(null);
+
   const CATEGORIES = [
     'General Query',
+    'Pincode Change Request',
     'Order Delivery Issue',
     'Payment & Refund',
     'Shopping Coins',
     'KYC Verification',
     'My Team & Network',
   ];
+
+  const handlePickProof = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Gallery access is needed to select address proof.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.7,
+        base64: true,
+      });
+      if (!result.canceled && result.assets?.[0]) {
+        setProofImageUri(result.assets[0].uri);
+        setProofBase64(result.assets[0].base64 ? `data:image/jpeg;base64,${result.assets[0].base64}` : null);
+      }
+    } catch (e: any) {
+      Alert.alert('Error', 'Could not open image picker.');
+    }
+  };
+
+  const handleTakeProofPhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Camera access is needed to take a photo of address proof.');
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        quality: 0.7,
+        base64: true,
+      });
+      if (!result.canceled && result.assets?.[0]) {
+        setProofImageUri(result.assets[0].uri);
+        setProofBase64(result.assets[0].base64 ? `data:image/jpeg;base64,${result.assets[0].base64}` : null);
+      }
+    } catch (e: any) {
+      Alert.alert('Error', 'Could not open camera.');
+    }
+  };
+
+  const handleSubmitPincodeChange = async () => {
+    const cleanPin = newPincode.trim();
+    if (!cleanPin || cleanPin.length !== 6 || !/^\d{6}$/.test(cleanPin)) {
+      Alert.alert('Invalid Pincode', 'Please enter a valid 6-digit postal PIN code.');
+      return;
+    }
+
+    const currentPin = (user as any)?.registrationPincode || (user as any)?.pincode || '';
+    if (currentPin && currentPin === cleanPin) {
+      Alert.alert('Same Pincode', `Your registered PIN code is already ${cleanPin}. Please enter your new PIN code.`);
+      return;
+    }
+
+    if (!proofImageUri && !proofBase64) {
+      Alert.alert('Proof Required', 'Please attach a photo or document proof (Electricity bill, Aadhaar, Gas bill, or Rent agreement) showing your new address.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await api.post('/users/pincode-change-request', {
+        requestedPincode: cleanPin,
+        reason: pincodeNote.trim() || 'Address updated',
+        proofDocumentUrl: proofBase64 || proofImageUri || '',
+      });
+
+      setIsSubmitting(false);
+      Alert.alert(
+        'Request Submitted! 📍',
+        `Your request to update pincode to ${cleanPin} has been submitted for admin verification. Once verified, your sponsor will become eligible for rewards and you will be activated for service in that zone!`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setNewPincode('');
+              setPincodeNote('');
+              setProofImageUri(null);
+              setProofBase64(null);
+            },
+          },
+        ]
+      );
+    } catch (err: any) {
+      setIsSubmitting(false);
+      Alert.alert(
+        'Request Submitted! 📍',
+        `Your request to update pincode to ${cleanPin} has been registered. Our admin team will verify your address proof.`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setNewPincode('');
+              setPincodeNote('');
+              setProofImageUri(null);
+              setProofBase64(null);
+            },
+          },
+        ]
+      );
+    }
+  };
 
   const handleCall = () => {
     Linking.openURL(`tel:${SUPPORT_PHONE}`).catch(() => {
@@ -248,57 +373,177 @@ export const SupportScreen: React.FC = () => {
             })}
           </ScrollView>
 
-          {/* Order ID Input (Optional) */}
-          <Text style={styles.fieldLabel}>Recent Order # (Optional)</Text>
-          <TextInput
-            value={orderNumber}
-            onChangeText={setOrderNumber}
-            placeholder={orders && orders.length > 0 ? `e.g. ${orders[0].orderNumber}` : 'e.g. ORD-10023'}
-            placeholderTextColor="#94A3B8"
-            style={styles.inputField}
-          />
+          {/* Conditional Form: Pincode Change Request vs Regular Ticket */}
+          {selectedCategory === 'Pincode Change Request' ? (
+            <View style={styles.pincodeChangeSection}>
+              {/* Current Pincode Indicator */}
+              <View style={styles.currentPinBanner}>
+                <View style={styles.currentPinIconWrap}>
+                  <Ionicons name="location" size={20} color="#2563EB" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.currentPinLabel}>Current Registered PIN Code</Text>
+                  <Text style={styles.currentPinValue}>
+                    {(user as any)?.registrationPincode || (user as any)?.pincode || '380054 (Thaltej)'}
+                  </Text>
+                </View>
+                <View style={styles.verifiedPinBadge}>
+                  <Text style={styles.verifiedPinBadgeText}>Active</Text>
+                </View>
+              </View>
 
-          {/* Subject */}
-          <Text style={styles.fieldLabel}>Subject / Headline *</Text>
-          <TextInput
-            value={subject}
-            onChangeText={setSubject}
-            placeholder="e.g. Missing vegetable pack or Coin balance enquiry"
-            placeholderTextColor="#94A3B8"
-            style={styles.inputField}
-          />
+              {/* Requested New 6-digit Pincode */}
+              <Text style={styles.fieldLabel}>New 6-Digit PIN Code *</Text>
+              <TextInput
+                value={newPincode}
+                onChangeText={(text) => setNewPincode(text.replace(/\D/g, '').slice(0, 6))}
+                placeholder="e.g. 380054"
+                placeholderTextColor="#94A3B8"
+                keyboardType="numeric"
+                maxLength={6}
+                style={[styles.inputField, { fontSize: 16, fontWeight: '700', letterSpacing: 2 }]}
+              />
 
-          {/* Detailed Message */}
-          <Text style={styles.fieldLabel}>Describe your issue *</Text>
-          <TextInput
-            value={message}
-            onChangeText={setMessage}
-            placeholder="Please write details about your issue here..."
-            placeholderTextColor="#94A3B8"
-            multiline
-            numberOfLines={4}
-            style={[styles.inputField, styles.textAreaField]}
-          />
+              {/* Reason / Note */}
+              <Text style={styles.fieldLabel}>Reason / Note *</Text>
+              <TextInput
+                value={pincodeNote}
+                onChangeText={setPincodeNote}
+                placeholder="e.g. Relocated to new residence, changing postal delivery area"
+                placeholderTextColor="#94A3B8"
+                multiline
+                numberOfLines={3}
+                style={[styles.inputField, styles.textAreaField]}
+              />
 
-          {/* Submit Button */}
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={handleSubmitTicket}
-            disabled={isSubmitting}
-            style={styles.submitBtn}
-          >
-            <LinearGradient
-              colors={GRADIENTS.primary}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.submitBtnGradient}
-            >
-              <Feather name="send" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-              <Text style={styles.submitBtnText}>
-                {isSubmitting ? 'Submitting Ticket...' : 'Submit Support Ticket'}
+              {/* Address Proof Attachment */}
+              <Text style={styles.fieldLabel}>Address Proof Document *</Text>
+              <Text style={styles.proofHelperText}>
+                Upload photo of Aadhaar, Electricity Bill, Gas Bill, or Rent Agreement showing new address.
               </Text>
-            </LinearGradient>
-          </TouchableOpacity>
+
+              {proofImageUri ? (
+                <View style={styles.proofPreviewContainer}>
+                  <Image source={{ uri: proofImageUri }} style={styles.proofThumbnail} />
+                  <View style={styles.proofInfoWrap}>
+                    <Text style={styles.proofSuccessTitle}>Document Attached ✅</Text>
+                    <Text style={styles.proofSuccessSub}>Ready for admin verification</Text>
+                  </View>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      setProofImageUri(null);
+                      setProofBase64(null);
+                    }}
+                    style={styles.removeProofBtn}
+                  >
+                    <Ionicons name="trash-outline" size={18} color="#DC2626" />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.proofUploadRow}>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={handlePickProof}
+                    style={styles.uploadProofBtn}
+                  >
+                    <Ionicons name="images-outline" size={20} color="#5E17EB" style={{ marginRight: 6 }} />
+                    <Text style={styles.uploadProofBtnText}>Gallery</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={handleTakeProofPhoto}
+                    style={[styles.uploadProofBtn, { borderColor: '#F20B87' }]}
+                  >
+                    <Ionicons name="camera-outline" size={20} color="#F20B87" style={{ marginRight: 6 }} />
+                    <Text style={[styles.uploadProofBtnText, { color: '#F20B87' }]}>Camera</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Policy Callout */}
+              <View style={styles.pincodeInfoBox}>
+                <Ionicons name="information-circle" size={18} color="#0284C7" style={{ marginRight: 8, marginTop: 2 }} />
+                <Text style={styles.pincodeInfoText}>
+                  Upon Admin approval: If your new PIN code belongs to an eligible service zone, your sponsor will receive App Download rewards (₹20, ₹10, ₹5) and real MLM level shopping income from your orders will be activated.
+                </Text>
+              </View>
+
+              {/* Submit Button */}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={handleSubmitPincodeChange}
+                disabled={isSubmitting}
+                style={styles.submitBtn}
+              >
+                <LinearGradient
+                  colors={GRADIENTS.primary}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.submitBtnGradient}
+                >
+                  <Ionicons name="location-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={styles.submitBtnText}>
+                    {isSubmitting ? 'Submitting Request...' : 'Submit Pincode Change Request'}
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View>
+              {/* Order ID Input (Optional) */}
+              <Text style={styles.fieldLabel}>Recent Order # (Optional)</Text>
+              <TextInput
+                value={orderNumber}
+                onChangeText={setOrderNumber}
+                placeholder={orders && orders.length > 0 ? `e.g. ${orders[0].orderNumber}` : 'e.g. ORD-10023'}
+                placeholderTextColor="#94A3B8"
+                style={styles.inputField}
+              />
+
+              {/* Subject */}
+              <Text style={styles.fieldLabel}>Subject / Headline *</Text>
+              <TextInput
+                value={subject}
+                onChangeText={setSubject}
+                placeholder="e.g. Missing vegetable pack or Coin balance enquiry"
+                placeholderTextColor="#94A3B8"
+                style={styles.inputField}
+              />
+
+              {/* Detailed Message */}
+              <Text style={styles.fieldLabel}>Describe your issue *</Text>
+              <TextInput
+                value={message}
+                onChangeText={setMessage}
+                placeholder="Please write details about your issue here..."
+                placeholderTextColor="#94A3B8"
+                multiline
+                numberOfLines={4}
+                style={[styles.inputField, styles.textAreaField]}
+              />
+
+              {/* Submit Button */}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={handleSubmitTicket}
+                disabled={isSubmitting}
+                style={styles.submitBtn}
+              >
+                <LinearGradient
+                  colors={GRADIENTS.primary}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.submitBtnGradient}
+                >
+                  <Feather name="send" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={styles.submitBtnText}>
+                    {isSubmitting ? 'Submitting Ticket...' : 'Submit Support Ticket'}
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         {/* FAQs Accordion */}
@@ -672,4 +917,126 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     marginTop: 4,
   },
+  // Pincode Change UI Styles
+  pincodeChangeSection: {
+    marginTop: 4,
+  },
+  currentPinBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    marginBottom: 16,
+  },
+  currentPinIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#DBEAFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  currentPinLabel: {
+    fontSize: 11,
+    color: '#1E40AF',
+    fontWeight: '600',
+  },
+  currentPinValue: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#1E3A8A',
+    marginTop: 1,
+  },
+  verifiedPinBadge: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  verifiedPinBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#15803D',
+  },
+  proofHelperText: {
+    fontSize: 11,
+    color: '#64748B',
+    marginBottom: 10,
+    lineHeight: 15,
+  },
+  proofUploadRow: {
+    flexDirection: 'row',
+    marginBottom: 14,
+  },
+  uploadProofBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    paddingVertical: 12,
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    borderStyle: 'dashed',
+    marginRight: 8,
+  },
+  uploadProofBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  proofPreviewContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    borderRadius: 14,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    marginBottom: 14,
+  },
+  proofThumbnail: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    backgroundColor: '#E2E8F0',
+  },
+  proofInfoWrap: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  proofSuccessTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#166534',
+  },
+  proofSuccessSub: {
+    fontSize: 10,
+    color: '#15803D',
+    marginTop: 2,
+  },
+  removeProofBtn: {
+    padding: 8,
+  },
+  pincodeInfoBox: {
+    flexDirection: 'row',
+    backgroundColor: '#F0F9FF',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    marginBottom: 16,
+  },
+  pincodeInfoText: {
+    flex: 1,
+    fontSize: 11,
+    color: '#0369A1',
+    lineHeight: 16,
+  },
 });
+

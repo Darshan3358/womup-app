@@ -17,11 +17,13 @@ import {
   TrendingUp,
   ChevronRight,
   ShieldAlert,
+  MapPin,
 } from 'lucide-react-native';
 import { RADIUS, SPACING } from '../../theme';
 
 export type ApprovalCategoryKey =
   | 'customer-kyc'
+  | 'pincode-changes'
   | 'riders'
   | 'dark-stores'
   | 'vendors'
@@ -51,6 +53,16 @@ export const CATEGORY_CONFIGS: Record<ApprovalCategoryKey, CategoryConfig> = {
     accentColor: '#2563EB',
     badgeBg: '#DBEAFE',
     icon: Users,
+  },
+  'pincode-changes': {
+    key: 'pincode-changes',
+    title: 'Pincode Changes',
+    description: 'Customer Pincode & Service Zone Approval',
+    bgColor: '#F0F9FF',
+    borderColor: '#BAE6FD',
+    accentColor: '#0284C7',
+    badgeBg: '#E0F2FE',
+    icon: MapPin,
   },
   'riders': {
     key: 'riders',

@@ -7,6 +7,7 @@ import { ApprovedPincode, ApprovedPincodeSchema } from '../areas/schemas/approve
 import { CoinTransaction, CoinTransactionSchema } from '../coins/schemas/coin-transaction.schema';
 import { TeamPurchaseIncome, TeamPurchaseIncomeSchema } from './schemas/team-purchase-income.schema';
 import { WithdrawalRequest, WithdrawalRequestSchema } from './schemas/withdrawal-request.schema';
+import { PincodeChangeRequest, PincodeChangeRequestSchema } from './schemas/pincode-change-request.schema';
 import { DeliveryPartner, DeliveryPartnerSchema } from '../delivery/schemas/delivery-partner.schema';
 import { Vendor, VendorSchema } from '../local-shops/schemas/vendor.schema';
 import { UsersService } from './users.service';
@@ -25,6 +26,7 @@ import { TrackingModule } from '../tracking/tracking.module';
       { name: CoinTransaction.name, schema: CoinTransactionSchema },
       { name: TeamPurchaseIncome.name, schema: TeamPurchaseIncomeSchema },
       { name: WithdrawalRequest.name, schema: WithdrawalRequestSchema },
+      { name: PincodeChangeRequest.name, schema: PincodeChangeRequestSchema },
       { name: DeliveryPartner.name, schema: DeliveryPartnerSchema },
       { name: Vendor.name, schema: VendorSchema },
     ]),

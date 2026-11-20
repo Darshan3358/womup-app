@@ -5,6 +5,7 @@ import {
   NotFoundException,
   Logger,
   ConflictException,
+  Optional,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -28,6 +29,7 @@ import { DeliveryPartner, DeliveryPartnerDocument } from '../delivery/schemas/de
 import { Store, StoreDocument } from '../stores/schemas/store.schema';
 import { Vendor, VendorDocument } from '../local-shops/schemas/vendor.schema';
 import { assertCrossRoleIdentityUniqueness } from '../common/services/cross-role-validator';
+import { TrackingGateway } from '../tracking/tracking.gateway';
 
 @Injectable()
 export class AuthService {
@@ -59,6 +61,7 @@ export class AuthService {
     private configService: ConfigService,
     private emailService: EmailService,
     private smsService: SmsService,
+    @Optional() private readonly trackingGateway?: TrackingGateway,
   ) { }
 
   async sendOtp(dto: SendOtpDto) {
@@ -1122,6 +1125,14 @@ export class AuthService {
       description: 'Welcome bonus - 2000 Shopping Coins',
     });
 
+    // 9. Credit Instant 3-Level Referral Shopping Coins (Level 1: 400, Level 2: 300, Level 3: 200)
+    // Rule: NO pincode eligibility restriction. Credited immediately upon user registration.
+    try {
+      await this.distributeInstantRegistrationCoins(user);
+    } catch (coinDistErr: any) {
+      this.logger.error(`Failed to distribute instant referral coins on registration: ${coinDistErr.message}`);
+    }
+
     const tokens = await this.generateTokens(user);
 
     return {
@@ -1148,6 +1159,62 @@ export class AuthService {
       },
       ...tokens,
     };
+  }
+
+  /**
+   * Distribute instant 3-level Referral Shopping Coins (400, 300, 200 SC) upon registration.
+   * Business Rule: No pincode eligibility restriction. Credited immediately upon user registration.
+   */
+  async distributeInstantRegistrationCoins(user: any) {
+    const TIERS = [
+      { level: 1, coinIncome: 400 },
+      { level: 2, coinIncome: 300 },
+      { level: 3, coinIncome: 200 },
+    ];
+
+    let currentSponsorId: Types.ObjectId | undefined = user.referredBy || (user.isCompanySponsored ? undefined : user.sponsorId);
+
+    for (const tier of TIERS) {
+      if (!currentSponsorId) break;
+
+      const sponsor = await this.userModel.findById(currentSponsorId);
+      if (!sponsor || sponsor.isCompanyAccount) break;
+
+      // Idempotency: verify no duplicate referral coin reward for this sponsor & new user
+      const existingTx = await this.coinTxModel.findOne({
+        userId: sponsor._id,
+        referenceId: user._id.toString(),
+        referenceType: { $in: ['REFERRAL', 'REFERRAL_REWARD'] },
+      });
+
+      if (!existingTx) {
+        const coinBefore = sponsor.shoppingCoins || 0;
+        sponsor.shoppingCoins = coinBefore + tier.coinIncome;
+        await sponsor.save();
+
+        await this.coinTxModel.create({
+          userId: sponsor._id,
+          type: 'EARN',
+          coins: tier.coinIncome,
+          balanceBefore: coinBefore,
+          balanceAfter: sponsor.shoppingCoins,
+          referenceType: 'REFERRAL_REWARD',
+          referenceId: user._id.toString(),
+          status: 'COMPLETED',
+          description: `Level ${tier.level} Referral Shopping Coins (${tier.coinIncome} SC) from new member: ${user.fullNameAsPerAadhaar || user.name}`,
+        });
+
+        this.logger.log(`[Instant Referral Coins] Credited ${tier.coinIncome} SC (Level ${tier.level}) to sponsor ${sponsor.name} (${sponsor._id}) for new registration ${user.name}`);
+
+        if (this.trackingGateway) {
+          this.trackingGateway.emitWalletUpdated(sponsor._id.toString(), {
+            shoppingCoins: sponsor.shoppingCoins,
+          });
+        }
+      }
+
+      currentSponsorId = sponsor.referredBy || (sponsor.isCompanySponsored ? undefined : sponsor.sponsorId);
+    }
   }
 
   /**

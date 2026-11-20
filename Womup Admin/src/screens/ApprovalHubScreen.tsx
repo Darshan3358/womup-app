@@ -23,6 +23,7 @@ import io from 'socket.io-client';
 
 const CATEGORY_KEYS: ApprovalCategoryKey[] = [
   'customer-kyc',
+  'pincode-changes',
   'riders',
   'dark-stores',
   'vendors',
@@ -86,6 +87,8 @@ export const ApprovalHubScreen: React.FC = () => {
     switch (key) {
       case 'customer-kyc':
         return summary.customerKyc ?? summary.categories?.customerKyc?.pending ?? 0;
+      case 'pincode-changes':
+        return summary.pincodeChanges ?? summary.categories?.pincodeChanges?.pending ?? 0;
       case 'riders':
         return summary.riders ?? summary.categories?.riders?.pending ?? 0;
       case 'dark-stores':
@@ -110,6 +113,8 @@ export const ApprovalHubScreen: React.FC = () => {
     switch (key) {
       case 'customer-kyc':
         return summary.categories.customerKyc?.reviewedToday || 0;
+      case 'pincode-changes':
+        return summary.categories.pincodeChanges?.reviewedToday || 0;
       case 'riders':
         return summary.categories.riders?.reviewedToday || 0;
       case 'dark-stores':

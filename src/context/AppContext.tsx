@@ -2160,7 +2160,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (address.type === 'Current') {
       return;
     }
-    setUser((prev) => {
+    setUser((prev) => { 
       const existingList = prev.savedAddresses || [];
       const isDuplicate = existingList.some((addr) => {
         if (addr.id && address.id && addr.id === address.id) return true;

@@ -19,12 +19,14 @@ import { City, CitySchema } from '../areas/schemas/city.schema';
 import { Area, AreaSchema } from '../areas/schemas/area.schema';
 import { ApprovedPincode, ApprovedPincodeSchema } from '../areas/schemas/approved-pincode.schema';
 import { IncomeTransaction, IncomeTransactionSchema } from '../users/schemas/income-transaction.schema';
+import { TrackingModule } from '../tracking/tracking.module';
 
 @Module({
   imports: [
     ConfigModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({}),
+    TrackingModule,
     MongooseModule.forFeature([
       { name: User.name, schema: UserSchema },
       { name: OtpVerification.name, schema: OtpVerificationSchema },

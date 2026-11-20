@@ -9,6 +9,7 @@ import { Order, OrderDocument } from '../orders/schemas/order.schema';
 import { OrderStatus } from '../common/enums/order-status.enum';
 import { AdminAuditLog, AdminAuditLogDocument } from './schemas/admin-audit-log.schema';
 import { WithdrawalRequest, WithdrawalRequestDocument } from '../users/schemas/withdrawal-request.schema';
+import { PincodeChangeRequest, PincodeChangeRequestDocument } from '../users/schemas/pincode-change-request.schema';
 import { IncomeTransaction, IncomeTransactionDocument } from '../users/schemas/income-transaction.schema';
 import { TrackingGateway } from '../tracking/tracking.gateway';
 import { NotificationService } from '../notifications/notification.service';
@@ -23,6 +24,7 @@ export interface ApprovalSummaryResponse {
   orders: number;
   withdrawals: number;
   rateChanges: number;
+  pincodeChanges?: number;
   totalPending: number;
   categories?: {
     customerKyc: { pending: number; reviewedToday: number };
@@ -33,6 +35,7 @@ export interface ApprovalSummaryResponse {
     cancellations: { pending: number; reviewedToday: number };
     staff: { pending: number; reviewedToday: number };
     rateChanges: { pending: number; reviewedToday: number };
+    pincodeChanges?: { pending: number; reviewedToday: number };
   };
 }
 
@@ -66,6 +69,7 @@ export class AdminApprovalsService implements OnModuleInit {
     @InjectModel(AdminAuditLog.name) private readonly auditLogModel: Model<AdminAuditLogDocument>,
     @InjectModel(WithdrawalRequest.name) private readonly withdrawalRequestModel: Model<WithdrawalRequestDocument>,
     @InjectModel(IncomeTransaction.name) private readonly incomeTxModel: Model<IncomeTransactionDocument>,
+    @InjectModel(PincodeChangeRequest.name) private readonly pincodeRequestModel: Model<PincodeChangeRequestDocument>,
     private readonly trackingGateway: TrackingGateway,
     @Optional() private readonly notificationService?: NotificationService,
     @Optional() @Inject(forwardRef(() => UsersService)) private readonly usersService?: UsersService,
@@ -123,6 +127,7 @@ export class AdminApprovalsService implements OnModuleInit {
         vendors,
         orders,
         withdrawals,
+        pincodeChanges,
       ] = await Promise.all([
         this.userModel.countDocuments({
           customerKycStatus: 1,
@@ -152,13 +157,16 @@ export class AdminApprovalsService implements OnModuleInit {
           this.riderSettlementModel.countDocuments({ status: 'PENDING' }),
           this.withdrawalRequestModel.countDocuments({ status: 'PENDING' }),
         ]).then(([r, c]) => r + c),
+        this.pincodeRequestModel
+          ? this.pincodeRequestModel.countDocuments({ status: 'PENDING' })
+          : Promise.resolve(0),
       ]);
 
       const staff = 0;
       const rateChanges = 2; // Pre-configured simulated rate change queue items
 
       const totalPending =
-        customerKyc + riders + stores + vendors + staff + orders + withdrawals + rateChanges;
+        customerKyc + riders + stores + vendors + staff + orders + withdrawals + rateChanges + pincodeChanges;
 
       const result: ApprovalSummaryResponse = {
         customerKyc,
@@ -169,6 +177,7 @@ export class AdminApprovalsService implements OnModuleInit {
         orders,
         withdrawals,
         rateChanges,
+        pincodeChanges,
         totalPending,
         categories: {
           customerKyc: { pending: customerKyc, reviewedToday: 12 },
@@ -179,6 +188,7 @@ export class AdminApprovalsService implements OnModuleInit {
           cancellations: { pending: orders, reviewedToday: 2 },
           staff: { pending: staff, reviewedToday: 0 },
           rateChanges: { pending: rateChanges, reviewedToday: 0 },
+          pincodeChanges: { pending: pincodeChanges, reviewedToday: 0 },
         },
       };
 
@@ -240,6 +250,9 @@ export class AdminApprovalsService implements OnModuleInit {
     }
     if (cat === 'rate-changes' || cat === 'rates') {
       return this.getRateChangesQueue(query);
+    }
+    if (cat === 'pincode-changes' || cat === 'pincode-change' || cat === 'pincode') {
+      return this.getPincodeChangesQueue(query);
     }
 
     throw new BadRequestException(`Unknown approval category: ${category}`);
@@ -650,6 +663,56 @@ export class AdminApprovalsService implements OnModuleInit {
     return { items, total: items.length };
   }
 
+  // ── Pincode Changes Queue ──
+  private async getPincodeChangesQueue(query: any): Promise<{ items: QueueItem[]; total: number }> {
+    if (!this.pincodeRequestModel) {
+      return { items: [], total: 0 };
+    }
+    const filter: any = { status: 'PENDING' };
+    if (query.search) {
+      filter.$or = [
+        { userName: { $regex: query.search, $options: 'i' } },
+        { userPhone: { $regex: query.search, $options: 'i' } },
+        { requestedPincode: { $regex: query.search, $options: 'i' } },
+      ];
+    }
+    const requests = await this.pincodeRequestModel.find(filter).sort({ createdAt: -1 }).limit(100).lean();
+    const now = Date.now();
+    const items: QueueItem[] = requests.map((r: any) => {
+      const docs: any[] = [];
+      if (r.proofDocumentUrl) {
+        docs.push({
+          id: 'proof_1',
+          label: 'Address Proof',
+          url: r.proofDocumentUrl,
+          type: 'image',
+        });
+      }
+      return {
+        id: r._id.toString(),
+        type: 'Pincode Change',
+        name: r.userName || 'Customer',
+        code: `${r.currentPincode || 'N/A'} ➔ ${r.requestedPincode}`,
+        mobile: r.userPhone || '',
+        email: r.userEmail || '',
+        submittedAt: r.createdAt || new Date(),
+        ageHours: Math.round((now - new Date(r.createdAt || now).getTime()) / (1000 * 60 * 60)),
+        documentsCount: docs.length,
+        documents: docs,
+        status: r.status,
+        priority: 'HIGH',
+        details: {
+          currentPincode: r.currentPincode,
+          requestedPincode: r.requestedPincode,
+          reason: r.reason,
+          isEligible: r.isEligiblePincode,
+          submittedAt: r.createdAt,
+        },
+      };
+    });
+    return { items, total: items.length };
+  }
+
   /**
    * 3. UNIFIED APPROVE ACTION
    */
@@ -673,6 +736,9 @@ export class AdminApprovalsService implements OnModuleInit {
       res = { success: true, message: `Staff request #${id} approved` };
     } else if (cat === 'rate-changes' || cat === 'rates') {
       res = await this.updatePayoutRate(payload, adminId);
+    } else if (cat === 'pincode-changes' || cat === 'pincode-change' || cat === 'pincode') {
+      if (!this.usersService) throw new BadRequestException('UsersService not available');
+      res = await this.usersService.approvePincodeChangeRequest(id, adminId, payload.notes);
     } else {
       throw new BadRequestException(`Unsupported category for approval: ${category}`);
     }
@@ -705,6 +771,9 @@ export class AdminApprovalsService implements OnModuleInit {
       res = { success: true, message: `Staff request #${id} rejected: ${reason}` };
     } else if (cat === 'rate-changes' || cat === 'rates') {
       res = { success: true, message: `Rate change proposal #${id} rejected: ${reason}` };
+    } else if (cat === 'pincode-changes' || cat === 'pincode-change' || cat === 'pincode') {
+      if (!this.usersService) throw new BadRequestException('UsersService not available');
+      res = await this.usersService.rejectPincodeChangeRequest(id, reason, adminId);
     } else {
       throw new BadRequestException(`Unsupported category for rejection: ${category}`);
     }

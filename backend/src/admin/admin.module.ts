@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from '../users/schemas/user.schema';
 import { WithdrawalRequest, WithdrawalRequestSchema } from '../users/schemas/withdrawal-request.schema';
+import { PincodeChangeRequest, PincodeChangeRequestSchema } from '../users/schemas/pincode-change-request.schema';
 import { IncomeTransaction, IncomeTransactionSchema } from '../users/schemas/income-transaction.schema';
 import { DeliveryPartner, DeliveryPartnerSchema, RiderSettlement, RiderSettlementSchema } from '../delivery/schemas/delivery-partner.schema';
 import { Store, StoreSchema } from '../stores/schemas/store.schema';
@@ -21,6 +22,7 @@ import { CronModule } from '../cron/cron.module';
     MongooseModule.forFeature([
       { name: User.name, schema: UserSchema },
       { name: WithdrawalRequest.name, schema: WithdrawalRequestSchema },
+      { name: PincodeChangeRequest.name, schema: PincodeChangeRequestSchema },
       { name: IncomeTransaction.name, schema: IncomeTransactionSchema },
       { name: DeliveryPartner.name, schema: DeliveryPartnerSchema },
       { name: RiderSettlement.name, schema: RiderSettlementSchema },
