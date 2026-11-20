@@ -122,6 +122,7 @@ export interface Order {
   handlingFee?: number;
   couponDiscount?: number;
   coinsDiscount?: number;
+  walletDeduction?: number;
   tip?: number;
   totalAmount: number;
   deliveryAddress: Address;

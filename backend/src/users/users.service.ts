@@ -403,8 +403,8 @@ export class UsersService {
         passbookImage: user.passbookImage,
         bankProofImage: user.bankProofImage,
         shoppingCoins: user.shoppingCoins,
-        availableIncome: user.availableIncome,
-        pendingIncome: user.pendingIncome,
+        availableIncome: Math.max(0, user.availableIncome || 0),
+        pendingIncome: Math.max(0, user.pendingIncome || 0),
       },
     };
   }
@@ -603,8 +603,8 @@ export class UsersService {
 
     return {
       shoppingCoins: user.shoppingCoins ?? 2000,
-      pendingIncome: user.pendingIncome ?? 0,
-      availableIncome: user.availableIncome ?? 0,
+      pendingIncome: Math.max(0, user.pendingIncome ?? 0),
+      availableIncome: Math.max(0, user.availableIncome ?? 0),
       appDownloadIncome: user.appDownloadIncome ?? 0,
       verificationStatus: user.verificationStatus ?? 'NON_VERIFIED',
       aadhaarVerified: !!user.aadhaarVerified,
@@ -660,9 +660,9 @@ export class UsersService {
     }
 
     return {
-      availableBalance: user.availableIncome || 0,
-      pendingBalance: user.pendingIncome || 0,
-      walletBalance: user.walletBalance || 0,
+      availableBalance: Math.max(0, user.availableIncome || 0),
+      pendingBalance: Math.max(0, user.pendingIncome || 0),
+      walletBalance: Math.max(0, user.walletBalance || 0),
       breakdown: {
         downloadIncome: Number(downloadIncomeTotal.toFixed(2)),
         monthlyTeamIncome: Number(monthlyTeamIncomeTotal.toFixed(2)),

@@ -2219,11 +2219,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const initialCoins = user.shoppingCoins;
     const initialWallet = walletBalance;
 
-    // Deduct wallet balance if applied
-    if (options?.walletDeduction && options.walletDeduction > 0) {
-      setWalletBalance((prev) => Math.max(0, prev - options.walletDeduction!));
-    }
-
     // Deduct coins if redeemed (strictly NO coins earned on order placement)
     const coinsToDeduct = typeof options?.coinsDeduction === 'number'
       ? options.coinsDeduction
@@ -2258,6 +2253,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deliveryInstructions: options?.deliveryInstructions || 'Ring bell & leave at door',
         coinsUsed: coinsToDeduct > 0 ? coinsToDeduct : undefined,
         coinsDiscount: coinsToDeduct > 0 ? coinsToDeduct : undefined,
+        walletDeduction: options?.walletDeduction && options.walletDeduction > 0 ? options.walletDeduction : undefined,
         address: {
           houseFlat: selectedAddress.houseFlat || resolvedAreaName,
           areaLandmark: selectedAddress.areaLandmark || resolvedAreaName,
@@ -2268,6 +2264,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           label: selectedAddress.type || 'Home',
         },
       });
+
+      // Deduct wallet balance only after backend successfully creates order
+      if (options?.walletDeduction && options.walletDeduction > 0) {
+        setWalletBalance((prev) => Math.max(0, prev - options.walletDeduction!));
+      }
 
       const anyRes = res as any;
       if (anyRes && anyRes.success === false) {
@@ -2292,6 +2293,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         couponDiscount: liveData.couponDiscount ?? (isBlinkit ? couponDiscount : 0),
         shoppingCoinsUsed: liveData.coinsUsed ?? (isBlinkit ? (coinsToDeduct || appliedCoins) : cartSummary.shoppingCoinDiscount),
         coinsDiscount: liveData.coinsDiscount ?? (isBlinkit ? (coinsToDeduct || appliedCoins) : cartSummary.shoppingCoinDiscount),
+        walletDeduction: liveData.walletDeduction ?? (options?.walletDeduction || 0),
         deliveryFee: liveData.deliveryFee ?? (typeof options?.deliveryFee === 'number' ? options.deliveryFee : (isBlinkit ? 39 : cartSummary.deliveryFee)),
         handlingFee: liveData.handlingFee ?? (isBlinkit ? 5 : cartSummary.handlingFee),
         tip: liveData.tip ?? (options?.tip || 0),

@@ -115,6 +115,9 @@ export class Order {
   coinsDiscount: number;
 
   @Prop({ default: 0 })
+  walletDeduction: number;
+
+  @Prop({ default: 0 })
   mrpSubtotal?: number;
 
   @Prop({ default: 0 })

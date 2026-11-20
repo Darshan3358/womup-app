@@ -151,6 +151,7 @@ export const OrderService = {
     handlingFee?: number;
     coinsUsed?: number;
     coinsDiscount?: number;
+    walletDeduction?: number;
     items?: {
       productId: string;
       quantity: number;

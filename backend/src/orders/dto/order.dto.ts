@@ -64,6 +64,10 @@ export class CreateOrderDto {
   @IsOptional()
   coinsDiscount?: number;
 
+  @ApiProperty({ example: 80, required: false, description: 'WOMUP Money / wallet balance deducted' })
+  @IsOptional()
+  walletDeduction?: number;
+
   @IsOptional()
   handlingFee?: number;
 

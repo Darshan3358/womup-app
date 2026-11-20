@@ -101,9 +101,14 @@ export async function runDailyIncomeRollover(forceUnlock = false) {
   let userCount = 0;
 
   for (const [userId, data] of Object.entries(userMap)) {
+    const existingUser = await User.findById(userId);
+    const safePendingIncome = Math.max(0, (existingUser?.pendingIncome || 0) - data.total);
+
     await User.findByIdAndUpdate(userId, {
+      $set: {
+        pendingIncome: safePendingIncome,
+      },
       $inc: {
-        pendingIncome: -data.total,
         availableIncome: data.total,
         walletBalance: data.total,
       },

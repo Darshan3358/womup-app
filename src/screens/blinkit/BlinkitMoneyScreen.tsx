@@ -566,7 +566,7 @@ export const BlinkitMoneyScreen: React.FC = () => {
                   <Text style={styles.balanceBadgePending}>TODAY'S INCOME</Text>
                   <Text style={styles.balanceIconSmall}>⏳</Text>
                 </View>
-                <Text style={styles.balanceValuePending}>₹{user.pendingIncome ?? 0}</Text>
+                <Text style={styles.balanceValuePending}>₹{Math.max(0, user.pendingIncome ?? 0)}</Text>
                 <Text style={styles.balanceSubPending}>
                   From downline • Auto-promoted at 00:00 midnight
                 </Text>

@@ -766,12 +766,16 @@ export class OrdersService {
     const user = await this.userModel.findById(uId);
     if (!user) throw new NotFoundException('User not found');
 
+    const walletDeductionRequested = Math.max(0, Number(dto.walletDeduction || 0));
+    let walletDeducted = 0;
+
     if (requestedMethod === 'WALLET' || requestedMethod === 'WOMUP_WALLET') {
       if (user.walletBalance < totalAmount) {
         throw new BadRequestException(
           `Insufficient wallet balance (Current: ₹${user.walletBalance}, Required: ₹${totalAmount})`,
         );
       }
+      walletDeducted = totalAmount;
       const before = user.walletBalance;
       user.walletBalance = Math.max(0, Number((user.walletBalance - totalAmount).toFixed(2)));
       user.availableIncome = Math.max(0, Number(((user.availableIncome || 0) - totalAmount).toFixed(2)));
@@ -787,6 +791,28 @@ export class OrdersService {
         status: 'SUCCESS',
         description: 'Payment for order',
       });
+      totalAmount = 0;
+    } else if (walletDeductionRequested > 0) {
+      const maxCanDeduct = Math.min(user.walletBalance || 0, walletDeductionRequested, totalAmount);
+      if (maxCanDeduct > 0) {
+        walletDeducted = maxCanDeduct;
+        const before = user.walletBalance;
+        user.walletBalance = Math.max(0, Number((user.walletBalance - maxCanDeduct).toFixed(2)));
+        user.availableIncome = Math.max(0, Number(((user.availableIncome || 0) - maxCanDeduct).toFixed(2)));
+        await user.save();
+
+        await this.walletTxModel.create({
+          userId: uId,
+          type: 'DEBIT',
+          amount: maxCanDeduct,
+          balanceBefore: before,
+          balanceAfter: user.walletBalance,
+          referenceType: 'ORDER_PAYMENT',
+          status: 'SUCCESS',
+          description: 'Partial WOMUP Money deduction at checkout',
+        });
+        totalAmount = Math.max(0, Number((totalAmount - maxCanDeduct).toFixed(2)));
+      }
     }
 
     // 5. Handle Shopping Coins deduction
@@ -850,6 +876,7 @@ export class OrdersService {
       couponCode: (dto as any)?.couponCode || undefined,
       coinsUsed,
       coinsDiscount: coinDiscount,
+      walletDeduction: walletDeducted,
       deliveryFee,
       handlingFee,
       convenienceFee: finalConvenienceFee,

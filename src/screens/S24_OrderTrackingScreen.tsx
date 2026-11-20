@@ -1194,13 +1194,14 @@ export const S24_OrderTrackingScreen: React.FC = () => {
           // 5. Discounts & Additional Charges
           const couponDiscount = Number(activeOrder?.couponDiscount) || 0;
           const coinsDiscount = Number(activeOrder?.coinsDiscount) || Number((activeOrder as any)?.coinsUsed) || 0;
+          const walletDeduction = Number(activeOrder?.walletDeduction) || Number((activeOrder as any)?.walletDeducted) || 0;
           const tip = Number(activeOrder?.tip) || 0;
           const tax = Number((activeOrder as any)?.tax) || 0;
 
           // 6. Total Amount Paid
           const totalPaid = typeof activeOrder?.totalAmount === 'number'
             ? activeOrder.totalAmount
-            : Math.max(0, itemSellingSubtotal + (deliveryFee || 0) + convenienceFee + tip + tax - couponDiscount - coinsDiscount);
+            : Math.max(0, itemSellingSubtotal + (deliveryFee || 0) + convenienceFee + tip + tax - couponDiscount - coinsDiscount - walletDeduction);
 
           return (
             <View style={styles.sectionCard}>
@@ -1273,6 +1274,14 @@ export const S24_OrderTrackingScreen: React.FC = () => {
                 <View style={styles.billRow}>
                   <Text style={[styles.billLabel, { color: '#059669' }]}>Shopping Coins Applied</Text>
                   <Text style={[styles.billValue, { color: '#059669', fontWeight: '700' }]}>-₹{coinsDiscount}</Text>
+                </View>
+              )}
+
+              {/* WOMUP Money used if applied */}
+              {walletDeduction > 0 && (
+                <View style={styles.billRow}>
+                  <Text style={[styles.billLabel, { color: '#059669' }]}>WOMUP Money Deducted</Text>
+                  <Text style={[styles.billValue, { color: '#059669', fontWeight: '700' }]}>-₹{walletDeduction}</Text>
                 </View>
               )}
 

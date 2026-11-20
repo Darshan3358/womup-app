@@ -27,6 +27,8 @@ export class CoinTransaction {
     enum: [
       'ORDER',
       'REFERRAL',
+      'REFERRAL_REWARD',
+      'APP_DOWNLOAD',
       'PROMOTION',
       'ADMIN_ADJUSTMENT',
       'SIGNUP_BONUS',
