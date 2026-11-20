@@ -88,7 +88,7 @@ const MainStoreApp: React.FC = () => {
       <View style={styles.container}>
         <Header />
         <View style={styles.body}>{renderContent()}</View>
-        <BottomNav />
+        {!subScreen && <BottomNav />}
       </View>
 
       {/* Slide-out Sidebar Drawer (Hamburger Menu) */}
