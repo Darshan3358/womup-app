@@ -53,7 +53,7 @@ export class RiderApiService {
     if (envUrl && envUrl.trim().length > 0) {
       return envUrl.trim().replace(/\/+$/, '');
     }
-    return DEFAULT_API_URL;
+    return isLocalWeb ? 'http://localhost:5050/api/v1' : DEFAULT_API_URL;
   }
 
   private static async getAuthHeader(): Promise<Record<string, string>> {
