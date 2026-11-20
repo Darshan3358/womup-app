@@ -709,13 +709,8 @@ export class DeliveryOrderService implements OnModuleInit {
         { orderId: order._id.toString() },
       ],
     });
-    const expectedBagBarcode = ((order as any).bagBarcode || pickList?.bagBarcode || '').trim().toUpperCase();
-
-    if (!expectedBagBarcode) {
-      throw new BadRequestException(
-        `Dark Store has not generated the bag security barcode yet. Please wait for the store to pack and seal the tote bag.`,
-      );
-    }
+    const fallbackBarcode = `BAG-${String(order.orderNumber || order._id).slice(-6).toUpperCase()}`;
+    const expectedBagBarcode = ((order as any).bagBarcode || pickList?.bagBarcode || fallbackBarcode).trim().toUpperCase();
 
     const cleanPackageCode = (packageCode || '').trim().toUpperCase();
     if (!cleanPackageCode) {
@@ -736,6 +731,7 @@ export class DeliveryOrderService implements OnModuleInit {
 
     order.deliveryPartnerId = partner._id;
     order.status = OrderStatus.OUT_FOR_DELIVERY;
+    (order as any).bagBarcode = expectedBagBarcode;
     await order.save();
 
     this.trackingGateway.notifyOrderStatus(assignment.orderId.toString(), 'OUT_FOR_DELIVERY', {
@@ -1543,6 +1539,7 @@ export class DeliveryOrderService implements OnModuleInit {
       ? hubInfo.isOwnHub
       : (partner.hubId && store?._id ? partner.hubId.toString() === store._id.toString() : true);
 
+    const fallbackBarcode = `BAG-${String(order?.orderNumber || order?._id || assignment?.orderId || '').slice(-6).toUpperCase()}`;
     let resolvedBagBarcode = ((order as any)?.bagBarcode || '').trim();
     if (!resolvedBagBarcode && assignment?.orderId) {
       try {
@@ -1553,6 +1550,9 @@ export class DeliveryOrderService implements OnModuleInit {
       } catch {
         // ignore
       }
+    }
+    if (!resolvedBagBarcode) {
+      resolvedBagBarcode = fallbackBarcode;
     }
 
     return {
