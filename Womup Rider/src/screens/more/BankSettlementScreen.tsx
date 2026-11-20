@@ -44,15 +44,17 @@ export const BankSettlementScreen: React.FC = () => {
     try {
       const data = await RiderApiService.getRiderWallet();
       setTransactions(data.transactions || []);
-      if (typeof data.balance === 'number') {
-        setWalletBalance(data.balance);
-      } else if (typeof data.pendingTransfer === 'number') {
-        setWalletBalance(data.pendingTransfer);
-      } else if (typeof settlementSummary?.pendingTransfer === 'number') {
-        setWalletBalance(settlementSummary.pendingTransfer);
-      } else {
-        setWalletBalance(0);
-      }
+      const resolvedBalance =
+        typeof data.balance === 'number' && data.balance > 0
+          ? data.balance
+          : typeof data.pendingTransfer === 'number' && data.pendingTransfer > 0
+          ? data.pendingTransfer
+          : typeof settlementSummary?.pendingTransfer === 'number' && settlementSummary.pendingTransfer > 0
+          ? settlementSummary.pendingTransfer
+          : typeof data.lifetimeEarnings === 'number'
+          ? data.lifetimeEarnings
+          : 0;
+      setWalletBalance(resolvedBalance);
     } catch (e) {
       console.log('Error fetching wallet data', e);
       setTransactions([]);
@@ -182,7 +184,7 @@ export const BankSettlementScreen: React.FC = () => {
         </View>
 
         <Text style={styles.balanceAmount}>
-          ₹ {walletBalance}
+          ₹ {Number(walletBalance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </Text>
         <Text style={styles.balanceSub}>Daily automatic batch payout at 11:59 PM</Text>
 
@@ -428,20 +430,25 @@ export const BankSettlementScreen: React.FC = () => {
                       color={isWithdrawal ? '#EF4444' : '#13B978'}
                     />
                   </View>
-                  <View>
-                    <Text style={styles.txTitle}>{tx.title}</Text>
+                  <View style={styles.txInfo}>
+                    <Text style={styles.txTitle} numberOfLines={1} ellipsizeMode="tail">
+                      {tx.title}
+                    </Text>
                     <Text style={styles.txTime}>{tx.timestamp}</Text>
                   </View>
                 </View>
 
-                <Text
-                  style={[
-                    styles.txAmount,
-                    { color: isWithdrawal ? '#EF4444' : '#13B978' },
-                  ]}
-                >
-                  {isWithdrawal ? `-₹${Math.abs(tx.amount)}` : `+₹${tx.amount}`}
-                </Text>
+                <View style={[styles.txAmountBadge, isWithdrawal ? styles.txAmountBadgeWithdrawal : styles.txAmountBadgeCredit]}>
+                  <Text
+                    style={[
+                      styles.txAmount,
+                      { color: isWithdrawal ? '#DC2626' : '#15803D' },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {isWithdrawal ? `- ₹${Math.abs(tx.amount).toFixed(2)}` : `+ ₹${tx.amount.toFixed(2)}`}
+                  </Text>
+                </View>
               </View>
             );
           })}
@@ -751,7 +758,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     shadowColor: '#000',
@@ -759,32 +767,63 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.03,
     shadowRadius: 3,
     elevation: 1,
+    gap: 10,
   },
   txLeft: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    minWidth: 0,
   },
   txIconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  txInfo: {
+    flex: 1,
+    minWidth: 0,
     justifyContent: 'center',
   },
   txTitle: {
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: 13,
+    fontWeight: '700',
     color: '#071B52',
+    letterSpacing: -0.2,
   },
   txTime: {
     fontSize: 11,
     color: '#94A3B8',
     marginTop: 2,
+    fontWeight: '500',
+  },
+  txAmountBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    minWidth: 74,
+  },
+  txAmountBadgeCredit: {
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  txAmountBadgeWithdrawal: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
   },
   txAmount: {
-    fontSize: 15,
-    fontWeight: '900',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: -0.2,
   },
   bottomSpacer: {
     height: 36,
