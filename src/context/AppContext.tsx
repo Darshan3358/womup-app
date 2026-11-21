@@ -152,6 +152,7 @@ interface AppContextType {
 
   // --- Blinkit Specific Extensions ---
   walletBalance: number;
+  setWalletBalance: React.Dispatch<React.SetStateAction<number>>;
   addWalletBalance: (amount: number) => void;
   hideSensitiveItems: boolean;
   setHideSensitiveItems: (value: boolean) => void;
@@ -1466,7 +1467,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           StorageService.KEYS.USER,
           null
         );
-        if (savedUser) setUser(savedUser);
+        if (savedUser) {
+          setUser(savedUser);
+          if (typeof savedUser.walletBalance === 'number' || typeof savedUser.availableIncome === 'number') {
+            setWalletBalance(Number(savedUser.walletBalance ?? savedUser.availableIncome ?? 0));
+          }
+        }
 
         const savedVerificationId = await StorageService.getItem<string | null>(
           StorageService.KEYS.AUTH_VERIFICATION_ID,
@@ -1482,6 +1488,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (profile && (profile.email || profile.phoneNumber || profile.fullName)) {
               // Live database user profile
               setUser(profile);
+              if (typeof profile.walletBalance === 'number' || typeof profile.availableIncome === 'number') {
+                setWalletBalance(Number(profile.walletBalance ?? profile.availableIncome ?? 0));
+              }
               StorageService.saveItem(StorageService.KEYS.USER, profile);
             } else {
               // Token was invalid or expired (401)
@@ -1539,9 +1548,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
             // Fetch Live Wallet Balance for Authenticated User from MongoDB
             try {
-              const walletRes = await api.get<{ balance: number }>('/wallet');
-              if (walletRes.success && walletRes.data) {
-                setWalletBalance(walletRes.data.balance || 0);
+              const walletRes = await api.get<any>('/wallet');
+              const bal = walletRes?.data?.balance ?? (walletRes as any)?.balance ?? (walletRes?.data as any)?.data?.balance;
+              if (typeof bal === 'number') {
+                setWalletBalance(bal);
               }
             } catch (e) {}
 
@@ -2656,6 +2666,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setJumperVisible,
     // Blinkit extensions
     walletBalance,
+    setWalletBalance,
     addWalletBalance,
     hideSensitiveItems,
     setHideSensitiveItems,

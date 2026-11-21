@@ -27,6 +27,7 @@ import { matchAreaByName } from '../../data/areas';
 import { LocalShopApi } from '../../local-shop-module/api/localShopApi';
 import { resolveImageThumbnail } from '../../utils/imageUrl';
 import { useApp } from '../../context/AppContext';
+import { api } from '../../services/api';
 import { CheckoutScreenSkeleton, Skeleton } from '../../components/common/Skeleton';
 
 // Resolve full-screen order celebration video asset (Cloudinary CDN URL for Web + native animated asset)
@@ -80,6 +81,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     updateBlinkitQty,
     couponDiscount,
     walletBalance,
+    setWalletBalance,
     deliveryLocation,
     setDeliveryLocation,
     currentCityName,
@@ -134,6 +136,16 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     setCouponMsg(null);
     emitCheckoutChange({ couponCode: '' });
   };
+
+  // Fetch live wallet balance from backend whenever Checkout is opened
+  useEffect(() => {
+    api.get<any>('/wallet').then((res: any) => {
+      const bal = res?.data?.balance ?? res?.balance ?? res?.data?.data?.balance;
+      if (typeof bal === 'number') {
+        setWalletBalance(bal);
+      }
+    }).catch(() => {});
+  }, []);
 
   // Sanitizer to eliminate stale corrupted strings from MongoDB / user profile
   const cleanHouseFlat = (raw?: string): string => {
@@ -737,9 +749,14 @@ export const BlinkitCheckoutScreen: React.FC = () => {
   const maxCoinsUsable = Math.min(availableCoins, Math.max(10, Math.floor(orderSubtotal * 0.2)));
   const coinsDeduction = useCoins ? maxCoinsUsable : 0;
 
-  // WOMUP Money wallet deduction on remaining amount
+  // WOMUP Money wallet deduction on remaining amount (with fallback to user.walletBalance or user.availableIncome)
+  const effectiveWalletBalance = Math.max(
+    Number(walletBalance) || 0,
+    Number((user as any)?.walletBalance) || 0,
+    Number(user?.availableIncome) || 0
+  );
   const remainingAfterCoins = Math.max(0, totalWithTip - coinsDeduction);
-  const walletDeduction = useWalletBalance ? Math.min(walletBalance, remainingAfterCoins) : 0;
+  const walletDeduction = useWalletBalance ? Math.min(effectiveWalletBalance, remainingAfterCoins) : 0;
   const finalPayable = Math.max(0, remainingAfterCoins - walletDeduction);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1432,19 +1449,19 @@ export const BlinkitCheckoutScreen: React.FC = () => {
                 <Text style={[TYPOGRAPHY.bodyMdMedium, styles.paymentTitle]}>
                   WOMUP Money
                 </Text>
-                <Text style={styles.walletBalText}>Available: ₹{walletBalance}</Text>
+                <Text style={styles.walletBalText}>Available: ₹{effectiveWalletBalance}</Text>
               </View>
             </View>
             <Switch
               trackColor={{ false: '#D1D5DB', true: COLORS.primary }}
               thumbColor={useWalletBalance ? COLORS.white : '#f4f3f4'}
               onValueChange={(val) => {
-                if (walletBalance > 0) {
+                if (effectiveWalletBalance > 0) {
                   setUseWalletBalance(val);
                 }
               }}
-              value={useWalletBalance && walletBalance > 0}
-              disabled={walletBalance <= 0}
+              value={useWalletBalance && effectiveWalletBalance > 0}
+              disabled={effectiveWalletBalance <= 0}
             />
           </View>
           {useWalletBalance && walletDeduction > 0 && (

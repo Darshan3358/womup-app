@@ -477,6 +477,7 @@ export const AuthService = {
             shoppingCoins: res.data.shoppingCoins ?? 2000,
             pendingIncome: res.data.pendingIncome ?? 0,
             availableIncome: res.data.availableIncome ?? 0,
+            walletBalance: typeof res.data.walletBalance === 'number' ? res.data.walletBalance : (res.data.availableIncome ?? 0),
             appDownloadIncome: res.data.appDownloadIncome ?? 0,
             verificationStatus: res.data.verificationStatus || (res.data.aadhaarVerified ? 'VERIFIED' : 'NON_VERIFIED'),
             aadhaarVerified: res.data.aadhaarVerified || false,

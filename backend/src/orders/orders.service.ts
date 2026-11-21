@@ -793,11 +793,12 @@ export class OrdersService {
       });
       totalAmount = 0;
     } else if (walletDeductionRequested > 0) {
-      const maxCanDeduct = Math.min(user.walletBalance || 0, walletDeductionRequested, totalAmount);
+      const availableUserBalance = Math.max(user.walletBalance || 0, user.availableIncome || 0);
+      const maxCanDeduct = Math.min(availableUserBalance, walletDeductionRequested, totalAmount);
       if (maxCanDeduct > 0) {
         walletDeducted = maxCanDeduct;
-        const before = user.walletBalance;
-        user.walletBalance = Math.max(0, Number((user.walletBalance - maxCanDeduct).toFixed(2)));
+        const before = user.walletBalance || availableUserBalance;
+        user.walletBalance = Math.max(0, Number((availableUserBalance - maxCanDeduct).toFixed(2)));
         user.availableIncome = Math.max(0, Number(((user.availableIncome || 0) - maxCanDeduct).toFixed(2)));
         await user.save();
 

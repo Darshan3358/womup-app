@@ -169,6 +169,7 @@ export interface UserProfile {
   aadhaarVerified?: boolean;
   pendingIncome?: number;
   availableIncome?: number;
+  walletBalance?: number;
   appDownloadIncome?: number;
   sponsorCode?: string;
   isCompanySponsored?: boolean;
