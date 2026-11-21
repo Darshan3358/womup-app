@@ -27,6 +27,7 @@ import {
   resolveCategoryGroup,
 } from '../../data/blinkitData';
 import { Product, Category, BlinkitProduct } from '../../types';
+import { api } from '../../services/api';
 
 export const BlinkitHomeScreen: React.FC = () => {
   const { width } = useWindowDimensions();
@@ -50,6 +51,46 @@ export const BlinkitHomeScreen: React.FC = () => {
     blinkitCart,
     blinkitCartCount,
   } = useApp();
+
+  const [activeBanners, setActiveBanners] = useState<any[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    api.get<any>('/banners').then((res: any) => {
+      if (!mounted) return;
+      const list = res?.data || (Array.isArray(res) ? res : []);
+      if (Array.isArray(list)) {
+        setActiveBanners(list);
+      }
+    }).catch(() => {});
+    return () => { mounted = false; };
+  }, [catalogVersion]);
+
+  const heroBanners = useMemo(() => {
+    return activeBanners.filter((b) => b.placement === 'HOME_HERO' && b.isActive !== false);
+  }, [activeBanners]);
+
+  const festiveBanner = useMemo(() => {
+    return activeBanners.find((b) => b.placement === 'FESTIVE_RAIL' && b.isActive !== false);
+  }, [activeBanners]);
+
+  const veggieSpotlight = useMemo(() => {
+    return activeBanners.find(
+      (b) =>
+        b.placement === 'CATEGORY_SPOTLIGHT' &&
+        b.isActive !== false &&
+        (b.targetId === 'c1' || (b.title && b.title.toLowerCase().includes('grocer')) || (b.title && b.title.toLowerCase().includes('veggie')))
+    );
+  }, [activeBanners]);
+
+  const dairySpotlight = useMemo(() => {
+    return activeBanners.find(
+      (b) =>
+        b.placement === 'CATEGORY_SPOTLIGHT' &&
+        b.isActive !== false &&
+        (b.targetId === 'c3' || (b.title && b.title.toLowerCase().includes('dairy')))
+    );
+  }, [activeBanners]);
 
   // Direct app open: Request location permission & detect location once on initial mount
   useEffect(() => {
@@ -311,15 +352,22 @@ export const BlinkitHomeScreen: React.FC = () => {
           />
         );
       case 'banner_veggies':
+        if (activeBanners.length > 0 && !veggieSpotlight) return null;
         return (
           <View style={styles.bannerWrapper}>
             <TouchableOpacity
               activeOpacity={0.9}
-              onPress={() => handleSelectCategory('Vegetables & Fruits', 'c1')}
+              onPress={() => {
+                if (veggieSpotlight?.targetType === 'CATEGORY' && veggieSpotlight?.targetId) {
+                  handleSelectCategory(veggieSpotlight.title || 'Vegetables & Fruits', veggieSpotlight.targetId);
+                } else {
+                  handleSelectCategory('Vegetables & Fruits', 'c1');
+                }
+              }}
               style={styles.groceriesBannerCard}
             >
               <Image
-                source={require('../../../assets/banners/9minbanner.png')}
+                source={veggieSpotlight?.imageUrl ? { uri: veggieSpotlight.imageUrl } : require('../../../assets/banners/9minbanner.png')}
                 style={styles.bannerImage}
                 resizeMode="contain"
               />
@@ -355,15 +403,22 @@ export const BlinkitHomeScreen: React.FC = () => {
           />
         );
       case 'banner_dairy':
+        if (activeBanners.length > 0 && !dairySpotlight) return null;
         return (
           <View style={styles.bannerWrapper}>
             <TouchableOpacity
               activeOpacity={0.9}
-              onPress={() => handleSelectCategory('Dairy, Bread & Eggs', 'c3')}
+              onPress={() => {
+                if (dairySpotlight?.targetType === 'CATEGORY' && dairySpotlight?.targetId) {
+                  handleSelectCategory(dairySpotlight.title || 'Dairy, Bread & Eggs', dairySpotlight.targetId);
+                } else {
+                  handleSelectCategory('Dairy, Bread & Eggs', 'c3');
+                }
+              }}
               style={styles.dairyBannerCard}
             >
               <Image
-                source={require('../../../assets/banners/dairy_breakfast.jpg')}
+                source={dairySpotlight?.imageUrl ? { uri: dairySpotlight.imageUrl } : require('../../../assets/banners/dairy_breakfast.jpg')}
                 style={styles.bannerImage}
                 resizeMode="contain"
               />
@@ -430,7 +485,7 @@ export const BlinkitHomeScreen: React.FC = () => {
   const ListHeader = useMemo(() => (
     <>
       <KYCBanner />
-      <HeroBannerCarousel onBannerPress={handleBannerPress} />
+      <HeroBannerCarousel onBannerPress={handleBannerPress} banners={heroBanners} />
       <WomupCategoryGrid
         onSelectCategory={(name, id) => {
           if (name.toLowerCase().includes('more') || id === 'c12') {
@@ -441,22 +496,30 @@ export const BlinkitHomeScreen: React.FC = () => {
         }}
         onViewAll={() => setActiveScreen('Blinkit_Categories')}
       />
-      {/* Festive Special Diwali Banner */}
-      <View style={styles.festiveBannerWrapper}>
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={() => setActiveScreen('C15_ProductListing')}
-          style={[styles.festiveBannerCard, { height: diwaliBannerHeight }]}
-        >
-          <Image
-            source={require('../../../assets/banners/diwali_ready_banner.png')}
-            style={styles.festiveBannerImage}
-            resizeMode="contain"
-          />
-        </TouchableOpacity>
-      </View>
+      {/* Festive Special Diwali Banner - Managed by Admin */}
+      {(festiveBanner || activeBanners.length === 0) && (
+        <View style={styles.festiveBannerWrapper}>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => {
+              if (festiveBanner?.targetType === 'CATEGORY' && festiveBanner.targetId) {
+                handleSelectCategory(festiveBanner.title || 'Festive Special', festiveBanner.targetId);
+              } else {
+                setActiveScreen('C15_ProductListing');
+              }
+            }}
+            style={[styles.festiveBannerCard, { height: diwaliBannerHeight }]}
+          >
+            <Image
+              source={festiveBanner?.imageUrl ? { uri: festiveBanner.imageUrl } : require('../../../assets/banners/diwali_ready_banner.png')}
+              style={styles.festiveBannerImage}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+        </View>
+      )}
     </>
-  ), [handleBannerPress, handleSelectCategory, setActiveScreen, diwaliBannerHeight]);
+  ), [handleBannerPress, handleSelectCategory, setActiveScreen, diwaliBannerHeight, heroBanners, festiveBanner, activeBanners.length]);
 
   const ListFooter = useMemo(() => (
     <>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   ScrollView,
@@ -46,9 +46,10 @@ export const HERO_SLIDES: HeroBannerItem[] = [
 
 interface HeroBannerCarouselProps {
   onBannerPress?: (banner: HeroBannerItem) => void;
+  banners?: any[];
 }
 
-const HeroBannerCarouselComponent: React.FC<HeroBannerCarouselProps> = ({ onBannerPress }) => {
+const HeroBannerCarouselComponent: React.FC<HeroBannerCarouselProps> = ({ onBannerPress, banners }) => {
   const { width } = useWindowDimensions();
   // Ensure the banner container never exceeds viewport width minus 24px padding
   const bannerWidth = Math.min(width - 24, 1400);
@@ -58,12 +59,31 @@ const HeroBannerCarouselComponent: React.FC<HeroBannerCarouselProps> = ({ onBann
   const timerRef = useRef<any>(null);
   const isInteracting = useRef(false);
 
+  const slides: HeroBannerItem[] = useMemo(() => {
+    if (banners && banners.length > 0) {
+      return banners.map((b: any, idx: number) => {
+        const fallback = HERO_SLIDES[idx % HERO_SLIDES.length];
+        const isCat = b.targetType?.toLowerCase() === 'category' || !!b.targetId;
+        return {
+          id: b._id || b.id || `hero_${idx}`,
+          type: isCat ? 'category' : 'deals',
+          categoryName: b.targetId === 'c1' ? 'Vegetables & Fruits' : b.targetId === 'c3' ? 'Dairy, Bread & Eggs' : (b.title || fallback.categoryName),
+          categoryId: b.targetId || undefined,
+          image: b.imageUrl ? { uri: b.imageUrl } : fallback.image,
+          bgColor: '#F9ECF8',
+        };
+      });
+    }
+    return HERO_SLIDES;
+  }, [banners]);
+
   const startAutoScroll = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
+    if (slides.length <= 1) return;
     timerRef.current = setInterval(() => {
       if (isInteracting.current) return;
       setActiveIndex((prev) => {
-        const next = (prev + 1) % HERO_SLIDES.length;
+        const next = (prev + 1) % slides.length;
         scrollRef.current?.scrollTo({
           x: next * bannerWidth,
           animated: true,
@@ -71,7 +91,7 @@ const HeroBannerCarouselComponent: React.FC<HeroBannerCarouselProps> = ({ onBann
         return next;
       });
     }, 4500);
-  }, [bannerWidth]);
+  }, [bannerWidth, slides.length]);
 
   useEffect(() => {
     startAutoScroll();
@@ -83,7 +103,7 @@ const HeroBannerCarouselComponent: React.FC<HeroBannerCarouselProps> = ({ onBann
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetX = e.nativeEvent.contentOffset.x;
     const index = Math.round(offsetX / (bannerWidth || 1));
-    if (index >= 0 && index < HERO_SLIDES.length && index !== activeIndex) {
+    if (index >= 0 && index < slides.length && index !== activeIndex) {
       setActiveIndex(index);
     }
   };
@@ -109,9 +129,9 @@ const HeroBannerCarouselComponent: React.FC<HeroBannerCarouselProps> = ({ onBann
             isInteracting.current = false;
           }}
           style={{ width: bannerWidth, height: bannerHeight, maxWidth: '100%', overflow: 'hidden' }}
-          contentContainerStyle={{ width: bannerWidth * HERO_SLIDES.length, height: bannerHeight }}
+          contentContainerStyle={{ width: bannerWidth * slides.length, height: bannerHeight }}
         >
-          {HERO_SLIDES.map((slide) => (
+          {slides.map((slide) => (
             <TouchableOpacity
               key={slide.id}
               activeOpacity={0.92}
@@ -133,7 +153,7 @@ const HeroBannerCarouselComponent: React.FC<HeroBannerCarouselProps> = ({ onBann
 
       {/* Carousel Dots */}
       <View style={styles.dotsContainer}>
-        {HERO_SLIDES.map((_, idx) => (
+        {slides.map((_, idx) => (
           <TouchableOpacity
             key={idx}
             activeOpacity={0.7}

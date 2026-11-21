@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Banner, BannerDocument } from './schemas/banner.schema';
+import { clearHomeCache } from '../home/home-cache';
 
 @Injectable()
 export class BannersService {
@@ -28,18 +29,22 @@ export class BannersService {
       sortOrder: dto.sortOrder || 0,
       isActive: dto.isActive !== undefined ? dto.isActive : true,
     });
-    return created.save();
+    const saved = await created.save();
+    clearHomeCache();
+    return saved;
   }
 
   async update(id: string, dto: Partial<Banner>) {
     const banner = await this.bannerModel.findByIdAndUpdate(id, { $set: dto }, { new: true }).exec();
     if (!banner) throw new NotFoundException('Banner not found');
+    clearHomeCache();
     return banner;
   }
 
   async delete(id: string) {
     const res = await this.bannerModel.findByIdAndDelete(id).exec();
     if (!res) throw new NotFoundException('Banner not found');
+    clearHomeCache();
     return { success: true, message: 'Banner deleted successfully' };
   }
 
@@ -47,6 +52,8 @@ export class BannersService {
     const banner = await this.bannerModel.findById(id).exec();
     if (!banner) throw new NotFoundException('Banner not found');
     banner.isActive = !banner.isActive;
-    return banner.save();
+    const saved = await banner.save();
+    clearHomeCache();
+    return saved;
   }
 }
