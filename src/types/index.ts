@@ -100,9 +100,15 @@ export interface Address {
 
 export interface OrderItem {
   productId: string;
+  variantId?: string;
   name: string;
   quantity: number;
   price: number;
+  mrp?: number;
+  unitPrice?: number;
+  unitMrp?: number;
+  subtotal?: number;
+  quantityLabel?: string;
   image?: ImageSourcePropType;
   imageUrl?: string;
 }
@@ -116,7 +122,10 @@ export interface Order {
   items: OrderItem[];
   itemCount: number;
   subtotal: number;
+  itemSubtotal?: number;
+  mrpSubtotal?: number;
   discount: number;
+  productDiscount?: number;
   shoppingCoinsUsed: number;
   deliveryFee: number;
   handlingFee?: number;

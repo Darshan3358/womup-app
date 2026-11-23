@@ -152,8 +152,13 @@ export const OrderService = {
     coinsUsed?: number;
     coinsDiscount?: number;
     walletDeduction?: number;
+    mrpSubtotal?: number;
+    itemSubtotal?: number;
+    productDiscount?: number;
+    discount?: number;
     items?: {
       productId: string;
+      variantId?: string;
       quantity: number;
       name?: string;
       price?: number;

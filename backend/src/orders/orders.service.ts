@@ -549,75 +549,78 @@ export class OrdersService {
       let authoritativeMrp: number | null = null;
       let authoritativeStock: number | null = null;
 
-      // 1. Check if area pricing override exists for store's area, matchedArea, or dto.areaId
+      const vIdStr = vId ? vId.toString() : null;
+      const vIdObj = vIdStr && Types.ObjectId.isValid(vIdStr) ? new Types.ObjectId(vIdStr) : null;
+      const prodIdStr = prodId ? prodId.toString() : null;
+      const prodIdObj = prodIdStr && Types.ObjectId.isValid(prodIdStr) ? new Types.ObjectId(prodIdStr) : null;
+
+      // 1. Fetch variant and master product documents
+      let variantDoc: any = null;
+      let productDoc: any = null;
+      if (vId) {
+        variantDoc = await this.connection.collection('product_variants').findOne({
+          _id: Types.ObjectId.isValid(vId.toString()) ? new Types.ObjectId(vId.toString()) : vId,
+        });
+      }
+      if (prodId) {
+        productDoc = await this.connection.collection('products').findOne({
+          _id: Types.ObjectId.isValid(prodId.toString()) ? new Types.ObjectId(prodId.toString()) : prodId,
+        });
+      }
+
+      // Check stock
+      if (variantDoc && typeof variantDoc.stock === 'number') authoritativeStock = variantDoc.stock;
+      else if (productDoc && typeof productDoc.stock === 'number') authoritativeStock = productDoc.stock;
+
+      // 2. Check if item's unitPrice already matches the catalog variant or master product
+      let matchesCatalog = false;
+      if (variantDoc && typeof variantDoc.sellingPrice === 'number' && item.unitPrice === variantDoc.sellingPrice) {
+        authoritativePrice = item.unitPrice;
+        authoritativeMrp = item.unitMrp || variantDoc.mrp || variantDoc.sellingPrice;
+        matchesCatalog = true;
+      } else if (productDoc && typeof productDoc.sellingPrice === 'number' && item.unitPrice === productDoc.sellingPrice) {
+        authoritativePrice = item.unitPrice;
+        authoritativeMrp = item.unitMrp || productDoc.mrp || productDoc.sellingPrice;
+        matchesCatalog = true;
+      }
+
+      // 3. If not an exact match with catalog, check customer's delivery destination area pricing ONLY
+      // Customer pricing is based on the delivery destination area (dto.areaId or matchedArea), NOT the fulfillment warehouse location
       const candidateAreaIds: any[] = [];
-      if (store.areaId) candidateAreaIds.push(store.areaId);
-      if (matchedArea?._id) candidateAreaIds.push(matchedArea._id);
       if (dto.areaId) candidateAreaIds.push(dto.areaId);
+      if (matchedArea?._id) candidateAreaIds.push(matchedArea._id);
 
       const candidateAreaIdStrs = candidateAreaIds.map((a) => a.toString());
       const candidateAreaIdObjs = candidateAreaIdStrs
         .filter((s) => Types.ObjectId.isValid(s))
         .map((s) => new Types.ObjectId(s));
 
-      const vIdStr = vId ? vId.toString() : null;
-      const vIdObj = vIdStr && Types.ObjectId.isValid(vIdStr) ? new Types.ObjectId(vIdStr) : null;
-      const prodIdStr = prodId ? prodId.toString() : null;
-      const prodIdObj = prodIdStr && Types.ObjectId.isValid(prodIdStr) ? new Types.ObjectId(prodIdStr) : null;
-
-      const areaPricingQuery: any = {
-        areaId: { $in: [...candidateAreaIdObjs, ...candidateAreaIdStrs] },
-      };
-      if (vId) {
-        areaPricingQuery.variantId = { $in: vIdObj ? [vIdObj, vIdStr] : [vIdStr] };
-      } else if (prodId) {
-        areaPricingQuery.productId = { $in: prodIdObj ? [prodIdObj, prodIdStr] : [prodIdStr] };
-      }
-
-      const areaPricingDoc = await this.connection.collection('area_pricing').findOne(areaPricingQuery);
-      if (areaPricingDoc && typeof areaPricingDoc.price === 'number') {
-        authoritativePrice = areaPricingDoc.price;
-        if (typeof areaPricingDoc.mrp === 'number') authoritativeMrp = areaPricingDoc.mrp;
-        if (typeof areaPricingDoc.stock === 'number') authoritativeStock = areaPricingDoc.stock;
-      }
-
-      // 1b. If still null, check if item.unitPrice matches any active area pricing for this product/variant
-      if (authoritativePrice === null && typeof item.unitPrice === 'number') {
-        const itemPricingMatch = await this.connection.collection('area_pricing').findOne({
-          $or: [
-            ...(vId ? [{ variantId: vIdStr }, { variantId: vIdObj }] : []),
-            ...(prodId ? [{ productId: prodIdStr }, { productId: prodIdObj }] : []),
-          ],
-          price: item.unitPrice,
-        });
-        if (itemPricingMatch) {
-          authoritativePrice = itemPricingMatch.price;
-          if (typeof itemPricingMatch.mrp === 'number') authoritativeMrp = itemPricingMatch.mrp;
-          if (typeof itemPricingMatch.stock === 'number') authoritativeStock = itemPricingMatch.stock;
-        }
-      }
-
-      // 2. If no area pricing override, check variant or master product
-      if (authoritativePrice === null) {
+      if (!matchesCatalog && candidateAreaIds.length > 0) {
+        const areaPricingQuery: any = {
+          areaId: { $in: [...candidateAreaIdObjs, ...candidateAreaIdStrs] },
+        };
         if (vId) {
-          const variantDoc = await this.connection.collection('product_variants').findOne({
-            _id: Types.ObjectId.isValid(vId.toString()) ? new Types.ObjectId(vId.toString()) : vId,
-          });
-          if (variantDoc) {
-            authoritativePrice = variantDoc.sellingPrice;
-            authoritativeMrp = variantDoc.mrp || variantDoc.sellingPrice;
-            if (typeof variantDoc.stock === 'number') authoritativeStock = variantDoc.stock;
-          }
+          areaPricingQuery.variantId = { $in: vIdObj ? [vIdObj, vIdStr] : [vIdStr] };
+        } else if (prodId) {
+          areaPricingQuery.productId = { $in: prodIdObj ? [prodIdObj, prodIdStr] : [prodIdStr] };
         }
-        if (authoritativePrice === null && prodId) {
-          const productDoc = await this.connection.collection('products').findOne({
-            _id: Types.ObjectId.isValid(prodId.toString()) ? new Types.ObjectId(prodId.toString()) : prodId,
-          });
-          if (productDoc) {
-            authoritativePrice = productDoc.sellingPrice;
-            authoritativeMrp = productDoc.mrp || productDoc.sellingPrice;
-            if (typeof productDoc.stock === 'number') authoritativeStock = productDoc.stock;
-          }
+
+        const areaPricingDoc = await this.connection.collection('area_pricing').findOne(areaPricingQuery);
+        if (areaPricingDoc && typeof areaPricingDoc.price === 'number') {
+          authoritativePrice = areaPricingDoc.price;
+          if (typeof areaPricingDoc.mrp === 'number') authoritativeMrp = areaPricingDoc.mrp;
+          if (typeof areaPricingDoc.stock === 'number') authoritativeStock = areaPricingDoc.stock;
+        }
+      }
+
+      // 4. If still not determined, fallback to catalog variant or product
+      if (authoritativePrice === null) {
+        if (variantDoc && typeof variantDoc.sellingPrice === 'number') {
+          authoritativePrice = variantDoc.sellingPrice;
+          authoritativeMrp = variantDoc.mrp || variantDoc.sellingPrice;
+        } else if (productDoc && typeof productDoc.sellingPrice === 'number') {
+          authoritativePrice = productDoc.sellingPrice;
+          authoritativeMrp = productDoc.mrp || productDoc.sellingPrice;
         }
       }
 
@@ -873,6 +876,7 @@ export class OrdersService {
       mrpSubtotal: mrpTotal,
       itemSubtotal,
       discount: Math.max(0, mrpTotal - itemSubtotal),
+      productDiscount: Math.max(0, mrpTotal - itemSubtotal),
       couponDiscount,
       couponCode: (dto as any)?.couponCode || undefined,
       coinsUsed,

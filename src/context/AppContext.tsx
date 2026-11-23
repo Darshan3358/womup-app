@@ -2217,7 +2217,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const orderItems = activeList.map((i: any) => ({
       productId: i.product.id,
-      variantId: (i.product as any).selectedVariantId,
+      variantId: (i.product as any).selectedVariantId || (i.product as any).variantId || i.variantId,
       name: `${i.product.name} ${i.product.quantityLabel || i.product.packSize || ''}`.trim(),
       quantity: i.quantity,
       price: i.product.sellingPrice,
@@ -2257,6 +2257,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         areaId: currentAreaId || undefined,
         paymentMethod,
         items: orderItems,
+        mrpSubtotal: isBlinkit ? blinkitMrpTotal : cartSummary.subtotalMrp,
+        itemSubtotal: isBlinkit ? blinkitCartTotal : cartSummary.subtotalSelling,
+        productDiscount: isBlinkit ? Math.max(0, blinkitMrpTotal - blinkitCartTotal) : cartSummary.productDiscount,
         tip: options?.tip || 0,
         deliveryFee: typeof options?.deliveryFee === 'number' ? options.deliveryFee : (isBlinkit ? 25 : cartSummary.deliveryFee),
         handlingFee: isBlinkit ? 5 : cartSummary.handlingFee,
@@ -2290,16 +2293,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       const livePartner = liveData.deliveryPartner || liveData.deliveryPartnerId;
+      const liveItems = Array.isArray(liveData.items) && liveData.items.length > 0 ? liveData.items : orderItems;
+      const liveItemSellingSubtotal = liveData.itemSubtotal ?? (isBlinkit ? blinkitCartTotal : cartSummary.subtotalSelling);
+      const liveMrpSubtotal = liveData.mrpSubtotal ?? (isBlinkit ? blinkitMrpTotal : cartSummary.subtotalMrp);
+      const liveProductDiscount = liveData.productDiscount ?? liveData.discount ?? (isBlinkit ? Math.max(0, blinkitMrpTotal - blinkitCartTotal) : cartSummary.productDiscount);
+
       liveOrder = {
         id: liveData._id || liveData.id || `ord_${Date.now()}`,
         _id: liveData._id,
         orderNumber: liveData.orderNumber || `#WUP-${Date.now().toString().slice(-6)}`,
         date: 'Just now',
         status: liveData.status || 'PLACED',
-        itemCount: liveData.items?.length || orderItems.length,
-        items: orderItems,
-        subtotal: liveData.itemSubtotal || (isBlinkit ? blinkitCartTotal : cartSummary.subtotalSelling),
-        discount: liveData.discount ?? (isBlinkit ? Math.max(0, blinkitMrpTotal - blinkitCartTotal) : cartSummary.productDiscount),
+        itemCount: liveItems.length,
+        items: liveItems,
+        subtotal: liveItemSellingSubtotal,
+        itemSubtotal: liveItemSellingSubtotal,
+        mrpSubtotal: liveMrpSubtotal,
+        discount: liveProductDiscount,
+        productDiscount: liveProductDiscount,
         couponDiscount: liveData.couponDiscount ?? (isBlinkit ? couponDiscount : 0),
         shoppingCoinsUsed: liveData.coinsUsed ?? (isBlinkit ? (coinsToDeduct || appliedCoins) : cartSummary.shoppingCoinDiscount),
         coinsDiscount: liveData.coinsDiscount ?? (isBlinkit ? (coinsToDeduct || appliedCoins) : cartSummary.shoppingCoinDiscount),

@@ -1126,8 +1126,12 @@ export const S24_OrderTrackingScreen: React.FC = () => {
             ? (activeOrder as any).mrpSubtotal
             : (calculatedMrpSubtotal > 0 ? calculatedMrpSubtotal : Math.max(itemSellingSubtotal, itemSellingSubtotal + (Number(activeOrder?.discount) || 0)));
 
-          // 2. Product Discount = MRP Subtotal - Selling Subtotal
-          const productDiscount = Math.max(0, itemMrpSubtotal - itemSellingSubtotal) || (Number(activeOrder?.discount) || 0);
+          // 2. Product Discount: Authoritative single source of truth from saved order
+          const productDiscount = typeof (activeOrder as any)?.productDiscount === 'number'
+            ? (activeOrder as any).productDiscount
+            : (typeof activeOrder?.discount === 'number' && activeOrder.discount > 0
+                ? activeOrder.discount
+                : Math.max(0, itemMrpSubtotal - itemSellingSubtotal));
 
           // 3. Convenience / Handling Fee (authoritative mapping, single charge)
           const convenienceFee = typeof (activeOrder as any)?.convenienceFee === 'number'

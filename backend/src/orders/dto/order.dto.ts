@@ -78,6 +78,15 @@ export class CreateOrderDto {
   mrpSubtotal?: number;
 
   @IsOptional()
+  itemSubtotal?: number;
+
+  @IsOptional()
+  productDiscount?: number;
+
+  @IsOptional()
+  discount?: number;
+
+  @IsOptional()
   deliveryDistanceKm?: number;
 
   @IsOptional()

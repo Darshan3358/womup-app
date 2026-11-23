@@ -103,6 +103,9 @@ export class Order {
   discount: number;
 
   @Prop({ default: 0 })
+  productDiscount?: number;
+
+  @Prop({ default: 0 })
   couponDiscount: number;
 
   @Prop()
