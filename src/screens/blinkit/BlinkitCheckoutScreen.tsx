@@ -25,7 +25,7 @@ import { CartService } from '../../services/cartService';
 import { LocationService } from '../../services/locationService';
 import { matchAreaByName } from '../../data/areas';
 import { LocalShopApi } from '../../local-shop-module/api/localShopApi';
-import { resolveImageThumbnail } from '../../utils/imageUrl';
+import { resolveImageThumbnail, resolveProductImageSource } from '../../utils/imageUrl';
 import { useApp } from '../../context/AppContext';
 import { api } from '../../services/api';
 import { CheckoutScreenSkeleton, Skeleton } from '../../components/common/Skeleton';
@@ -1322,7 +1322,10 @@ export const BlinkitCheckoutScreen: React.FC = () => {
             const itemKey = itemVariantId ? `${item.product.id}_${itemVariantId}` : item.product.id;
             return (
               <View key={itemKey} style={styles.cartItemRow}>
-                <Image source={{ uri: resolveImageThumbnail(item.product.imageUrl) }} style={styles.cartItemImg} />
+                <Image
+                  source={resolveProductImageSource(item.product.imageUrl, item.product.name, (item.product as any).slug)}
+                  style={styles.cartItemImg}
+                />
                 <View style={styles.cartItemInfo}>
                   <Text style={styles.cartItemName} numberOfLines={1}>
                     {item.product.name}

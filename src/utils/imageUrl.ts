@@ -9,11 +9,31 @@ const getUploadsBaseUrl = (): string => {
  * Universal Image Source Resolver
  * Prioritizes 34 local bundled assets for 0ms loading, falling back to remote URLs.
  */
-export const resolveProductImageSource = (url?: string | null): any => {
-  const local = getLocalProductAsset(url);
+export const resolveProductImageSource = (
+  url?: string | null,
+  name?: string | null,
+  slug?: string | null,
+): any => {
+  const local = getLocalProductAsset(url, name, slug);
   if (local) return local;
+
   const remote = resolveImageUrl(url);
-  return { uri: remote || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&q=80' };
+  let optimizedRemote = remote || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80';
+
+  // Optimize Unsplash remote URLs to load fast compressed thumbnails instead of 1200px uncompressed images
+  if (optimizedRemote.includes('images.unsplash.com')) {
+    optimizedRemote = optimizedRemote
+      .replace(/w=\d+/, 'w=400')
+      .replace(/q=\d+/, 'q=80');
+    if (!optimizedRemote.includes('auto=format')) {
+      optimizedRemote = `${optimizedRemote}&auto=format`;
+    }
+  }
+
+  return {
+    uri: optimizedRemote,
+    cache: 'force-cache',
+  };
 };
 
 /**

@@ -136,7 +136,7 @@ const BlinkitProductCardComponent: React.FC<BlinkitProductCardProps> = ({
         {/* Left: Product Image Box */}
         <View style={styles.wishlistImageWrapper}>
           <Image
-            source={resolveProductImageSource(product.imageUrl)}
+            source={resolveProductImageSource(product.imageUrl, product.name, (product as any).slug)}
             style={styles.wishlistProductImage}
             resizeMode="cover"
           />
@@ -283,7 +283,7 @@ const BlinkitProductCardComponent: React.FC<BlinkitProductCardProps> = ({
       {/* Product Image Box with Real Online Photo */}
       <View style={[styles.imageContainer, isHorizontal && styles.horizontalImageContainer]}>
         <Image
-          source={resolveProductImageSource(product.imageUrl)}
+          source={resolveProductImageSource(product.imageUrl, product.name, (product as any).slug)}
           style={styles.productImage}
           resizeMode="cover"
         />

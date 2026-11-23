@@ -318,7 +318,11 @@ export const BlinkitCartScreen: React.FC = () => {
               >
                 <View style={styles.itemEmojiContainer}>
                   <Image
-                    source={resolveProductImageSource(entry.product.imageUrl)}
+                    source={resolveProductImageSource(
+                      entry.product.imageUrl,
+                      entry.product.name,
+                      (entry.product as any).slug
+                    )}
                     style={styles.itemRealImage}
                     resizeMode="cover"
                   />

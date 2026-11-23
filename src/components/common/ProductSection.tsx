@@ -194,7 +194,7 @@ const ProductSectionComponent: React.FC<ProductSectionProps> = ({
           ]}
         >
           <Image
-            source={resolveProductImageSource(item.imageUrl)}
+            source={resolveProductImageSource(item.imageUrl, item.name, (item as any).slug)}
             style={styles.productImage}
             resizeMode="cover"
           />

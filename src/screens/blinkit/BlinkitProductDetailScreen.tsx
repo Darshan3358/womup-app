@@ -184,7 +184,11 @@ export const BlinkitProductDetailScreen: React.FC = () => {
         <View style={styles.imageCarouselWrapper}>
           <View style={styles.carouselImageContainer}>
             <Image
-              source={resolveProductImageSource(product.galleryImages?.[activeImageIndex] || product.imageUrl)}
+              source={resolveProductImageSource(
+                product.galleryImages?.[activeImageIndex] || product.imageUrl,
+                product.name,
+                (product as any).slug
+              )}
               style={styles.carouselImage}
               resizeMode="cover"
             />

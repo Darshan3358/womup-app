@@ -15,6 +15,7 @@ import { Header } from '../components/common/Header';
 import { QuantityStepper } from '../components/product/QuantityStepper';
 import { GradientButton } from '../components/common/GradientButton';
 import { useApp } from '../context/AppContext';
+import { resolveProductImageSource } from '../utils/imageUrl';
 
 export const S19_CartScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -63,7 +64,7 @@ export const S19_CartScreen: React.FC = () => {
               <View style={styles.itemImageWrapper}>
                 {item.product.image || item.product.imageUrl ? (
                   <Image
-                    source={item.product.image || { uri: item.product.imageUrl }}
+                    source={item.product.image || resolveProductImageSource(item.product.imageUrl, item.product.name, (item.product as any).slug)}
                     style={styles.itemImage}
                     resizeMode="cover"
                   />
