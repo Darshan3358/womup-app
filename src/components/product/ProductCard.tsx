@@ -85,7 +85,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             <Image
               source={product.image || resolveProductImageSource(product.imageUrl, product.name, (product as any).slug)}
               style={styles.horizontalImage}
-              resizeMode="cover"
+              resizeMode="contain"
             />
           ) : (
             <View style={styles.iconCircle}>
@@ -200,7 +200,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           <Image
             source={product.image || resolveProductImageSource(product.imageUrl, product.name, (product as any).slug)}
             style={styles.gridProductImage}
-            resizeMode="cover"
+            resizeMode="contain"
           />
         ) : (
           <View style={styles.iconCircleLarge}>
@@ -312,19 +312,19 @@ const styles = StyleSheet.create({
   gridImageContainer: {
     width: '100%',
     aspectRatio: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: RADIUS.card,
     borderTopRightRadius: RADIUS.card,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,
-    padding: 0,
+    padding: 6,
     overflow: 'hidden',
   },
   gridProductImage: {
     width: '100%',
     height: '100%',
-    resizeMode: 'cover',
+    resizeMode: 'contain',
   },
   iconCircleLarge: {
     width: 54,
@@ -426,18 +426,18 @@ const styles = StyleSheet.create({
   horizontalImageContainer: {
     width: 72,
     aspectRatio: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
     borderRadius: RADIUS.sm,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-    padding: 0,
+    padding: 4,
     overflow: 'hidden',
   },
   horizontalImage: {
     width: '100%',
     height: '100%',
-    resizeMode: 'cover',
+    resizeMode: 'contain',
   },
   iconCircle: {
     width: 44,

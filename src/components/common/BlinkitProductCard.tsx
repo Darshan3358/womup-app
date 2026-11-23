@@ -138,7 +138,7 @@ const BlinkitProductCardComponent: React.FC<BlinkitProductCardProps> = ({
           <Image
             source={resolveProductImageSource(product.imageUrl, product.name, (product as any).slug)}
             style={styles.wishlistProductImage}
-            resizeMode="cover"
+            resizeMode="contain"
           />
           {product.discountBadge && (
             <View style={styles.wishlistDiscountBadge}>
@@ -285,7 +285,7 @@ const BlinkitProductCardComponent: React.FC<BlinkitProductCardProps> = ({
         <Image
           source={resolveProductImageSource(product.imageUrl, product.name, (product as any).slug)}
           style={styles.productImage}
-          resizeMode="cover"
+          resizeMode="contain"
         />
 
         {/* Wishlist Heart Top Right */}
@@ -472,14 +472,14 @@ const styles = StyleSheet.create({
   imageContainer: {
     width: '100%',
     aspectRatio: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 14,
     borderTopRightRadius: 14,
     position: 'relative',
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 0,
+    padding: 6,
   },
   horizontalImageContainer: {
     width: '100%',
@@ -488,7 +488,7 @@ const styles = StyleSheet.create({
   productImage: {
     width: '100%',
     height: '100%',
-    resizeMode: 'cover',
+    resizeMode: 'contain',
   },
   wishlistButton: {
     position: 'absolute',
@@ -730,19 +730,19 @@ const styles = StyleSheet.create({
     height: 105,
     aspectRatio: 1,
     borderRadius: 12,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
     overflow: 'hidden',
-    padding: 0,
+    padding: 4,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
   wishlistProductImage: {
     width: '100%',
     height: '100%',
-    resizeMode: 'cover',
+    resizeMode: 'contain',
   },
   wishlistDiscountBadge: {
     position: 'absolute',

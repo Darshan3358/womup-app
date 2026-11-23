@@ -324,7 +324,7 @@ export const BlinkitCartScreen: React.FC = () => {
                       (entry.product as any).slug
                     )}
                     style={styles.itemRealImage}
-                    resizeMode="cover"
+                    resizeMode="contain"
                   />
                 </View>
 
@@ -615,8 +615,8 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 8,
-    backgroundColor: '#F8FAFC',
-    padding: 0,
+    backgroundColor: '#FFFFFF',
+    padding: 3,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -625,7 +625,7 @@ const styles = StyleSheet.create({
   itemRealImage: {
     width: '100%',
     height: '100%',
-    resizeMode: 'cover',
+    resizeMode: 'contain',
   },
   itemDetails: {
     flex: 1,
