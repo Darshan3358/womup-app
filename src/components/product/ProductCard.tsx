@@ -43,8 +43,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     ? Math.round(((currentMrp - currentSellingPrice) / currentMrp) * 100)
     : product.discountPercent;
 
-  const cartItem = cart.find((i) => i.product.id === product.id);
-  const quantity = cartItem ? cartItem.quantity : (getBlinkitQty ? getBlinkitQty(product.id) : 0);
+  const quantity = getBlinkitQty ? getBlinkitQty(product.id, activeVariant?.id) : 0;
 
   const handleAddToCart = () => {
     const enrichedProduct: Product = {
@@ -52,8 +51,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       sellingPrice: currentSellingPrice,
       mrp: currentMrp,
       quantityLabel: currentLabel,
+      selectedVariantId: activeVariant?.id,
     };
-    addToCart(enrichedProduct);
+    addToCart(enrichedProduct, activeVariant?.id);
   };
 
   const handleCardPress = () => {
@@ -170,8 +170,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           ) : (
             <QuantityStepper
               quantity={quantity}
-              onIncrement={() => updateQuantity(product.id, 1)}
-              onDecrement={() => updateQuantity(product.id, -1)}
+              onIncrement={() => updateQuantity(product.id, 1, activeVariant?.id)}
+              onDecrement={() => updateQuantity(product.id, -1, activeVariant?.id)}
             />
           )}
         </View>
@@ -281,8 +281,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           ) : (
             <QuantityStepper
               quantity={quantity}
-              onIncrement={() => updateQuantity(product.id, 1)}
-              onDecrement={() => updateQuantity(product.id, -1)}
+              onIncrement={() => updateQuantity(product.id, 1, activeVariant?.id)}
+              onDecrement={() => updateQuantity(product.id, -1, activeVariant?.id)}
             />
           )}
         </View>

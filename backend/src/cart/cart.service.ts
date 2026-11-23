@@ -363,13 +363,15 @@ export class CartService {
       cart.storeId = new Types.ObjectId(storeId);
     }
 
+    const reqVIdStr = variantId ? variantId.toString() : '';
     const existingIndex = cart.items.findIndex((i) => {
       const pMatch = i.productId.toString() === resolvedProductId.toString();
       if (!pMatch) return false;
-      if (resolvedVariantId && i.variantId) {
-        return i.variantId.toString() === resolvedVariantId.toString();
+      const itemVIdStr = i.variantId ? i.variantId.toString() : '';
+      if (reqVIdStr && itemVIdStr) {
+        return itemVIdStr === reqVIdStr;
       }
-      return !resolvedVariantId && !i.variantId;
+      return !reqVIdStr && !itemVIdStr;
     });
 
     if (existingIndex > -1) {
@@ -405,13 +407,15 @@ export class CartService {
       cart.storeId = new Types.ObjectId(storeId);
     }
 
+    const reqVIdStr = variantId ? variantId.toString() : '';
     const existingIndex = cart.items.findIndex((i) => {
       const pMatch = i.productId.toString() === targetIdStr || i.productId.toString() === productId;
       if (!pMatch) return false;
-      if (resolvedVariantId && i.variantId) {
-        return i.variantId.toString() === resolvedVariantId.toString();
+      const itemVIdStr = i.variantId ? i.variantId.toString() : '';
+      if (reqVIdStr && itemVIdStr) {
+        return itemVIdStr === reqVIdStr;
       }
-      return !resolvedVariantId && !i.variantId;
+      return !reqVIdStr && !itemVIdStr;
     });
 
     if (existingIndex > -1) {
@@ -451,13 +455,15 @@ export class CartService {
       cart.storeId = new Types.ObjectId(storeId);
     }
 
+    const reqVIdStr = variantId ? variantId.toString() : '';
     const existingIndex = cart.items.findIndex((i) => {
       const pMatch = i.productId.toString() === targetIdStr || i.productId.toString() === productId;
       if (!pMatch) return false;
-      if (resolvedVariantId && i.variantId) {
-        return i.variantId.toString() === resolvedVariantId.toString();
+      const itemVIdStr = i.variantId ? i.variantId.toString() : '';
+      if (reqVIdStr && itemVIdStr) {
+        return itemVIdStr === reqVIdStr;
       }
-      return !resolvedVariantId && !i.variantId;
+      return !reqVIdStr && !itemVIdStr;
     });
 
     if (quantity <= 0) {
@@ -491,14 +497,15 @@ export class CartService {
           $or: [{ slug: productId }, { name: new RegExp(productId, 'i') }],
         }).exec();
     const targetIdStr = product ? product._id.toString() : productId;
-    const resolvedVariantIdStr = variantId && Types.ObjectId.isValid(variantId) ? variantId.toString() : undefined;
+    const reqVIdStr = variantId ? variantId.toString() : '';
 
     const cart = await this.getOrCreateCart(userId);
     cart.items = cart.items.filter((i) => {
       const pMatch = i.productId.toString() === targetIdStr || i.productId.toString() === productId;
       if (!pMatch) return true;
-      if (resolvedVariantIdStr && i.variantId) {
-        return i.variantId.toString() !== resolvedVariantIdStr;
+      const itemVIdStr = i.variantId ? i.variantId.toString() : '';
+      if (reqVIdStr && itemVIdStr) {
+        return itemVIdStr !== reqVIdStr;
       }
       return false;
     });

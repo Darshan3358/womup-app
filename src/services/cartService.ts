@@ -88,6 +88,11 @@ export const CartService = {
     return res.success ? res.data : null;
   },
 
+  async setExactQuantityOnServer(productId: string, quantity: number, variantId?: string, areaId?: string, storeId?: string): Promise<any> {
+    const res = await api.post<any>('/cart/update', { productId, quantity, variantId, areaId, storeId });
+    return res.success ? res.data : null;
+  },
+
   async removeItemFromServer(productId: string, variantId?: string): Promise<boolean> {
     const qs = variantId ? `?variantId=${encodeURIComponent(variantId)}` : '';
     const res = await api.delete<any>(`/cart/items/${productId}${qs}`);
