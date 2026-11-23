@@ -83,12 +83,14 @@ export class CartService {
     const detailedItems: any[] = [];
     let itemSubtotal = 0;
     let mrpTotal = 0;
+    const seenItemKeys = new Set<string>();
 
     for (const entry of cart.items) {
+      if (!entry || !entry.productId || entry.quantity <= 0) continue;
       const product = await this.productModel.findById(entry.productId).exec();
       if (product && product.isActive) {
-        let sellingPrice = product.sellingPrice;
-        let mrp = product.mrp;
+        let sellingPrice = Number(product.sellingPrice || 0);
+        let mrp = Number(product.mrp || sellingPrice);
         let quantityLabel = product.quantityLabel;
         let variantObj: any = null;
 
@@ -98,8 +100,8 @@ export class CartService {
             _id: vObjId,
           });
           if (varDoc) {
-            sellingPrice = varDoc.sellingPrice ?? sellingPrice;
-            mrp = varDoc.mrp ?? mrp;
+            sellingPrice = Number(varDoc.sellingPrice ?? sellingPrice);
+            mrp = Number(varDoc.mrp ?? mrp);
             quantityLabel = varDoc.weightOrVolume ?? quantityLabel;
 
             // Dynamic area pricing lookup matching user's selected area
@@ -152,6 +154,47 @@ export class CartService {
           } catch {}
         }
 
+        // Price safety fallback: if sellingPrice is 0 or unpriced, resolve from product_variants
+        if (sellingPrice <= 0) {
+          try {
+            const fallbackVar = await this.connection.collection('product_variants').findOne({
+              productId: product._id,
+              isActive: true,
+            });
+            if (fallbackVar && typeof fallbackVar.sellingPrice === 'number' && fallbackVar.sellingPrice > 0) {
+              sellingPrice = fallbackVar.sellingPrice;
+              mrp = fallbackVar.mrp || mrp || sellingPrice;
+              quantityLabel = quantityLabel || fallbackVar.weightOrVolume;
+              if (!variantObj) {
+                variantObj = {
+                  id: fallbackVar._id.toString(),
+                  _id: fallbackVar._id.toString(),
+                  label: fallbackVar.weightOrVolume,
+                  price: sellingPrice,
+                  mrp: mrp,
+                };
+              }
+            }
+          } catch {}
+        }
+
+        // Never emit a zero-price item if product has a valid price
+        if (sellingPrice <= 0) {
+          sellingPrice = Number(product.mrp || 1);
+          mrp = Math.max(mrp, sellingPrice);
+        }
+
+        const prodIdStr = product._id.toString();
+        const vIdStr = entry.variantId ? entry.variantId.toString() : (variantObj?.id || '');
+        const dedupKey = vIdStr ? `${prodIdStr}_${vIdStr}` : prodIdStr;
+
+        // Skip exact duplicate items or coalesce if same product already added
+        if (seenItemKeys.has(dedupKey) || seenItemKeys.has(prodIdStr)) {
+          continue;
+        }
+        seenItemKeys.add(dedupKey);
+        if (vIdStr) seenItemKeys.add(prodIdStr);
+
         const linePrice = sellingPrice * entry.quantity;
         const lineMrp = mrp * entry.quantity;
         itemSubtotal += linePrice;
@@ -159,7 +202,7 @@ export class CartService {
 
         detailedItems.push({
           product: {
-            id: product._id.toString(),
+            id: prodIdStr,
             name: product.name,
             brand: product.brand,
             imageUrl: product.imageUrl,
@@ -170,7 +213,7 @@ export class CartService {
             stock: product.stock,
           },
           variant: variantObj,
-          variantId: entry.variantId ? entry.variantId.toString() : undefined,
+          variantId: vIdStr || undefined,
           quantity: entry.quantity,
           subtotal: linePrice,
           totalMrp: lineMrp,
@@ -364,7 +407,7 @@ export class CartService {
     }
 
     const reqVIdStr = variantId ? variantId.toString() : '';
-    const existingIndex = cart.items.findIndex((i) => {
+    let existingIndex = cart.items.findIndex((i) => {
       const pMatch = i.productId.toString() === resolvedProductId.toString();
       if (!pMatch) return false;
       const itemVIdStr = i.variantId ? i.variantId.toString() : '';
@@ -374,8 +417,16 @@ export class CartService {
       return !reqVIdStr && !itemVIdStr;
     });
 
+    // If exact variant match not found, check if a single un-varianted entry exists for this product
+    if (existingIndex === -1) {
+      existingIndex = cart.items.findIndex((i) => i.productId.toString() === resolvedProductId.toString());
+    }
+
     if (existingIndex > -1) {
       cart.items[existingIndex].quantity += quantity;
+      if (resolvedVariantId) {
+        cart.items[existingIndex].variantId = resolvedVariantId;
+      }
     } else {
       cart.items.push({
         productId: resolvedProductId,
@@ -384,6 +435,7 @@ export class CartService {
       } as any);
     }
 
+    this.sanitizeCartItems(cart);
     await cart.save();
     const summary = await this.getCartSummary(userId, areaId, storeId);
     this.trackingGateway.emitCartUpdated(userId, summary);
@@ -408,7 +460,7 @@ export class CartService {
     }
 
     const reqVIdStr = variantId ? variantId.toString() : '';
-    const existingIndex = cart.items.findIndex((i) => {
+    let existingIndex = cart.items.findIndex((i) => {
       const pMatch = i.productId.toString() === targetIdStr || i.productId.toString() === productId;
       if (!pMatch) return false;
       const itemVIdStr = i.variantId ? i.variantId.toString() : '';
@@ -418,24 +470,62 @@ export class CartService {
       return !reqVIdStr && !itemVIdStr;
     });
 
+    if (existingIndex === -1) {
+      existingIndex = cart.items.findIndex((i) => i.productId.toString() === targetIdStr || i.productId.toString() === productId);
+    }
+
     if (existingIndex > -1) {
       cart.items[existingIndex].quantity += delta;
+      if (resolvedVariantId) {
+        cart.items[existingIndex].variantId = resolvedVariantId;
+      }
       if (cart.items[existingIndex].quantity <= 0) {
         cart.items.splice(existingIndex, 1);
       }
-      await cart.save();
     } else if (delta > 0 && product) {
       cart.items.push({
         productId: product._id,
         variantId: resolvedVariantId,
         quantity: delta,
       } as any);
-      await cart.save();
     }
+
+    this.sanitizeCartItems(cart);
+    await cart.save();
 
     const summary = await this.getCartSummary(userId, areaId, storeId);
     this.trackingGateway.emitCartUpdated(userId, summary);
     return summary;
+  }
+
+  private sanitizeCartItems(cart: any) {
+    if (!cart || !Array.isArray(cart.items)) return;
+    const dedupeMap = new Map<string, number>();
+    const cleanList: any[] = [];
+    for (const item of cart.items) {
+      if (!item || !item.productId || item.quantity <= 0) continue;
+      const pKey = item.productId.toString();
+      const vKey = item.variantId ? item.variantId.toString() : '';
+      const compoundKey = vKey ? `${pKey}_${vKey}` : pKey;
+
+      if (dedupeMap.has(compoundKey)) {
+        const idx = dedupeMap.get(compoundKey)!;
+        cleanList[idx].quantity = item.quantity;
+      } else if (vKey && dedupeMap.has(pKey)) {
+        // Upgrade un-varianted entry to this specific variant
+        const idx = dedupeMap.get(pKey)!;
+        cleanList[idx] = item;
+        dedupeMap.delete(pKey);
+        dedupeMap.set(compoundKey, idx);
+      } else if (!vKey && Array.from(dedupeMap.keys()).some((k) => k.startsWith(`${pKey}_`))) {
+        // Skip adding an un-varianted duplicate if variant already in cart
+        continue;
+      } else {
+        dedupeMap.set(compoundKey, cleanList.length);
+        cleanList.push(item);
+      }
+    }
+    cart.items = cleanList;
   }
 
   async setExactQuantity(userId: string, productId: string, quantity: number, variantId?: string, areaId?: string, storeId?: string) {
@@ -456,7 +546,7 @@ export class CartService {
     }
 
     const reqVIdStr = variantId ? variantId.toString() : '';
-    const existingIndex = cart.items.findIndex((i) => {
+    let existingIndex = cart.items.findIndex((i) => {
       const pMatch = i.productId.toString() === targetIdStr || i.productId.toString() === productId;
       if (!pMatch) return false;
       const itemVIdStr = i.variantId ? i.variantId.toString() : '';
@@ -466,24 +556,31 @@ export class CartService {
       return !reqVIdStr && !itemVIdStr;
     });
 
+    if (existingIndex === -1) {
+      existingIndex = cart.items.findIndex((i) => i.productId.toString() === targetIdStr || i.productId.toString() === productId);
+    }
+
     if (quantity <= 0) {
       if (existingIndex > -1) {
         cart.items.splice(existingIndex, 1);
-        await cart.save();
       }
     } else {
       if (existingIndex > -1) {
         cart.items[existingIndex].quantity = quantity;
-        await cart.save();
+        if (resolvedVariantId) {
+          cart.items[existingIndex].variantId = resolvedVariantId;
+        }
       } else if (product) {
         cart.items.push({
           productId: product._id,
           variantId: resolvedVariantId,
           quantity,
         } as any);
-        await cart.save();
       }
     }
+
+    this.sanitizeCartItems(cart);
+    await cart.save();
 
     const summary = await this.getCartSummary(userId, areaId, storeId);
     this.trackingGateway.emitCartUpdated(userId, summary);

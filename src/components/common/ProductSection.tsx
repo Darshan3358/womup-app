@@ -113,7 +113,16 @@ const ProductSectionComponent: React.FC<ProductSectionProps> = ({
   const renderCard = useCallback(({ item }: { item: BlinkitProduct }) => {
     const itemVariants = item.variants && item.variants.length > 0 ? item.variants : [];
     const defaultVariant = itemVariants.find((v) => v.isDefault) || itemVariants[0];
-    const selectedVariantId = selectedVariants[item.id] || defaultVariant?.id || null;
+
+    // If this product is already in the cart, sync with the variant currently in the cart
+    const cartEntry = Object.values(blinkitCart).find((e) => {
+      if (!e || e.quantity <= 0) return false;
+      const pId = String(e.product?.id || (e.product as any)?._id || '').trim();
+      return pId === item.id;
+    });
+    const cartVariantId = (cartEntry?.product as any)?.selectedVariantId;
+
+    const selectedVariantId = selectedVariants[item.id] || cartVariantId || defaultVariant?.id || null;
     const activeVariant = itemVariants.find((v) => v.id === selectedVariantId) || defaultVariant;
 
     let currentSellingPrice = activeVariant ? activeVariant.price : item.sellingPrice;
