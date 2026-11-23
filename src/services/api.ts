@@ -37,13 +37,14 @@ class ApiClient {
     const cacheKey = `${endpoint}|${this.token || 'anon'}`;
 
     // De-duplicate concurrent in-flight GET requests (prevents 10+ components spamming simultaneously)
-    if (isGet && !options._isRetry && this.inFlightGetRequests.has(cacheKey)) {
+    // Only de-duplicate if no custom signal is provided (custom signals should have their own independent lifecycle)
+    if (isGet && !options._isRetry && !options.signal && this.inFlightGetRequests.has(cacheKey)) {
       return this.inFlightGetRequests.get(cacheKey)!;
     }
 
     const requestPromise = this.executeRequest<T>(endpoint, options);
 
-    if (isGet && !options._isRetry) {
+    if (isGet && !options._isRetry && !options.signal) {
       this.inFlightGetRequests.set(cacheKey, requestPromise);
       requestPromise.finally(() => {
         this.inFlightGetRequests.delete(cacheKey);

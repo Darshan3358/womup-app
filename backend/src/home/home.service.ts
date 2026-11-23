@@ -39,7 +39,13 @@ export class HomeService {
       this.productsService.findAll({ storeId, areaId, limit: 120 }),
     ]);
 
-    const allProducts = allProductsResult?.items || [];
+    let allProducts = allProductsResult?.items || [];
+    // Fallback: If areaId/storeId produced 0 products (e.g. outside delivery area or dark store has no stock),
+    // fallback to global catalog so users can ALWAYS browse products anywhere!
+    if (allProducts.length === 0 && (storeId || areaId)) {
+      const fallbackResult = await this.productsService.findAll({ limit: 120 });
+      allProducts = fallbackResult?.items || [];
+    }
 
     // Helper for category match
     const isVegFruit = (p: any) => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -99,30 +99,28 @@ export const BlinkitHomeScreen: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState('Home');
   const [isLoading, setIsLoading] = useState(true);
-  const [dbProducts, setDbProducts] = useState<Product[]>([]);
+  const [dbProducts, setDbProducts] = useState<Product[]>(() => ProductService.getAllProducts());
   const [backendSections, setBackendSections] = useState<Record<string, BlinkitProduct[]>>({});
+  const requestEpochRef = useRef(0);
 
   // Fetch unified home data — sections already contain all product lists
-  // (B-01 fix: removed redundant fetchProducts; fetchHomeSections returns all 7 sections
-  //  with up to 8 products each so a separate full-catalogue call is wasteful)
   useEffect(() => {
     let isMounted = true;
-    const controller = new AbortController(); // B-06 fix: cancel stale requests on area change
+    const epoch = ++requestEpochRef.current;
 
     (async () => {
       try {
-        setIsLoading(true);
-        const homeData = await ProductService.fetchHomeSections(
-          {
-            areaId: currentAreaId || undefined,
-            storeId: currentStoreId || undefined,
-          },
-          controller.signal,
-        ).catch(() => null);
+        if (dbProducts.length === 0) {
+          setIsLoading(true);
+        }
+        const homeData = await ProductService.fetchHomeSections({
+          areaId: currentAreaId || undefined,
+          storeId: currentStoreId || undefined,
+        }).catch(() => null);
 
-        if (!isMounted) return;
+        if (!isMounted || epoch !== requestEpochRef.current) return;
 
-        if (homeData) {
+        if (homeData && homeData.sections && homeData.sections.length > 0) {
           // Populate section map from the unified home response
           const map: Record<string, BlinkitProduct[]> = {};
           for (const sec of homeData.sections || []) {
@@ -142,13 +140,17 @@ export const BlinkitHomeScreen: React.FC = () => {
             }
           }
           if (allProds.length > 0) setDbProducts(allProds);
+        } else {
+          // Fallback: If unified homeData returned empty sections, fetch catalog directly
+          const fallbackProds = await ProductService.fetchProducts({ limit: 120 }).catch(() => []);
+          if (isMounted && epoch === requestEpochRef.current && fallbackProds.length > 0) {
+            setDbProducts(fallbackProds);
+          }
         }
       } catch (e: any) {
-        if (e?.name !== 'AbortError') {
-          console.warn('Error loading home data:', e);
-        }
+        console.warn('Error loading home data:', e);
       } finally {
-        if (isMounted) {
+        if (isMounted && epoch === requestEpochRef.current) {
           setIsLoading(false);
         }
       }
@@ -156,7 +158,6 @@ export const BlinkitHomeScreen: React.FC = () => {
 
     return () => {
       isMounted = false;
-      controller.abort(); // Cancel any in-flight request when deps change
     };
   // Auto-refreshes when area changes OR when admin pushes real-time price/catalog update (catalogVersion)
   }, [currentAreaId, currentStoreId, catalogVersion]);
@@ -213,40 +214,48 @@ export const BlinkitHomeScreen: React.FC = () => {
 
   // 1. Deals of the Day (combines backend section, live products with discount)
   const dealsList = useMemo(() => {
-    if (isLoading) return [];
+    if (isLoading && liveBlinkitProducts.length === 0) return [];
     const fromApi = backendSections['deals'];
     if (fromApi && fromApi.length > 0) return fromApi;
     const liveDeals = liveBlinkitProducts.filter((p) => p.mrp > p.sellingPrice);
     if (liveDeals.length > 0) return liveDeals.slice(0, 10);
-    return [];
+    return liveBlinkitProducts.slice(0, 8);
   }, [isLoading, backendSections, liveBlinkitProducts]);
 
   // 2. 9-Minute Delivery (Fast-Moving Items)
   const fastDeliveryList = useMemo(() => {
-    if (isLoading) return [];
+    if (isLoading && liveBlinkitProducts.length === 0) return [];
     const fromApi = backendSections['fast_delivery'];
     if (fromApi && fromApi.length > 0) return fromApi;
     const liveFast = liveBlinkitProducts.filter((p) => p.stock > 0 && p.deliveryMinutes <= 15);
     if (liveFast.length > 0) return liveFast.slice(0, 10);
-    return [];
+    return liveBlinkitProducts.slice(0, 8);
   }, [isLoading, backendSections, liveBlinkitProducts]);
 
   // 3. Fresh Vegetables & Fruits
   const freshVegFruitsList = useMemo(() => {
-    if (isLoading) return [];
+    if (isLoading && liveBlinkitProducts.length === 0) return [];
     const fromApi = backendSections['fresh_veggies'];
     if (fromApi && fromApi.length > 0) return fromApi;
     const liveVeg = liveBlinkitProducts.filter((p) => {
       const text = `${p.category || ''} ${p.name || ''}`.toLowerCase();
-      return text.includes('veg') || text.includes('fruit') || text.includes('tomato') || text.includes('onion') || text.includes('banana');
+      return (
+        text.includes('veg') ||
+        text.includes('fruit') ||
+        text.includes('tomato') ||
+        text.includes('onion') ||
+        text.includes('banana') ||
+        text.includes('potato') ||
+        text.includes('apple')
+      );
     });
     if (liveVeg.length > 0) return liveVeg.slice(0, 10);
-    return [];
+    return liveBlinkitProducts.slice(0, 8);
   }, [isLoading, backendSections, liveBlinkitProducts]);
 
   // 4. Dairy, Bread & Eggs
   const dairyBreadEggsList = useMemo(() => {
-    if (isLoading) return [];
+    if (isLoading && liveBlinkitProducts.length === 0) return [];
     const fromApi = backendSections['dairy_bread'];
     if (fromApi && fromApi.length > 0) return fromApi;
     const liveDairy = liveBlinkitProducts.filter((p) => {
@@ -257,26 +266,27 @@ export const BlinkitHomeScreen: React.FC = () => {
         text.includes('bread') ||
         text.includes('egg') ||
         text.includes('paneer') ||
-        text.includes('butter')
+        text.includes('butter') ||
+        text.includes('curd')
       );
     });
     if (liveDairy.length > 0) return liveDairy.slice(0, 10);
-    return [];
+    return liveBlinkitProducts.slice(0, 8);
   }, [isLoading, backendSections, liveBlinkitProducts]);
 
   // 5. Bestsellers (Rated 4.5+, high sales)
   const bestsellersList = useMemo(() => {
-    if (isLoading) return [];
+    if (isLoading && liveBlinkitProducts.length === 0) return [];
     const fromApi = backendSections['bestsellers'];
     if (fromApi && fromApi.length > 0) return fromApi;
     const liveBs = liveBlinkitProducts.filter((p) => p.rating >= 4.5);
     if (liveBs.length > 0) return liveBs.slice(0, 10);
-    return [];
+    return liveBlinkitProducts.slice(0, 8);
   }, [isLoading, backendSections, liveBlinkitProducts]);
 
   // 6. New Arrivals
   const newArrivalsList = useMemo(() => {
-    if (isLoading) return [];
+    if (isLoading && liveBlinkitProducts.length === 0) return [];
     const fromApi = backendSections['new_arrivals'];
     if (fromApi && fromApi.length > 0) return fromApi;
     if (liveBlinkitProducts.length > 0) return liveBlinkitProducts.slice(0, 8);
@@ -285,12 +295,12 @@ export const BlinkitHomeScreen: React.FC = () => {
 
   // 7. Under ₹50 (Everyday Savings)
   const under50List = useMemo(() => {
-    if (isLoading) return [];
+    if (isLoading && liveBlinkitProducts.length === 0) return [];
     const fromApi = backendSections['under_50'];
     if (fromApi && fromApi.length > 0) return fromApi;
     const liveU50 = liveBlinkitProducts.filter((p) => p.sellingPrice <= 50);
     if (liveU50.length > 0) return liveU50.slice(0, 10);
-    return [];
+    return liveBlinkitProducts.slice(0, 8);
   }, [isLoading, backendSections, liveBlinkitProducts]);
 
   // ── FlatList section data ─────────────────────────────────────────────────

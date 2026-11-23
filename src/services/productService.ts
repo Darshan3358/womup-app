@@ -96,19 +96,137 @@ export const ProductService = {
       return cached.data;
     }
 
-    const res = await api.request<any>(`/home/sections${qs}`, { method: 'GET', signal });
-    if (res.success && res.data?.sections) {
-      const result = {
-        hero: res.data.hero || [],
-        categories: res.data.categories || [],
-        sections: res.data.sections.map((sec: any) => ({
-          ...sec,
-          products: (sec.products || []).map(mapRawItemToProduct),
-        })),
-      };
-      _homeSectionCache.set(cacheKey, { data: result, ts: Date.now() });
-      return result;
+    try {
+      let res = await api.request<any>(`/home/sections${qs}`, { method: 'GET', signal });
+
+      // If scoped query returned empty sections or failed, fallback to global /home/sections
+      if ((!res.success || !res.data?.sections || res.data.sections.length === 0) && qs) {
+        res = await api.request<any>('/home/sections', { method: 'GET' });
+      }
+
+      if (res.success && res.data?.sections && res.data.sections.length > 0) {
+        const result = {
+          hero: res.data.hero || [],
+          categories: res.data.categories || [],
+          sections: res.data.sections.map((sec: any) => ({
+            ...sec,
+            products: (sec.products || []).map(mapRawItemToProduct),
+          })),
+        };
+        _homeSectionCache.set(cacheKey, { data: result, ts: Date.now() });
+
+        // Update cachedProducts flat array
+        const allProds: Product[] = [];
+        const seen = new Set<string>();
+        for (const sec of result.sections) {
+          for (const p of sec.products) {
+            if (!seen.has(p.id)) {
+              seen.add(p.id);
+              allProds.push(p);
+            }
+          }
+        }
+        if (allProds.length > 0) {
+          cachedProducts = allProds;
+        }
+
+        return result;
+      }
+    } catch (e) {
+      console.warn('[ProductService] fetchHomeSections network error:', e);
     }
+
+    // Secondary fallback: synthesize 7 home sections from fetchProducts directly
+    try {
+      const allItems = await ProductService.fetchProducts({ limit: 120 });
+      if (allItems && allItems.length > 0) {
+        cachedProducts = allItems;
+        const synthSections = [
+          {
+            id: 'deals',
+            title: 'Deals of the Day',
+            subtitle: 'Save big on daily essentials',
+            icon: '🔥',
+            products: allItems.filter((p) => p.mrp > p.sellingPrice).slice(0, 8),
+          },
+          {
+            id: 'fast_delivery',
+            title: 'Fresh Grocery & Essentials',
+            subtitle: 'In stock at your nearest dark store',
+            icon: '⚡',
+            products: allItems.slice(0, 8),
+          },
+          {
+            id: 'fresh_veggies',
+            title: 'Fresh Vegetables & Fruits',
+            subtitle: 'Farm fresh, delivered directly to your doorstep',
+            icon: '🌱',
+            products: allItems
+              .filter((p) => {
+                const t = `${p.categoryName || ''} ${p.name || ''}`.toLowerCase();
+                return (
+                  t.includes('veg') ||
+                  t.includes('fruit') ||
+                  t.includes('tomato') ||
+                  t.includes('onion') ||
+                  t.includes('apple') ||
+                  t.includes('banana') ||
+                  t.includes('potato')
+                );
+              })
+              .slice(0, 8),
+          },
+          {
+            id: 'dairy_bread',
+            title: 'Dairy, Bread & Eggs',
+            subtitle: 'Start your day right',
+            icon: '🥛',
+            products: allItems
+              .filter((p) => {
+                const t = `${p.categoryName || ''} ${p.name || ''}`.toLowerCase();
+                return (
+                  t.includes('dairy') ||
+                  t.includes('milk') ||
+                  t.includes('bread') ||
+                  t.includes('egg') ||
+                  t.includes('paneer') ||
+                  t.includes('butter') ||
+                  t.includes('curd')
+                );
+              })
+              .slice(0, 8),
+          },
+          {
+            id: 'bestsellers',
+            title: 'Bestsellers',
+            subtitle: 'Loved by 1000+ customers',
+            icon: '⭐',
+            products: allItems.filter((p) => p.rating >= 4.5).slice(0, 8),
+          },
+          {
+            id: 'new_arrivals',
+            title: 'New Arrivals',
+            subtitle: 'Just landed in our stores',
+            icon: '🆕',
+            products: allItems.slice(0, 8),
+          },
+          {
+            id: 'under_50',
+            title: 'Under ₹50',
+            subtitle: 'Everyday savings',
+            icon: '💰',
+            products: allItems.filter((p) => p.sellingPrice <= 50).slice(0, 8),
+          },
+        ];
+
+        return {
+          hero: [],
+          categories: cachedCategories,
+          sections: synthSections,
+        };
+      }
+    } catch (_) {}
+
     return null;
   },
 
