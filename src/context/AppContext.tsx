@@ -1078,12 +1078,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         // 2. Preserve any recent optimistic additions that the server response hasn't captured yet
         Object.entries(prevBlinkit).forEach(([k, v]) => {
-          const pId = String(v.product?.id || '');
+          const pId = String(v.product?.id || (v.product as any)?._id || '');
+          const vId = (v.product as any)?.selectedVariantId || (v.product as any)?.variantId || '';
           const pending =
             pendingCartMutationsRef.current.get(k) ||
             pendingCartMutationsRef.current.get(pId);
           if (pending && now - pending.timestamp < 5000 && pending.expectedQty > 0) {
-            if (!newBlinkitCart[k]) {
+            // Guard: ensure this product/variant is not already present in newBlinkitCart under another key
+            const isAlreadyPresent = Object.values(newBlinkitCart).some((entry) => {
+              const entryPId = String(entry.product?.id || (entry.product as any)?._id || '');
+              const entryVId = (entry.product as any)?.selectedVariantId || (entry.product as any)?.variantId || '';
+              return entryPId === pId && (!vId || entryVId === vId);
+            });
+            if (!isAlreadyPresent && !newBlinkitCart[k]) {
               newBlinkitCart[k] = { ...v, quantity: pending.expectedQty };
               newCart.push({
                 product: mapBlinkitToProduct(v.product),
@@ -2012,9 +2019,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [currentAreaId, currentStoreId, currentAreaName, catalogVersion]);
 
-  // Re-reconcile cart whenever user navigates to Cart Screen
+  // Re-reconcile cart whenever user navigates to Cart Screen or returns to Home Screen
   useEffect(() => {
-    if (activeScreen === 'Blinkit_Cart' && (currentAreaId || currentStoreId)) {
+    if ((activeScreen === 'Blinkit_Cart' || activeScreen === 'Blinkit_Home') && (currentAreaId || currentStoreId)) {
       CartService.getServerCart(currentAreaId || undefined, currentStoreId || undefined)
         .then((serverCart) => {
           if (serverCart) {
@@ -2367,18 +2374,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setFilters(DEFAULT_FILTERS);
   };
 
-  // --- Blinkit Cart Operations (Memoized) ---
-  const blinkitCartList = useMemo(() => Object.values(blinkitCart).filter((e) => e.quantity > 0), [blinkitCart]);
-  const blinkitCartCount = useMemo(() => blinkitCartList.reduce((sum, item) => sum + item.quantity, 0), [blinkitCartList]);
-  const blinkitCartTotal = useMemo(() => blinkitCartList.reduce((sum, item) => {
-    const price = typeof item.product.sellingPrice === 'number' ? item.product.sellingPrice : 0;
-    return sum + price * item.quantity;
-  }, 0), [blinkitCartList]);
+  // --- Blinkit Cart Operations (Memoized & Strictly Deduplicated) ---
+  const blinkitCartList = useMemo(() => {
+    const raw = Object.values(blinkitCart).filter((e) => e && e.quantity > 0);
+    // Deduplicate by canonical product ID + variant ID to guarantee zero ghost duplicates
+    const dedupedMap = new Map<string, BlinkitCartEntry>();
+    raw.forEach((entry) => {
+      const pId = String(entry.product?.id || (entry.product as any)?._id || '');
+      if (!pId) return;
+      const vId = (entry.product as any)?.selectedVariantId || (entry.product as any)?.variantId || '';
+      const uniqueKey = vId ? `${pId}_${vId}` : pId;
+      if (dedupedMap.has(uniqueKey)) {
+        const existing = dedupedMap.get(uniqueKey)!;
+        // Keep the entry with valid product data and the actual chosen quantity
+        dedupedMap.set(uniqueKey, {
+          ...entry,
+          quantity: Math.max(existing.quantity, entry.quantity),
+        });
+      } else {
+        dedupedMap.set(uniqueKey, entry);
+      }
+    });
+    return Array.from(dedupedMap.values());
+  }, [blinkitCart]);
 
-  const blinkitMrpTotal = useMemo(() => blinkitCartList.reduce((sum, item) => {
-    const mrp = typeof item.product.mrp === 'number' ? item.product.mrp : (typeof item.product.sellingPrice === 'number' ? item.product.sellingPrice : 0);
-    return sum + mrp * item.quantity;
-  }, 0), [blinkitCartList]);
+  const blinkitCartCount = useMemo(
+    () => blinkitCartList.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0),
+    [blinkitCartList]
+  );
+
+  const blinkitCartTotal = useMemo(
+    () =>
+      blinkitCartList.reduce((sum, item) => {
+        const price = typeof item.product.sellingPrice === 'number' ? item.product.sellingPrice : 0;
+        return sum + price * (Number(item.quantity) || 0);
+      }, 0),
+    [blinkitCartList]
+  );
+
+  const blinkitMrpTotal = useMemo(
+    () =>
+      blinkitCartList.reduce((sum, item) => {
+        const mrp =
+          typeof item.product.mrp === 'number'
+            ? item.product.mrp
+            : typeof item.product.sellingPrice === 'number'
+            ? item.product.sellingPrice
+            : 0;
+        return sum + mrp * (Number(item.quantity) || 0);
+      }, 0),
+    [blinkitCartList]
+  );
 
   const getBlinkitQty = useCallback((productId: string, variantId?: string): number => {
     if (!productId) return 0;
@@ -2459,70 +2505,68 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       selectedVariantId: resolvedVariantId,
     };
 
-    // Calculate current and next quantity synchronously
-    let current = 0;
-    if (blinkitCart[cartKey]?.quantity) {
-      current = blinkitCart[cartKey].quantity;
-    } else if (blinkitCart[targetProdId]?.quantity) {
-      current = blinkitCart[targetProdId].quantity;
-    } else {
-      for (const [k, v] of Object.entries(blinkitCart)) {
-        const itemPId = String(v.product?.id || (v.product as any)?._id || '');
-        const itemVId = (v.product as any)?.selectedVariantId || (v.product as any)?.variantId;
-        if (itemPId === targetProdId && (!resolvedVariantId || itemVId === resolvedVariantId)) {
-          current = v.quantity || 0;
-          break;
-        }
-      }
-    }
-
-    const nextQty = Math.max(0, current + delta);
-    const finalQty = effectiveProd.stock ? Math.min(nextQty, effectiveProd.stock) : nextQty;
-
-    // Register optimistic pending mutation timestamp to block older server responses from reverting
-    const now = Date.now();
-    pendingCartMutationsRef.current.set(cartKey, { expectedQty: finalQty, timestamp: now });
-    pendingCartMutationsRef.current.set(targetProdId, { expectedQty: finalQty, timestamp: now });
-
     // Snapshot current state for rollback if server request fails
     const prevBlinkitSnapshot = { ...blinkitCart };
     const prevCartSnapshot = [...cart];
 
-    // 1. Update blinkitCart immediately
+    let computedFinalQty = 0;
+
+    // 1. Update blinkitCart immediately using functional prev to avoid race conditions
     setBlinkitCart((prev) => {
       const copy = { ...prev };
-      if (finalQty <= 0) {
-        delete copy[cartKey];
-        delete copy[targetProdId];
-        Object.keys(copy).forEach((k) => {
-          const entry = copy[k];
-          const entryPId = String(entry?.product?.id || (entry?.product as any)?._id || '');
-          const entryVId = (entry?.product as any)?.selectedVariantId || (entry?.product as any)?.variantId;
-          if (entryPId === targetProdId) {
-            if (!resolvedVariantId || entryVId === resolvedVariantId || k === cartKey || k.startsWith(`${targetProdId}_`)) {
-              delete copy[k];
-            }
+
+      // Calculate current quantity accurately from prev state
+      let current = 0;
+      if (copy[cartKey]?.quantity) {
+        current = copy[cartKey].quantity;
+      } else if (copy[targetProdId]?.quantity) {
+        current = copy[targetProdId].quantity;
+      } else {
+        for (const [k, v] of Object.entries(copy)) {
+          const itemPId = String(v.product?.id || (v.product as any)?._id || '');
+          const itemVId = (v.product as any)?.selectedVariantId || (v.product as any)?.variantId;
+          if (itemPId === targetProdId && (!resolvedVariantId || itemVId === resolvedVariantId)) {
+            current = v.quantity || 0;
+            break;
           }
-        });
-        if (Object.keys(copy).length === 0) {
-          StorageService.removeItem(StorageService.KEYS.BLINKIT_CART);
-        } else {
-          StorageService.saveItem(StorageService.KEYS.BLINKIT_CART, copy);
         }
-        return copy;
       }
 
-      if (resolvedVariantId && copy[targetProdId]) {
-        delete copy[targetProdId];
+      const nextQty = Math.max(0, current + delta);
+      const finalQty = effectiveProd.stock ? Math.min(nextQty, effectiveProd.stock) : nextQty;
+      computedFinalQty = finalQty;
+
+      // Clean up any stale or conflicting keys for this product
+      Object.keys(copy).forEach((k) => {
+        const entry = copy[k];
+        const entryPId = String(entry?.product?.id || (entry?.product as any)?._id || '');
+        const entryVId = (entry?.product as any)?.selectedVariantId || (entry?.product as any)?.variantId;
+        if (entryPId === targetProdId) {
+          if (finalQty <= 0 || !resolvedVariantId || entryVId === resolvedVariantId || k === targetProdId || k === cartKey) {
+            delete copy[k];
+          }
+        }
+      });
+
+      if (finalQty > 0) {
+        copy[cartKey] = {
+          product: effectiveProd,
+          quantity: finalQty,
+        };
       }
 
-      copy[cartKey] = {
-        product: effectiveProd,
-        quantity: finalQty,
-      };
-      StorageService.saveItem(StorageService.KEYS.BLINKIT_CART, copy);
+      if (Object.keys(copy).length === 0) {
+        StorageService.removeItem(StorageService.KEYS.BLINKIT_CART);
+      } else {
+        StorageService.saveItem(StorageService.KEYS.BLINKIT_CART, copy);
+      }
       return copy;
     });
+
+    // Register optimistic pending mutation timestamp to block older server responses from reverting
+    const now = Date.now();
+    pendingCartMutationsRef.current.set(cartKey, { expectedQty: computedFinalQty, timestamp: now });
+    pendingCartMutationsRef.current.set(targetProdId, { expectedQty: computedFinalQty, timestamp: now });
 
     // 2. Synchronize to legacy cart immediately
     setCart((prev) => {
@@ -2553,7 +2597,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     });
 
-    // 3. Sync to backend API with automatic rollback on network error
+    // 3. Sync to backend API with authoritative summary update
     CartService.updateQuantityOnServer(
       targetProdId,
       delta,
@@ -2561,12 +2605,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       currentAreaId || undefined,
       currentStoreId || undefined
     )
-      .then(() => {
-        // Keep pending mutation lock active for 2s after success to absorb and block late socket events
+      .then((serverCart) => {
+        if (serverCart && Array.isArray(serverCart.items)) {
+          syncCartFromSummary(serverCart);
+        }
+        // Keep pending mutation lock active for 1.5s after success to absorb and block late socket events
         setTimeout(() => {
           pendingCartMutationsRef.current.delete(cartKey);
           pendingCartMutationsRef.current.delete(targetProdId);
-        }, 2000);
+        }, 1500);
       })
       .catch((err) => {
         console.warn('[Cart] Server update failed, rolling back local cart state:', err);
