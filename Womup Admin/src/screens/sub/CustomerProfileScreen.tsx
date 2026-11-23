@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   User,
   Phone,
@@ -39,6 +40,8 @@ import { CustomerLevelDetailModal } from '../modals/CustomerLevelDetailModal';
 import { NEST_API_BASE_URL } from '../../services/api';
 
 export const CustomerProfileScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
+  const tabScrollRef = useRef<ScrollView>(null);
   const {
     selectedCustomer,
     toggleBlockCustomer,
@@ -159,7 +162,14 @@ export const CustomerProfileScreen: React.FC = () => {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[
+        styles.content,
+        { paddingBottom: Math.max(insets.bottom, 16) + 110 },
+      ]}
+      showsVerticalScrollIndicator={true}
+    >
       {/* Header Profile Card */}
       <View style={styles.profileHeaderCard}>
         {selectedCustomer.avatar ? (
@@ -295,20 +305,33 @@ export const CustomerProfileScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* Sub Tabs */}
-      <View style={styles.tabRow}>
-        {(['Profile', 'Orders', 'Wallet', 'KYC', 'Token & Income History'] as const).map((tab) => {
-          const isSelected = activeTab === tab;
-          return (
-            <TouchableOpacity
-              key={tab}
-              style={[styles.tab, isSelected && styles.activeTab]}
-              onPress={() => setActiveTab(tab)}
-            >
-              <Text style={[styles.tabText, isSelected && styles.activeTabText]}>{tab}</Text>
-            </TouchableOpacity>
-          );
-        })}
+      {/* Sub Tabs - Horizontally Scrollable */}
+      <View style={styles.tabScrollWrapper}>
+        <ScrollView
+          ref={tabScrollRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabScrollContent}
+        >
+          {(['Profile', 'Orders', 'Wallet', 'KYC', 'Token & Income History'] as const).map((tab) => {
+            const isSelected = activeTab === tab;
+            return (
+              <TouchableOpacity
+                key={tab}
+                style={[styles.tab, isSelected && styles.activeTab]}
+                onPress={() => setActiveTab(tab)}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[styles.tabText, isSelected && styles.activeTabText]}
+                  numberOfLines={1}
+                >
+                  {tab}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
       {/* Tab Contents */}
@@ -886,26 +909,48 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
-  tabRow: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.cardBackground,
-    borderRadius: RADIUS.pill,
-    padding: 3,
+  tabScrollWrapper: {
     marginBottom: SPACING.md,
   },
-  tab: {
-    flex: 1,
-    paddingVertical: 8,
+  tabScrollContent: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
+    paddingVertical: 2,
+    paddingHorizontal: 2,
+  },
+  tab: {
+    paddingHorizontal: 16,
+    paddingVertical: 9,
     borderRadius: RADIUS.pill,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   activeTab: {
     backgroundColor: COLORS.purple,
+    borderColor: COLORS.purple,
+    ...Platform.select({
+      ios: {
+        shadowColor: COLORS.purple,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+      web: {
+        boxShadow: '0 2px 8px rgba(124, 58, 237, 0.25)',
+      } as any,
+    }),
   },
   tabText: {
     fontSize: 13,
     fontWeight: '600',
-    color: COLORS.textMuted,
+    color: '#64748B',
   },
   activeTabText: {
     color: COLORS.white,
