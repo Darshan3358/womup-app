@@ -40,6 +40,8 @@ interface MemberDetail {
   name: string;
   phone?: string;
   memberCode?: string;
+  sponsorCode?: string;
+  sponsorName?: string;
   isActive?: boolean;
   isIncomeEligible?: boolean;
   registrationPincode?: string;
@@ -101,7 +103,9 @@ export const CustomerLevelDetailModal: React.FC<CustomerLevelDetailModalProps> =
             id: m.id || m._id,
             name: m.name || 'WormUp Member',
             phone: m.phone,
-            memberCode: m.referralCode || m.sponsorCode,
+            memberCode: m.referralCode || m.memberCode,
+            sponsorCode: m.sponsorCode,
+            sponsorName: m.sponsorName,
             isActive: m.isActiveMember || (m.monthlyPurchaseValue || 0) >= 2000,
             monthlyPurchaseValue: m.monthlyPurchaseValue || 0,
             vegetableGMV: 0,
@@ -441,6 +445,17 @@ export const CustomerLevelDetailModal: React.FC<CustomerLevelDetailModalProps> =
                                           <Text style={styles.memberPhoneText}>
                                             📞 {member.phone}
                                           </Text>
+                                        )}
+                                      </View>
+                                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
+                                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#64748B' }}>Sponsor ID:</Text>
+                                        <View style={{ backgroundColor: '#F3E8FF', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4, borderWidth: 1, borderColor: '#E9D5FF' }}>
+                                          <Text style={{ fontSize: 10, fontWeight: '800', color: '#7E22CE' }}>
+                                            {member.sponsorCode || 'ROOT'}
+                                          </Text>
+                                        </View>
+                                        {Boolean(member.sponsorName) && (
+                                          <Text style={{ fontSize: 10, color: '#64748B' }}>({member.sponsorName})</Text>
                                         )}
                                       </View>
                                     </View>

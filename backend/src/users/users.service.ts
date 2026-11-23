@@ -777,6 +777,75 @@ export class UsersService {
     return levels;
   }
 
+  // ── Helper: Resolve Sponsor Codes for Downline Levels ──
+  private async resolveSponsorCodeMap(
+    rootUser: any,
+    downlineLevels: Array<UserDocument[]>,
+  ): Promise<Map<string, { code: string; name?: string }>> {
+    const parentCodeMap = new Map<string, { code: string; name?: string }>();
+
+    const cleanRootCode = (rootUser.referralCode || (rootUser as any).customerCode || 'WOMADMIN')
+      .replace(/^WORMUP/i, 'WOMUP')
+      .replace(/^WORM/i, 'WOM');
+    parentCodeMap.set(rootUser._id.toString(), {
+      code: cleanRootCode,
+      name: rootUser.name || (rootUser as any).fullName,
+    });
+
+    for (const lvl of downlineLevels) {
+      for (const m of lvl) {
+        const mCode = (m.referralCode || (m as any).customerCode || '')
+          .replace(/^WORMUP/i, 'WOMUP')
+          .replace(/^WORM/i, 'WOM');
+        if (mCode) {
+          parentCodeMap.set(m._id.toString(), {
+            code: mCode,
+            name: m.name || (m as any).fullName,
+          });
+        }
+      }
+    }
+
+    const missingParentIds = new Set<string>();
+    for (const lvl of downlineLevels) {
+      for (const m of lvl) {
+        if (!m.sponsorCode) {
+          const pId = m.referredBy || m.sponsorId || (m as any).parentId;
+          if (pId) {
+            const pIdStr = pId.toString();
+            if (!parentCodeMap.has(pIdStr) && Types.ObjectId.isValid(pIdStr)) {
+              missingParentIds.add(pIdStr);
+            }
+          }
+        }
+      }
+    }
+
+    if (missingParentIds.size > 0) {
+      try {
+        const parents = await this.userModel.find({
+          _id: { $in: Array.from(missingParentIds).map((id) => new Types.ObjectId(id)) },
+        }).select('_id referralCode customerCode name fullName').lean().exec();
+
+        parents.forEach((p: any) => {
+          const pCode = (p.referralCode || p.customerCode || '')
+            .replace(/^WORMUP/i, 'WOMUP')
+            .replace(/^WORM/i, 'WOM');
+          if (pCode) {
+            parentCodeMap.set(p._id.toString(), {
+              code: pCode,
+              name: p.name || p.fullName,
+            });
+          }
+        });
+      } catch (err) {
+        // Safe fallback
+      }
+    }
+
+    return parentCodeMap;
+  }
+
   // ── Team Performance & 7-Level Income Dashboard ──
   async getTeamDashboard(userId: string) {
     await this.settleUserPendingIncome(userId);
@@ -792,6 +861,10 @@ export class UsersService {
     if (!user) throw new NotFoundException('User not found');
 
     const downlineLevels = await this.get7LevelDownline(user._id);
+    const parentCodeMap = await this.resolveSponsorCodeMap(user, downlineLevels);
+    const cleanUserCode = (user.referralCode || (user as any).customerCode || 'WOMADMIN')
+      .replace(/^WORMUP/i, 'WOMUP')
+      .replace(/^WORM/i, 'WOM');
 
     let totalTeamSize = 0;
     let totalVegetableGMV = 0;
@@ -818,11 +891,35 @@ export class UsersService {
         const mIncome = Number(((veg * 0.03) + (other * 0.004)).toFixed(2));
         const isActive = (m.monthlyPurchaseValue || 0) >= 2000;
         const memberCode = m.referralCode || m.sponsorCode || (m.phone ? `WOM${m.phone.slice(-5)}` : `WOM${m._id.toString().slice(-5).toUpperCase()}`);
+
+        const pId = m.referredBy || m.sponsorId || (m as any).parentId;
+        const pIdStr = pId ? pId.toString() : '';
+
+        let cleanSponsorCode = (m.sponsorCode || '').trim();
+        let cleanSponsorName = (m.sponsorName || '').trim();
+
+        if (!cleanSponsorCode && pIdStr && parentCodeMap.has(pIdStr)) {
+          const pInfo = parentCodeMap.get(pIdStr)!;
+          cleanSponsorCode = pInfo.code;
+          if (!cleanSponsorName && pInfo.name) cleanSponsorName = pInfo.name;
+        }
+
+        if (!cleanSponsorCode && index === 0) {
+          cleanSponsorCode = cleanUserCode;
+          cleanSponsorName = user.name;
+        }
+
+        cleanSponsorCode = cleanSponsorCode.replace(/^WORMUP/i, 'WOMUP').replace(/^WORM/i, 'WOM');
+
         return {
           id: m._id.toString(),
           name: m.fullNameAsPerAadhaar || m.name || 'WormUp Member',
           phone: m.phone ? `${m.phone.slice(0, 3)}****${m.phone.slice(-3)}` : undefined,
           memberCode,
+          referralCode: memberCode,
+          sponsorCode: cleanSponsorCode || 'N/A',
+          sponsorName: cleanSponsorName || '',
+          sponsorId: pIdStr,
           isActive,
           isIncomeEligible: isEligibleForIncome,
           registrationPincode: m.registrationPincode,
@@ -1708,27 +1805,63 @@ export class UsersService {
     if (!customer) throw new NotFoundException('Customer not found');
 
     const downlineLevels = await this.get7LevelDownline(customer._id);
+    const parentCodeMap = await this.resolveSponsorCodeMap(customer, downlineLevels);
+    const cleanCustomerCode = (customer.referralCode || (customer as any).customerCode || 'WOMADMIN')
+      .replace(/^WORMUP/i, 'WOMUP')
+      .replace(/^WORM/i, 'WOM');
+
     return {
       success: true,
       customer: {
         id: customer._id,
         name: customer.name,
-        referralCode: customer.referralCode,
+        referralCode: cleanCustomerCode,
         sponsorCode: customer.sponsorCode,
         sponsorName: customer.sponsorName,
       },
       levels: downlineLevels.map((lvl, idx) => ({
         level: idx + 1,
         count: lvl.length,
-        members: lvl.map((m) => ({
-          id: m._id,
-          name: m.name,
-          phone: m.phone,
-          referralCode: m.referralCode,
-          monthlyPurchaseValue: m.monthlyPurchaseValue || 0,
-          isActiveMember: (m.monthlyPurchaseValue || 0) >= 2000,
-          verificationStatus: m.verificationStatus,
-        })),
+        members: lvl.map((m) => {
+          let cleanSponsorCode = (m.sponsorCode || '').trim();
+          let cleanSponsorName = (m.sponsorName || '').trim();
+
+          const pId = m.referredBy || m.sponsorId || (m as any).parentId;
+          const pIdStr = pId ? pId.toString() : '';
+
+          if (!cleanSponsorCode && pIdStr && parentCodeMap.has(pIdStr)) {
+            const pInfo = parentCodeMap.get(pIdStr)!;
+            cleanSponsorCode = pInfo.code;
+            if (!cleanSponsorName && pInfo.name) {
+              cleanSponsorName = pInfo.name;
+            }
+          }
+
+          if (!cleanSponsorCode && idx === 0) {
+            cleanSponsorCode = cleanCustomerCode;
+            cleanSponsorName = customer.name;
+          }
+
+          cleanSponsorCode = cleanSponsorCode.replace(/^WORMUP/i, 'WOMUP').replace(/^WORM/i, 'WOM');
+
+          const cleanMemberCode = (m.referralCode || (m as any).customerCode || `WOM${m._id.toString().slice(-6).toUpperCase()}`)
+            .replace(/^WORMUP/i, 'WOMUP')
+            .replace(/^WORM/i, 'WOM');
+
+          return {
+            id: m._id,
+            name: m.name,
+            phone: m.phone,
+            referralCode: cleanMemberCode,
+            memberCode: cleanMemberCode,
+            sponsorCode: cleanSponsorCode || 'N/A',
+            sponsorName: cleanSponsorName || '',
+            sponsorId: pIdStr,
+            monthlyPurchaseValue: m.monthlyPurchaseValue || 0,
+            isActiveMember: (m.monthlyPurchaseValue || 0) >= 2000,
+            verificationStatus: m.verificationStatus,
+          };
+        }),
       })),
     };
   }

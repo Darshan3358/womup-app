@@ -292,13 +292,17 @@ export const ReferralTreeScreen: React.FC = () => {
                       members.map((m: any) => {
                         const mId = m.id || m._id;
                         const isSpendActive = m.isActiveMember || (m.monthlyPurchaseValue || 0) >= 2000;
+                        const memberIdCode = m.referralCode || m.memberCode || 'N/A';
+                        const sponsorCode = m.sponsorCode || 'ROOT';
 
                         return (
                           <View key={mId} style={styles.memberRow}>
                             <View style={styles.memberLeft}>
-                              <User size={14} color="#64748B" />
-                              <View>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <View style={styles.memberAvatarCircle}>
+                                <User size={13} color="#64748B" />
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                                   <Text style={styles.memberName}>{m.name}</Text>
                                   <View
                                     style={[
@@ -320,7 +324,18 @@ export const ReferralTreeScreen: React.FC = () => {
                                   <Phone size={10} color="#94A3B8" />
                                   <Text style={styles.memberPhone}>{m.phone || 'No Phone'}</Text>
                                   <Text style={styles.dot}>•</Text>
-                                  <Text style={styles.memberCode}>{m.referralCode}</Text>
+                                  <Text style={styles.memberCode}>ID: {memberIdCode}</Text>
+                                </View>
+                                <View style={styles.sponsorBadgeRow}>
+                                  <Text style={styles.sponsorBadgeLabel}>Sponsor ID:</Text>
+                                  <View style={styles.sponsorBadge}>
+                                    <Text style={styles.sponsorBadgeText}>{sponsorCode}</Text>
+                                  </View>
+                                  {Boolean(m.sponsorName) && (
+                                    <Text style={styles.sponsorNameText} numberOfLines={1}>
+                                      • {m.sponsorName}
+                                    </Text>
+                                  )}
                                 </View>
                               </View>
                             </View>
@@ -678,10 +693,19 @@ const styles = StyleSheet.create({
   },
   memberLeft: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 8,
     flex: 1,
     marginRight: 10,
+  },
+  memberAvatarCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 2,
   },
   memberName: {
     fontSize: 13,
@@ -745,5 +769,34 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: COLORS.purple,
+  },
+  sponsorBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 3,
+    flexWrap: 'wrap',
+  },
+  sponsorBadgeLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  sponsorBadge: {
+    backgroundColor: '#F3E8FF',
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+  },
+  sponsorBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#7E22CE',
+  },
+  sponsorNameText: {
+    fontSize: 10,
+    color: '#64748B',
   },
 });
