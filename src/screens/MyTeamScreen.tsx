@@ -10,10 +10,11 @@ import {
   RefreshControl,
   Modal,
   ScrollView,
-  SafeAreaView,
   Platform,
   Alert,
+  StatusBar,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '../context/AppContext';
 import { AppIcon } from '../components/common/AppIcon';
 import { COLORS } from '../theme/colors';
@@ -27,6 +28,8 @@ interface DrilldownEntry {
 }
 
 export const MyTeamScreen: React.FC = () => {
+  const insets = useSafeAreaInsets();
+  const topInset = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 0) : 0);
   const { goBack, user } = useApp();
 
   // State
@@ -281,9 +284,10 @@ export const MyTeamScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={[styles.safeArea, { paddingBottom: insets.bottom }]}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={Platform.OS === 'android'} />
       {/* 1. Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: topInset + (Platform.OS === 'android' ? 10 : 8) }]}>
         <TouchableOpacity
           onPress={() => {
             if (drilldownStack.length > 0) {
@@ -722,7 +726,7 @@ export const MyTeamScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -735,7 +739,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? 12 : 8,
     paddingBottom: 12,
     backgroundColor: COLORS.white,
     borderBottomWidth: 1,
