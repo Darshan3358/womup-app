@@ -206,14 +206,21 @@ export class CartService {
         const activeVIdStr = vIdStr || (variantObj?.id || '');
         const dedupKey = activeVIdStr ? `${prodIdStr}_${activeVIdStr}` : prodIdStr;
 
-        // Skip exact duplicate items or coalesce if same product/variant already processed
+        const linePrice = sellingPrice * entry.quantity;
+        const lineMrp = mrp * entry.quantity;
+
+        // Coalesce if same product/variant already processed to prevent lost quantities
         if (seenItemKeys.has(dedupKey)) {
+          const existing = detailedItems.find((d) => d.id === prodIdStr || d.canonicalCartKey === dedupKey);
+          if (existing) {
+            existing.quantity = (existing.quantity || 0) + entry.quantity;
+            itemSubtotal += linePrice;
+            mrpTotal += lineMrp;
+          }
           continue;
         }
         seenItemKeys.add(dedupKey);
 
-        const linePrice = sellingPrice * entry.quantity;
-        const lineMrp = mrp * entry.quantity;
         itemSubtotal += linePrice;
         mrpTotal += lineMrp;
 
@@ -490,8 +497,8 @@ export class CartService {
       return !reqVIdStr && !itemVIdStr;
     });
 
-    // Only fall back to an un-varianted entry if no specific variant was requested
-    if (existingIndex === -1 && !reqVIdStr) {
+    // If exact variant not found, match by product ID to update/upgrade rather than duplicate
+    if (existingIndex === -1) {
       existingIndex = cart.items.findIndex((i) => i.productId.toString() === targetIdStr || i.productId.toString() === productId);
     }
 
@@ -580,8 +587,8 @@ export class CartService {
       return !reqVIdStr && !itemVIdStr;
     });
 
-    // Only fall back to an un-varianted entry if no specific variant was requested
-    if (existingIndex === -1 && !reqVIdStr) {
+    // If exact variant not found, match by product ID to update/upgrade rather than duplicate
+    if (existingIndex === -1) {
       existingIndex = cart.items.findIndex((i) => i.productId.toString() === targetIdStr || i.productId.toString() === productId);
     }
 
