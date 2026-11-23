@@ -472,14 +472,12 @@ const styles = StyleSheet.create({
   imageContainer: {
     width: '100%',
     aspectRatio: 1,
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 14,
-    borderTopRightRadius: 14,
+    backgroundColor: '#F7F7F7',
+    borderRadius: 10,
     position: 'relative',
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 6,
   },
   horizontalImageContainer: {
     width: '100%',
@@ -488,7 +486,6 @@ const styles = StyleSheet.create({
   productImage: {
     width: '100%',
     height: '100%',
-    resizeMode: 'contain',
   },
   wishlistButton: {
     position: 'absolute',

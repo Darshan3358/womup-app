@@ -23,7 +23,7 @@ export const resolveProductImageSource = (
   // Optimize Cloudinary URLs with auto format and uniform 400x400 padded fit
   if (optimizedRemote.includes('res.cloudinary.com') && optimizedRemote.includes('/upload/')) {
     if (!optimizedRemote.includes('/upload/f_auto,q_auto') && !optimizedRemote.includes('/upload/w_')) {
-      optimizedRemote = optimizedRemote.replace('/upload/', '/upload/f_auto,q_auto,w_400,c_pad,b_white/');
+      optimizedRemote = optimizedRemote.replace('/upload/', '/upload/f_auto,q_auto,w_400,h_400,c_pad,b_rgb:F7F7F7/');
     }
   }
 

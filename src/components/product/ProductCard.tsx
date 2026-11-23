@@ -312,19 +312,16 @@ const styles = StyleSheet.create({
   gridImageContainer: {
     width: '100%',
     aspectRatio: 1,
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: RADIUS.card,
-    borderTopRightRadius: RADIUS.card,
+    backgroundColor: '#F7F7F7',
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,
-    padding: 6,
     overflow: 'hidden',
   },
   gridProductImage: {
     width: '100%',
     height: '100%',
-    resizeMode: 'contain',
   },
   iconCircleLarge: {
     width: 54,

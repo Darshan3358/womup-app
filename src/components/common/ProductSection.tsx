@@ -240,11 +240,7 @@ const ProductSectionComponent: React.FC<ProductSectionProps> = ({
         <TouchableOpacity
           activeOpacity={0.9}
           onPress={() => onOpenProduct(getProductPayload())}
-          style={[
-            styles.imageWrapper,
-            { width: '100%', aspectRatio: 1 },
-            isCompact && { marginBottom: 6 },
-          ]}
+          style={styles.imageContainer}
         >
           <Image
             source={resolveProductImageSource(item.imageUrl, item.name, (item as any).slug)}
@@ -673,19 +669,19 @@ const styles = StyleSheet.create({
     shadowRadius: 1,
     elevation: 1,
   },
-  imageWrapper: {
-    borderRadius: 8,
+  imageContainer: {
+    width: '100%',
+    aspectRatio: 1,
+    backgroundColor: '#F7F7F7',
+    borderRadius: 10,
     overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
     alignItems: 'center',
-    padding: 6,
+    justifyContent: 'center',
     marginBottom: 6,
   },
   productImage: {
     width: '100%',
     height: '100%',
-    resizeMode: 'contain',
   },
   productName: {
     fontSize: 11.5,
