@@ -1,0 +1,34 @@
+[
+  {
+    "_id": "6b0059dc1b70282aedd37be6",
+    "riderId": "6b00503174dbac6e14818c5c",
+    "riderName": "Ramesh Kumar",
+    "riderPhone": "9876543299",
+    "amount": 53,
+    "utrNumber": "123456789009",
+    "paymentMethod": "UPI",
+    "status": "APPROVED",
+    "requestedAt": "2026-11-20T14:31:56.918Z",
+    "createdAt": "2026-11-20T14:31:56.919Z",
+    "updatedAt": "2026-11-20T14:31:56.919Z",
+    "__v": 0,
+    "adminRemarks": "Settlement verified and approved",
+    "approvedAt": "2026-11-20T14:32:46.385Z"
+  },
+  {
+    "_id": "6b00624e1b70282aedd3858a",
+    "riderId": "6b00503174dbac6e14818c5c",
+    "riderName": "Ramesh Kumar",
+    "riderPhone": "9876543299",
+    "amount": 894,
+    "utrNumber": "sgdiqwugqjlduqegdqs",
+    "paymentMethod": "UPI",
+    "status": "APPROVED",
+    "requestedAt": "2026-11-20T15:07:58.971Z",
+    "createdAt": "2026-11-20T15:07:58.972Z",
+    "updatedAt": "2026-11-20T15:07:58.972Z",
+    "__v": 0,
+    "adminRemarks": "Settlement verified and approved",
+    "approvedAt": "2026-11-20T15:08:55.877Z"
+  }
+]

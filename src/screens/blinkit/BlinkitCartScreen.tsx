@@ -17,7 +17,7 @@ import { TYPOGRAPHY } from '../../theme/typography';
 import { AppIcon } from '../../components/common/AppIcon';
 import { useApp } from '../../context/AppContext';
 import { CartService } from '../../services/cartService';
-import { resolveImageThumbnail } from '../../utils/imageUrl';
+import { resolveImageThumbnail, resolveProductImageSource } from '../../utils/imageUrl';
 import { matchAreaByName } from '../../data/areas';
 import { CartScreenSkeleton, Skeleton } from '../../components/common/Skeleton';
 
@@ -318,7 +318,7 @@ export const BlinkitCartScreen: React.FC = () => {
               >
                 <View style={styles.itemEmojiContainer}>
                   <Image
-                    source={{ uri: resolveImageThumbnail(entry.product.imageUrl) }}
+                    source={resolveProductImageSource(entry.product.imageUrl)}
                     style={styles.itemRealImage}
                     resizeMode="cover"
                   />

@@ -1,0 +1,62 @@
+[
+  {
+    "_id": "6abcefe75a521a988d799c02",
+    "code": "AHM",
+    "createdAt": "2026-09-30T11:17:59.269Z",
+    "name": "Ahmedabad",
+    "sortOrder": 1,
+    "state": "Gujarat",
+    "status": "Active",
+    "updatedAt": "2026-09-30T11:17:59.269Z"
+  },
+  {
+    "_id": "6abcefe75a521a988d799c03",
+    "code": "SUR",
+    "createdAt": "2026-09-30T11:17:59.269Z",
+    "name": "Surat",
+    "sortOrder": 2,
+    "state": "Gujarat",
+    "status": "Active",
+    "updatedAt": "2026-09-30T11:17:59.317Z"
+  },
+  {
+    "_id": "6abcefe75a521a988d799c04",
+    "code": "BDQ",
+    "createdAt": "2026-09-30T11:17:59.269Z",
+    "name": "Vadodara",
+    "sortOrder": 3,
+    "state": "Gujarat",
+    "status": "Active",
+    "updatedAt": "2026-09-30T11:17:59.362Z"
+  },
+  {
+    "_id": "6abcefe75a521a988d799c05",
+    "code": "RAJ",
+    "createdAt": "2026-09-30T11:17:59.269Z",
+    "name": "Rajkot",
+    "sortOrder": 4,
+    "state": "Gujarat",
+    "status": "Active",
+    "updatedAt": "2026-09-30T11:17:59.408Z"
+  },
+  {
+    "_id": "6abcefe75a521a988d799c06",
+    "code": "GNR",
+    "createdAt": "2026-09-30T11:17:59.269Z",
+    "name": "Gandhinagar",
+    "sortOrder": 5,
+    "state": "Gujarat",
+    "status": "Active",
+    "updatedAt": "2026-09-30T11:17:59.449Z"
+  },
+  {
+    "_id": "6af827ba132fe7423ea5ac13",
+    "name": "Pratapgarh",
+    "code": "PRG",
+    "state": "Rajasthan",
+    "status": "Active",
+    "isActive": true,
+    "createdAt": "2026-11-14T09:19:54.739Z",
+    "updatedAt": "2026-11-14T09:19:54.739Z"
+  }
+]

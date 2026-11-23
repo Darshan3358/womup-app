@@ -1,7 +1,19 @@
 import { Platform } from 'react-native';
+import { getLocalProductAsset } from './localProductAssets';
 
 const getUploadsBaseUrl = (): string => {
   return 'https://womup-app-uquz.onrender.com';
+};
+
+/**
+ * Universal Image Source Resolver
+ * Prioritizes 34 local bundled assets for 0ms loading, falling back to remote URLs.
+ */
+export const resolveProductImageSource = (url?: string | null): any => {
+  const local = getLocalProductAsset(url);
+  if (local) return local;
+  const remote = resolveImageUrl(url);
+  return { uri: remote || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&q=80' };
 };
 
 /**
@@ -27,6 +39,12 @@ export const resolveImageUrl = (url?: string | null): string => {
     trimmed.includes('googleusercontent.com')
   ) {
     return trimmed;
+  }
+
+  // If URL starts with api uploads path
+  if (trimmed.startsWith('/api/v1/uploads/files/')) {
+    const base = getUploadsBaseUrl();
+    return `${base}${trimmed}`;
   }
 
   // If the URL contains an /uploads/ asset path

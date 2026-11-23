@@ -1,0 +1,39 @@
+[
+  {
+    "_id": "6afc5020b3587c2ddc607731",
+    "userId": "6afc501e88ae17b096618c43",
+    "availableIncome": 500,
+    "balance": 500,
+    "createdAt": "2026-11-17T13:01:19.465Z",
+    "pendingIncome": 0,
+    "shoppingCoins": 2000,
+    "updatedAt": "2026-11-17T13:01:19.465Z"
+  },
+  {
+    "_id": "6afc592eb3587c2ddc6078cc",
+    "userId": "6afc59229189c0b0663cca7f",
+    "balance": 0,
+    "pendingIncome": 30,
+    "shoppingCoins": 2000,
+    "updatedAt": "2026-11-17T15:14:29.046Z",
+    "pendingShoppingCoins": 700
+  },
+  {
+    "_id": "6afc592eb3587c2ddc6078cd",
+    "userId": "6afc59239189c0b0663cca80",
+    "balance": 0,
+    "pendingIncome": 20,
+    "shoppingCoins": 2000,
+    "updatedAt": "2026-11-17T15:14:29.125Z",
+    "pendingShoppingCoins": 400
+  },
+  {
+    "_id": "6afc592eb3587c2ddc6078ce",
+    "userId": "6afc59249189c0b0663cca81",
+    "balance": 0,
+    "pendingIncome": 0,
+    "shoppingCoins": 2000,
+    "updatedAt": "2026-11-17T15:14:29.175Z",
+    "pendingShoppingCoins": 0
+  }
+]

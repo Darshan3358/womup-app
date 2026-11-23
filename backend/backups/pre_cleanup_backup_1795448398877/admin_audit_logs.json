@@ -1,0 +1,684 @@
+[
+  {
+    "_id": "6ad26430a99413179ec71976",
+    "actorId": "6ad26430a99413179ec71975",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6ad2622f563ca91f02d85927",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": "good "
+    },
+    "createdAt": "2026-10-16T17:51:44.442Z",
+    "updatedAt": "2026-10-16T17:51:44.442Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ad267db6c7703ba75866201",
+    "actorId": "6ad267db6c7703ba75866200",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6ad2622f563ca91f02d85927",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": "good"
+    },
+    "createdAt": "2026-10-16T18:07:23.959Z",
+    "updatedAt": "2026-10-16T18:07:23.959Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ad268116c7703ba758662ca",
+    "actorId": "6ad268116c7703ba758662c9",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6ad2622f563ca91f02d85927",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-10-16T18:08:17.145Z",
+    "updatedAt": "2026-10-16T18:08:17.145Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ad4cd6d017c2d71eb9bb0ea",
+    "actorId": "6ad4cd6d017c2d71eb9bb0e9",
+    "actorRole": "SUPER_ADMIN",
+    "action": "UPDATE_PAYOUT_RATE",
+    "entity": "PayoutRate",
+    "entityId": "GLOBAL",
+    "newValue": {
+      "notes": ""
+    },
+    "createdAt": "2026-10-18T13:45:17.622Z",
+    "updatedAt": "2026-10-18T13:45:17.622Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ad4cd6f017c2d71eb9bb0f3",
+    "actorId": "6ad4cd6f017c2d71eb9bb0f2",
+    "actorRole": "SUPER_ADMIN",
+    "action": "UPDATE_PAYOUT_RATE",
+    "entity": "PayoutRate",
+    "entityId": "GLOBAL",
+    "newValue": {
+      "notes": ""
+    },
+    "createdAt": "2026-10-18T13:45:19.733Z",
+    "updatedAt": "2026-10-18T13:45:19.733Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ad5feade39fb6b79b284461",
+    "actorId": "6ad5feade39fb6b79b284460",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_WITHDRAWAL",
+    "entity": "RiderSettlement",
+    "entityId": "6ad5db64d720ad3b18ac7cf0",
+    "newValue": {
+      "status": "SETTLED"
+    },
+    "createdAt": "2026-10-19T11:27:41.458Z",
+    "updatedAt": "2026-10-19T11:27:41.458Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ad66aa8c2eae6186ac703d6",
+    "actorId": "6ad66aa8c2eae6186ac703d5",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6ad5f50baab0a82f1a609b60",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-10-19T19:08:24.970Z",
+    "updatedAt": "2026-10-19T19:08:24.970Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ad66ab1c2eae6186ac703ec",
+    "actorId": "6ad66ab1c2eae6186ac703eb",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6ad4c0e28448016b6b21cb9a",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-10-19T19:08:33.482Z",
+    "updatedAt": "2026-10-19T19:08:33.482Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ad66ab3c2eae6186ac703fd",
+    "actorId": "6ad66ab3c2eae6186ac703fc",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6ad2622f563ca91f02d85927",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-10-19T19:08:35.698Z",
+    "updatedAt": "2026-10-19T19:08:35.698Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ad66ab5c2eae6186ac70410",
+    "actorId": "6ad66ab5c2eae6186ac7040f",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6acef7e580276080bfea0cf4",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-10-19T19:08:37.950Z",
+    "updatedAt": "2026-10-19T19:08:37.950Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ad66d1dc2eae6186ac706a6",
+    "actorId": "6ad66d1dc2eae6186ac706a5",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6ad5f50baab0a82f1a609b60",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-10-19T19:18:53.181Z",
+    "updatedAt": "2026-10-19T19:18:53.181Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ad66d1fc2eae6186ac706b7",
+    "actorId": "6ad66d1fc2eae6186ac706b6",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6ad4c0e28448016b6b21cb9a",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-10-19T19:18:55.573Z",
+    "updatedAt": "2026-10-19T19:18:55.573Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ad66d21c2eae6186ac706c8",
+    "actorId": "6ad66d21c2eae6186ac706c7",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6ad2622f563ca91f02d85927",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-10-19T19:18:57.215Z",
+    "updatedAt": "2026-10-19T19:18:57.215Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ad66d23c2eae6186ac706d9",
+    "actorId": "6ad66d22c2eae6186ac706d8",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6acef7e580276080bfea0cf4",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-10-19T19:18:59.001Z",
+    "updatedAt": "2026-10-19T19:18:59.001Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ad66d43c2eae6186ac7079b",
+    "actorId": "6ad66d43c2eae6186ac7079a",
+    "actorRole": "SUPER_ADMIN",
+    "action": "REJECT_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6ad5f50baab0a82f1a609b60",
+    "newValue": {
+      "customerKycStatus": 3,
+      "reason": "Aadhaar image not clear / blurry",
+      "notes": ""
+    },
+    "createdAt": "2026-10-19T19:19:31.858Z",
+    "updatedAt": "2026-10-19T19:19:31.858Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ad66d6bc2eae6186ac7084e",
+    "actorId": "6ad66d6bc2eae6186ac7084d",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6ad4c0e28448016b6b21cb9a",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-10-19T19:20:11.622Z",
+    "updatedAt": "2026-10-19T19:20:11.622Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ad66d6fc2eae6186ac70867",
+    "actorId": "6ad66d6fc2eae6186ac70866",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6ad2622f563ca91f02d85927",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-10-19T19:20:15.886Z",
+    "updatedAt": "2026-10-19T19:20:15.886Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ad66d71c2eae6186ac70878",
+    "actorId": "6ad66d71c2eae6186ac70877",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6acef7e580276080bfea0cf4",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-10-19T19:20:17.853Z",
+    "updatedAt": "2026-10-19T19:20:17.853Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ad66fd290bfd985560af7cc",
+    "actorId": "6ad66fd290bfd985560af7cb",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6ad5f50baab0a82f1a609b60",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-10-19T19:30:26.148Z",
+    "updatedAt": "2026-10-19T19:30:26.148Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ad66fd790bfd985560af7df",
+    "actorId": "6ad66fd790bfd985560af7de",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6ad4c0e28448016b6b21cb9a",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-10-19T19:30:31.546Z",
+    "updatedAt": "2026-10-19T19:30:31.546Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ad66fd990bfd985560af7f2",
+    "actorId": "6ad66fd990bfd985560af7f1",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6ad2622f563ca91f02d85927",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-10-19T19:30:33.157Z",
+    "updatedAt": "2026-10-19T19:30:33.157Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ad66fda90bfd985560af803",
+    "actorId": "6ad66fda90bfd985560af802",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6acef7e580276080bfea0cf4",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-10-19T19:30:34.966Z",
+    "updatedAt": "2026-10-19T19:30:34.966Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ad672a0ab0c80bdd42bd5ea",
+    "actorId": "6ad672a0ab0c80bdd42bd5e9",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6ad5f50baab0a82f1a609b60",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-10-19T19:42:24.940Z",
+    "updatedAt": "2026-10-19T19:42:24.940Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ad74c01dfdf6c5d742f0dae",
+    "actorId": "6ad74c01dfdf6c5d742f0dad",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6ad5f50baab0a82f1a609b60",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-10-20T11:09:53.830Z",
+    "updatedAt": "2026-10-20T11:09:53.830Z",
+    "__v": 0
+  },
+  {
+    "_id": "6adfbdcae030379004e28a45",
+    "actorId": "6adfbdcae030379004e28a44",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6adfa92ecf1461616763aa7a",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-10-26T20:53:30.808Z",
+    "updatedAt": "2026-10-26T20:53:30.808Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aeda1b8a64cec48b93b138c",
+    "actorId": "6aeda1b8a64cec48b93b138b",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6aed9deca64cec48b93b1172",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-11-06T09:45:28.038Z",
+    "updatedAt": "2026-11-06T09:45:28.038Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aeda1bca64cec48b93b139b",
+    "actorId": "6aeda1bca64cec48b93b139a",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6ae9bf92a64cec48b93ae65e",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-11-06T09:45:32.055Z",
+    "updatedAt": "2026-11-06T09:45:32.055Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aeda1bfa64cec48b93b13aa",
+    "actorId": "6aeda1bfa64cec48b93b13a9",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6ae9993ca64cec48b93ae535",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-11-06T09:45:35.025Z",
+    "updatedAt": "2026-11-06T09:45:35.025Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aeda1c2a64cec48b93b13b9",
+    "actorId": "6aeda1c2a64cec48b93b13b8",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6ae5b477a64cec48b93ac835",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-11-06T09:45:38.037Z",
+    "updatedAt": "2026-11-06T09:45:38.037Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aedb2d5a64cec48b93b1866",
+    "actorId": "6aedb2d5a64cec48b93b1865",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_VENDOR",
+    "entity": "Vendor",
+    "entityId": "6ae268b620b08cfa5b81e314",
+    "newValue": {
+      "isVerified": true,
+      "isActive": true,
+      "vendorStatus": 2
+    },
+    "createdAt": "2026-11-06T10:58:29.976Z",
+    "updatedAt": "2026-11-06T10:58:29.976Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aeee81e32a0ed6c254071da",
+    "actorId": "6aeee81e32a0ed6c254071d9",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6aeee18032a0ed6c25406e5c",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-11-07T08:58:06.782Z",
+    "updatedAt": "2026-11-07T08:58:06.782Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aeee82232a0ed6c254071e9",
+    "actorId": "6aeee82232a0ed6c254071e8",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6aeee5a032a0ed6c254070c1",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-11-07T08:58:10.339Z",
+    "updatedAt": "2026-11-07T08:58:10.339Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aef048d6ef450c2c9caf179",
+    "actorId": "6aef048d6ef450c2c9caf178",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6aef01446ef450c2c9caee00",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-11-07T10:59:25.066Z",
+    "updatedAt": "2026-11-07T10:59:25.066Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aef04916ef450c2c9caf18f",
+    "actorId": "6aef04916ef450c2c9caf18e",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6aef02de6ef450c2c9caefc0",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-11-07T10:59:29.863Z",
+    "updatedAt": "2026-11-07T10:59:29.863Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aef04986ef450c2c9caf1b3",
+    "actorId": "6aef04986ef450c2c9caf1b2",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6aeefdf932a0ed6c254078b1",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-11-07T10:59:36.061Z",
+    "updatedAt": "2026-11-07T10:59:36.061Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aef0bdb6ef450c2c9caf609",
+    "actorId": "6aef0bdb6ef450c2c9caf608",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6aef08a46ef450c2c9caf44d",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-11-07T11:30:35.299Z",
+    "updatedAt": "2026-11-07T11:30:35.299Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aef0be16ef450c2c9caf626",
+    "actorId": "6aef0be16ef450c2c9caf625",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6aef09956ef450c2c9caf4c7",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-11-07T11:30:41.160Z",
+    "updatedAt": "2026-11-07T11:30:41.160Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aef0be56ef450c2c9caf643",
+    "actorId": "6aef0be56ef450c2c9caf642",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6aef0a7a6ef450c2c9caf554",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-11-07T11:30:45.906Z",
+    "updatedAt": "2026-11-07T11:30:45.906Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afc5aa37e52ce43d64b1665",
+    "actorId": "6afc5aa37e52ce43d64b1664",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6af87f0b59ee50c9a2cf998e",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-11-17T13:46:11.619Z",
+    "updatedAt": "2026-11-17T13:46:11.619Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0018a1e0f7d2a216303ef8",
+    "actorId": "6b0018a1e0f7d2a216303ef7",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6b0016c9e0f7d2a216303d0d",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-11-20T09:53:37.109Z",
+    "updatedAt": "2026-11-20T09:53:37.109Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b005510c6a0c2d3ad76b2dc",
+    "actorId": "6b005510c6a0c2d3ad76b2db",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6afd56f56396024e04b957e5",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-11-20T14:11:28.578Z",
+    "updatedAt": "2026-11-20T14:11:28.578Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b005515c6a0c2d3ad76b2f4",
+    "actorId": "6b005515c6a0c2d3ad76b2f3",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6afd590b6396024e04b958df",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-11-20T14:11:33.872Z",
+    "updatedAt": "2026-11-20T14:11:33.872Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b00551ac6a0c2d3ad76b30c",
+    "actorId": "6b00551ac6a0c2d3ad76b30b",
+    "actorRole": "SUPER_ADMIN",
+    "action": "APPROVE_CUSTOMER_KYC",
+    "entity": "User",
+    "entityId": "6afd59a66396024e04b95975",
+    "newValue": {
+      "customerKycStatus": 2,
+      "verified": true,
+      "notes": ""
+    },
+    "createdAt": "2026-11-20T14:11:38.819Z",
+    "updatedAt": "2026-11-20T14:11:38.819Z",
+    "__v": 0
+  }
+]

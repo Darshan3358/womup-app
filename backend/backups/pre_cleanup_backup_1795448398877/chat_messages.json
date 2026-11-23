@@ -1,0 +1,32 @@
+[
+  {
+    "_id": "6aba2d2a1e89f5be50aeee29",
+    "orderId": "6ab6c638fb6e0ebab3ebe75d",
+    "senderId": "6aad6a94227ef33cd75a64a4",
+    "senderRole": "RIDER",
+    "senderName": "NIRAJ",
+    "receiverId": "",
+    "receiverRole": "ALL",
+    "message": "I have arrived at your building",
+    "attachmentUrl": "",
+    "isRead": false,
+    "createdAt": "2026-09-28T09:02:34.285Z",
+    "updatedAt": "2026-09-28T09:02:34.285Z",
+    "__v": 0
+  },
+  {
+    "_id": "6abe401950ff8f9ad2bb66b8",
+    "orderId": "6abe3fa650ff8f9ad2bb65e2",
+    "senderId": "6abe3f8d50ff8f9ad2bb64e4",
+    "senderRole": "RIDER",
+    "senderName": "Darshan Thanki",
+    "receiverId": "",
+    "receiverRole": "ALL",
+    "message": "I have arrived at your building",
+    "attachmentUrl": "",
+    "isRead": false,
+    "createdAt": "2026-10-01T11:12:25.826Z",
+    "updatedAt": "2026-10-01T11:12:25.826Z",
+    "__v": 0
+  }
+]

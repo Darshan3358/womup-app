@@ -1,0 +1,41 @@
+[
+  {
+    "_id": "6ac6345a99ebd1b86223d36f",
+    "storeId": "6aa277a7fc02997cbe281ac1",
+    "balance": 13,
+    "createdAt": "2026-10-07T12:00:26.268Z",
+    "isActive": true,
+    "settlementCycle": "WEEKLY",
+    "storeName": "Wom Up Prahlad Nagar Dark Store",
+    "totalCommission": 11,
+    "totalEarned": 114,
+    "updatedAt": "2026-10-21T09:43:47.675Z",
+    "lastSettlementAt": "2026-10-15T16:00:13.247Z"
+  },
+  {
+    "_id": "6ac68c1a99ebd1b86223d935",
+    "storeId": "6aac257b8f337240651ef43b",
+    "balance": 0,
+    "createdAt": "2026-10-07T18:14:50.798Z",
+    "isActive": true,
+    "settlementCycle": "WEEKLY",
+    "storeName": "Wom Up Chandlodiya - Tragad Dark Store",
+    "totalCommission": 621,
+    "totalEarned": 6182,
+    "updatedAt": "2026-11-20T15:10:50.520Z",
+    "lastSettlementAt": "2026-11-20T15:10:50.520Z",
+    "alreadyPaid": 5561
+  },
+  {
+    "_id": "6ad4f78b99ebd1b862267bbb",
+    "storeId": "6ad22ceccb1c11cfded14ca5",
+    "balance": 29,
+    "createdAt": "2026-10-18T16:44:59.540Z",
+    "isActive": true,
+    "settlementCycle": "WEEKLY",
+    "storeName": "womupTragad",
+    "totalCommission": 3,
+    "totalEarned": 32,
+    "updatedAt": "2026-10-22T08:36:18.950Z"
+  }
+]

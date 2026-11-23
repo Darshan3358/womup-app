@@ -1,0 +1,800 @@
+[
+  {
+    "_id": "6acdb1bb58821ea107c96328",
+    "userId": "6aabb71b07616fb631539486",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-10-13T04:21:15.921Z",
+    "updatedAt": "2026-10-13T04:21:15.921Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace2c91803c3ea8273e7ee6",
+    "userId": "6aa11866c6c3e5984e2ef5e5",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-10-13T13:05:21.415Z",
+    "updatedAt": "2026-10-13T13:05:21.415Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ace2db1803c3ea8273e81b7",
+    "userId": "6ac7c0bdcd37863cc22a9fef",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-10-13T13:10:09.171Z",
+    "updatedAt": "2026-10-13T13:10:09.171Z",
+    "__v": 0
+  },
+  {
+    "_id": "6acee1cf4d58d4c2df42bc68",
+    "userId": "6acee1944d58d4c2df42bc04",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-10-14T01:58:39.451Z",
+    "updatedAt": "2026-10-14T01:58:39.451Z",
+    "__v": 0
+  },
+  {
+    "_id": "6acef85f80276080bfea0e47",
+    "userId": "6acef7e580276080bfea0cf4",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-10-14T03:34:55.104Z",
+    "updatedAt": "2026-10-14T03:34:55.104Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ad2429a2e01826cb4e5013a",
+    "userId": "6ad242952e01826cb4e500de",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-10-16T15:28:26.510Z",
+    "updatedAt": "2026-10-16T15:28:26.510Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ad2643ba99413179ec719b7",
+    "userId": "6ad2622f563ca91f02d85927",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": true,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": true
+    },
+    "createdAt": "2026-10-16T17:51:55.068Z",
+    "updatedAt": "2026-10-17T06:00:23.226Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ad5f520aab0a82f1a609b9d",
+    "userId": "6ad5f50baab0a82f1a609b60",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-10-19T10:46:56.265Z",
+    "updatedAt": "2026-10-19T10:46:56.265Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ad87f0a3e0122e6acfe5928",
+    "userId": "6ad87ee63e0122e6acfe58c4",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-10-21T08:59:54.109Z",
+    "updatedAt": "2026-10-21T08:59:54.109Z",
+    "__v": 0
+  },
+  {
+    "_id": "6adb29c6f9d95afe4f353030",
+    "userId": "6adb29bef9d95afe4f352ff8",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-10-23T09:32:54.125Z",
+    "updatedAt": "2026-10-23T09:32:54.125Z",
+    "__v": 0
+  },
+  {
+    "_id": "6adfb334e030379004e27fc7",
+    "userId": "6adf9665b1c611656a1bc266",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-10-26T20:08:20.275Z",
+    "updatedAt": "2026-10-26T20:08:20.275Z",
+    "__v": 0
+  },
+  {
+    "_id": "6adfbcdee030379004e288ab",
+    "userId": "6adfb37348316a078aeff2b2",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-10-26T20:49:34.357Z",
+    "updatedAt": "2026-10-26T20:49:34.357Z",
+    "__v": 0
+  },
+  {
+    "_id": "6adfbd85e030379004e289f8",
+    "userId": "6adfa92ecf1461616763aa7a",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-10-26T20:52:21.975Z",
+    "updatedAt": "2026-10-26T20:52:21.975Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae5b4d2a64cec48b93ac867",
+    "userId": "6ae5b477a64cec48b93ac835",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-10-31T09:28:50.392Z",
+    "updatedAt": "2026-10-31T09:28:50.392Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae9c54ca64cec48b93ae7a5",
+    "userId": "6ae9bf92a64cec48b93ae65e",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-11-03T11:28:12.685Z",
+    "updatedAt": "2026-11-03T11:28:12.685Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae9cb63a64cec48b93ae956",
+    "userId": "6ae9c688a64cec48b93ae820",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-11-03T11:54:11.541Z",
+    "updatedAt": "2026-11-03T11:54:11.541Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae9d1e2a64cec48b93aeb82",
+    "userId": "6ae9cee3a64cec48b93aea72",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-11-03T12:21:54.349Z",
+    "updatedAt": "2026-11-03T12:21:54.349Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aed9f10a64cec48b93b11c9",
+    "userId": "6aed9deca64cec48b93b1172",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-11-06T09:34:08.533Z",
+    "updatedAt": "2026-11-06T09:34:08.533Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aeee29432a0ed6c25406ef8",
+    "userId": "6aeee18032a0ed6c25406e5c",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-11-07T08:34:28.445Z",
+    "updatedAt": "2026-11-07T08:34:28.445Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aeee5c432a0ed6c25407114",
+    "userId": "6aeee5a032a0ed6c254070c1",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-11-07T08:48:04.653Z",
+    "updatedAt": "2026-11-07T08:48:04.653Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aeeed1232a0ed6c254074c4",
+    "userId": "6aeeec8c32a0ed6c2540746f",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-11-07T09:19:14.542Z",
+    "updatedAt": "2026-11-07T09:19:14.542Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aeefe1232a0ed6c254078e2",
+    "userId": "6aeefdf932a0ed6c254078b1",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-11-07T10:31:46.667Z",
+    "updatedAt": "2026-11-07T10:31:46.667Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aef01f66ef450c2c9caeec6",
+    "userId": "6aef01446ef450c2c9caee00",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-11-07T10:48:22.203Z",
+    "updatedAt": "2026-11-07T10:48:22.203Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aef02f86ef450c2c9caf01f",
+    "userId": "6aef02de6ef450c2c9caefc0",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-11-07T10:52:40.655Z",
+    "updatedAt": "2026-11-07T10:52:40.655Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aef094b6ef450c2c9caf4a5",
+    "userId": "6aef08a46ef450c2c9caf44d",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-11-07T11:19:39.073Z",
+    "updatedAt": "2026-11-07T11:19:39.073Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aef09ac6ef450c2c9caf4f5",
+    "userId": "6aef09956ef450c2c9caf4c7",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-11-07T11:21:16.105Z",
+    "updatedAt": "2026-11-07T11:21:16.105Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aef0a906ef450c2c9caf581",
+    "userId": "6aef0a7a6ef450c2c9caf554",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-11-07T11:25:04.701Z",
+    "updatedAt": "2026-11-07T11:25:04.701Z",
+    "__v": 0
+  },
+  {
+    "_id": "6af87f2e59ee50c9a2cf99bb",
+    "userId": "6af87f0b59ee50c9a2cf998e",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-11-14T15:33:02.640Z",
+    "updatedAt": "2026-11-14T15:33:02.640Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afc51dafbddc5b081b3caaf",
+    "userId": "6afc501e88ae17b096618c43",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-11-17T13:08:42.327Z",
+    "updatedAt": "2026-11-17T13:08:42.327Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afc61673d0573e676234c5b",
+    "userId": "6afc59229189c0b0663cca7f",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-11-17T14:15:03.772Z",
+    "updatedAt": "2026-11-17T14:15:03.772Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afd57236396024e04b95817",
+    "userId": "6afd56f56396024e04b957e5",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-11-18T07:43:31.643Z",
+    "updatedAt": "2026-11-18T07:43:31.643Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afd59256396024e04b9590b",
+    "userId": "6afd590b6396024e04b958df",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-11-18T07:52:05.482Z",
+    "updatedAt": "2026-11-18T07:52:05.482Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afd59c56396024e04b959a8",
+    "userId": "6afd59a66396024e04b95975",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-11-18T07:54:45.887Z",
+    "updatedAt": "2026-11-18T07:54:45.887Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afdd75c6396024e04b96f66",
+    "userId": "6afc95705dfb520af538adb0",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-11-18T16:50:36.842Z",
+    "updatedAt": "2026-11-18T16:50:36.842Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0018a7e0f7d2a216303f49",
+    "userId": "6b0016c9e0f7d2a216303d0d",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-11-20T09:53:43.771Z",
+    "updatedAt": "2026-11-20T09:53:43.771Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b001903e0f7d2a216303ffa",
+    "userId": "6b00183ce0f7d2a216303e82",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-11-20T09:55:15.008Z",
+    "updatedAt": "2026-11-20T09:55:15.008Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0019e7e0f7d2a2163040a9",
+    "userId": "6b0019d6e0f7d2a21630407f",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-11-20T09:59:03.442Z",
+    "updatedAt": "2026-11-20T09:59:03.442Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b004e1ebabfbbc9ce0357e2",
+    "userId": "6b004de2babfbbc9ce035748",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-11-20T13:41:50.531Z",
+    "updatedAt": "2026-11-20T13:41:50.531Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0067061b70282aedd387db",
+    "userId": "6b004cb4babfbbc9ce0356c5",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-11-20T15:28:06.432Z",
+    "updatedAt": "2026-11-20T15:28:06.432Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0163f55dde0f9a42794ed1",
+    "userId": "6b015d685dde0f9a42794966",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-11-21T09:27:17.262Z",
+    "updatedAt": "2026-11-21T09:27:17.262Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0164a15dde0f9a42794f47",
+    "userId": "6b01623c5dde0f9a42794deb",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-11-21T09:30:09.789Z",
+    "updatedAt": "2026-11-21T09:30:09.789Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0164f35dde0f9a42794f7f",
+    "userId": "6b0162df5dde0f9a42794e21",
+    "personalizedFeeds": true,
+    "anonymousAnalytics": true,
+    "hideSensitiveItems": false,
+    "searchHistoryEnabled": true,
+    "notificationPrefs": {
+      "liveOrderTracking": true,
+      "whatsappInvoices": true,
+      "exclusiveOffers": true,
+      "orderUpdates": true,
+      "pushNotifications": true,
+      "emailMarketing": false
+    },
+    "createdAt": "2026-11-21T09:31:31.880Z",
+    "updatedAt": "2026-11-21T09:31:31.880Z",
+    "__v": 0
+  }
+]

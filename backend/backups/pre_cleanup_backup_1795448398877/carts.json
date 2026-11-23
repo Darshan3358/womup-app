@@ -1,0 +1,237 @@
+[
+  {
+    "_id": "6adfa983c786ae55e8e0e361",
+    "userId": "6adf9665b1c611656a1bc266",
+    "items": [
+      {
+        "productId": "6aa11868c6c3e5984e2ef69e",
+        "variantId": "6aa11868c6c3e5984e2ef6a0",
+        "quantity": 3
+      },
+      {
+        "productId": "6aa11868c6c3e5984e2ef66a",
+        "variantId": "6aa11868c6c3e5984e2ef66c",
+        "quantity": 5
+      },
+      {
+        "productId": "6aa11866c6c3e5984e2ef616",
+        "variantId": "6aa11866c6c3e5984e2ef618",
+        "quantity": 1
+      }
+    ],
+    "useCoins": false,
+    "appliedCoins": 0,
+    "tip": 0,
+    "deliveryInstructions": "",
+    "createdAt": "2026-10-26T19:26:59.483Z",
+    "updatedAt": "2026-11-23T15:10:51.416Z",
+    "__v": 5,
+    "areaId": "6aa11866c6c3e5984e2ef5df",
+    "storeId": "6aa277a7fc02997cbe281ac1"
+  },
+  {
+    "_id": "6adfc0cbe030379004e28b23",
+    "userId": "6adfa92ecf1461616763aa7a",
+    "items": [],
+    "useCoins": false,
+    "appliedCoins": 0,
+    "tip": 0,
+    "deliveryInstructions": "",
+    "createdAt": "2026-10-26T21:06:19.131Z",
+    "updatedAt": "2026-10-30T09:02:45.941Z",
+    "__v": 76,
+    "areaId": "6aac257b8f337240651ef43c",
+    "storeId": "6aac257b8f337240651ef43b"
+  },
+  {
+    "_id": "6ae5ef8aa64cec48b93ace80",
+    "userId": "6ae5b477a64cec48b93ac835",
+    "items": [],
+    "useCoins": false,
+    "appliedCoins": 0,
+    "tip": 0,
+    "deliveryInstructions": "",
+    "createdAt": "2026-10-31T13:39:22.827Z",
+    "updatedAt": "2026-11-03T16:28:13.500Z",
+    "__v": 0,
+    "areaId": "6aac257b8f337240651ef43c",
+    "storeId": "6aac257b8f337240651ef43b"
+  },
+  {
+    "_id": "6aeefccb32a0ed6c25407847",
+    "userId": "6aeee18032a0ed6c25406e5c",
+    "items": [
+      {
+        "productId": "6aa11868c6c3e5984e2ef69e",
+        "variantId": "6aa11868c6c3e5984e2ef6a0",
+        "quantity": 2
+      },
+      {
+        "productId": "6aa11868c6c3e5984e2ef66a",
+        "variantId": "6aa11868c6c3e5984e2ef66c",
+        "quantity": 2
+      },
+      {
+        "productId": "6aa11866c6c3e5984e2ef616",
+        "variantId": "6aa11866c6c3e5984e2ef618",
+        "quantity": 1
+      }
+    ],
+    "useCoins": false,
+    "appliedCoins": 0,
+    "tip": 0,
+    "deliveryInstructions": "",
+    "createdAt": "2026-11-07T10:26:19.230Z",
+    "updatedAt": "2026-11-23T15:12:03.732Z",
+    "__v": 93,
+    "areaId": "6aa11866c6c3e5984e2ef5e1",
+    "storeId": "6aa277a7fc02997cbe281ac3"
+  },
+  {
+    "_id": "6aef02f96ef450c2c9caf026",
+    "userId": "6aef02de6ef450c2c9caefc0",
+    "items": [],
+    "useCoins": false,
+    "appliedCoins": 0,
+    "tip": 0,
+    "deliveryInstructions": "",
+    "createdAt": "2026-11-07T10:52:41.396Z",
+    "updatedAt": "2026-11-07T10:52:41.396Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aef047e6ef450c2c9caf14a",
+    "userId": "6aef01446ef450c2c9caee00",
+    "items": [],
+    "useCoins": false,
+    "appliedCoins": 0,
+    "tip": 0,
+    "deliveryInstructions": "",
+    "createdAt": "2026-11-07T10:59:10.797Z",
+    "updatedAt": "2026-11-09T14:42:33.449Z",
+    "__v": 96,
+    "areaId": "6aac257b8f337240651ef43c",
+    "storeId": "6aac257b8f337240651ef43b"
+  },
+  {
+    "_id": "6aef07fd6ef450c2c9caf383",
+    "userId": "6aeeec8c32a0ed6c2540746f",
+    "items": [],
+    "useCoins": false,
+    "appliedCoins": 0,
+    "tip": 0,
+    "deliveryInstructions": "",
+    "createdAt": "2026-11-07T11:14:05.491Z",
+    "updatedAt": "2026-11-07T11:14:05.491Z",
+    "__v": 0
+  },
+  {
+    "_id": "6af2e44d132fe7423ea593b4",
+    "userId": "6af16efab657a7a98d9c2805",
+    "items": [],
+    "useCoins": false,
+    "appliedCoins": 0,
+    "tip": 0,
+    "deliveryInstructions": "",
+    "createdAt": "2026-11-10T09:30:53.874Z",
+    "updatedAt": "2026-11-10T09:30:53.874Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afc5a5f7e52ce43d64b1607",
+    "userId": "6afc501e88ae17b096618c43",
+    "items": [],
+    "useCoins": false,
+    "appliedCoins": 0,
+    "tip": 0,
+    "deliveryInstructions": "",
+    "createdAt": "2026-11-17T13:45:03.710Z",
+    "updatedAt": "2026-11-17T14:09:59.474Z",
+    "__v": 0,
+    "areaId": "6aac257b8f337240651ef43c",
+    "storeId": "6aac257b8f337240651ef43b"
+  },
+  {
+    "_id": "6afc66773d0573e676234cda",
+    "userId": "6afc59229189c0b0663cca7f",
+    "items": [],
+    "useCoins": false,
+    "appliedCoins": 0,
+    "tip": 0,
+    "deliveryInstructions": "",
+    "createdAt": "2026-11-17T14:36:39.301Z",
+    "updatedAt": "2026-11-17T14:36:40.155Z",
+    "__v": 0,
+    "areaId": "6ad8fc07078837a1a8c2ed39"
+  },
+  {
+    "_id": "6afda0706396024e04b96db9",
+    "userId": "6afc95705dfb520af538adb0",
+    "items": [],
+    "useCoins": true,
+    "appliedCoins": 1369,
+    "tip": 0,
+    "deliveryInstructions": "",
+    "createdAt": "2026-11-18T12:56:16.899Z",
+    "updatedAt": "2026-11-23T15:31:52.433Z",
+    "__v": 254,
+    "areaId": "6aac257b8f337240651ef43c",
+    "storeId": "6aac257b8f337240651ef43b"
+  },
+  {
+    "_id": "6b004df8babfbbc9ce035786",
+    "userId": "6b004cb4babfbbc9ce0356c5",
+    "items": [],
+    "useCoins": false,
+    "appliedCoins": 0,
+    "tip": 0,
+    "deliveryInstructions": "",
+    "createdAt": "2026-11-20T13:41:12.848Z",
+    "updatedAt": "2026-11-23T12:09:58.507Z",
+    "__v": 128,
+    "areaId": "6aac257b8f337240651ef43c",
+    "storeId": "6aac257b8f337240651ef43b"
+  },
+  {
+    "_id": "6b0170db7e152d2766b27228",
+    "userId": "6b015d685dde0f9a42794966",
+    "items": [],
+    "useCoins": false,
+    "appliedCoins": 0,
+    "tip": 0,
+    "deliveryInstructions": "",
+    "createdAt": "2026-11-21T10:22:19.048Z",
+    "updatedAt": "2026-11-23T06:16:40.654Z",
+    "__v": 7,
+    "areaId": "6ae9cd0da64cec48b93ae9e3",
+    "storeId": "6aeda3ada64cec48b93b13f6"
+  },
+  {
+    "_id": "6b0172387e152d2766b27391",
+    "userId": "6aeee5a032a0ed6c254070c1",
+    "items": [],
+    "useCoins": false,
+    "appliedCoins": 0,
+    "tip": 0,
+    "deliveryInstructions": "",
+    "createdAt": "2026-11-21T10:28:08.139Z",
+    "updatedAt": "2026-11-21T10:29:21.708Z",
+    "__v": 4,
+    "areaId": "6ae9cd0da64cec48b93ae9e3",
+    "storeId": "6aeda3ada64cec48b93b13f6"
+  },
+  {
+    "_id": "6b03f2691d88e378abb9d2e1",
+    "userId": "6b01623c5dde0f9a42794deb",
+    "items": [],
+    "useCoins": false,
+    "appliedCoins": 0,
+    "tip": 0,
+    "deliveryInstructions": "",
+    "createdAt": "2026-11-23T07:59:37.850Z",
+    "updatedAt": "2026-11-23T08:08:57.098Z",
+    "__v": 5,
+    "areaId": "6ae9cd0da64cec48b93ae9e3",
+    "storeId": "6aeda3ada64cec48b93b13f6"
+  }
+]

@@ -1,0 +1,26 @@
+[
+  {
+    "_id": "6afc59289189c0b0663cca83",
+    "userId": "6afc59229189c0b0663cca7f",
+    "amount": 400,
+    "type": "CREDIT",
+    "description": "Level 1 Referral Coin Reward from Test User Level 2",
+    "createdAt": "2026-11-17T13:39:52.385Z"
+  },
+  {
+    "_id": "6afc59299189c0b0663cca85",
+    "userId": "6afc59229189c0b0663cca7f",
+    "amount": 300,
+    "type": "CREDIT",
+    "description": "Level 2 Referral Coin Reward from Test User Level 3",
+    "createdAt": "2026-11-17T13:39:53.498Z"
+  },
+  {
+    "_id": "6afc592a9189c0b0663cca87",
+    "userId": "6afc59239189c0b0663cca80",
+    "amount": 400,
+    "type": "CREDIT",
+    "description": "Level 1 Referral Coin Reward from Test User Level 3",
+    "createdAt": "2026-11-17T13:39:54.871Z"
+  }
+]

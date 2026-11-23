@@ -1,0 +1,233 @@
+[
+  {
+    "_id": "6ae2698520b08cfa5b81e4d7",
+    "orderId": "6ae268b820b08cfa5b81e325",
+    "storeId": "6aac257b8f337240651ef43b",
+    "pickerId": "6aac257b8f337240651ef43b",
+    "items": [
+      {
+        "productId": "6aa11866c6c3e5984e2ef5ec",
+        "variantId": "6aa11866c6c3e5984e2ef5ee",
+        "name": "Fresh Tomato 250 g",
+        "quantity": 1,
+        "unit": "250 g",
+        "shelfLocation": "A1-R1",
+        "barcode": "",
+        "status": "PICKED",
+        "notes": "",
+        "pickedAt": "2026-11-20T14:01:53.144Z",
+        "scannedBy": "6aac257b8f337240651ef43b"
+      }
+    ],
+    "status": "COMPLETED",
+    "startedAt": "2026-10-28T21:30:45.598Z",
+    "shelfSlot": "READY-01",
+    "exceptionCount": 0,
+    "pickDurationSeconds": 1960272,
+    "createdAt": "2026-10-28T21:30:45.599Z",
+    "updatedAt": "2026-11-20T14:02:04.019Z",
+    "__v": 0,
+    "bagBarcode": "BAG-63-438",
+    "packedAt": "2026-11-20T14:01:57.435Z",
+    "readyAt": "2026-11-20T14:01:57.567Z",
+    "completedAt": "2026-11-20T14:02:04.018Z"
+  },
+  {
+    "_id": "6af1dbf2a3975ae3630ad3ec",
+    "orderId": "6af1dbd7b657a7a98d9c4b8a",
+    "storeId": "6aac257b8f337240651ef43b",
+    "pickerId": "6aac257b8f337240651ef43b",
+    "items": [
+      {
+        "productId": "6aa11866c6c3e5984e2ef5ec",
+        "variantId": "6aa11866c6c3e5984e2ef5ee",
+        "name": "Fresh Tomato 250 g",
+        "quantity": 1,
+        "unit": "250 g",
+        "shelfLocation": "A1-R1",
+        "barcode": "",
+        "status": "PICKED",
+        "notes": "",
+        "pickedAt": "2026-11-09T14:43:13.509Z",
+        "scannedBy": "6aac257b8f337240651ef43b"
+      }
+    ],
+    "status": "COMPLETED",
+    "startedAt": "2026-11-09T14:42:58.387Z",
+    "shelfSlot": "READY-01",
+    "exceptionCount": 0,
+    "pickDurationSeconds": 24,
+    "createdAt": "2026-11-09T14:42:58.392Z",
+    "updatedAt": "2026-11-20T13:48:19.901Z",
+    "__v": 0,
+    "bagBarcode": "BAG-76-491",
+    "packedAt": "2026-11-09T14:43:22.194Z",
+    "readyAt": "2026-11-09T14:43:27.013Z",
+    "completedAt": "2026-11-20T13:48:19.901Z"
+  },
+  {
+    "_id": "6b004f5ababfbbc9ce035a1c",
+    "orderId": "6b004f02babfbbc9ce035970",
+    "storeId": "6aac257b8f337240651ef43b",
+    "pickerId": "6aac257b8f337240651ef43b",
+    "items": [
+      {
+        "productId": "6aa11866c6c3e5984e2ef5ec",
+        "variantId": "6aa11866c6c3e5984e2ef5ef",
+        "name": "Fresh Tomato 500 g",
+        "quantity": 1,
+        "unit": "500 g",
+        "shelfLocation": "A1-R1",
+        "barcode": "",
+        "status": "PICKED",
+        "notes": "",
+        "pickedAt": "2026-11-20T13:47:20.945Z",
+        "scannedBy": "6aac257b8f337240651ef43b"
+      }
+    ],
+    "status": "COMPLETED",
+    "startedAt": "2026-11-20T13:47:06.899Z",
+    "shelfSlot": "READY-01",
+    "exceptionCount": 0,
+    "pickDurationSeconds": 20,
+    "createdAt": "2026-11-20T13:47:06.900Z",
+    "updatedAt": "2026-11-20T13:47:49.880Z",
+    "__v": 0,
+    "bagBarcode": "BAG-73-785",
+    "packedAt": "2026-11-20T13:47:26.615Z",
+    "readyAt": "2026-11-20T13:47:26.835Z",
+    "completedAt": "2026-11-20T13:47:49.879Z"
+  },
+  {
+    "_id": "6b00573d1b70282aedd3779c",
+    "orderId": "6b0057361b70282aedd37752",
+    "storeId": "6aac257b8f337240651ef43b",
+    "pickerId": "6aac257b8f337240651ef43b",
+    "items": [
+      {
+        "productId": "6aa1186ac6c3e5984e2ef786",
+        "variantId": "6aa1186ac6c3e5984e2ef788",
+        "name": "Fortune Sunflower Oil 500 ml",
+        "quantity": 1,
+        "unit": "500 ml",
+        "shelfLocation": "D1-R1",
+        "barcode": "",
+        "status": "PICKED",
+        "notes": "",
+        "pickedAt": "2026-11-20T14:27:41.681Z",
+        "scannedBy": "6aac257b8f337240651ef43b"
+      }
+    ],
+    "status": "COMPLETED",
+    "startedAt": "2026-11-20T14:20:45.173Z",
+    "shelfSlot": "READY-01",
+    "exceptionCount": 0,
+    "pickDurationSeconds": 434,
+    "createdAt": "2026-11-20T14:20:45.174Z",
+    "updatedAt": "2026-11-20T14:28:21.323Z",
+    "__v": 0,
+    "bagBarcode": "BAG-31-315",
+    "packedAt": "2026-11-20T14:27:59.083Z",
+    "readyAt": "2026-11-20T14:27:59.390Z",
+    "completedAt": "2026-11-20T14:28:21.322Z"
+  },
+  {
+    "_id": "6b0060781b70282aedd37fcb",
+    "orderId": "6b00605d1b70282aedd37f31",
+    "storeId": "6aac257b8f337240651ef43b",
+    "pickerId": "6aac257b8f337240651ef43b",
+    "items": [
+      {
+        "productId": "6aa11866c6c3e5984e2ef5ec",
+        "variantId": "6aa11866c6c3e5984e2ef5ee",
+        "name": "Fresh Tomato 250 g",
+        "quantity": 1,
+        "unit": "250 g",
+        "shelfLocation": "A1-R1",
+        "barcode": "",
+        "status": "PICKED",
+        "notes": "",
+        "pickedAt": "2026-11-20T15:00:17.561Z",
+        "scannedBy": "6aac257b8f337240651ef43b"
+      }
+    ],
+    "status": "COMPLETED",
+    "startedAt": "2026-11-20T15:00:08.988Z",
+    "shelfSlot": "READY-01",
+    "exceptionCount": 0,
+    "pickDurationSeconds": 12,
+    "createdAt": "2026-11-20T15:00:08.990Z",
+    "updatedAt": "2026-11-20T15:00:32.998Z",
+    "__v": 0,
+    "bagBarcode": "BAG-08-567",
+    "packedAt": "2026-11-20T15:00:20.683Z",
+    "readyAt": "2026-11-20T15:00:20.876Z",
+    "completedAt": "2026-11-20T15:00:32.998Z"
+  },
+  {
+    "_id": "6b00610d1b70282aedd381f5",
+    "orderId": "6b0061031b70282aedd3819b",
+    "storeId": "6aac257b8f337240651ef43b",
+    "pickerId": "6aac257b8f337240651ef43b",
+    "items": [
+      {
+        "productId": "6aa1186ac6c3e5984e2ef7c2",
+        "variantId": "6aa1186ac6c3e5984e2ef7c6",
+        "name": "Aashirvaad Atta 10 kg",
+        "quantity": 2,
+        "unit": "10 kg",
+        "shelfLocation": "D2-R1",
+        "barcode": "",
+        "status": "PICKED",
+        "notes": "",
+        "pickedAt": "2026-11-20T15:02:41.115Z",
+        "scannedBy": "6aac257b8f337240651ef43b"
+      }
+    ],
+    "status": "COMPLETED",
+    "startedAt": "2026-11-20T15:02:37.898Z",
+    "shelfSlot": "READY-01",
+    "exceptionCount": 0,
+    "pickDurationSeconds": 6,
+    "createdAt": "2026-11-20T15:02:37.900Z",
+    "updatedAt": "2026-11-20T15:02:46.772Z",
+    "__v": 0,
+    "bagBarcode": "BAG-43-249",
+    "packedAt": "2026-11-20T15:02:43.696Z",
+    "readyAt": "2026-11-20T15:02:43.917Z",
+    "completedAt": "2026-11-20T15:02:46.770Z"
+  },
+  {
+    "_id": "6b0061ec1b70282aedd38488",
+    "orderId": "6b0061e31b70282aedd38434",
+    "storeId": "6aac257b8f337240651ef43b",
+    "pickerId": "6aac257b8f337240651ef43b",
+    "items": [
+      {
+        "productId": "6aa11866c6c3e5984e2ef5ec",
+        "variantId": "6aa11866c6c3e5984e2ef5ee",
+        "name": "Fresh Tomato 250 g",
+        "quantity": 1,
+        "unit": "250 g",
+        "shelfLocation": "A1-R1",
+        "barcode": "",
+        "status": "PICKED",
+        "notes": "",
+        "pickedAt": "2026-11-20T15:06:23.964Z",
+        "scannedBy": "6aac257b8f337240651ef43b"
+      }
+    ],
+    "status": "COMPLETED",
+    "startedAt": "2026-11-20T15:06:20.784Z",
+    "shelfSlot": "READY-01",
+    "exceptionCount": 0,
+    "pickDurationSeconds": 5,
+    "createdAt": "2026-11-20T15:06:20.785Z",
+    "updatedAt": "2026-11-20T15:06:35.254Z",
+    "__v": 0,
+    "bagBarcode": "BAG-70-121",
+    "packedAt": "2026-11-20T15:06:25.909Z",
+    "readyAt": "2026-11-20T15:06:26.095Z",
+    "completedAt": "2026-11-20T15:06:35.253Z"
+  }
+]

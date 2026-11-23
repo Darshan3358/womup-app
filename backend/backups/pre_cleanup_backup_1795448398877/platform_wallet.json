@@ -1,0 +1,128 @@
+[
+  {
+    "_id": "6ac6345a99ebd1b86223d371",
+    "date": "2026-10-07",
+    "commissions": 20,
+    "createdAt": "2026-10-07T12:00:26.811Z",
+    "handlingFees": 25,
+    "totalRevenue": 45,
+    "updatedAt": "2026-10-07T19:03:52.327Z"
+  },
+  {
+    "_id": "6ac8175c99ebd1b862240c85",
+    "date": "2026-10-08",
+    "commissions": 5,
+    "createdAt": "2026-10-08T22:21:16.066Z",
+    "handlingFees": 5,
+    "totalRevenue": 10,
+    "updatedAt": "2026-10-08T22:21:16.066Z"
+  },
+  {
+    "_id": "6ac82f0899ebd1b862240e85",
+    "date": "2026-10-09",
+    "commissions": 120,
+    "createdAt": "2026-10-09T00:02:16.319Z",
+    "handlingFees": 20,
+    "totalRevenue": 140,
+    "updatedAt": "2026-10-09T10:41:16.210Z"
+  },
+  {
+    "_id": "6aca73bb99ebd1b862248ebf",
+    "date": "2026-10-10",
+    "commissions": 17,
+    "createdAt": "2026-10-10T17:19:55.705Z",
+    "handlingFees": 30,
+    "totalRevenue": 47,
+    "updatedAt": "2026-10-10T20:11:36.106Z"
+  },
+  {
+    "_id": "6acb3f7a99ebd1b862249a44",
+    "date": "2026-10-11",
+    "commissions": 114,
+    "createdAt": "2026-10-11T07:49:14.357Z",
+    "handlingFees": 55,
+    "totalRevenue": 169,
+    "updatedAt": "2026-10-11T17:11:38.975Z"
+  },
+  {
+    "_id": "6acfb53f99ebd1b862261d65",
+    "date": "2026-10-14",
+    "commissions": 121,
+    "createdAt": "2026-10-14T17:00:47.096Z",
+    "handlingFees": 10,
+    "totalRevenue": 131,
+    "updatedAt": "2026-10-14T17:37:56.288Z"
+  },
+  {
+    "_id": "6ad0cd8399ebd1b86226312a",
+    "date": "2026-10-15",
+    "commissions": 106,
+    "createdAt": "2026-10-15T12:56:35.366Z",
+    "handlingFees": 5,
+    "totalRevenue": 111,
+    "updatedAt": "2026-10-15T12:56:35.366Z"
+  },
+  {
+    "_id": "6ad4d2ad99ebd1b862267ae7",
+    "date": "2026-10-18",
+    "commissions": 9,
+    "createdAt": "2026-10-18T14:07:41.533Z",
+    "handlingFees": 45,
+    "totalRevenue": 54,
+    "updatedAt": "2026-10-18T18:27:24.924Z"
+  },
+  {
+    "_id": "6ad5db6499ebd1b8622680f9",
+    "date": "2026-10-19",
+    "commissions": 1,
+    "createdAt": "2026-10-19T08:57:08.292Z",
+    "handlingFees": 5,
+    "totalRevenue": 6,
+    "updatedAt": "2026-10-19T08:57:08.292Z"
+  },
+  {
+    "_id": "6ad79cbb201175611be676b9",
+    "date": "2026-10-20",
+    "commissions": 0,
+    "createdAt": "2026-10-20T16:54:19.465Z",
+    "handlingFees": 10,
+    "totalRevenue": 10,
+    "updatedAt": "2026-10-20T16:58:47.233Z"
+  },
+  {
+    "_id": "6ad88955201175611be67e25",
+    "date": "2026-10-21",
+    "commissions": 1,
+    "createdAt": "2026-10-21T09:43:49.175Z",
+    "handlingFees": 5,
+    "totalRevenue": 6,
+    "updatedAt": "2026-10-21T09:43:49.175Z"
+  },
+  {
+    "_id": "6ad9cb03201175611be689f0",
+    "date": "2026-10-22",
+    "commissions": 1,
+    "createdAt": "2026-10-22T08:36:19.053Z",
+    "handlingFees": 5,
+    "totalRevenue": 6,
+    "updatedAt": "2026-10-22T08:36:19.053Z"
+  },
+  {
+    "_id": "6adb21ed201175611be6985d",
+    "date": "2026-10-23",
+    "commissions": 0,
+    "createdAt": "2026-10-23T08:59:25.524Z",
+    "handlingFees": 5,
+    "totalRevenue": 5,
+    "updatedAt": "2026-10-23T08:59:25.524Z"
+  },
+  {
+    "_id": "6b0055c6fe11b83d0335ee79",
+    "date": "2026-11-20",
+    "commissions": 120,
+    "createdAt": "2026-11-20T14:14:30.502Z",
+    "handlingFees": 20,
+    "totalRevenue": 140,
+    "updatedAt": "2026-11-20T15:05:07.437Z"
+  }
+]

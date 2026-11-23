@@ -1,0 +1,86 @@
+[
+  {
+    "_id": "6a9ffe87d4a21fe082fbbe32",
+    "name": "All Cooking Essentials",
+    "slug": "cooking-all",
+    "categoryId": "6a9ffe87d4a21fe082fbbe30",
+    "icon": "restaurant-outline",
+    "itemCount": 142,
+    "isActive": true,
+    "createdAt": "2026-09-08T12:24:39.729Z",
+    "updatedAt": "2026-09-08T12:24:39.729Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a9ffe87d4a21fe082fbbe36",
+    "name": "All Snacks & Beverages",
+    "slug": "snacks-all",
+    "categoryId": "6a9ffe87d4a21fe082fbbe34",
+    "icon": "cafe-outline",
+    "itemCount": 98,
+    "isActive": true,
+    "createdAt": "2026-09-08T12:24:39.774Z",
+    "updatedAt": "2026-09-08T12:24:39.774Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a9ffe87d4a21fe082fbbe3a",
+    "name": "All Dairy & Bakery",
+    "slug": "dairy-all",
+    "categoryId": "6a9ffe87d4a21fe082fbbe38",
+    "icon": "nutrition-outline",
+    "itemCount": 76,
+    "isActive": true,
+    "createdAt": "2026-09-08T12:24:39.827Z",
+    "updatedAt": "2026-09-08T12:24:39.827Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a9ffe87d4a21fe082fbbe3e",
+    "name": "All Fruits & Vegetables",
+    "slug": "fruits-all",
+    "categoryId": "6a9ffe87d4a21fe082fbbe3c",
+    "icon": "leaf-outline",
+    "itemCount": 110,
+    "isActive": true,
+    "createdAt": "2026-09-08T12:24:39.890Z",
+    "updatedAt": "2026-09-08T12:24:39.890Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a9ffe87d4a21fe082fbbe42",
+    "name": "All Electronics & Gadgets",
+    "slug": "electronics-all",
+    "categoryId": "6a9ffe87d4a21fe082fbbe40",
+    "icon": "headphones",
+    "itemCount": 64,
+    "isActive": true,
+    "createdAt": "2026-09-08T12:24:39.944Z",
+    "updatedAt": "2026-09-08T12:24:39.944Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a9ffe87d4a21fe082fbbe46",
+    "name": "All Beauty & Personal Care",
+    "slug": "beauty-all",
+    "categoryId": "6a9ffe87d4a21fe082fbbe44",
+    "icon": "beauty",
+    "itemCount": 88,
+    "isActive": true,
+    "createdAt": "2026-09-08T12:24:39.991Z",
+    "updatedAt": "2026-09-08T12:24:39.991Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a9ffe88d4a21fe082fbbe4a",
+    "name": "All Ganeshotsav Festive Store",
+    "slug": "ganeshotsav-all",
+    "categoryId": "6a9ffe88d4a21fe082fbbe48",
+    "icon": "ganesh",
+    "itemCount": 45,
+    "isActive": true,
+    "createdAt": "2026-09-08T12:24:40.038Z",
+    "updatedAt": "2026-09-08T12:24:40.038Z",
+    "__v": 0
+  }
+]

@@ -1,0 +1,542 @@
+[
+  {
+    "_id": "6a9ffe87d4a21fe082fbbe2c",
+    "name": "Wom Up Ahmedabad Central Dark Store",
+    "code": "DARK-STORE-01",
+    "address": "Near Corporate Road, Prahlad Nagar",
+    "city": "Ahmedabad",
+    "pincode": "380015",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.515,
+        23.02
+      ]
+    },
+    "serviceRadiusKm": 1,
+    "estimatedDeliveryMinutes": 9,
+    "isActive": true,
+    "createdAt": "2026-09-08T12:24:39.637Z",
+    "updatedAt": "2026-10-21T19:37:33.699Z",
+    "__v": 0,
+    "managerName": "Central Hub Manager",
+    "managerPhone": "+919876543210",
+    "operatingHours": {
+      "open": "06:00",
+      "close": "02:00"
+    },
+    "loginId": "womup_darkstore01",
+    "loginPasswordHash": "$2a$10$XRDz65RmFfcE2vvpbOjz5OR.oaUSns0g3f9pDk5ZqohubF0iEXtAO",
+    "passwordUpdatedAt": "2026-09-19T04:22:43.526Z",
+    "cityId": "6abcefe75a521a988d799c02",
+    "cityName": "Ahmedabad",
+    "areaId": "6abcf767c486687900e11ef4",
+    "areaName": "Paldi",
+    "isOnShift": true,
+    "isOnline": true,
+    "coordinates": [
+      72.515,
+      23.02
+    ],
+    "latitude": 23.02,
+    "longitude": 72.515
+  },
+  {
+    "_id": "6aa277a7fc02997cbe281ac1",
+    "areaId": "6aa11866c6c3e5984e2ef5df",
+    "address": "Prahlad Nagar, Ahmedabad",
+    "areaName": "Prahlad Nagar",
+    "city": "Ahmedabad",
+    "code": "STORE-PRAHLAD_NAGAR",
+    "createdAt": "2026-09-10T09:25:59.521Z",
+    "estimatedDeliveryMinutes": 9,
+    "isActive": true,
+    "name": "Wom Up Prahlad Nagar Dark Store",
+    "serviceRadiusKm": 5,
+    "updatedAt": "2026-11-06T10:26:35.618Z",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.5067,
+        23.0141
+      ]
+    },
+    "managerName": "Operations Manager",
+    "managerPhone": "+919876543210",
+    "operatingHours": {
+      "open": "06:00",
+      "close": "02:00"
+    },
+    "pincode": "380015",
+    "loginId": "womupPrahladNagar",
+    "loginPasswordHash": "$2a$10$pM0QCI3Uxgfy948wuIArLuZ31XcD1skEW1aV5BQiua5dJmPg/B7Qq",
+    "passwordUpdatedAt": "2026-10-20T18:16:44.034Z",
+    "cityId": "6abcefe75a521a988d799c02",
+    "cityName": "Ahmedabad",
+    "lastLoginAt": "2026-11-06T10:26:35.618Z",
+    "closingTime": "23:00",
+    "isOnShift": true,
+    "openingTime": "07:00",
+    "status": "ACTIVE",
+    "loginPassword": "womupPrahladNagar",
+    "coordinates": [
+      72.5067,
+      23.0141
+    ],
+    "latitude": 23.0141,
+    "longitude": 72.5067
+  },
+  {
+    "_id": "6aa277a7fc02997cbe281ac2",
+    "areaId": "6aa11866c6c3e5984e2ef5e0",
+    "address": "Satellite, Ahmedabad",
+    "areaName": "Satellite",
+    "city": "Ahmedabad",
+    "code": "STORE-SATELLITE",
+    "createdAt": "2026-09-10T09:25:59.573Z",
+    "estimatedDeliveryMinutes": 10,
+    "isActive": true,
+    "name": "Wom Up Satellite Dark Store",
+    "serviceRadiusKm": 3,
+    "updatedAt": "2026-10-12T17:33:08.574Z",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.5074,
+        23.0267
+      ]
+    },
+    "managerName": "Operations Manager",
+    "managerPhone": "+919876543210",
+    "operatingHours": {
+      "open": "06:00",
+      "close": "02:00"
+    },
+    "pincode": "380015",
+    "loginId": "womupSatellite",
+    "loginPasswordHash": "$2a$10$HtbTwBlOz7Q/QW./C502n.uGGcKb348BczL4iD3ry3UF97Mp0bUDi",
+    "passwordUpdatedAt": "2026-09-19T04:22:43.688Z",
+    "cityId": "6abcefe75a521a988d799c02",
+    "cityName": "Ahmedabad"
+  },
+  {
+    "_id": "6aa277a7fc02997cbe281ac3",
+    "areaId": "6aa11866c6c3e5984e2ef5e1",
+    "address": "Navrangpura, Ahmedabad",
+    "areaName": "Navrangpura",
+    "city": "Ahmedabad",
+    "code": "STORE-NAVRANGPURA",
+    "createdAt": "2026-09-10T09:25:59.625Z",
+    "estimatedDeliveryMinutes": 9,
+    "isActive": true,
+    "name": "Wom Up Navrangpura Dark Store",
+    "serviceRadiusKm": 3,
+    "updatedAt": "2026-10-09T07:21:30.354Z",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.5603,
+        23.0395
+      ]
+    },
+    "managerName": "Operations Manager",
+    "managerPhone": "+919876543210",
+    "operatingHours": {
+      "open": "06:00",
+      "close": "02:00"
+    },
+    "pincode": "380009",
+    "loginId": "womupNavrangpura",
+    "loginPasswordHash": "$2a$10$wVmMiq75YGklT8FK3Zoez.mR9RHRxkKUMXBvKvPqnVpLumJUjBxhi",
+    "passwordUpdatedAt": "2026-09-19T04:22:43.775Z",
+    "cityId": "6abcefe75a521a988d799c02",
+    "cityName": "Ahmedabad",
+    "isOnShift": true,
+    "isOnline": true
+  },
+  {
+    "_id": "6aa277a7fc02997cbe281ac4",
+    "areaId": "6aa11866c6c3e5984e2ef5e2",
+    "address": "Ghatlodia, Ahmedabad",
+    "areaName": "Ghatlodia",
+    "city": "Ahmedabad",
+    "code": "STORE-GHATLODIA",
+    "createdAt": "2026-09-10T09:25:59.667Z",
+    "estimatedDeliveryMinutes": 11,
+    "isActive": true,
+    "name": "Wom Up Ghatlodia Dark Store",
+    "serviceRadiusKm": 3.5,
+    "updatedAt": "2026-09-30T11:18:00.938Z",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.543,
+        23.06
+      ]
+    },
+    "managerName": "Operations Manager",
+    "managerPhone": "+919876543210",
+    "operatingHours": {
+      "open": "06:00",
+      "close": "02:00"
+    },
+    "pincode": "380061",
+    "loginId": "womupGhatlodia",
+    "loginPasswordHash": "$2a$10$l9C49r0pYvRg3ENCn5ZBWOKVlIshffxMJdhv2D0FMgOvG6BQQ0XwS",
+    "passwordUpdatedAt": "2026-09-19T04:22:43.851Z",
+    "cityId": "6abcefe75a521a988d799c02",
+    "cityName": "Ahmedabad"
+  },
+  {
+    "_id": "6aa277a7fc02997cbe281ac5",
+    "areaId": "6aa11866c6c3e5984e2ef5e3",
+    "address": "Bopal, Ahmedabad",
+    "areaName": "Bopal",
+    "city": "Ahmedabad",
+    "code": "STORE-BOPAL",
+    "createdAt": "2026-09-10T09:25:59.710Z",
+    "estimatedDeliveryMinutes": 12,
+    "isActive": true,
+    "name": "Wom Up Bopal Dark Store",
+    "serviceRadiusKm": 4,
+    "updatedAt": "2026-10-09T07:21:25.901Z",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.475,
+        23.035
+      ]
+    },
+    "managerName": "Operations Manager",
+    "managerPhone": "+919876543210",
+    "operatingHours": {
+      "open": "06:00",
+      "close": "02:00"
+    },
+    "pincode": "380058",
+    "loginId": "womupBopal",
+    "loginPasswordHash": "$2a$10$uN4RbMewgC8Awb2ceo6ez.C0g.eXP6xWVZ7LFsoW.2uDUBPBX55qS",
+    "passwordUpdatedAt": "2026-09-19T04:22:43.944Z",
+    "cityId": "6abcefe75a521a988d799c02",
+    "cityName": "Ahmedabad",
+    "isOnShift": true,
+    "isOnline": true
+  },
+  {
+    "_id": "6aa277a8fc02997cbe281ac6",
+    "areaId": "6aa11866c6c3e5984e2ef5e4",
+    "address": "SG Highway, Ahmedabad",
+    "areaName": "SG Highway",
+    "city": "Ahmedabad",
+    "code": "STORE-SG_HIGHWAY",
+    "createdAt": "2026-09-10T09:25:59.753Z",
+    "estimatedDeliveryMinutes": 10,
+    "isActive": true,
+    "name": "Wom Up SG Highway Dark Store",
+    "serviceRadiusKm": 4,
+    "updatedAt": "2026-10-09T07:21:21.203Z",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.505,
+        23.03
+      ]
+    },
+    "managerName": "Operations Manager",
+    "managerPhone": "+919876543210",
+    "operatingHours": {
+      "open": "06:00",
+      "close": "02:00"
+    },
+    "pincode": "380054",
+    "loginId": "womupSGHighway",
+    "loginPasswordHash": "$2a$10$fHtTYe10Fwkoqmo8/292CuxItJ.u0ueMG07n92cXRWACB1zXRRMKG",
+    "passwordUpdatedAt": "2026-09-19T04:22:44.020Z",
+    "cityId": "6abcefe75a521a988d799c02",
+    "cityName": "Ahmedabad",
+    "isOnShift": true,
+    "isOnline": true
+  },
+  {
+    "_id": "6aa277a8fc02997cbe281ac7",
+    "areaId": "6aa11866c6c3e5984e2ef5e5",
+    "address": "Thaltej, Ahmedabad",
+    "areaName": "Thaltej",
+    "city": "Ahmedabad",
+    "code": "STORE-THALTEJ",
+    "createdAt": "2026-09-10T09:26:00.003Z",
+    "estimatedDeliveryMinutes": 11,
+    "isActive": true,
+    "name": "Wom Up Thaltej Dark Store",
+    "serviceRadiusKm": 3.5,
+    "updatedAt": "2026-10-18T15:50:46.639Z",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.51,
+        23.05
+      ]
+    },
+    "managerName": "Operations Manager",
+    "managerPhone": "+919876543210",
+    "operatingHours": {
+      "open": "06:00",
+      "close": "02:00"
+    },
+    "pincode": "380059",
+    "loginId": "womupThaltej",
+    "loginPasswordHash": "$2b$10$Ravu6jNqHTW5zgOc0m1nyOOo8qGCeKkNob5JaIoFmI0nAcbhV8.uu",
+    "passwordUpdatedAt": "2026-10-18T14:51:53.240Z",
+    "cityId": "6abcefe75a521a988d799c02",
+    "cityName": "Ahmedabad",
+    "isOnShift": true,
+    "isOnline": true,
+    "lastLoginAt": "2026-10-18T15:50:46.639Z",
+    "acceptingOrders": true
+  },
+  {
+    "_id": "6aa27940fc02997cbe281af6",
+    "areaId": "6aa279407dab7debc8348c16",
+    "address": "Vastrapur Lake Road, Ahmedabad",
+    "areaName": "Vastrapur",
+    "city": "Ahmedabad",
+    "code": "STORE-VASTRAPUR",
+    "createdAt": "2026-09-10T09:32:48.099Z",
+    "estimatedDeliveryMinutes": 10,
+    "isActive": true,
+    "name": "Wom Up Vastrapur Dark Store",
+    "serviceRadiusKm": 4.5,
+    "updatedAt": "2026-10-09T07:21:24.302Z",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.529,
+        23.035
+      ]
+    },
+    "managerName": "Operations Manager",
+    "managerPhone": "+919876543210",
+    "operatingHours": {
+      "open": "06:00",
+      "close": "02:00"
+    },
+    "pincode": "380015",
+    "loginId": "womupVastrapur",
+    "loginPasswordHash": "$2b$10$3wtBZJzK6TBJg89Ci5hwiuumDO4tTmzo.B9opRXM6tEVGoCFNCKv6",
+    "passwordUpdatedAt": "2026-10-09T01:02:16.850Z",
+    "cityId": "6abcefe75a521a988d799c02",
+    "cityName": "Ahmedabad",
+    "isOnShift": true,
+    "isOnline": true
+  },
+  {
+    "_id": "6aac257b8f337240651ef43b",
+    "name": "Wom Up Chandlodiya - Tragad Dark Store",
+    "code": "STORE-CHANDLODIYA_TRAGAD",
+    "address": "Shop 10-14, Ground Floor, Shukan Hub, Near Chandlodiya Railway Crossing & Tragad Rd, Ahmedabad - 382481",
+    "city": "Ahmedabad",
+    "pincode": "382481",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.558775,
+        23.128086
+      ]
+    },
+    "serviceRadiusKm": 10,
+    "estimatedDeliveryMinutes": 9,
+    "openingTime": "06:00",
+    "closingTime": "02:00",
+    "phoneNumber": "+91 98765 43220",
+    "managerName": "Suresh Patel",
+    "managerPhone": "+91 98765 43220",
+    "isActive": true,
+    "updatedAt": "2026-11-20T12:53:58.679Z",
+    "createdAt": "2026-09-17T17:38:03.620Z",
+    "areaId": "6aac257b8f337240651ef43c",
+    "areaName": "Chandlodiya - Tragad",
+    "operatingHours": {
+      "open": "06:00",
+      "close": "02:00"
+    },
+    "loginId": "womupTragad",
+    "loginPasswordHash": "$2a$10$cvIJIbsEpFCJn.2.1lzzSOOO1bPfiYJr6n7PT/5VOXOeJG4FOmBLC",
+    "passwordUpdatedAt": "2026-10-22T19:58:14.173Z",
+    "lastLoginAt": "2026-11-20T12:53:58.678Z",
+    "cityId": "6abcefe75a521a988d799c02",
+    "cityName": "Ahmedabad",
+    "isOnShift": true,
+    "isOnline": false,
+    "status": "ACTIVE",
+    "latitude": 23.128086,
+    "longitude": 72.558775,
+    "coordinates": [
+      72.558775,
+      23.128086
+    ],
+    "__v": 1,
+    "shopPhotosUrls": [],
+    "loginPassword": "123"
+  },
+  {
+    "_id": "6ac36432ccb04b37e676d731",
+    "name": "GOPAL VEGETABLE STORE",
+    "code": "STR-MANINAGAR",
+    "address": "GOPAL VEGETABLE STORE, Maninagar, Ahmedabad",
+    "city": "Ahmedabad",
+    "cityName": "Ahmedabad",
+    "cityId": "6abcefe75a521a988d799c02",
+    "pincode": "380008",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.6033,
+        22.9978
+      ]
+    },
+    "serviceRadiusKm": 3.5,
+    "estimatedDeliveryMinutes": 9,
+    "isActive": true,
+    "isOnShift": true,
+    "openingTime": "07:00",
+    "closingTime": "23:00",
+    "areaId": "6abcf767c486687900e11ef3",
+    "areaName": "Maninagar",
+    "managerName": "Manish",
+    "managerPhone": "9825620044",
+    "ownerName": "Manish",
+    "email": "manish@zoomintos.biz",
+    "phone": "9825620044",
+    "status": "ACTIVE",
+    "loginId": "womup_maninagar",
+    "loginPasswordHash": "$2a$10$YLwCsxqACLSymqjywlUJIuBWdRc5EkMnMppVurkPADMPJy8bZ63eG",
+    "passwordUpdatedAt": "2026-10-05T08:47:46.037Z",
+    "createdAt": "2026-10-05T08:47:46.134Z",
+    "updatedAt": "2026-10-05T08:47:46.134Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ac3653eccb04b37e676d756",
+    "name": "Zarwebcoders",
+    "code": "STR-ADAJAN",
+    "address": "Zarwebcoders, Adajan, Surat",
+    "city": "Surat",
+    "cityName": "Surat",
+    "cityId": "6abcefe75a521a988d799c03",
+    "pincode": "395009",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.7997,
+        21.1926
+      ]
+    },
+    "serviceRadiusKm": 3.5,
+    "estimatedDeliveryMinutes": 9,
+    "isActive": true,
+    "isOnShift": true,
+    "openingTime": "07:00",
+    "closingTime": "23:00",
+    "areaId": "6abcf768c486687900e11ef6",
+    "areaName": "Adajan",
+    "managerName": "Abuzar Munshi",
+    "managerPhone": "8160404725",
+    "ownerName": "Abuzar Munshi",
+    "email": "zarwebcoders@gmail.com",
+    "phone": "8160404725",
+    "status": "ACTIVE",
+    "loginId": "womup_adajan",
+    "loginPasswordHash": "$2a$10$vRxfo8oZ1SBTHh5CP249OugYrh.EjrZSTUuTGOpfa9.PWjMGa6jD.",
+    "passwordUpdatedAt": "2026-10-05T08:52:14.939Z",
+    "createdAt": "2026-10-05T08:52:14.940Z",
+    "updatedAt": "2026-10-11T07:13:24.827Z",
+    "__v": 0,
+    "lastLoginAt": "2026-10-05T08:52:42.629Z",
+    "isOnline": true
+  },
+  {
+    "_id": "6ad22ceccb1c11cfded14ca5",
+    "name": "womupTragad",
+    "code": "STR-AREACHANDLODIYATRAGAD",
+    "address": "womupTragad, Chandlodiya - Tragad, Ahmedabad",
+    "city": "Ahmedabad",
+    "cityName": "Ahmedabad",
+    "cityId": "6abcefe75a521a988d799c02",
+    "pincode": "382481",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.540983,
+        23.134066
+      ]
+    },
+    "serviceRadiusKm": 10,
+    "estimatedDeliveryMinutes": 9,
+    "isActive": true,
+    "isOnShift": true,
+    "openingTime": "07:00",
+    "closingTime": "23:00",
+    "areaId": "6ad8fc07078837a1a8c2ed39",
+    "areaName": "Chandlodiya - Tragad",
+    "managerName": "xyz",
+    "managerPhone": "8989988998",
+    "ownerName": "xyz",
+    "email": "xyz@gmail.com",
+    "phone": "8989988998",
+    "status": "ACTIVE",
+    "loginId": "womup_areachandlodiyatragad",
+    "loginPasswordHash": "$2b$10$3HTiJ4gHP2lObo.vTzoVV.BWHPp4QknF0KsOdfaCpqhXO2j9truue",
+    "passwordUpdatedAt": "2026-10-18T14:50:36.333Z",
+    "createdAt": "2026-10-16T13:55:56.178Z",
+    "updatedAt": "2026-10-22T07:40:37.985Z",
+    "__v": 1,
+    "coordinates": [
+      72.540983,
+      23.134066
+    ],
+    "latitude": 23.134066,
+    "longitude": 72.540983,
+    "lastLoginAt": "2026-10-22T07:40:37.985Z",
+    "shopPhotosUrls": []
+  },
+  {
+    "_id": "6aeda3ada64cec48b93b13f6",
+    "name": "Testing",
+    "code": "STR-SND",
+    "address": "ABC",
+    "city": "Ahmedabad",
+    "cityName": "Ahmedabad",
+    "cityId": "6abcefe75a521a988d799c02",
+    "pincode": "382481",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.49316,
+        22.98772
+      ]
+    },
+    "serviceRadiusKm": 5,
+    "estimatedDeliveryMinutes": 9,
+    "isActive": true,
+    "isOnShift": false,
+    "isOnline": true,
+    "openingTime": "06:00 AM",
+    "closingTime": "11:00 PM",
+    "areaId": "6ae9cd0da64cec48b93ae9e3",
+    "areaName": "Sanand",
+    "managerName": "Prayag Patel",
+    "managerPhone": "6376870703",
+    "ownerName": "Prayag Patel",
+    "email": "prayagpatel8632@gmail.com",
+    "phone": "6376870703",
+    "status": "ACTIVE",
+    "loginId": "womup_snd",
+    "loginPasswordHash": "$2a$10$ULGjZBBBG1v9IhVez4Cy7eCk2MU46hCrxjO3JmWebwxgFx6wbsL/G",
+    "passwordUpdatedAt": "2026-11-06T09:53:49.913Z",
+    "shopPhotosUrls": [],
+    "createdAt": "2026-11-06T09:53:49.915Z",
+    "updatedAt": "2026-11-06T10:04:35.420Z",
+    "__v": 0,
+    "lastLoginAt": "2026-11-06T10:04:35.420Z"
+  }
+]

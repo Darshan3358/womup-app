@@ -1,0 +1,86 @@
+[
+  {
+    "_id": "6b0174f9c4736bc8abf105fa",
+    "title": "Groceries & Essentials • 9-Min Delivery",
+    "imageUrl": "https://res.cloudinary.com/dp6ukil0g/image/upload/v1795257327/womup/banners/home_banner.png",
+    "placement": "HOME_HERO",
+    "targetType": "CATEGORY",
+    "targetId": "all",
+    "sortOrder": 1,
+    "isActive": true,
+    "createdAt": "2026-11-21T10:39:53.541Z",
+    "updatedAt": "2026-11-23T09:06:18.157Z"
+  },
+  {
+    "_id": "6b0174f9c4736bc8abf105fb",
+    "title": "Fresh & Healthy Vegetables & Fruits",
+    "imageUrl": "https://res.cloudinary.com/dp6ukil0g/image/upload/v1795257329/womup/banners/fresh_healthy.png",
+    "placement": "HOME_HERO",
+    "targetType": "CATEGORY",
+    "targetId": "c1",
+    "sortOrder": 2,
+    "isActive": true,
+    "createdAt": "2026-11-21T10:39:53.541Z",
+    "updatedAt": "2026-11-21T10:39:53.541Z"
+  },
+  {
+    "_id": "6b0174f9c4736bc8abf105fc",
+    "title": "Dairy Special & Breakfast",
+    "imageUrl": "https://res.cloudinary.com/dp6ukil0g/image/upload/v1795257330/womup/banners/dairy_special.png",
+    "placement": "HOME_HERO",
+    "targetType": "CATEGORY",
+    "targetId": "c3",
+    "sortOrder": 3,
+    "isActive": true,
+    "createdAt": "2026-11-21T10:39:53.541Z",
+    "updatedAt": "2026-11-21T11:04:18.923Z"
+  },
+  {
+    "_id": "6b0174f9c4736bc8abf105fd",
+    "title": "Make Your Home Diwali Ready - Festive Special",
+    "imageUrl": "https://res.cloudinary.com/dp6ukil0g/image/upload/v1795257332/womup/banners/diwali_ready.png",
+    "placement": "FESTIVE_RAIL",
+    "targetType": "CATEGORY",
+    "targetId": "festive",
+    "sortOrder": 1,
+    "isActive": false,
+    "createdAt": "2026-11-21T10:39:53.541Z",
+    "updatedAt": "2026-11-23T09:06:20.204Z"
+  },
+  {
+    "_id": "6b0174f9c4736bc8abf105fe",
+    "title": "Fresh Groceries Delivered in 9 Minutes",
+    "imageUrl": "https://res.cloudinary.com/dp6ukil0g/image/upload/v1795257333/womup/banners/9minbanner.png",
+    "placement": "CATEGORY_SPOTLIGHT",
+    "targetType": "CATEGORY",
+    "targetId": "c1",
+    "sortOrder": 1,
+    "isActive": true,
+    "createdAt": "2026-11-21T10:39:53.541Z",
+    "updatedAt": "2026-11-21T11:05:29.542Z"
+  },
+  {
+    "_id": "6b0174f9c4736bc8abf105ff",
+    "title": "Dairy & Breakfast - Up to 20% Off",
+    "imageUrl": "https://res.cloudinary.com/dp6ukil0g/image/upload/v1795257334/womup/banners/dairy_breakfast.jpg",
+    "placement": "CATEGORY_SPOTLIGHT",
+    "targetType": "CATEGORY",
+    "targetId": "c3",
+    "sortOrder": 2,
+    "isActive": true,
+    "createdAt": "2026-11-21T10:39:53.541Z",
+    "updatedAt": "2026-11-21T10:39:53.541Z"
+  },
+  {
+    "_id": "6b0174f9c4736bc8abf10600",
+    "title": "Snack Attack - Quick Bites & Beverages",
+    "imageUrl": "https://res.cloudinary.com/dp6ukil0g/image/upload/v1795257335/womup/banners/snack_attack.png",
+    "placement": "CATEGORY_SPOTLIGHT",
+    "targetType": "CATEGORY",
+    "targetId": "c2",
+    "sortOrder": 3,
+    "isActive": true,
+    "createdAt": "2026-11-21T10:39:53.541Z",
+    "updatedAt": "2026-11-21T10:39:53.541Z"
+  }
+]

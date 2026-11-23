@@ -1,0 +1,14 @@
+[
+  {
+    "_id": "6ad2622f563ca91f02d85928",
+    "phone": "9825100561",
+    "email": "thankidarshan561@gmail.com",
+    "otpHash": "",
+    "verificationId": "v-darshan-561",
+    "isVerified": true,
+    "attempts": 0,
+    "status": "approved",
+    "expiresAt": "2027-10-16T17:43:11.486Z",
+    "createdAt": "2026-10-16T17:43:11.486Z"
+  }
+]

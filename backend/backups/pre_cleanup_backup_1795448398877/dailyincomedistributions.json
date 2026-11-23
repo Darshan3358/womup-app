@@ -1,0 +1,233 @@
+[
+  {
+    "_id": "6afc607fb3587c2ddc60798b",
+    "date": "2026-11-17",
+    "__v": 0,
+    "breakdown": {
+      "referralIncome": 80,
+      "levelIncome": 0,
+      "otherIncome": 0,
+      "_id": "6afc607f7e52ce43d64b1778"
+    },
+    "createdAt": "2026-11-17T14:11:11.181Z",
+    "distributionSummary": [
+      {
+        "userId": "6afc59229189c0b0663cca7f",
+        "userName": "User Level 1",
+        "totalAmount": 30,
+        "referralAmount": 30,
+        "levelAmount": 0,
+        "otherAmount": 0,
+        "txCount": 2
+      },
+      {
+        "userId": "6afc59239189c0b0663cca80",
+        "userName": "Test User Level 2",
+        "totalAmount": 20,
+        "referralAmount": 20,
+        "levelAmount": 0,
+        "otherAmount": 0,
+        "txCount": 1
+      },
+      {
+        "userId": "6aeee5a032a0ed6c254070c1",
+        "userName": "Vikash Shah",
+        "totalAmount": 20,
+        "referralAmount": 20,
+        "levelAmount": 0,
+        "otherAmount": 0,
+        "txCount": 1
+      },
+      {
+        "userId": "6aeee18032a0ed6c25406e5c",
+        "userName": "Prayag Dineshbhai Patel",
+        "totalAmount": 10,
+        "referralAmount": 10,
+        "levelAmount": 0,
+        "otherAmount": 0,
+        "txCount": 1
+      }
+    ],
+    "errorDetails": null,
+    "executedAt": "2026-11-17T14:11:11.180Z",
+    "failedCount": 0,
+    "status": "SUCCESS",
+    "totalAmount": 80,
+    "transactionCount": 5,
+    "updatedAt": "2026-11-17T14:11:11.181Z",
+    "userCount": 4
+  },
+  {
+    "_id": "6afc9d28b3587c2ddc608808",
+    "date": "2026-11-18",
+    "__v": 0,
+    "breakdown": {
+      "referralIncome": 0,
+      "levelIncome": 0,
+      "otherIncome": 0,
+      "_id": "6afc9d288c25d51b9778563f"
+    },
+    "createdAt": "2026-11-17T18:30:00.650Z",
+    "distributionSummary": [],
+    "errorDetails": null,
+    "executedAt": "2026-11-17T18:30:00.734Z",
+    "failedCount": 0,
+    "status": "SUCCESS",
+    "totalAmount": 0,
+    "transactionCount": 0,
+    "updatedAt": "2026-11-17T18:30:00.735Z",
+    "userCount": 0
+  },
+  {
+    "_id": "6afdeea8b3587c2ddc60a007",
+    "date": "2026-11-19",
+    "__v": 0,
+    "breakdown": {
+      "referralIncome": 0,
+      "levelIncome": 0,
+      "otherIncome": 0,
+      "_id": "6afdeea8ec877b50433d79c8"
+    },
+    "createdAt": "2026-11-18T18:30:00.714Z",
+    "distributionSummary": [],
+    "errorDetails": null,
+    "executedAt": "2026-11-18T18:30:00.735Z",
+    "failedCount": 0,
+    "status": "SUCCESS",
+    "totalAmount": 0,
+    "transactionCount": 0,
+    "updatedAt": "2026-11-18T18:30:00.736Z",
+    "userCount": 0
+  },
+  {
+    "_id": "6aff4028fe11b83d0335d5ec",
+    "date": "2026-11-20",
+    "__v": 0,
+    "breakdown": {
+      "referralIncome": 0,
+      "levelIncome": 0,
+      "otherIncome": 0,
+      "_id": "6aff402842692bbc72e52594"
+    },
+    "createdAt": "2026-11-19T18:30:00.642Z",
+    "distributionSummary": [],
+    "errorDetails": null,
+    "executedAt": "2026-11-19T18:30:00.721Z",
+    "failedCount": 0,
+    "status": "SUCCESS",
+    "totalAmount": 0,
+    "transactionCount": 0,
+    "updatedAt": "2026-11-19T18:30:00.722Z",
+    "userCount": 0
+  },
+  {
+    "_id": "6b0091aafe11b83d0335f01b",
+    "date": "2026-11-21",
+    "__v": 0,
+    "breakdown": {
+      "referralIncome": 80,
+      "levelIncome": 0,
+      "otherIncome": 0,
+      "_id": "6b0091aae1ed4ea9c4661847"
+    },
+    "createdAt": "2026-11-20T18:30:02.056Z",
+    "distributionSummary": [
+      {
+        "userId": "6b004cb4babfbbc9ce0356c5",
+        "userName": "MAIN  Spinser",
+        "totalAmount": 20,
+        "referralAmount": 20,
+        "levelAmount": 0,
+        "otherAmount": 0,
+        "txCount": 1
+      },
+      {
+        "userId": "6aeee18032a0ed6c25406e5c",
+        "userName": "Prayag Dineshbhai Patel",
+        "totalAmount": 60,
+        "referralAmount": 60,
+        "levelAmount": 0,
+        "otherAmount": 0,
+        "txCount": 3
+      }
+    ],
+    "errorDetails": null,
+    "executedAt": "2026-11-20T18:30:02.231Z",
+    "failedCount": 0,
+    "status": "SUCCESS",
+    "totalAmount": 80,
+    "transactionCount": 4,
+    "updatedAt": "2026-11-20T18:30:02.232Z",
+    "userCount": 2
+  },
+  {
+    "_id": "6b01e32bfe11b83d03361bed",
+    "date": "2026-11-22",
+    "__v": 0,
+    "breakdown": {
+      "referralIncome": 85,
+      "levelIncome": 0,
+      "otherIncome": 0,
+      "_id": "6b01e32a9094c001dadedad7"
+    },
+    "createdAt": "2026-11-21T18:30:02.973Z",
+    "distributionSummary": [
+      {
+        "userId": "6aeee18032a0ed6c25406e5c",
+        "userName": "Prayag Dineshbhai Patel",
+        "totalAmount": 35,
+        "referralAmount": 35,
+        "levelAmount": 0,
+        "otherAmount": 0,
+        "txCount": 3
+      },
+      {
+        "userId": "6b015d685dde0f9a42794966",
+        "userName": "Test Test Test Test",
+        "totalAmount": 30,
+        "referralAmount": 30,
+        "levelAmount": 0,
+        "otherAmount": 0,
+        "txCount": 2
+      },
+      {
+        "userId": "6b01623c5dde0f9a42794deb",
+        "userName": "Test2 Test2 Test2 Test2",
+        "totalAmount": 20,
+        "referralAmount": 20,
+        "levelAmount": 0,
+        "otherAmount": 0,
+        "txCount": 1
+      }
+    ],
+    "errorDetails": null,
+    "executedAt": "2026-11-21T18:30:02.972Z",
+    "failedCount": 0,
+    "status": "SUCCESS",
+    "totalAmount": 85,
+    "transactionCount": 6,
+    "updatedAt": "2026-11-21T18:30:02.973Z",
+    "userCount": 3
+  },
+  {
+    "_id": "6b0334a8fe11b83d03368653",
+    "date": "2026-11-23",
+    "__v": 0,
+    "breakdown": {
+      "referralIncome": 0,
+      "levelIncome": 0,
+      "otherIncome": 0,
+      "_id": "6b0334a89094c001dadee0d1"
+    },
+    "createdAt": "2026-11-22T18:30:00.676Z",
+    "distributionSummary": [],
+    "errorDetails": null,
+    "executedAt": "2026-11-22T18:30:00.675Z",
+    "failedCount": 0,
+    "status": "SUCCESS",
+    "totalAmount": 0,
+    "transactionCount": 0,
+    "updatedAt": "2026-11-22T18:30:00.676Z",
+    "userCount": 0
+  }
+]

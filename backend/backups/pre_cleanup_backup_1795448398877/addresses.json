@@ -1,0 +1,583 @@
+[
+  {
+    "_id": "6adf9665b1c611656a1bc267",
+    "userId": "6adf9665b1c611656a1bc266",
+    "label": "Office / Admin HQ",
+    "houseNumber": "Office 101, Womup HQ",
+    "street": "Chandlodia Main Road",
+    "landmark": "Chandlodia",
+    "city": "Ahmedabad",
+    "state": "Gujarat",
+    "pincode": "382481",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.5507,
+        23.1288
+      ]
+    },
+    "isDefault": false,
+    "createdAt": "2026-10-26T18:05:25.312Z",
+    "updatedAt": "2026-10-26T20:11:51.761Z"
+  },
+  {
+    "_id": "6adfa92ecf1461616763aa7b",
+    "userId": "6adfa92ecf1461616763aa7a",
+    "label": "Home",
+    "houseNumber": "A-302, Darshan Residency",
+    "street": "Chandlodia - Tragad Road",
+    "landmark": "Near Tragad Crossing",
+    "city": "Ahmedabad",
+    "state": "Gujarat",
+    "pincode": "382501",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.545,
+        23.115
+      ]
+    },
+    "isDefault": false,
+    "createdAt": "2026-10-26T19:25:34.322Z",
+    "updatedAt": "2026-10-30T09:02:37.075Z"
+  },
+  {
+    "_id": "6adfb3aee030379004e28092",
+    "userId": "6adf9665b1c611656a1bc266",
+    "label": "Home",
+    "houseNumber": "Office 101",
+    "street": "Womup HQ, Chandlodia Main Road",
+    "landmark": "Chandlodia",
+    "city": "Ahmedabad",
+    "state": "Gujarat",
+    "pincode": "380015",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.493177,
+        22.987688
+      ]
+    },
+    "isDefault": false,
+    "deliveryInstructions": "",
+    "areaId": "6aa11866c6c3e5984e2ef5df",
+    "areaName": "Prahlad Nagar",
+    "storeId": "6aa277a7fc02997cbe281ac1",
+    "createdAt": "2026-10-26T20:10:22.713Z",
+    "updatedAt": "2026-10-26T20:11:51.761Z",
+    "__v": 0
+  },
+  {
+    "_id": "6adfb407e030379004e280fb",
+    "userId": "6adf9665b1c611656a1bc266",
+    "label": "Home",
+    "houseNumber": "Adani Pratham S2 202",
+    "street": "Prahlad Nagar",
+    "landmark": "Prahlad Nagar",
+    "city": "Ahmedabad",
+    "state": "Gujarat",
+    "pincode": "380015",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.493136,
+        22.987349
+      ]
+    },
+    "isDefault": true,
+    "deliveryInstructions": "",
+    "areaId": "6aa11866c6c3e5984e2ef5df",
+    "areaName": "Prahlad Nagar",
+    "storeId": "6aa277a7fc02997cbe281ac1",
+    "createdAt": "2026-10-26T20:11:51.838Z",
+    "updatedAt": "2026-10-26T20:11:51.838Z",
+    "__v": 0
+  },
+  {
+    "_id": "6adfc5eae030379004e28d07",
+    "userId": "6adfa92ecf1461616763aa7a",
+    "label": "Home",
+    "houseNumber": "prahlad nagar",
+    "street": "prahlad nagar",
+    "landmark": "prahlad nagar",
+    "city": "Ahmedabad",
+    "state": "Gujarat",
+    "pincode": "380015",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.493087,
+        22.987549
+      ]
+    },
+    "isDefault": false,
+    "deliveryInstructions": "",
+    "areaId": "6aa11866c6c3e5984e2ef5df",
+    "areaName": "Prahlad Nagar",
+    "storeId": "6aa277a7fc02997cbe281ac1",
+    "createdAt": "2026-10-26T21:28:10.278Z",
+    "updatedAt": "2026-10-30T09:02:37.075Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae45d2d526d034ccd0d2e86",
+    "userId": "6adfa92ecf1461616763aa7a",
+    "label": "Home",
+    "houseNumber": "GPS Location",
+    "street": "Street",
+    "landmark": "Chandlodia",
+    "city": "Tragad",
+    "state": "Gujarat",
+    "pincode": "382470",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.55056372083772,
+        23.12872467188299
+      ]
+    },
+    "isDefault": true,
+    "deliveryInstructions": "",
+    "areaId": "6ad8fc07078837a1a8c2ed39",
+    "areaName": "Tragad",
+    "storeId": "6aac257b8f337240651ef43b",
+    "createdAt": "2026-10-30T09:02:37.148Z",
+    "updatedAt": "2026-10-30T09:02:44.624Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aea21e0a64cec48b93af847",
+    "userId": "6ae5b477a64cec48b93ac835",
+    "label": "Home",
+    "houseNumber": "909-910 singture -2",
+    "street": "Prahlad Nagar",
+    "landmark": "Prahlad Nagar",
+    "city": "Ahmedabad",
+    "state": "Gujarat",
+    "pincode": "380015",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.49312520027162,
+        22.98750849756567
+      ]
+    },
+    "isDefault": true,
+    "deliveryInstructions": "",
+    "areaId": "6aa11866c6c3e5984e2ef5df",
+    "areaName": "Prahlad Nagar",
+    "storeId": "6aa277a7fc02997cbe281ac1",
+    "createdAt": "2026-11-03T18:03:12.834Z",
+    "updatedAt": "2026-11-03T18:03:12.834Z",
+    "__v": 0
+  },
+  {
+    "_id": "6af1da5db657a7a98d9c4ab9",
+    "userId": "6aef01446ef450c2c9caee00",
+    "label": "Home",
+    "houseNumber": "adani",
+    "street": "Street",
+    "landmark": "traged",
+    "city": "Ahmedabad",
+    "state": "Gujarat",
+    "pincode": "382470",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.550302,
+        23.128923
+      ]
+    },
+    "isDefault": false,
+    "deliveryInstructions": "",
+    "areaId": "6ad8fc07078837a1a8c2ed39",
+    "areaName": "Tragad",
+    "storeId": "6aac257b8f337240651ef43b",
+    "createdAt": "2026-11-09T14:36:13.687Z",
+    "updatedAt": "2026-11-09T14:42:27.484Z",
+    "__v": 0
+  },
+  {
+    "_id": "6af1da9ab657a7a98d9c4af5",
+    "userId": "6aef01446ef450c2c9caee00",
+    "label": "Home",
+    "houseNumber": "Adani Pratham S2 202",
+    "street": "Tragead",
+    "landmark": "Tragead",
+    "city": "Ahmedabad",
+    "state": "Gujarat",
+    "pincode": "382470",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.550793,
+        23.129547
+      ]
+    },
+    "isDefault": true,
+    "deliveryInstructions": "",
+    "areaId": "6ad8fc07078837a1a8c2ed39",
+    "areaName": "Tragad",
+    "storeId": "6aac257b8f337240651ef43b",
+    "createdAt": "2026-11-09T14:37:14.496Z",
+    "updatedAt": "2026-11-09T14:37:14.496Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afc344c59ee50c9a2cfad97",
+    "userId": "6aeee18032a0ed6c25406e5c",
+    "label": "Home",
+    "houseNumber": "GPS Location",
+    "street": "Street",
+    "landmark": "Sanand",
+    "city": "Ahmedabad",
+    "state": "Gujarat",
+    "pincode": "382210",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.4931365,
+        22.9876358
+      ]
+    },
+    "isDefault": false,
+    "deliveryInstructions": "",
+    "createdAt": "2026-11-17T11:02:36.786Z",
+    "updatedAt": "2026-11-19T09:34:11.215Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afc502088ae17b096618c44",
+    "userId": "6afc501e88ae17b096618c43",
+    "label": "Home",
+    "type": "HOME",
+    "houseFlat": "Flat 402, Block B",
+    "street": "Shagun Residency, SG Highway",
+    "area": "Tragad",
+    "landmark": "Near Nirma University",
+    "city": "Ahmedabad",
+    "state": "Gujarat",
+    "pincode": "382481",
+    "latitude": 23.125,
+    "longitude": 72.54,
+    "isDefault": false,
+    "createdAt": "2026-11-17T13:01:20.945Z",
+    "updatedAt": "2026-11-17T13:09:22.396Z"
+  },
+  {
+    "_id": "6afc5202fbddc5b081b3cad0",
+    "userId": "6afc501e88ae17b096618c43",
+    "label": "Home",
+    "houseNumber": "Malabar S2 202",
+    "street": "Tragead",
+    "landmark": "Tragead",
+    "city": "Ahmedabad",
+    "state": "Gujarat",
+    "pincode": "382470",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.55233561387287,
+        23.12899828971206
+      ]
+    },
+    "isDefault": true,
+    "deliveryInstructions": "",
+    "areaId": "6ad8fc07078837a1a8c2ed39",
+    "areaName": "Tragad",
+    "storeId": "6aac257b8f337240651ef43b",
+    "createdAt": "2026-11-17T13:09:22.675Z",
+    "updatedAt": "2026-11-17T13:09:22.675Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afc592fb3587c2ddc6078cf",
+    "userId": "6afc59229189c0b0663cca7f",
+    "area": "Tragad",
+    "city": "Ahmedabad",
+    "createdAt": "2026-11-17T13:39:58.920Z",
+    "houseFlat": "Flat 101, Block A",
+    "isDefault": true,
+    "label": "Home - Level 1",
+    "landmark": "Near Nirma University",
+    "latitude": 23.125,
+    "longitude": 72.54,
+    "pincode": "382481",
+    "state": "Gujarat",
+    "street": "Shagun Heights, SG Highway",
+    "type": "HOME",
+    "updatedAt": "2026-11-17T15:14:29.248Z"
+  },
+  {
+    "_id": "6afc5930b3587c2ddc6078d0",
+    "userId": "6afc59239189c0b0663cca80",
+    "area": "Tragad",
+    "city": "Ahmedabad",
+    "createdAt": "2026-11-17T13:39:59.627Z",
+    "houseFlat": "Flat 202, Block B",
+    "isDefault": true,
+    "label": "Home - Level 2",
+    "landmark": "Opposite Dark Store",
+    "latitude": 23.125,
+    "longitude": 72.54,
+    "pincode": "382481",
+    "state": "Gujarat",
+    "street": "Shagun Green, SG Highway",
+    "type": "HOME",
+    "updatedAt": "2026-11-17T15:14:29.318Z"
+  },
+  {
+    "_id": "6afc5930b3587c2ddc6078d1",
+    "userId": "6afc59249189c0b0663cca81",
+    "area": "Tragad",
+    "city": "Ahmedabad",
+    "createdAt": "2026-11-17T13:40:00.098Z",
+    "houseFlat": "Flat 303, Block C",
+    "isDefault": true,
+    "label": "Home - Level 3",
+    "landmark": "Near SG Highway Cross",
+    "latitude": 23.125,
+    "longitude": 72.54,
+    "pincode": "382481",
+    "state": "Gujarat",
+    "street": "Shagun Residency, SG Highway",
+    "type": "HOME",
+    "updatedAt": "2026-11-17T15:14:29.376Z"
+  },
+  {
+    "_id": "6afd62d06396024e04b95e3f",
+    "userId": "6aeee18032a0ed6c25406e5c",
+    "label": "Home",
+    "houseNumber": "Sanand",
+    "street": "Street",
+    "landmark": "Sanand",
+    "city": "Sanand",
+    "state": "Gujarat",
+    "pincode": "382210",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.5714,
+        23.0225
+      ]
+    },
+    "isDefault": false,
+    "deliveryInstructions": "",
+    "createdAt": "2026-11-18T08:33:20.575Z",
+    "updatedAt": "2026-11-18T09:12:26.621Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afd6bfa6396024e04b96333",
+    "userId": "6aeee18032a0ed6c25406e5c",
+    "label": "Home",
+    "houseNumber": "K 302, Pacifica north enclave",
+    "street": "Street",
+    "landmark": "Near vaishnodevi circle, 382501",
+    "city": "Ahmedabad",
+    "state": "Gujarat",
+    "pincode": "382210",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.4931563,
+        22.9876977
+      ]
+    },
+    "isDefault": true,
+    "deliveryInstructions": "",
+    "areaId": "6ae9cd0da64cec48b93ae9e3",
+    "areaName": "Sanand",
+    "storeId": "6aeda3ada64cec48b93b13f6",
+    "createdAt": "2026-11-18T09:12:26.900Z",
+    "updatedAt": "2026-11-20T09:13:22.968Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afda0cc6396024e04b96e08",
+    "userId": "6afc95705dfb520af538adb0",
+    "label": "Home",
+    "houseNumber": "202, Thaltej, Ahmedabad, Street, Street, Street, Street",
+    "street": "Street",
+    "landmark": "Thaltej, Ahmedabad",
+    "city": "Ahmedabad",
+    "state": "Gujarat",
+    "pincode": "380059",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.5106,
+        23.0623
+      ]
+    },
+    "isDefault": false,
+    "deliveryInstructions": "",
+    "areaId": "6aa11866c6c3e5984e2ef5e5",
+    "areaName": "Thaltej",
+    "storeId": "6aa277a8fc02997cbe281ac7",
+    "createdAt": "2026-11-18T12:57:48.206Z",
+    "updatedAt": "2026-11-20T13:23:44.377Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0049edbabfbbc9ce0354e2",
+    "userId": "6afc95705dfb520af538adb0",
+    "label": "Home",
+    "houseNumber": "202, Thaltej, Street",
+    "street": "Street",
+    "landmark": "Thaltej",
+    "city": "Ahmedabad",
+    "state": "Gujarat",
+    "pincode": "380059",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.51,
+        23.05
+      ]
+    },
+    "isDefault": true,
+    "deliveryInstructions": "",
+    "createdAt": "2026-11-20T13:23:57.276Z",
+    "updatedAt": "2026-11-20T13:28:26.402Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b004f01babfbbc9ce035965",
+    "userId": "6b004cb4babfbbc9ce0356c5",
+    "label": "Home",
+    "houseNumber": "A, Tragad gam road",
+    "street": "Street",
+    "landmark": "Godrej Garden City",
+    "city": "Tragad",
+    "state": "Gujarat",
+    "pincode": "382470",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.5504237,
+        23.1287182
+      ]
+    },
+    "isDefault": true,
+    "deliveryInstructions": "",
+    "createdAt": "2026-11-20T13:45:37.356Z",
+    "updatedAt": "2026-11-20T15:40:04.320Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0066ed5dde0f9a427940bc",
+    "userId": "6afc95705dfb520af538adb0",
+    "label": "Home",
+    "houseNumber": "A, Tragad gam road, Street",
+    "street": "Street",
+    "landmark": "Godrej Garden City",
+    "city": "Tragad",
+    "state": "Gujarat",
+    "pincode": "382470",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.5504274,
+        23.1287139
+      ]
+    },
+    "isDefault": true,
+    "deliveryInstructions": "",
+    "createdAt": "2026-11-20T15:27:41.259Z",
+    "updatedAt": "2026-11-23T11:42:52.037Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0172787e152d2766b27438",
+    "userId": "6aeee5a032a0ed6c254070c1",
+    "label": "Home",
+    "houseNumber": "Sanand",
+    "street": "Street",
+    "landmark": "Sanand",
+    "city": "Sanand",
+    "state": "Gujarat",
+    "pincode": "382210",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.5714,
+        23.0225
+      ]
+    },
+    "isDefault": true,
+    "deliveryInstructions": "",
+    "createdAt": "2026-11-21T10:29:12.244Z",
+    "updatedAt": "2026-11-21T10:29:12.244Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b03da409094c001dadee937",
+    "userId": "6b015d685dde0f9a42794966",
+    "label": "Home",
+    "houseNumber": "Sanand",
+    "street": "Street",
+    "landmark": "Sanand",
+    "city": "Sanand",
+    "state": "Gujarat",
+    "pincode": "382210",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.5714,
+        23.0225
+      ]
+    },
+    "isDefault": true,
+    "deliveryInstructions": "",
+    "createdAt": "2026-11-23T06:16:32.236Z",
+    "updatedAt": "2026-11-23T06:16:32.236Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b03dff69094c001dadeeb19",
+    "userId": "6aeee18032a0ed6c25406e5c",
+    "label": "Home",
+    "houseNumber": "Navrangpura",
+    "street": "Street",
+    "landmark": "Navrangpura",
+    "city": "Navrangpura",
+    "state": "Gujarat",
+    "pincode": "380009",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.5603,
+        23.0395
+      ]
+    },
+    "isDefault": true,
+    "deliveryInstructions": "",
+    "createdAt": "2026-11-23T06:40:54.425Z",
+    "updatedAt": "2026-11-23T06:40:54.425Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b03f4911d88e378abb9da45",
+    "userId": "6b01623c5dde0f9a42794deb",
+    "label": "Home",
+    "houseNumber": "Signature - 2, Sarkhej Sanand Highway, Sarkhej Circle",
+    "street": "Street",
+    "landmark": "Makarba",
+    "city": "Ahmedabad",
+    "state": "Gujarat",
+    "pincode": "382210",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.4931545,
+        22.987702
+      ]
+    },
+    "isDefault": true,
+    "deliveryInstructions": "",
+    "createdAt": "2026-11-23T08:08:49.404Z",
+    "updatedAt": "2026-11-23T08:08:49.404Z",
+    "__v": 0
+  }
+]

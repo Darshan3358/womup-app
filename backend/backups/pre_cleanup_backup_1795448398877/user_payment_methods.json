@@ -1,0 +1,695 @@
+[
+  {
+    "_id": "6adfb334e030379004e27fcc",
+    "userId": "6adf9665b1c611656a1bc266",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6adfb334e030379004e27fcd",
+        "createdAt": "2026-10-26T20:08:20.539Z",
+        "updatedAt": "2026-10-26T20:08:20.539Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-10-26T20:08:20.540Z",
+    "updatedAt": "2026-10-26T20:08:20.540Z",
+    "__v": 0
+  },
+  {
+    "_id": "6adfbcdee030379004e288ad",
+    "userId": "6adfb37348316a078aeff2b2",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6adfbcdee030379004e288ae",
+        "createdAt": "2026-10-26T20:49:34.385Z",
+        "updatedAt": "2026-10-26T20:49:34.385Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-10-26T20:49:34.385Z",
+    "updatedAt": "2026-10-26T20:49:34.385Z",
+    "__v": 0
+  },
+  {
+    "_id": "6adfbd85e030379004e289fb",
+    "userId": "6adfa92ecf1461616763aa7a",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6adfbd85e030379004e289fc",
+        "createdAt": "2026-10-26T20:52:21.983Z",
+        "updatedAt": "2026-10-26T20:52:21.983Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-10-26T20:52:21.983Z",
+    "updatedAt": "2026-10-26T20:52:21.983Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae5b4d2a64cec48b93ac86a",
+    "userId": "6ae5b477a64cec48b93ac835",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6ae5b4d2a64cec48b93ac86b",
+        "createdAt": "2026-10-31T09:28:50.408Z",
+        "updatedAt": "2026-10-31T09:28:50.408Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-10-31T09:28:50.408Z",
+    "updatedAt": "2026-10-31T09:28:50.408Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae9c54ca64cec48b93ae7a7",
+    "userId": "6ae9bf92a64cec48b93ae65e",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6ae9c54ca64cec48b93ae7a8",
+        "createdAt": "2026-11-03T11:28:12.716Z",
+        "updatedAt": "2026-11-03T11:28:12.716Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-11-03T11:28:12.716Z",
+    "updatedAt": "2026-11-03T11:28:12.716Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae9cb63a64cec48b93ae958",
+    "userId": "6ae9c688a64cec48b93ae820",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6ae9cb63a64cec48b93ae959",
+        "createdAt": "2026-11-03T11:54:11.598Z",
+        "updatedAt": "2026-11-03T11:54:11.598Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-11-03T11:54:11.598Z",
+    "updatedAt": "2026-11-03T11:54:11.598Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae9d1e2a64cec48b93aeb7e",
+    "userId": "6ae9cee3a64cec48b93aea72",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6ae9d1e2a64cec48b93aeb7f",
+        "createdAt": "2026-11-03T12:21:54.334Z",
+        "updatedAt": "2026-11-03T12:21:54.334Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-11-03T12:21:54.342Z",
+    "updatedAt": "2026-11-03T12:21:54.342Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aed9f11a64cec48b93b11d0",
+    "userId": "6aed9deca64cec48b93b1172",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6aed9f11a64cec48b93b11d1",
+        "createdAt": "2026-11-06T09:34:09.114Z",
+        "updatedAt": "2026-11-06T09:34:09.114Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-11-06T09:34:09.114Z",
+    "updatedAt": "2026-11-06T09:34:09.114Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aeee29432a0ed6c25406efa",
+    "userId": "6aeee18032a0ed6c25406e5c",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6aeee29432a0ed6c25406efb",
+        "createdAt": "2026-11-07T08:34:28.600Z",
+        "updatedAt": "2026-11-07T08:34:28.600Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-11-07T08:34:28.600Z",
+    "updatedAt": "2026-11-07T08:34:28.600Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aeee5c432a0ed6c2540710e",
+    "userId": "6aeee5a032a0ed6c254070c1",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6aeee5c432a0ed6c2540710f",
+        "createdAt": "2026-11-07T08:48:04.275Z",
+        "updatedAt": "2026-11-07T08:48:04.275Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-11-07T08:48:04.275Z",
+    "updatedAt": "2026-11-07T08:48:04.275Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aeeed1232a0ed6c254074c7",
+    "userId": "6aeeec8c32a0ed6c2540746f",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6aeeed1232a0ed6c254074c8",
+        "createdAt": "2026-11-07T09:19:14.615Z",
+        "updatedAt": "2026-11-07T09:19:14.615Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-11-07T09:19:14.615Z",
+    "updatedAt": "2026-11-07T09:19:14.615Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aeefe1232a0ed6c254078e5",
+    "userId": "6aeefdf932a0ed6c254078b1",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6aeefe1232a0ed6c254078e6",
+        "createdAt": "2026-11-07T10:31:46.750Z",
+        "updatedAt": "2026-11-07T10:31:46.750Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-11-07T10:31:46.750Z",
+    "updatedAt": "2026-11-07T10:31:46.750Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aef01f66ef450c2c9caeec9",
+    "userId": "6aef01446ef450c2c9caee00",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6aef01f66ef450c2c9caeeca",
+        "createdAt": "2026-11-07T10:48:22.218Z",
+        "updatedAt": "2026-11-07T10:48:22.218Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-11-07T10:48:22.218Z",
+    "updatedAt": "2026-11-07T10:48:22.218Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aef02f86ef450c2c9caf01b",
+    "userId": "6aef02de6ef450c2c9caefc0",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6aef02f86ef450c2c9caf01c",
+        "createdAt": "2026-11-07T10:52:40.575Z",
+        "updatedAt": "2026-11-07T10:52:40.575Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-11-07T10:52:40.575Z",
+    "updatedAt": "2026-11-07T10:52:40.575Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aef094b6ef450c2c9caf4a2",
+    "userId": "6aef08a46ef450c2c9caf44d",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6aef094b6ef450c2c9caf4a3",
+        "createdAt": "2026-11-07T11:19:39.071Z",
+        "updatedAt": "2026-11-07T11:19:39.071Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-11-07T11:19:39.071Z",
+    "updatedAt": "2026-11-07T11:19:39.071Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aef09ac6ef450c2c9caf4fa",
+    "userId": "6aef09956ef450c2c9caf4c7",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6aef09ac6ef450c2c9caf4fb",
+        "createdAt": "2026-11-07T11:21:16.562Z",
+        "updatedAt": "2026-11-07T11:21:16.562Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-11-07T11:21:16.562Z",
+    "updatedAt": "2026-11-07T11:21:16.562Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aef0a916ef450c2c9caf588",
+    "userId": "6aef0a7a6ef450c2c9caf554",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6aef0a916ef450c2c9caf589",
+        "createdAt": "2026-11-07T11:25:05.537Z",
+        "updatedAt": "2026-11-07T11:25:05.537Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-11-07T11:25:05.537Z",
+    "updatedAt": "2026-11-07T11:25:05.537Z",
+    "__v": 0
+  },
+  {
+    "_id": "6af87f2e59ee50c9a2cf99bd",
+    "userId": "6af87f0b59ee50c9a2cf998e",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6af87f2e59ee50c9a2cf99be",
+        "createdAt": "2026-11-14T15:33:02.666Z",
+        "updatedAt": "2026-11-14T15:33:02.666Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-11-14T15:33:02.667Z",
+    "updatedAt": "2026-11-14T15:33:02.667Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afc51dafbddc5b081b3cab1",
+    "userId": "6afc501e88ae17b096618c43",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6afc51dafbddc5b081b3cab2",
+        "createdAt": "2026-11-17T13:08:42.434Z",
+        "updatedAt": "2026-11-17T13:08:42.434Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-11-17T13:08:42.434Z",
+    "updatedAt": "2026-11-17T13:08:42.434Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afc61673d0573e676234c5d",
+    "userId": "6afc59229189c0b0663cca7f",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6afc61673d0573e676234c5e",
+        "createdAt": "2026-11-17T14:15:03.806Z",
+        "updatedAt": "2026-11-17T14:15:03.806Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-11-17T14:15:03.806Z",
+    "updatedAt": "2026-11-17T14:15:03.806Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afd57236396024e04b95814",
+    "userId": "6afd56f56396024e04b957e5",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6afd57236396024e04b95815",
+        "createdAt": "2026-11-18T07:43:31.593Z",
+        "updatedAt": "2026-11-18T07:43:31.593Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-11-18T07:43:31.594Z",
+    "updatedAt": "2026-11-18T07:43:31.594Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afd59256396024e04b9590e",
+    "userId": "6afd590b6396024e04b958df",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6afd59256396024e04b9590f",
+        "createdAt": "2026-11-18T07:52:05.496Z",
+        "updatedAt": "2026-11-18T07:52:05.496Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-11-18T07:52:05.496Z",
+    "updatedAt": "2026-11-18T07:52:05.496Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afd59c56396024e04b959a4",
+    "userId": "6afd59a66396024e04b95975",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6afd59c56396024e04b959a5",
+        "createdAt": "2026-11-18T07:54:45.793Z",
+        "updatedAt": "2026-11-18T07:54:45.793Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-11-18T07:54:45.793Z",
+    "updatedAt": "2026-11-18T07:54:45.793Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afd5b786396024e04b95ac2",
+    "userId": "6aa11866c6c3e5984e2ef5e5",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6afd5b786396024e04b95ac3",
+        "createdAt": "2026-11-18T08:02:00.685Z",
+        "updatedAt": "2026-11-18T08:02:00.685Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-11-18T08:02:00.685Z",
+    "updatedAt": "2026-11-18T08:02:00.685Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afdd75c6396024e04b96f63",
+    "userId": "6afc95705dfb520af538adb0",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6afdd75c6396024e04b96f64",
+        "createdAt": "2026-11-18T16:50:36.836Z",
+        "updatedAt": "2026-11-18T16:50:36.836Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-11-18T16:50:36.836Z",
+    "updatedAt": "2026-11-18T16:50:36.836Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0018a7e0f7d2a216303f4c",
+    "userId": "6b0016c9e0f7d2a216303d0d",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6b0018a7e0f7d2a216303f4d",
+        "createdAt": "2026-11-20T09:53:43.821Z",
+        "updatedAt": "2026-11-20T09:53:43.821Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-11-20T09:53:43.821Z",
+    "updatedAt": "2026-11-20T09:53:43.821Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b001903e0f7d2a216303ffe",
+    "userId": "6b00183ce0f7d2a216303e82",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6b001903e0f7d2a216303fff",
+        "createdAt": "2026-11-20T09:55:15.167Z",
+        "updatedAt": "2026-11-20T09:55:15.167Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-11-20T09:55:15.167Z",
+    "updatedAt": "2026-11-20T09:55:15.167Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0019e7e0f7d2a2163040b0",
+    "userId": "6b0019d6e0f7d2a21630407f",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6b0019e7e0f7d2a2163040b1",
+        "createdAt": "2026-11-20T09:59:03.928Z",
+        "updatedAt": "2026-11-20T09:59:03.928Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-11-20T09:59:03.928Z",
+    "updatedAt": "2026-11-20T09:59:03.928Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b004e1ebabfbbc9ce0357df",
+    "userId": "6b004de2babfbbc9ce035748",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6b004e1ebabfbbc9ce0357e0",
+        "createdAt": "2026-11-20T13:41:50.527Z",
+        "updatedAt": "2026-11-20T13:41:50.527Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-11-20T13:41:50.528Z",
+    "updatedAt": "2026-11-20T13:41:50.528Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0067061b70282aedd387de",
+    "userId": "6b004cb4babfbbc9ce0356c5",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6b0067061b70282aedd387df",
+        "createdAt": "2026-11-20T15:28:06.440Z",
+        "updatedAt": "2026-11-20T15:28:06.440Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-11-20T15:28:06.441Z",
+    "updatedAt": "2026-11-20T15:28:06.441Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0163f55dde0f9a42794ed3",
+    "userId": "6b015d685dde0f9a42794966",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6b0163f55dde0f9a42794ed4",
+        "createdAt": "2026-11-21T09:27:17.308Z",
+        "updatedAt": "2026-11-21T09:27:17.308Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-11-21T09:27:17.308Z",
+    "updatedAt": "2026-11-21T09:27:17.308Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0164a15dde0f9a42794f43",
+    "userId": "6b01623c5dde0f9a42794deb",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6b0164a15dde0f9a42794f44",
+        "createdAt": "2026-11-21T09:30:09.786Z",
+        "updatedAt": "2026-11-21T09:30:09.786Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-11-21T09:30:09.787Z",
+    "updatedAt": "2026-11-21T09:30:09.787Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0164f35dde0f9a42794f81",
+    "userId": "6b0162df5dde0f9a42794e21",
+    "methods": [
+      {
+        "type": "UPI",
+        "upiId": "thankiayushi@okhdfcbank",
+        "isDefault": true,
+        "verified": true,
+        "label": "Primary UPI",
+        "_id": "6b0164f35dde0f9a42794f82",
+        "createdAt": "2026-11-21T09:31:31.936Z",
+        "updatedAt": "2026-11-21T09:31:31.936Z"
+      }
+    ],
+    "codEnabled": true,
+    "preferredMethod": "UPI",
+    "createdAt": "2026-11-21T09:31:31.937Z",
+    "updatedAt": "2026-11-21T09:31:31.937Z",
+    "__v": 0
+  }
+]

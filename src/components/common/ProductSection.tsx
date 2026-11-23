@@ -17,7 +17,7 @@ import { SECTION_ICONS } from '../../theme/sectionIcons';
 import { BlinkitProduct } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { ProductSectionSkeleton } from './Skeleton';
-import { resolveImageThumbnail } from '../../utils/imageUrl';
+import { resolveImageThumbnail, resolveProductImageSource } from '../../utils/imageUrl';
 
 export interface ProductSectionProps {
   id?: string;
@@ -194,7 +194,7 @@ const ProductSectionComponent: React.FC<ProductSectionProps> = ({
           ]}
         >
           <Image
-            source={{ uri: resolveImageThumbnail(item.imageUrl) }}
+            source={resolveProductImageSource(item.imageUrl)}
             style={styles.productImage}
             resizeMode="cover"
           />

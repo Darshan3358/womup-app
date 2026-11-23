@@ -1,0 +1,15 @@
+[
+  {
+    "_id": "6b00686aa40966245ca77f88",
+    "userId": "6b004cb4babfbbc9ce0356c5",
+    "type": "TOPUP",
+    "amount": 100,
+    "balanceBefore": 0,
+    "balanceAfter": 100,
+    "referenceType": "ADMIN_CREDIT",
+    "status": "SUCCESS",
+    "description": "Admin credited ₹100 WOMUP Money",
+    "createdAt": "2026-11-20T15:34:02.865Z",
+    "updatedAt": "2026-11-20T15:34:02.865Z"
+  }
+]

@@ -1,0 +1,6094 @@
+[
+  {
+    "_id": "6ad9c80a8dbf34b8a59f0ed8",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6ad5f50baab0a82f1a609b60",
+    "userId": "6ad5f50baab0a82f1a609b60",
+    "role": "CUSTOMER",
+    "storeId": "6ad22ceccb1c11cfded14ca5",
+    "customerId": "6ad5f50baab0a82f1a609b60",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-417737-417 has been placed successfully.",
+    "body": "Your WormUp order #WORM-417737-417 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6ad9c8098dbf34b8a59f0eba",
+    "orderId": "6ad9c8098dbf34b8a59f0eba",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-417737-417",
+      "totalAmount": 37
+    },
+    "dedupeKey": "ORDER_PLACED:6ad9c8098dbf34b8a59f0eba:6ad5f50baab0a82f1a609b60",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-417737-417",
+      "totalAmount": 37
+    },
+    "createdAt": "2026-10-22T08:23:38.172Z",
+    "updatedAt": "2026-10-22T08:23:38.172Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ad9c80a8dbf34b8a59f0ede",
+    "recipientType": "STORE",
+    "recipientId": "6ad22ceccb1c11cfded14ca5",
+    "role": "STORE",
+    "storeId": "6ad22ceccb1c11cfded14ca5",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-417737-417 • ₹37 • 1 items",
+    "body": "Order #WORM-417737-417 • ₹37 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6ad9c8098dbf34b8a59f0eba",
+    "orderId": "6ad9c8098dbf34b8a59f0eba",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-417737-417",
+      "totalAmount": 37,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6ad9c8098dbf34b8a59f0eba:6ad22ceccb1c11cfded14ca5",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-417737-417",
+      "totalAmount": 37,
+      "itemCount": 1
+    },
+    "createdAt": "2026-10-22T08:23:38.201Z",
+    "updatedAt": "2026-10-22T08:23:38.201Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ada3400d1a76a6e31ee3572",
+    "recipientType": "STORE",
+    "recipientId": "6ad22ceccb1c11cfded14ca5",
+    "role": "STORE",
+    "storeId": "6ad22ceccb1c11cfded14ca5",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-052185-172 • ₹100 • 1 items",
+    "body": "Order #WORM-052185-172 • ₹100 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6ada33fcd1a76a6e31ee3555",
+    "orderId": "6ada33fcd1a76a6e31ee3555",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-052185-172",
+      "totalAmount": 100,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6ada33fcd1a76a6e31ee3555:6ad22ceccb1c11cfded14ca5",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-052185-172",
+      "totalAmount": 100,
+      "itemCount": 1
+    },
+    "createdAt": "2026-10-22T16:04:16.027Z",
+    "updatedAt": "2026-10-22T16:04:16.027Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ada3400d1a76a6e31ee3574",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6ad5f50baab0a82f1a609b60",
+    "userId": "6ad5f50baab0a82f1a609b60",
+    "role": "CUSTOMER",
+    "storeId": "6ad22ceccb1c11cfded14ca5",
+    "customerId": "6ad5f50baab0a82f1a609b60",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-052185-172 has been placed successfully.",
+    "body": "Your WormUp order #WORM-052185-172 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6ada33fcd1a76a6e31ee3555",
+    "orderId": "6ada33fcd1a76a6e31ee3555",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-052185-172",
+      "totalAmount": 100
+    },
+    "dedupeKey": "ORDER_PLACED:6ada33fcd1a76a6e31ee3555:6ad5f50baab0a82f1a609b60",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-052185-172",
+      "totalAmount": 100
+    },
+    "createdAt": "2026-10-22T16:04:16.040Z",
+    "updatedAt": "2026-10-22T16:04:16.040Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ada3490d1a76a6e31ee3758",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6ad5f50baab0a82f1a609b60",
+    "userId": "6ad5f50baab0a82f1a609b60",
+    "role": "CUSTOMER",
+    "storeId": "6ad22ceccb1c11cfded14ca5",
+    "customerId": "6ad5f50baab0a82f1a609b60",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-197484-891 has been placed successfully.",
+    "body": "Your WormUp order #WORM-197484-891 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6ada348dd1a76a6e31ee3739",
+    "orderId": "6ada348dd1a76a6e31ee3739",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-197484-891",
+      "totalAmount": 47
+    },
+    "dedupeKey": "ORDER_PLACED:6ada348dd1a76a6e31ee3739:6ad5f50baab0a82f1a609b60",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-197484-891",
+      "totalAmount": 47
+    },
+    "createdAt": "2026-10-22T16:06:40.999Z",
+    "updatedAt": "2026-10-22T16:06:40.999Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ada3490d1a76a6e31ee3756",
+    "recipientType": "STORE",
+    "recipientId": "6ad22ceccb1c11cfded14ca5",
+    "role": "STORE",
+    "storeId": "6ad22ceccb1c11cfded14ca5",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-197484-891 • ₹47 • 1 items",
+    "body": "Order #WORM-197484-891 • ₹47 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6ada348dd1a76a6e31ee3739",
+    "orderId": "6ada348dd1a76a6e31ee3739",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-197484-891",
+      "totalAmount": 47,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6ada348dd1a76a6e31ee3739:6ad22ceccb1c11cfded14ca5",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-197484-891",
+      "totalAmount": 47,
+      "itemCount": 1
+    },
+    "createdAt": "2026-10-22T16:06:40.994Z",
+    "updatedAt": "2026-10-22T16:06:40.994Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ada35c9d1a76a6e31ee39bb",
+    "recipientType": "STORE",
+    "recipientId": "6ad5fbd6fbd812883359fe0e",
+    "role": "STORE",
+    "storeId": "6ad5fbd6fbd812883359fe0e",
+    "title": "🛒 Counter Payment Request",
+    "message": "Dm T requested ₹1000 counter payment (COINS)",
+    "body": "Dm T requested ₹1000 counter payment (COINS)",
+    "type": "NEW_COLLECTION_REQUEST",
+    "entityType": "COLLECTION_REQUEST",
+    "entityId": "6ada35c9d1a76a6e31ee39b7",
+    "isRead": false,
+    "actionType": "COLLECTION_VERIFY",
+    "metadata": {
+      "requestId": "6ada35c9d1a76a6e31ee39b7",
+      "customerName": "Dm T",
+      "customerPhone": "9879461328",
+      "billAmount": 1000,
+      "coinsUsed": 100,
+      "cashToCollect": 900,
+      "paymentMethod": "COINS"
+    },
+    "dedupeKey": "COLLECTION_REQ:6ada35c9d1a76a6e31ee39b7",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "requestId": "6ada35c9d1a76a6e31ee39b7",
+      "customerName": "Dm T",
+      "customerPhone": "9879461328",
+      "billAmount": 1000,
+      "coinsUsed": 100,
+      "cashToCollect": 900,
+      "paymentMethod": "COINS"
+    },
+    "createdAt": "2026-10-22T16:11:53.939Z",
+    "updatedAt": "2026-10-22T16:11:53.939Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ada35e4d1a76a6e31ee3a71",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6ad5f50baab0a82f1a609b60",
+    "userId": "6ad5f50baab0a82f1a609b60",
+    "role": "CUSTOMER",
+    "customerId": "6ad5f50baab0a82f1a609b60",
+    "title": "✅ Payment Verified",
+    "message": "Your payment of ₹1000 at mariti was verified successfully.",
+    "body": "Your payment of ₹1000 at mariti was verified successfully.",
+    "type": "COLLECTION_VERIFIED",
+    "entityType": "ORDER",
+    "entityId": "WM-TXN-39B7",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WM-TXN-39B7",
+      "billAmount": 1000,
+      "coinsUsed": 100,
+      "cashPaid": 900,
+      "vendorName": "mariti"
+    },
+    "dedupeKey": "COLLECTION_VERIFIED:6ada35c9d1a76a6e31ee39b7",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WM-TXN-39B7",
+      "billAmount": 1000,
+      "coinsUsed": 100,
+      "cashPaid": 900,
+      "vendorName": "mariti"
+    },
+    "createdAt": "2026-10-22T16:12:20.190Z",
+    "updatedAt": "2026-10-22T16:12:20.190Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ada685c90fcb75ac6c3df77",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6ad5f50baab0a82f1a609b60",
+    "userId": "6ad5f50baab0a82f1a609b60",
+    "role": "CUSTOMER",
+    "storeId": "6ad22ceccb1c11cfded14ca5",
+    "customerId": "6ad5f50baab0a82f1a609b60",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-457124-689 has been placed successfully.",
+    "body": "Your WormUp order #WORM-457124-689 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6ada685990fcb75ac6c3df5b",
+    "orderId": "6ada685990fcb75ac6c3df5b",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-457124-689",
+      "totalAmount": 37
+    },
+    "dedupeKey": "ORDER_PLACED:6ada685990fcb75ac6c3df5b:6ad5f50baab0a82f1a609b60",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-457124-689",
+      "totalAmount": 37
+    },
+    "createdAt": "2026-10-22T19:47:40.672Z",
+    "updatedAt": "2026-10-22T19:47:40.672Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ada685c90fcb75ac6c3df7a",
+    "recipientType": "STORE",
+    "recipientId": "6ad22ceccb1c11cfded14ca5",
+    "role": "STORE",
+    "storeId": "6ad22ceccb1c11cfded14ca5",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-457124-689 • ₹37 • 1 items",
+    "body": "Order #WORM-457124-689 • ₹37 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6ada685990fcb75ac6c3df5b",
+    "orderId": "6ada685990fcb75ac6c3df5b",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-457124-689",
+      "totalAmount": 37,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6ada685990fcb75ac6c3df5b:6ad22ceccb1c11cfded14ca5",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-457124-689",
+      "totalAmount": 37,
+      "itemCount": 1
+    },
+    "createdAt": "2026-10-22T19:47:40.676Z",
+    "updatedAt": "2026-10-22T19:47:40.676Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ada6c003d0c8fc933973ee9",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6ad5f50baab0a82f1a609b60",
+    "userId": "6ad5f50baab0a82f1a609b60",
+    "role": "CUSTOMER",
+    "storeId": "6ad22ceccb1c11cfded14ca5",
+    "customerId": "6ad5f50baab0a82f1a609b60",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-389494-303 has been placed successfully.",
+    "body": "Your WormUp order #WORM-389494-303 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6ada6bfd3d0c8fc933973eca",
+    "orderId": "6ada6bfd3d0c8fc933973eca",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-389494-303",
+      "totalAmount": 37
+    },
+    "dedupeKey": "ORDER_PLACED:6ada6bfd3d0c8fc933973eca:6ad5f50baab0a82f1a609b60",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-389494-303",
+      "totalAmount": 37
+    },
+    "createdAt": "2026-10-22T20:03:12.803Z",
+    "updatedAt": "2026-10-22T20:03:12.803Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ada6c003d0c8fc933973eec",
+    "recipientType": "STORE",
+    "recipientId": "6ad22ceccb1c11cfded14ca5",
+    "role": "STORE",
+    "storeId": "6ad22ceccb1c11cfded14ca5",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-389494-303 • ₹37 • 1 items",
+    "body": "Order #WORM-389494-303 • ₹37 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6ada6bfd3d0c8fc933973eca",
+    "orderId": "6ada6bfd3d0c8fc933973eca",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-389494-303",
+      "totalAmount": 37,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6ada6bfd3d0c8fc933973eca:6ad22ceccb1c11cfded14ca5",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-389494-303",
+      "totalAmount": 37,
+      "itemCount": 1
+    },
+    "createdAt": "2026-10-22T20:03:12.820Z",
+    "updatedAt": "2026-10-22T20:03:12.820Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ada6c7f3d0c8fc933974000",
+    "recipientType": "STORE",
+    "recipientId": "6ad22ceccb1c11cfded14ca5",
+    "role": "STORE",
+    "storeId": "6ad22ceccb1c11cfded14ca5",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-516565-436 • ₹37 • 1 items",
+    "body": "Order #WORM-516565-436 • ₹37 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6ada6c7c3d0c8fc933973fe3",
+    "orderId": "6ada6c7c3d0c8fc933973fe3",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-516565-436",
+      "totalAmount": 37,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6ada6c7c3d0c8fc933973fe3:6ad22ceccb1c11cfded14ca5",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-516565-436",
+      "totalAmount": 37,
+      "itemCount": 1
+    },
+    "createdAt": "2026-10-22T20:05:19.987Z",
+    "updatedAt": "2026-10-22T20:05:19.987Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ada6c7f3d0c8fc933973ffe",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6ad5f50baab0a82f1a609b60",
+    "userId": "6ad5f50baab0a82f1a609b60",
+    "role": "CUSTOMER",
+    "storeId": "6ad22ceccb1c11cfded14ca5",
+    "customerId": "6ad5f50baab0a82f1a609b60",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-516565-436 has been placed successfully.",
+    "body": "Your WormUp order #WORM-516565-436 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6ada6c7c3d0c8fc933973fe3",
+    "orderId": "6ada6c7c3d0c8fc933973fe3",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-516565-436",
+      "totalAmount": 37
+    },
+    "dedupeKey": "ORDER_PLACED:6ada6c7c3d0c8fc933973fe3:6ad5f50baab0a82f1a609b60",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-516565-436",
+      "totalAmount": 37
+    },
+    "createdAt": "2026-10-22T20:05:19.984Z",
+    "updatedAt": "2026-10-22T20:05:19.984Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ada6cb83d0c8fc9339740c8",
+    "recipientType": "STORE",
+    "recipientId": "6ad22ceccb1c11cfded14ca5",
+    "role": "STORE",
+    "storeId": "6ad22ceccb1c11cfded14ca5",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-573000-488 • ₹37 • 1 items",
+    "body": "Order #WORM-573000-488 • ₹37 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6ada6cb53d0c8fc9339740aa",
+    "orderId": "6ada6cb53d0c8fc9339740aa",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-573000-488",
+      "totalAmount": 37,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6ada6cb53d0c8fc9339740aa:6ad22ceccb1c11cfded14ca5",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-573000-488",
+      "totalAmount": 37,
+      "itemCount": 1
+    },
+    "createdAt": "2026-10-22T20:06:16.442Z",
+    "updatedAt": "2026-10-22T20:06:16.442Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ada6cb83d0c8fc9339740c5",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6ad5f50baab0a82f1a609b60",
+    "userId": "6ad5f50baab0a82f1a609b60",
+    "role": "CUSTOMER",
+    "storeId": "6ad22ceccb1c11cfded14ca5",
+    "customerId": "6ad5f50baab0a82f1a609b60",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-573000-488 has been placed successfully.",
+    "body": "Your WormUp order #WORM-573000-488 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6ada6cb53d0c8fc9339740aa",
+    "orderId": "6ada6cb53d0c8fc9339740aa",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-573000-488",
+      "totalAmount": 37
+    },
+    "dedupeKey": "ORDER_PLACED:6ada6cb53d0c8fc9339740aa:6ad5f50baab0a82f1a609b60",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-573000-488",
+      "totalAmount": 37
+    },
+    "createdAt": "2026-10-22T20:06:16.436Z",
+    "updatedAt": "2026-10-22T20:06:16.436Z",
+    "__v": 0
+  },
+  {
+    "_id": "6adb11f793ce384721794968",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-879084-270 • ₹28 • 1 items",
+    "body": "Order #WORM-879084-270 • ₹28 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6adb11f793ce384721794947",
+    "orderId": "6adb11f793ce384721794947",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-879084-270",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6adb11f793ce384721794947:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-879084-270",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "createdAt": "2026-10-23T07:51:19.679Z",
+    "updatedAt": "2026-10-23T07:51:19.679Z",
+    "__v": 0
+  },
+  {
+    "_id": "6adb11f793ce38472179496b",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6ad5f50baab0a82f1a609b60",
+    "userId": "6ad5f50baab0a82f1a609b60",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6ad5f50baab0a82f1a609b60",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-879084-270 has been placed successfully.",
+    "body": "Your WormUp order #WORM-879084-270 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6adb11f793ce384721794947",
+    "orderId": "6adb11f793ce384721794947",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-879084-270",
+      "totalAmount": 28
+    },
+    "dedupeKey": "ORDER_PLACED:6adb11f793ce384721794947:6ad5f50baab0a82f1a609b60",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-879084-270",
+      "totalAmount": 28
+    },
+    "createdAt": "2026-10-23T07:51:19.682Z",
+    "updatedAt": "2026-10-23T07:51:19.682Z",
+    "__v": 0
+  },
+  {
+    "_id": "6adb20be48884c4f3f9709b0",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-658673-289 • ₹28 • 1 items",
+    "body": "Order #WORM-658673-289 • ₹28 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6adb20ba48884c4f3f970994",
+    "orderId": "6adb20ba48884c4f3f970994",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-658673-289",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6adb20ba48884c4f3f970994:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-658673-289",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "createdAt": "2026-10-23T08:54:22.153Z",
+    "updatedAt": "2026-10-23T08:54:22.153Z",
+    "__v": 0
+  },
+  {
+    "_id": "6adb20be48884c4f3f9709b3",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6ad5f50baab0a82f1a609b60",
+    "userId": "6ad5f50baab0a82f1a609b60",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6ad5f50baab0a82f1a609b60",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-658673-289 has been placed successfully.",
+    "body": "Your WormUp order #WORM-658673-289 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6adb20ba48884c4f3f970994",
+    "orderId": "6adb20ba48884c4f3f970994",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-658673-289",
+      "totalAmount": 28
+    },
+    "dedupeKey": "ORDER_PLACED:6adb20ba48884c4f3f970994:6ad5f50baab0a82f1a609b60",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-658673-289",
+      "totalAmount": 28
+    },
+    "createdAt": "2026-10-23T08:54:22.162Z",
+    "updatedAt": "2026-10-23T08:54:22.162Z",
+    "__v": 0
+  },
+  {
+    "_id": "6adb210848884c4f3f970a60",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6ad5f50baab0a82f1a609b60",
+    "userId": "6ad5f50baab0a82f1a609b60",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6ad5f50baab0a82f1a609b60",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-733457-252 has been placed successfully.",
+    "body": "Your WormUp order #WORM-733457-252 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6adb210548884c4f3f970a46",
+    "orderId": "6adb210548884c4f3f970a46",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-733457-252",
+      "totalAmount": 28
+    },
+    "dedupeKey": "ORDER_PLACED:6adb210548884c4f3f970a46:6ad5f50baab0a82f1a609b60",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-733457-252",
+      "totalAmount": 28
+    },
+    "createdAt": "2026-10-23T08:55:36.752Z",
+    "updatedAt": "2026-10-23T08:55:36.752Z",
+    "__v": 0
+  },
+  {
+    "_id": "6adb210848884c4f3f970a62",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-733457-252 • ₹28 • 1 items",
+    "body": "Order #WORM-733457-252 • ₹28 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6adb210548884c4f3f970a46",
+    "orderId": "6adb210548884c4f3f970a46",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-733457-252",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6adb210548884c4f3f970a46:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-733457-252",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "createdAt": "2026-10-23T08:55:36.754Z",
+    "updatedAt": "2026-10-23T08:55:36.754Z",
+    "__v": 0
+  },
+  {
+    "_id": "6adb232348884c4f3f970dce",
+    "recipientType": "STORE",
+    "recipientId": "6ad5fbd6fbd812883359fe0e",
+    "role": "STORE",
+    "storeId": "6ad5fbd6fbd812883359fe0e",
+    "title": "🛒 Counter Payment Request",
+    "message": "Dm T requested ₹1000 counter payment (COINS)",
+    "body": "Dm T requested ₹1000 counter payment (COINS)",
+    "type": "NEW_COLLECTION_REQUEST",
+    "entityType": "COLLECTION_REQUEST",
+    "entityId": "6adb232348884c4f3f970dca",
+    "isRead": false,
+    "actionType": "COLLECTION_VERIFY",
+    "metadata": {
+      "requestId": "6adb232348884c4f3f970dca",
+      "customerName": "Dm T",
+      "customerPhone": "9879461328",
+      "billAmount": 1000,
+      "coinsUsed": 100,
+      "cashToCollect": 900,
+      "paymentMethod": "COINS"
+    },
+    "dedupeKey": "COLLECTION_REQ:6adb232348884c4f3f970dca",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "requestId": "6adb232348884c4f3f970dca",
+      "customerName": "Dm T",
+      "customerPhone": "9879461328",
+      "billAmount": 1000,
+      "coinsUsed": 100,
+      "cashToCollect": 900,
+      "paymentMethod": "COINS"
+    },
+    "createdAt": "2026-10-23T09:04:35.660Z",
+    "updatedAt": "2026-10-23T09:04:35.660Z",
+    "__v": 0
+  },
+  {
+    "_id": "6adb233648884c4f3f970deb",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6ad5f50baab0a82f1a609b60",
+    "userId": "6ad5f50baab0a82f1a609b60",
+    "role": "CUSTOMER",
+    "customerId": "6ad5f50baab0a82f1a609b60",
+    "title": "✅ Payment Verified",
+    "message": "Your payment of ₹1000 at mariti was verified successfully.",
+    "body": "Your payment of ₹1000 at mariti was verified successfully.",
+    "type": "COLLECTION_VERIFIED",
+    "entityType": "ORDER",
+    "entityId": "WM-TXN-0DCA",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WM-TXN-0DCA",
+      "billAmount": 1000,
+      "coinsUsed": 100,
+      "cashPaid": 900,
+      "vendorName": "mariti"
+    },
+    "dedupeKey": "COLLECTION_VERIFIED:6adb232348884c4f3f970dca",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WM-TXN-0DCA",
+      "billAmount": 1000,
+      "coinsUsed": 100,
+      "cashPaid": 900,
+      "vendorName": "mariti"
+    },
+    "createdAt": "2026-10-23T09:04:54.217Z",
+    "updatedAt": "2026-10-23T09:04:54.217Z",
+    "__v": 0
+  },
+  {
+    "_id": "6adfbdb8e030379004e28a2e",
+    "recipientType": "ADMIN",
+    "recipientId": "admin",
+    "role": "ADMIN",
+    "title": "👤 New Customer KYC Submitted",
+    "message": "Darshan Thanki submitted KYC & bank details for verification.",
+    "body": "Darshan Thanki submitted KYC & bank details for verification.",
+    "type": "CUSTOMER_KYC_REQUEST",
+    "entityType": "CUSTOMER_KYC",
+    "entityId": "6adfa92ecf1461616763aa7a",
+    "isRead": false,
+    "actionType": "CUSTOMER_APPROVAL",
+    "metadata": {
+      "userId": "6adfa92ecf1461616763aa7a",
+      "userName": "Darshan Thanki",
+      "phone": "7984940855"
+    },
+    "dedupeKey": "CUSTOMER_KYC_SUBMITTED:6adfa92ecf1461616763aa7a:1793047992477",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "userId": "6adfa92ecf1461616763aa7a",
+      "userName": "Darshan Thanki",
+      "phone": "7984940855"
+    },
+    "createdAt": "2026-10-26T20:53:12.580Z",
+    "updatedAt": "2026-10-26T20:53:12.580Z",
+    "__v": 0
+  },
+  {
+    "_id": "6adfbdcae030379004e28a4f",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6adfa92ecf1461616763aa7a",
+    "userId": "6adfa92ecf1461616763aa7a",
+    "role": "CUSTOMER",
+    "customerId": "6adfa92ecf1461616763aa7a",
+    "title": "✓ KYC Approved",
+    "message": "Your KYC verification has been approved! Income features are now unlocked.",
+    "body": "Your KYC verification has been approved! Income features are now unlocked.",
+    "type": "CUSTOMER_KYC_APPROVED",
+    "entityType": "USER",
+    "entityId": "6adfa92ecf1461616763aa7a",
+    "isRead": false,
+    "actionType": "KYC_STATUS",
+    "metadata": {
+      "customerKycStatus": 2
+    },
+    "dedupeKey": "CUSTOMER_KYC_APPROVED:6adfa92ecf1461616763aa7a",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "customerKycStatus": 2
+    },
+    "createdAt": "2026-10-26T20:53:30.921Z",
+    "updatedAt": "2026-10-26T20:53:30.921Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae268b820b08cfa5b81e35d",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6adfa92ecf1461616763aa7a",
+    "userId": "6adfa92ecf1461616763aa7a",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6adfa92ecf1461616763aa7a",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-840063-438 has been placed successfully.",
+    "body": "Your WormUp order #WORM-840063-438 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6ae268b820b08cfa5b81e325",
+    "orderId": "6ae268b820b08cfa5b81e325",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-840063-438",
+      "totalAmount": 28
+    },
+    "dedupeKey": "ORDER_PLACED:6ae268b820b08cfa5b81e325:6adfa92ecf1461616763aa7a",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-840063-438",
+      "totalAmount": 28
+    },
+    "createdAt": "2026-10-28T21:27:20.706Z",
+    "updatedAt": "2026-10-28T21:27:20.706Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae268b820b08cfa5b81e361",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-840063-438 • ₹28 • 1 items",
+    "body": "Order #WORM-840063-438 • ₹28 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6ae268b820b08cfa5b81e325",
+    "orderId": "6ae268b820b08cfa5b81e325",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-840063-438",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6ae268b820b08cfa5b81e325:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-840063-438",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "createdAt": "2026-10-28T21:27:20.715Z",
+    "updatedAt": "2026-10-28T21:27:20.715Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae26a168668dec9e9797ffd",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6adfa92ecf1461616763aa7a",
+    "userId": "6adfa92ecf1461616763aa7a",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6adfa92ecf1461616763aa7a",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-187018-348 has been placed successfully.",
+    "body": "Your WormUp order #WORM-187018-348 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6ae26a138668dec9e9797fda",
+    "orderId": "6ae26a138668dec9e9797fda",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-187018-348",
+      "totalAmount": 28
+    },
+    "dedupeKey": "ORDER_PLACED:6ae26a138668dec9e9797fda:6adfa92ecf1461616763aa7a",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-187018-348",
+      "totalAmount": 28
+    },
+    "createdAt": "2026-10-28T21:33:10.804Z",
+    "updatedAt": "2026-10-28T21:33:10.804Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae26a168668dec9e9798000",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-187018-348 • ₹28 • 1 items",
+    "body": "Order #WORM-187018-348 • ₹28 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6ae26a138668dec9e9797fda",
+    "orderId": "6ae26a138668dec9e9797fda",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-187018-348",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6ae26a138668dec9e9797fda:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-187018-348",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "createdAt": "2026-10-28T21:33:10.808Z",
+    "updatedAt": "2026-10-28T21:33:10.808Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae26a3a8668dec9e9798082",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6adfa92ecf1461616763aa7a",
+    "userId": "6adfa92ecf1461616763aa7a",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6adfa92ecf1461616763aa7a",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-223092-828 has been placed successfully.",
+    "body": "Your WormUp order #WORM-223092-828 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6ae26a378668dec9e9798066",
+    "orderId": "6ae26a378668dec9e9798066",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-223092-828",
+      "totalAmount": 28
+    },
+    "dedupeKey": "ORDER_PLACED:6ae26a378668dec9e9798066:6adfa92ecf1461616763aa7a",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-223092-828",
+      "totalAmount": 28
+    },
+    "createdAt": "2026-10-28T21:33:46.313Z",
+    "updatedAt": "2026-10-28T21:33:46.313Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae26a3a8668dec9e9798080",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-223092-828 • ₹28 • 1 items",
+    "body": "Order #WORM-223092-828 • ₹28 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6ae26a378668dec9e9798066",
+    "orderId": "6ae26a378668dec9e9798066",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-223092-828",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6ae26a378668dec9e9798066:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-223092-828",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "createdAt": "2026-10-28T21:33:46.311Z",
+    "updatedAt": "2026-10-28T21:33:46.311Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae26a408668dec9e97980a5",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6adfa92ecf1461616763aa7a",
+    "userId": "6adfa92ecf1461616763aa7a",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6adfa92ecf1461616763aa7a",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-229133-531 has been placed successfully.",
+    "body": "Your WormUp order #WORM-229133-531 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6ae26a3d8668dec9e979808f",
+    "orderId": "6ae26a3d8668dec9e979808f",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-229133-531",
+      "totalAmount": 28
+    },
+    "dedupeKey": "ORDER_PLACED:6ae26a3d8668dec9e979808f:6adfa92ecf1461616763aa7a",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-229133-531",
+      "totalAmount": 28
+    },
+    "createdAt": "2026-10-28T21:33:52.336Z",
+    "updatedAt": "2026-10-28T21:33:52.336Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae26a408668dec9e97980a8",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-229133-531 • ₹28 • 1 items",
+    "body": "Order #WORM-229133-531 • ₹28 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6ae26a3d8668dec9e979808f",
+    "orderId": "6ae26a3d8668dec9e979808f",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-229133-531",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6ae26a3d8668dec9e979808f:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-229133-531",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "createdAt": "2026-10-28T21:33:52.339Z",
+    "updatedAt": "2026-10-28T21:33:52.339Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae26e5f8668dec9e97981b4",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-283857-243 • ₹28 • 1 items",
+    "body": "Order #WORM-283857-243 • ₹28 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6ae26e5b8668dec9e9798197",
+    "orderId": "6ae26e5b8668dec9e9798197",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-283857-243",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6ae26e5b8668dec9e9798197:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-283857-243",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "createdAt": "2026-10-28T21:51:27.080Z",
+    "updatedAt": "2026-10-28T21:51:27.080Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae26e5f8668dec9e97981b6",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6adfa92ecf1461616763aa7a",
+    "userId": "6adfa92ecf1461616763aa7a",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6adfa92ecf1461616763aa7a",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-283857-243 has been placed successfully.",
+    "body": "Your WormUp order #WORM-283857-243 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6ae26e5b8668dec9e9798197",
+    "orderId": "6ae26e5b8668dec9e9798197",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-283857-243",
+      "totalAmount": 28
+    },
+    "dedupeKey": "ORDER_PLACED:6ae26e5b8668dec9e9798197:6adfa92ecf1461616763aa7a",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-283857-243",
+      "totalAmount": 28
+    },
+    "createdAt": "2026-10-28T21:51:27.082Z",
+    "updatedAt": "2026-10-28T21:51:27.082Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae26e898668dec9e9798274",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6adfa92ecf1461616763aa7a",
+    "userId": "6adfa92ecf1461616763aa7a",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6adfa92ecf1461616763aa7a",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-326132-286 has been placed successfully.",
+    "body": "Your WormUp order #WORM-326132-286 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6ae26e868668dec9e9798259",
+    "orderId": "6ae26e868668dec9e9798259",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-326132-286",
+      "totalAmount": 28
+    },
+    "dedupeKey": "ORDER_PLACED:6ae26e868668dec9e9798259:6adfa92ecf1461616763aa7a",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-326132-286",
+      "totalAmount": 28
+    },
+    "createdAt": "2026-10-28T21:52:09.403Z",
+    "updatedAt": "2026-10-28T21:52:09.403Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae26e898668dec9e9798276",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-326132-286 • ₹28 • 1 items",
+    "body": "Order #WORM-326132-286 • ₹28 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6ae26e868668dec9e9798259",
+    "orderId": "6ae26e868668dec9e9798259",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-326132-286",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6ae26e868668dec9e9798259:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-326132-286",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "createdAt": "2026-10-28T21:52:09.405Z",
+    "updatedAt": "2026-10-28T21:52:09.405Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae26ea220b08cfa5b81e714",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-353913-163 • ₹28 • 1 items",
+    "body": "Order #WORM-353913-163 • ₹28 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6ae26ea120b08cfa5b81e6ec",
+    "orderId": "6ae26ea120b08cfa5b81e6ec",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-353913-163",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6ae26ea120b08cfa5b81e6ec:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-353913-163",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "createdAt": "2026-10-28T21:52:34.490Z",
+    "updatedAt": "2026-10-28T21:52:34.490Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae26ea220b08cfa5b81e716",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6adfa92ecf1461616763aa7a",
+    "userId": "6adfa92ecf1461616763aa7a",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6adfa92ecf1461616763aa7a",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-353913-163 has been placed successfully.",
+    "body": "Your WormUp order #WORM-353913-163 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6ae26ea120b08cfa5b81e6ec",
+    "orderId": "6ae26ea120b08cfa5b81e6ec",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-353913-163",
+      "totalAmount": 28
+    },
+    "dedupeKey": "ORDER_PLACED:6ae26ea120b08cfa5b81e6ec:6adfa92ecf1461616763aa7a",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-353913-163",
+      "totalAmount": 28
+    },
+    "createdAt": "2026-10-28T21:52:34.490Z",
+    "updatedAt": "2026-10-28T21:52:34.490Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae26efd20b08cfa5b81e7c3",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-444910-216 • ₹28 • 1 items",
+    "body": "Order #WORM-444910-216 • ₹28 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6ae26efc20b08cfa5b81e7a1",
+    "orderId": "6ae26efc20b08cfa5b81e7a1",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-444910-216",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6ae26efc20b08cfa5b81e7a1:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-444910-216",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "createdAt": "2026-10-28T21:54:05.490Z",
+    "updatedAt": "2026-10-28T21:54:05.490Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae26efd20b08cfa5b81e7c6",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6adfa92ecf1461616763aa7a",
+    "userId": "6adfa92ecf1461616763aa7a",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6adfa92ecf1461616763aa7a",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-444910-216 has been placed successfully.",
+    "body": "Your WormUp order #WORM-444910-216 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6ae26efc20b08cfa5b81e7a1",
+    "orderId": "6ae26efc20b08cfa5b81e7a1",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-444910-216",
+      "totalAmount": 28
+    },
+    "dedupeKey": "ORDER_PLACED:6ae26efc20b08cfa5b81e7a1:6adfa92ecf1461616763aa7a",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-444910-216",
+      "totalAmount": 28
+    },
+    "createdAt": "2026-10-28T21:54:05.492Z",
+    "updatedAt": "2026-10-28T21:54:05.492Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae26f4220b08cfa5b81e862",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6adfa92ecf1461616763aa7a",
+    "userId": "6adfa92ecf1461616763aa7a",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6adfa92ecf1461616763aa7a",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-514497-569 has been placed successfully.",
+    "body": "Your WormUp order #WORM-514497-569 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6ae26f4220b08cfa5b81e83c",
+    "orderId": "6ae26f4220b08cfa5b81e83c",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-514497-569",
+      "totalAmount": 28
+    },
+    "dedupeKey": "ORDER_PLACED:6ae26f4220b08cfa5b81e83c:6adfa92ecf1461616763aa7a",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-514497-569",
+      "totalAmount": 28
+    },
+    "createdAt": "2026-10-28T21:55:14.995Z",
+    "updatedAt": "2026-10-28T21:55:14.995Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae26f4320b08cfa5b81e864",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-514497-569 • ₹28 • 1 items",
+    "body": "Order #WORM-514497-569 • ₹28 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6ae26f4220b08cfa5b81e83c",
+    "orderId": "6ae26f4220b08cfa5b81e83c",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-514497-569",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6ae26f4220b08cfa5b81e83c:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-514497-569",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "createdAt": "2026-10-28T21:55:15.004Z",
+    "updatedAt": "2026-10-28T21:55:15.004Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae271aa8668dec9e9798346",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6adfa92ecf1461616763aa7a",
+    "userId": "6adfa92ecf1461616763aa7a",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6adfa92ecf1461616763aa7a",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-127043-483 has been placed successfully.",
+    "body": "Your WormUp order #WORM-127043-483 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6ae271a78668dec9e9798330",
+    "orderId": "6ae271a78668dec9e9798330",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-127043-483",
+      "totalAmount": 28
+    },
+    "dedupeKey": "ORDER_PLACED:6ae271a78668dec9e9798330:6adfa92ecf1461616763aa7a",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-127043-483",
+      "totalAmount": 28
+    },
+    "createdAt": "2026-10-28T22:05:30.257Z",
+    "updatedAt": "2026-10-28T22:05:30.257Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae271aa8668dec9e9798349",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-127043-483 • ₹28 • 1 items",
+    "body": "Order #WORM-127043-483 • ₹28 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6ae271a78668dec9e9798330",
+    "orderId": "6ae271a78668dec9e9798330",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-127043-483",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6ae271a78668dec9e9798330:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-127043-483",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "createdAt": "2026-10-28T22:05:30.261Z",
+    "updatedAt": "2026-10-28T22:05:30.261Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae271cb20b08cfa5b81e92b",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6adfa92ecf1461616763aa7a",
+    "userId": "6adfa92ecf1461616763aa7a",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6adfa92ecf1461616763aa7a",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-163099-197 has been placed successfully.",
+    "body": "Your WormUp order #WORM-163099-197 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6ae271cb20b08cfa5b81e906",
+    "orderId": "6ae271cb20b08cfa5b81e906",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-163099-197",
+      "totalAmount": 28
+    },
+    "dedupeKey": "ORDER_PLACED:6ae271cb20b08cfa5b81e906:6adfa92ecf1461616763aa7a",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-163099-197",
+      "totalAmount": 28
+    },
+    "createdAt": "2026-10-28T22:06:03.678Z",
+    "updatedAt": "2026-10-28T22:06:03.678Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae271cb20b08cfa5b81e929",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-163099-197 • ₹28 • 1 items",
+    "body": "Order #WORM-163099-197 • ₹28 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6ae271cb20b08cfa5b81e906",
+    "orderId": "6ae271cb20b08cfa5b81e906",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-163099-197",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6ae271cb20b08cfa5b81e906:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-163099-197",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "createdAt": "2026-10-28T22:06:03.677Z",
+    "updatedAt": "2026-10-28T22:06:03.677Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae271e78668dec9e9798407",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-187867-988 • ₹28 • 1 items",
+    "body": "Order #WORM-187867-988 • ₹28 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6ae271e38668dec9e97983ec",
+    "orderId": "6ae271e38668dec9e97983ec",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-187867-988",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6ae271e38668dec9e97983ec:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-187867-988",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "createdAt": "2026-10-28T22:06:31.082Z",
+    "updatedAt": "2026-10-28T22:06:31.082Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae271e78668dec9e979840a",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6adfa92ecf1461616763aa7a",
+    "userId": "6adfa92ecf1461616763aa7a",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6adfa92ecf1461616763aa7a",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-187867-988 has been placed successfully.",
+    "body": "Your WormUp order #WORM-187867-988 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6ae271e38668dec9e97983ec",
+    "orderId": "6ae271e38668dec9e97983ec",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-187867-988",
+      "totalAmount": 28
+    },
+    "dedupeKey": "ORDER_PLACED:6ae271e38668dec9e97983ec:6adfa92ecf1461616763aa7a",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-187867-988",
+      "totalAmount": 28
+    },
+    "createdAt": "2026-10-28T22:06:31.086Z",
+    "updatedAt": "2026-10-28T22:06:31.086Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae271fa20b08cfa5b81e9c3",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-209459-990 • ₹28 • 1 items",
+    "body": "Order #WORM-209459-990 • ₹28 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6ae271f920b08cfa5b81e9a0",
+    "orderId": "6ae271f920b08cfa5b81e9a0",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-209459-990",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6ae271f920b08cfa5b81e9a0:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-209459-990",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "createdAt": "2026-10-28T22:06:50.004Z",
+    "updatedAt": "2026-10-28T22:06:50.004Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae271fa20b08cfa5b81e9c8",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6adfa92ecf1461616763aa7a",
+    "userId": "6adfa92ecf1461616763aa7a",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6adfa92ecf1461616763aa7a",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-209459-990 has been placed successfully.",
+    "body": "Your WormUp order #WORM-209459-990 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6ae271f920b08cfa5b81e9a0",
+    "orderId": "6ae271f920b08cfa5b81e9a0",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-209459-990",
+      "totalAmount": 28
+    },
+    "dedupeKey": "ORDER_PLACED:6ae271f920b08cfa5b81e9a0:6adfa92ecf1461616763aa7a",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-209459-990",
+      "totalAmount": 28
+    },
+    "createdAt": "2026-10-28T22:06:50.016Z",
+    "updatedAt": "2026-10-28T22:06:50.016Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae2735a8668dec9e97984e2",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-559246-787 • ₹28 • 1 items",
+    "body": "Order #WORM-559246-787 • ₹28 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6ae273578668dec9e97984c7",
+    "orderId": "6ae273578668dec9e97984c7",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-559246-787",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6ae273578668dec9e97984c7:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-559246-787",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "createdAt": "2026-10-28T22:12:42.460Z",
+    "updatedAt": "2026-10-28T22:12:42.460Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae2735a8668dec9e97984e5",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6adfa92ecf1461616763aa7a",
+    "userId": "6adfa92ecf1461616763aa7a",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6adfa92ecf1461616763aa7a",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-559246-787 has been placed successfully.",
+    "body": "Your WormUp order #WORM-559246-787 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6ae273578668dec9e97984c7",
+    "orderId": "6ae273578668dec9e97984c7",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-559246-787",
+      "totalAmount": 28
+    },
+    "dedupeKey": "ORDER_PLACED:6ae273578668dec9e97984c7:6adfa92ecf1461616763aa7a",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-559246-787",
+      "totalAmount": 28
+    },
+    "createdAt": "2026-10-28T22:12:42.465Z",
+    "updatedAt": "2026-10-28T22:12:42.465Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae273af8668dec9e97985a0",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6adfa92ecf1461616763aa7a",
+    "userId": "6adfa92ecf1461616763aa7a",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6adfa92ecf1461616763aa7a",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-644056-478 has been placed successfully.",
+    "body": "Your WormUp order #WORM-644056-478 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6ae273ac8668dec9e9798585",
+    "orderId": "6ae273ac8668dec9e9798585",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-644056-478",
+      "totalAmount": 28
+    },
+    "dedupeKey": "ORDER_PLACED:6ae273ac8668dec9e9798585:6adfa92ecf1461616763aa7a",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-644056-478",
+      "totalAmount": 28
+    },
+    "createdAt": "2026-10-28T22:14:07.267Z",
+    "updatedAt": "2026-10-28T22:14:07.267Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae273af8668dec9e97985a2",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-644056-478 • ₹28 • 1 items",
+    "body": "Order #WORM-644056-478 • ₹28 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6ae273ac8668dec9e9798585",
+    "orderId": "6ae273ac8668dec9e9798585",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-644056-478",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6ae273ac8668dec9e9798585:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-644056-478",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "createdAt": "2026-10-28T22:14:07.269Z",
+    "updatedAt": "2026-10-28T22:14:07.269Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae273e08668dec9e979866a",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-693655-692 • ₹28 • 1 items",
+    "body": "Order #WORM-693655-692 • ₹28 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6ae273dd8668dec9e9798652",
+    "orderId": "6ae273dd8668dec9e9798652",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-693655-692",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6ae273dd8668dec9e9798652:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-693655-692",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "createdAt": "2026-10-28T22:14:56.869Z",
+    "updatedAt": "2026-10-28T22:14:56.869Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae273e08668dec9e979866d",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6adfa92ecf1461616763aa7a",
+    "userId": "6adfa92ecf1461616763aa7a",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6adfa92ecf1461616763aa7a",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-693655-692 has been placed successfully.",
+    "body": "Your WormUp order #WORM-693655-692 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6ae273dd8668dec9e9798652",
+    "orderId": "6ae273dd8668dec9e9798652",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-693655-692",
+      "totalAmount": 28
+    },
+    "dedupeKey": "ORDER_PLACED:6ae273dd8668dec9e9798652:6adfa92ecf1461616763aa7a",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-693655-692",
+      "totalAmount": 28
+    },
+    "createdAt": "2026-10-28T22:14:56.871Z",
+    "updatedAt": "2026-10-28T22:14:56.871Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae276028668dec9e979873b",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-239014-982 • ₹28 • 1 items",
+    "body": "Order #WORM-239014-982 • ₹28 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6ae275ff8668dec9e9798720",
+    "orderId": "6ae275ff8668dec9e9798720",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-239014-982",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6ae275ff8668dec9e9798720:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-239014-982",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "createdAt": "2026-10-28T22:24:02.232Z",
+    "updatedAt": "2026-10-28T22:24:02.232Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae276028668dec9e979873e",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6adfa92ecf1461616763aa7a",
+    "userId": "6adfa92ecf1461616763aa7a",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6adfa92ecf1461616763aa7a",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-239014-982 has been placed successfully.",
+    "body": "Your WormUp order #WORM-239014-982 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6ae275ff8668dec9e9798720",
+    "orderId": "6ae275ff8668dec9e9798720",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-239014-982",
+      "totalAmount": 28
+    },
+    "dedupeKey": "ORDER_PLACED:6ae275ff8668dec9e9798720:6adfa92ecf1461616763aa7a",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-239014-982",
+      "totalAmount": 28
+    },
+    "createdAt": "2026-10-28T22:24:02.234Z",
+    "updatedAt": "2026-10-28T22:24:02.234Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae2764e8668dec9e9798809",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-315333-691 • ₹65 • 1 items",
+    "body": "Order #WORM-315333-691 • ₹65 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6ae2764b8668dec9e97987ee",
+    "orderId": "6ae2764b8668dec9e97987ee",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-315333-691",
+      "totalAmount": 65,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6ae2764b8668dec9e97987ee:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-315333-691",
+      "totalAmount": 65,
+      "itemCount": 1
+    },
+    "createdAt": "2026-10-28T22:25:18.568Z",
+    "updatedAt": "2026-10-28T22:25:18.568Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae2764e8668dec9e979880b",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6adfa92ecf1461616763aa7a",
+    "userId": "6adfa92ecf1461616763aa7a",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6adfa92ecf1461616763aa7a",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-315333-691 has been placed successfully.",
+    "body": "Your WormUp order #WORM-315333-691 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6ae2764b8668dec9e97987ee",
+    "orderId": "6ae2764b8668dec9e97987ee",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-315333-691",
+      "totalAmount": 65
+    },
+    "dedupeKey": "ORDER_PLACED:6ae2764b8668dec9e97987ee:6adfa92ecf1461616763aa7a",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-315333-691",
+      "totalAmount": 65
+    },
+    "createdAt": "2026-10-28T22:25:18.569Z",
+    "updatedAt": "2026-10-28T22:25:18.569Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae45d36526d034ccd0d2ef7",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6adfa92ecf1461616763aa7a",
+    "userId": "6adfa92ecf1461616763aa7a",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6adfa92ecf1461616763aa7a",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-965529-144 has been placed successfully.",
+    "body": "Your WormUp order #WORM-965529-144 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6ae45d35526d034ccd0d2edb",
+    "orderId": "6ae45d35526d034ccd0d2edb",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-965529-144",
+      "totalAmount": 28
+    },
+    "dedupeKey": "ORDER_PLACED:6ae45d35526d034ccd0d2edb:6adfa92ecf1461616763aa7a",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-965529-144",
+      "totalAmount": 28
+    },
+    "createdAt": "2026-10-30T09:02:46.150Z",
+    "updatedAt": "2026-10-30T09:02:46.150Z",
+    "__v": 0
+  },
+  {
+    "_id": "6ae45d36526d034ccd0d2ef9",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-965529-144 • ₹28 • 1 items",
+    "body": "Order #WORM-965529-144 • ₹28 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6ae45d35526d034ccd0d2edb",
+    "orderId": "6ae45d35526d034ccd0d2edb",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-965529-144",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6ae45d35526d034ccd0d2edb:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-965529-144",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "createdAt": "2026-10-30T09:02:46.151Z",
+    "updatedAt": "2026-10-30T09:02:46.151Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aed995da64cec48b93b0f8f",
+    "recipientType": "ADMIN",
+    "recipientId": "admin",
+    "role": "ADMIN",
+    "title": "👤 New Customer KYC Submitted",
+    "message": "Prayag Dineshbhai patel Patel submitted KYC & bank details for verification.",
+    "body": "Prayag Dineshbhai patel Patel submitted KYC & bank details for verification.",
+    "type": "CUSTOMER_KYC_REQUEST",
+    "entityType": "CUSTOMER_KYC",
+    "entityId": "6ae9bf92a64cec48b93ae65e",
+    "isRead": false,
+    "actionType": "CUSTOMER_APPROVAL",
+    "metadata": {
+      "userId": "6ae9bf92a64cec48b93ae65e",
+      "userName": "Prayag Dineshbhai patel Patel",
+      "phone": "9537535533"
+    },
+    "dedupeKey": "CUSTOMER_KYC_SUBMITTED:6ae9bf92a64cec48b93ae65e:1793956189233",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "userId": "6ae9bf92a64cec48b93ae65e",
+      "userName": "Prayag Dineshbhai patel Patel",
+      "phone": "9537535533"
+    },
+    "createdAt": "2026-11-06T09:09:49.701Z",
+    "updatedAt": "2026-11-06T09:09:49.701Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aed9963a64cec48b93b0f98",
+    "recipientType": "ADMIN",
+    "recipientId": "admin",
+    "role": "ADMIN",
+    "title": "👤 New Customer KYC Submitted",
+    "message": "Prayag Dineshbhai patel Patel submitted KYC & bank details for verification.",
+    "body": "Prayag Dineshbhai patel Patel submitted KYC & bank details for verification.",
+    "type": "CUSTOMER_KYC_REQUEST",
+    "entityType": "CUSTOMER_KYC",
+    "entityId": "6ae9bf92a64cec48b93ae65e",
+    "isRead": false,
+    "actionType": "CUSTOMER_APPROVAL",
+    "metadata": {
+      "userId": "6ae9bf92a64cec48b93ae65e",
+      "userName": "Prayag Dineshbhai patel Patel",
+      "phone": "9537535533"
+    },
+    "dedupeKey": "CUSTOMER_KYC_SUBMITTED:6ae9bf92a64cec48b93ae65e:1793956195262",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "userId": "6ae9bf92a64cec48b93ae65e",
+      "userName": "Prayag Dineshbhai patel Patel",
+      "phone": "9537535533"
+    },
+    "createdAt": "2026-11-06T09:09:55.701Z",
+    "updatedAt": "2026-11-06T09:09:55.701Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aeda1b8a64cec48b93b1396",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6aed9deca64cec48b93b1172",
+    "userId": "6aed9deca64cec48b93b1172",
+    "role": "CUSTOMER",
+    "customerId": "6aed9deca64cec48b93b1172",
+    "title": "✓ KYC Approved",
+    "message": "Your KYC verification has been approved! Income features are now unlocked.",
+    "body": "Your KYC verification has been approved! Income features are now unlocked.",
+    "type": "CUSTOMER_KYC_APPROVED",
+    "entityType": "USER",
+    "entityId": "6aed9deca64cec48b93b1172",
+    "isRead": false,
+    "actionType": "KYC_STATUS",
+    "metadata": {
+      "customerKycStatus": 2
+    },
+    "dedupeKey": "CUSTOMER_KYC_APPROVED:6aed9deca64cec48b93b1172",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "customerKycStatus": 2
+    },
+    "createdAt": "2026-11-06T09:45:28.477Z",
+    "updatedAt": "2026-11-06T09:45:28.477Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aeda1bca64cec48b93b139e",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6ae9bf92a64cec48b93ae65e",
+    "userId": "6ae9bf92a64cec48b93ae65e",
+    "role": "CUSTOMER",
+    "customerId": "6ae9bf92a64cec48b93ae65e",
+    "title": "✓ KYC Approved",
+    "message": "Your KYC verification has been approved! Income features are now unlocked.",
+    "body": "Your KYC verification has been approved! Income features are now unlocked.",
+    "type": "CUSTOMER_KYC_APPROVED",
+    "entityType": "USER",
+    "entityId": "6ae9bf92a64cec48b93ae65e",
+    "isRead": false,
+    "actionType": "KYC_STATUS",
+    "metadata": {
+      "customerKycStatus": 2
+    },
+    "dedupeKey": "CUSTOMER_KYC_APPROVED:6ae9bf92a64cec48b93ae65e",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "customerKycStatus": 2
+    },
+    "createdAt": "2026-11-06T09:45:32.491Z",
+    "updatedAt": "2026-11-06T09:45:32.491Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aeda1bfa64cec48b93b13ad",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6ae9993ca64cec48b93ae535",
+    "userId": "6ae9993ca64cec48b93ae535",
+    "role": "CUSTOMER",
+    "customerId": "6ae9993ca64cec48b93ae535",
+    "title": "✓ KYC Approved",
+    "message": "Your KYC verification has been approved! Income features are now unlocked.",
+    "body": "Your KYC verification has been approved! Income features are now unlocked.",
+    "type": "CUSTOMER_KYC_APPROVED",
+    "entityType": "USER",
+    "entityId": "6ae9993ca64cec48b93ae535",
+    "isRead": false,
+    "actionType": "KYC_STATUS",
+    "metadata": {
+      "customerKycStatus": 2
+    },
+    "dedupeKey": "CUSTOMER_KYC_APPROVED:6ae9993ca64cec48b93ae535",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "customerKycStatus": 2
+    },
+    "createdAt": "2026-11-06T09:45:35.461Z",
+    "updatedAt": "2026-11-06T09:45:35.461Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aeda1c2a64cec48b93b13bc",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6ae5b477a64cec48b93ac835",
+    "userId": "6ae5b477a64cec48b93ac835",
+    "role": "CUSTOMER",
+    "customerId": "6ae5b477a64cec48b93ac835",
+    "title": "✓ KYC Approved",
+    "message": "Your KYC verification has been approved! Income features are now unlocked.",
+    "body": "Your KYC verification has been approved! Income features are now unlocked.",
+    "type": "CUSTOMER_KYC_APPROVED",
+    "entityType": "USER",
+    "entityId": "6ae5b477a64cec48b93ac835",
+    "isRead": false,
+    "actionType": "KYC_STATUS",
+    "metadata": {
+      "customerKycStatus": 2
+    },
+    "dedupeKey": "CUSTOMER_KYC_APPROVED:6ae5b477a64cec48b93ac835",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "customerKycStatus": 2
+    },
+    "createdAt": "2026-11-06T09:45:38.473Z",
+    "updatedAt": "2026-11-06T09:45:38.473Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aeda3afa64cec48b93b140e",
+    "recipientType": "ADMIN",
+    "recipientId": "admin",
+    "role": "ADMIN",
+    "title": "🏬 New Dark Store Registered",
+    "message": "Store Testing (STR-SND) registered in Ahmedabad by Prayag Patel.",
+    "body": "Store Testing (STR-SND) registered in Ahmedabad by Prayag Patel.",
+    "type": "STORE_KYC_REQUEST",
+    "entityType": "STORE_KYC",
+    "entityId": "6aeda3ada64cec48b93b13f6",
+    "isRead": false,
+    "actionType": "STORE_APPROVAL",
+    "metadata": {
+      "storeId": "6aeda3ada64cec48b93b13f6",
+      "storeName": "Testing",
+      "city": "Ahmedabad"
+    },
+    "dedupeKey": "STORE_REGISTERED:6aeda3ada64cec48b93b13f6",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "storeId": "6aeda3ada64cec48b93b13f6",
+      "storeName": "Testing",
+      "city": "Ahmedabad"
+    },
+    "createdAt": "2026-11-06T09:53:51.449Z",
+    "updatedAt": "2026-11-06T09:53:51.449Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aeee81f32a0ed6c254071dd",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6aeee18032a0ed6c25406e5c",
+    "userId": "6aeee18032a0ed6c25406e5c",
+    "role": "CUSTOMER",
+    "customerId": "6aeee18032a0ed6c25406e5c",
+    "title": "✓ KYC Approved",
+    "message": "Your KYC verification has been approved! Income features are now unlocked.",
+    "body": "Your KYC verification has been approved! Income features are now unlocked.",
+    "type": "CUSTOMER_KYC_APPROVED",
+    "entityType": "USER",
+    "entityId": "6aeee18032a0ed6c25406e5c",
+    "isRead": false,
+    "actionType": "KYC_STATUS",
+    "metadata": {
+      "customerKycStatus": 2
+    },
+    "dedupeKey": "CUSTOMER_KYC_APPROVED:6aeee18032a0ed6c25406e5c",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "customerKycStatus": 2
+    },
+    "createdAt": "2026-11-07T08:58:07.194Z",
+    "updatedAt": "2026-11-07T08:58:07.194Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aeee82232a0ed6c254071ec",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6aeee5a032a0ed6c254070c1",
+    "userId": "6aeee5a032a0ed6c254070c1",
+    "role": "CUSTOMER",
+    "customerId": "6aeee5a032a0ed6c254070c1",
+    "title": "✓ KYC Approved",
+    "message": "Your KYC verification has been approved! Income features are now unlocked.",
+    "body": "Your KYC verification has been approved! Income features are now unlocked.",
+    "type": "CUSTOMER_KYC_APPROVED",
+    "entityType": "USER",
+    "entityId": "6aeee5a032a0ed6c254070c1",
+    "isRead": false,
+    "actionType": "KYC_STATUS",
+    "metadata": {
+      "customerKycStatus": 2
+    },
+    "dedupeKey": "CUSTOMER_KYC_APPROVED:6aeee5a032a0ed6c254070c1",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "customerKycStatus": 2
+    },
+    "createdAt": "2026-11-07T08:58:10.747Z",
+    "updatedAt": "2026-11-07T08:58:10.747Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aef04376ef450c2c9caf0e3",
+    "recipientType": "ADMIN",
+    "recipientId": "admin",
+    "role": "ADMIN",
+    "title": "👤 New Customer KYC Submitted",
+    "message": "THANKI submitted KYC & bank details for verification.",
+    "body": "THANKI submitted KYC & bank details for verification.",
+    "type": "CUSTOMER_KYC_REQUEST",
+    "entityType": "CUSTOMER_KYC",
+    "entityId": "6aef01446ef450c2c9caee00",
+    "isRead": false,
+    "actionType": "CUSTOMER_APPROVAL",
+    "metadata": {
+      "userId": "6aef01446ef450c2c9caee00",
+      "userName": "THANKI",
+      "phone": "9879431212"
+    },
+    "dedupeKey": "CUSTOMER_KYC_SUBMITTED:6aef01446ef450c2c9caee00:1794049079320",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "userId": "6aef01446ef450c2c9caee00",
+      "userName": "THANKI",
+      "phone": "9879431212"
+    },
+    "createdAt": "2026-11-07T10:57:59.699Z",
+    "updatedAt": "2026-11-07T10:57:59.699Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aef048d6ef450c2c9caf17c",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6aef01446ef450c2c9caee00",
+    "userId": "6aef01446ef450c2c9caee00",
+    "role": "CUSTOMER",
+    "customerId": "6aef01446ef450c2c9caee00",
+    "title": "✓ KYC Approved",
+    "message": "Your KYC verification has been approved! Income features are now unlocked.",
+    "body": "Your KYC verification has been approved! Income features are now unlocked.",
+    "type": "CUSTOMER_KYC_APPROVED",
+    "entityType": "USER",
+    "entityId": "6aef01446ef450c2c9caee00",
+    "isRead": false,
+    "actionType": "KYC_STATUS",
+    "metadata": {
+      "customerKycStatus": 2
+    },
+    "dedupeKey": "CUSTOMER_KYC_APPROVED:6aef01446ef450c2c9caee00",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "customerKycStatus": 2
+    },
+    "createdAt": "2026-11-07T10:59:25.443Z",
+    "updatedAt": "2026-11-07T10:59:25.443Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aef04926ef450c2c9caf192",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6aef02de6ef450c2c9caefc0",
+    "userId": "6aef02de6ef450c2c9caefc0",
+    "role": "CUSTOMER",
+    "customerId": "6aef02de6ef450c2c9caefc0",
+    "title": "✓ KYC Approved",
+    "message": "Your KYC verification has been approved! Income features are now unlocked.",
+    "body": "Your KYC verification has been approved! Income features are now unlocked.",
+    "type": "CUSTOMER_KYC_APPROVED",
+    "entityType": "USER",
+    "entityId": "6aef02de6ef450c2c9caefc0",
+    "isRead": false,
+    "actionType": "KYC_STATUS",
+    "metadata": {
+      "customerKycStatus": 2
+    },
+    "dedupeKey": "CUSTOMER_KYC_APPROVED:6aef02de6ef450c2c9caefc0",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "customerKycStatus": 2
+    },
+    "createdAt": "2026-11-07T10:59:30.240Z",
+    "updatedAt": "2026-11-07T10:59:30.240Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aef04986ef450c2c9caf1b6",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6aeefdf932a0ed6c254078b1",
+    "userId": "6aeefdf932a0ed6c254078b1",
+    "role": "CUSTOMER",
+    "customerId": "6aeefdf932a0ed6c254078b1",
+    "title": "✓ KYC Approved",
+    "message": "Your KYC verification has been approved! Income features are now unlocked.",
+    "body": "Your KYC verification has been approved! Income features are now unlocked.",
+    "type": "CUSTOMER_KYC_APPROVED",
+    "entityType": "USER",
+    "entityId": "6aeefdf932a0ed6c254078b1",
+    "isRead": false,
+    "actionType": "KYC_STATUS",
+    "metadata": {
+      "customerKycStatus": 2
+    },
+    "dedupeKey": "CUSTOMER_KYC_APPROVED:6aeefdf932a0ed6c254078b1",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "customerKycStatus": 2
+    },
+    "createdAt": "2026-11-07T10:59:36.449Z",
+    "updatedAt": "2026-11-07T10:59:36.449Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aef0bdb6ef450c2c9caf60c",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6aef08a46ef450c2c9caf44d",
+    "userId": "6aef08a46ef450c2c9caf44d",
+    "role": "CUSTOMER",
+    "customerId": "6aef08a46ef450c2c9caf44d",
+    "title": "✓ KYC Approved",
+    "message": "Your KYC verification has been approved! Income features are now unlocked.",
+    "body": "Your KYC verification has been approved! Income features are now unlocked.",
+    "type": "CUSTOMER_KYC_APPROVED",
+    "entityType": "USER",
+    "entityId": "6aef08a46ef450c2c9caf44d",
+    "isRead": false,
+    "actionType": "KYC_STATUS",
+    "metadata": {
+      "customerKycStatus": 2
+    },
+    "dedupeKey": "CUSTOMER_KYC_APPROVED:6aef08a46ef450c2c9caf44d",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "customerKycStatus": 2
+    },
+    "createdAt": "2026-11-07T11:30:35.722Z",
+    "updatedAt": "2026-11-07T11:30:35.722Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aef0be16ef450c2c9caf629",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6aef09956ef450c2c9caf4c7",
+    "userId": "6aef09956ef450c2c9caf4c7",
+    "role": "CUSTOMER",
+    "customerId": "6aef09956ef450c2c9caf4c7",
+    "title": "✓ KYC Approved",
+    "message": "Your KYC verification has been approved! Income features are now unlocked.",
+    "body": "Your KYC verification has been approved! Income features are now unlocked.",
+    "type": "CUSTOMER_KYC_APPROVED",
+    "entityType": "USER",
+    "entityId": "6aef09956ef450c2c9caf4c7",
+    "isRead": false,
+    "actionType": "KYC_STATUS",
+    "metadata": {
+      "customerKycStatus": 2
+    },
+    "dedupeKey": "CUSTOMER_KYC_APPROVED:6aef09956ef450c2c9caf4c7",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "customerKycStatus": 2
+    },
+    "createdAt": "2026-11-07T11:30:41.576Z",
+    "updatedAt": "2026-11-07T11:30:41.576Z",
+    "__v": 0
+  },
+  {
+    "_id": "6aef0be66ef450c2c9caf646",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6aef0a7a6ef450c2c9caf554",
+    "userId": "6aef0a7a6ef450c2c9caf554",
+    "role": "CUSTOMER",
+    "customerId": "6aef0a7a6ef450c2c9caf554",
+    "title": "✓ KYC Approved",
+    "message": "Your KYC verification has been approved! Income features are now unlocked.",
+    "body": "Your KYC verification has been approved! Income features are now unlocked.",
+    "type": "CUSTOMER_KYC_APPROVED",
+    "entityType": "USER",
+    "entityId": "6aef0a7a6ef450c2c9caf554",
+    "isRead": false,
+    "actionType": "KYC_STATUS",
+    "metadata": {
+      "customerKycStatus": 2
+    },
+    "dedupeKey": "CUSTOMER_KYC_APPROVED:6aef0a7a6ef450c2c9caf554",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "customerKycStatus": 2
+    },
+    "createdAt": "2026-11-07T11:30:46.320Z",
+    "updatedAt": "2026-11-07T11:30:46.320Z",
+    "__v": 0
+  },
+  {
+    "_id": "6af1dbdab657a7a98d9c4ba0",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6aef01446ef450c2c9caee00",
+    "userId": "6aef01446ef450c2c9caee00",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6aef01446ef450c2c9caee00",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-351276-491 has been placed successfully.",
+    "body": "Your WormUp order #WORM-351276-491 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6af1dbd7b657a7a98d9c4b8a",
+    "orderId": "6af1dbd7b657a7a98d9c4b8a",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-351276-491",
+      "totalAmount": 28
+    },
+    "dedupeKey": "ORDER_PLACED:6af1dbd7b657a7a98d9c4b8a:6aef01446ef450c2c9caee00",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-351276-491",
+      "totalAmount": 28
+    },
+    "createdAt": "2026-11-09T14:42:34.805Z",
+    "updatedAt": "2026-11-09T14:42:34.805Z",
+    "__v": 0
+  },
+  {
+    "_id": "6af1dbdab657a7a98d9c4ba2",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-351276-491 • ₹28 • 1 items",
+    "body": "Order #WORM-351276-491 • ₹28 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6af1dbd7b657a7a98d9c4b8a",
+    "orderId": "6af1dbd7b657a7a98d9c4b8a",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-351276-491",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6af1dbd7b657a7a98d9c4b8a:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-351276-491",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-09T14:42:34.806Z",
+    "updatedAt": "2026-11-09T14:42:34.806Z",
+    "__v": 0
+  },
+  {
+    "_id": "6af1f3d0a01c8cecf1757892",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6aef02de6ef450c2c9caefc0",
+    "userId": "6aef02de6ef450c2c9caefc0",
+    "role": "CUSTOMER",
+    "title": "Order Delivered! 🥗",
+    "message": "Your vegetable order #WORM-483355-946 of ₹2,000 has been delivered. ₹2,000 Monthly Veg GMV credited! You are now an ACTIVE MEMBER! 🎉",
+    "body": "Your vegetable order #WORM-483355-946 of ₹2,000 has been delivered. ₹2,000 Monthly Veg GMV credited! You are now an ACTIVE MEMBER! 🎉",
+    "type": "ORDER_DELIVERED",
+    "entityType": "ORDER",
+    "entityId": "6af1f3cba01c8cecf175788a",
+    "orderId": "6af1f3cba01c8cecf175788a",
+    "actionType": "DEEP_LINK",
+    "actionPayload": "S24_OrderTrackingScreen",
+    "metadata": {
+      "orderNumber": "WORM-483355-946",
+      "vegGmv": 2000,
+      "totalAmount": 2000
+    },
+    "dedupeKey": "ORDER_DELIVERED_WORM-483355-946",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "isRead": false,
+    "createdAt": "2026-11-09T16:24:43.355Z",
+    "updatedAt": "2026-11-09T16:24:43.355Z"
+  },
+  {
+    "_id": "6af87f6e59ee50c9a2cf99d1",
+    "recipientType": "ADMIN",
+    "recipientId": "admin",
+    "role": "ADMIN",
+    "title": "👤 New Customer KYC Submitted",
+    "message": "Prayag Patel submitted KYC & bank details for verification.",
+    "body": "Prayag Patel submitted KYC & bank details for verification.",
+    "type": "CUSTOMER_KYC_REQUEST",
+    "entityType": "CUSTOMER_KYC",
+    "entityId": "6af87f0b59ee50c9a2cf998e",
+    "isRead": false,
+    "actionType": "CUSTOMER_APPROVAL",
+    "actionPayload": "CUSTOMER_APPROVAL",
+    "metadata": {
+      "userId": "6af87f0b59ee50c9a2cf998e",
+      "userName": "Prayag Patel",
+      "phone": "8957519654"
+    },
+    "dedupeKey": "CUSTOMER_KYC_SUBMITTED:6af87f0b59ee50c9a2cf998e:1794670446486",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "userId": "6af87f0b59ee50c9a2cf998e",
+      "userName": "Prayag Patel",
+      "phone": "8957519654"
+    },
+    "createdAt": "2026-11-14T15:34:06.905Z",
+    "updatedAt": "2026-11-14T15:34:06.905Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afc345659ee50c9a2cfadca",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6aeee18032a0ed6c25406e5c",
+    "userId": "6aeee18032a0ed6c25406e5c",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6aeee18032a0ed6c25406e5c",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-361445-504 has been placed successfully.",
+    "body": "Your WormUp order #WORM-361445-504 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6afc345159ee50c9a2cfada5",
+    "orderId": "6afc345159ee50c9a2cfada5",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-361445-504",
+      "totalAmount": 330
+    },
+    "dedupeKey": "ORDER_PLACED:6afc345159ee50c9a2cfada5:6aeee18032a0ed6c25406e5c",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-361445-504",
+      "totalAmount": 330
+    },
+    "createdAt": "2026-11-17T11:02:46.824Z",
+    "updatedAt": "2026-11-17T11:02:46.824Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afc345659ee50c9a2cfadcc",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-361445-504 • ₹330 • 3 items",
+    "body": "Order #WORM-361445-504 • ₹330 • 3 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6afc345159ee50c9a2cfada5",
+    "orderId": "6afc345159ee50c9a2cfada5",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-361445-504",
+      "totalAmount": 330,
+      "itemCount": 3
+    },
+    "dedupeKey": "NEW_ORDER:6afc345159ee50c9a2cfada5:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-361445-504",
+      "totalAmount": 330,
+      "itemCount": 3
+    },
+    "createdAt": "2026-11-17T11:02:46.850Z",
+    "updatedAt": "2026-11-17T11:02:46.850Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afc5aa47e52ce43d64b1668",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6af87f0b59ee50c9a2cf998e",
+    "userId": "6af87f0b59ee50c9a2cf998e",
+    "role": "CUSTOMER",
+    "customerId": "6af87f0b59ee50c9a2cf998e",
+    "title": "✓ KYC Approved",
+    "message": "Your KYC verification has been approved! Income features are now unlocked.",
+    "body": "Your KYC verification has been approved! Income features are now unlocked.",
+    "type": "CUSTOMER_KYC_APPROVED",
+    "entityType": "USER",
+    "entityId": "6af87f0b59ee50c9a2cf998e",
+    "isRead": false,
+    "actionType": "KYC_STATUS",
+    "actionPayload": "KYC_STATUS",
+    "metadata": {
+      "customerKycStatus": 2
+    },
+    "dedupeKey": "CUSTOMER_KYC_APPROVED:6af87f0b59ee50c9a2cf998e",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "customerKycStatus": 2
+    },
+    "createdAt": "2026-11-17T13:46:12.076Z",
+    "updatedAt": "2026-11-17T13:46:12.076Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afd62d76396024e04b95e61",
+    "recipientType": "STORE",
+    "recipientId": "6aa277a7fc02997cbe281ac3",
+    "role": "STORE",
+    "storeId": "6aa277a7fc02997cbe281ac3",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-804020-547 • ₹229 • 1 items",
+    "body": "Order #WORM-804020-547 • ₹229 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6afd62d46396024e04b95e4a",
+    "orderId": "6afd62d46396024e04b95e4a",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-804020-547",
+      "totalAmount": 229,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6afd62d46396024e04b95e4a:6aa277a7fc02997cbe281ac3",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-804020-547",
+      "totalAmount": 229,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-18T08:33:27.110Z",
+    "updatedAt": "2026-11-18T08:33:27.110Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afd62d76396024e04b95e63",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6aeee18032a0ed6c25406e5c",
+    "userId": "6aeee18032a0ed6c25406e5c",
+    "role": "CUSTOMER",
+    "storeId": "6aa277a7fc02997cbe281ac3",
+    "customerId": "6aeee18032a0ed6c25406e5c",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-804020-547 has been placed successfully.",
+    "body": "Your WormUp order #WORM-804020-547 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6afd62d46396024e04b95e4a",
+    "orderId": "6afd62d46396024e04b95e4a",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-804020-547",
+      "totalAmount": 229
+    },
+    "dedupeKey": "ORDER_PLACED:6afd62d46396024e04b95e4a:6aeee18032a0ed6c25406e5c",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-804020-547",
+      "totalAmount": 229
+    },
+    "createdAt": "2026-11-18T08:33:27.126Z",
+    "updatedAt": "2026-11-18T08:33:27.126Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afd65416396024e04b95f81",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6aeee18032a0ed6c25406e5c",
+    "userId": "6aeee18032a0ed6c25406e5c",
+    "role": "CUSTOMER",
+    "storeId": "6aa277a7fc02997cbe281ac3",
+    "customerId": "6aeee18032a0ed6c25406e5c",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-422388-418 has been placed successfully.",
+    "body": "Your WormUp order #WORM-422388-418 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6afd653e6396024e04b95f69",
+    "orderId": "6afd653e6396024e04b95f69",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-422388-418",
+      "totalAmount": 229
+    },
+    "dedupeKey": "ORDER_PLACED:6afd653e6396024e04b95f69:6aeee18032a0ed6c25406e5c",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-422388-418",
+      "totalAmount": 229
+    },
+    "createdAt": "2026-11-18T08:43:45.513Z",
+    "updatedAt": "2026-11-18T08:43:45.513Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afd65416396024e04b95f84",
+    "recipientType": "STORE",
+    "recipientId": "6aa277a7fc02997cbe281ac3",
+    "role": "STORE",
+    "storeId": "6aa277a7fc02997cbe281ac3",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-422388-418 • ₹229 • 1 items",
+    "body": "Order #WORM-422388-418 • ₹229 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6afd653e6396024e04b95f69",
+    "orderId": "6afd653e6396024e04b95f69",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-422388-418",
+      "totalAmount": 229,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6afd653e6396024e04b95f69:6aa277a7fc02997cbe281ac3",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-422388-418",
+      "totalAmount": 229,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-18T08:43:45.528Z",
+    "updatedAt": "2026-11-18T08:43:45.528Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afd66456396024e04b96012",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6aeee18032a0ed6c25406e5c",
+    "userId": "6aeee18032a0ed6c25406e5c",
+    "role": "CUSTOMER",
+    "storeId": "6aa277a7fc02997cbe281ac3",
+    "customerId": "6aeee18032a0ed6c25406e5c",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-682235-175 has been placed successfully.",
+    "body": "Your WormUp order #WORM-682235-175 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6afd66426396024e04b95ff9",
+    "orderId": "6afd66426396024e04b95ff9",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-682235-175",
+      "totalAmount": 229
+    },
+    "dedupeKey": "ORDER_PLACED:6afd66426396024e04b95ff9:6aeee18032a0ed6c25406e5c",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-682235-175",
+      "totalAmount": 229
+    },
+    "createdAt": "2026-11-18T08:48:05.262Z",
+    "updatedAt": "2026-11-18T08:48:05.262Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afd66456396024e04b96014",
+    "recipientType": "STORE",
+    "recipientId": "6aa277a7fc02997cbe281ac3",
+    "role": "STORE",
+    "storeId": "6aa277a7fc02997cbe281ac3",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-682235-175 • ₹229 • 1 items",
+    "body": "Order #WORM-682235-175 • ₹229 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6afd66426396024e04b95ff9",
+    "orderId": "6afd66426396024e04b95ff9",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-682235-175",
+      "totalAmount": 229,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6afd66426396024e04b95ff9:6aa277a7fc02997cbe281ac3",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-682235-175",
+      "totalAmount": 229,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-18T08:48:05.268Z",
+    "updatedAt": "2026-11-18T08:48:05.268Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afd66e26396024e04b960ba",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6aeee18032a0ed6c25406e5c",
+    "userId": "6aeee18032a0ed6c25406e5c",
+    "role": "CUSTOMER",
+    "storeId": "6aa277a7fc02997cbe281ac3",
+    "customerId": "6aeee18032a0ed6c25406e5c",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-839780-667 has been placed successfully.",
+    "body": "Your WormUp order #WORM-839780-667 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6afd66df6396024e04b960a5",
+    "orderId": "6afd66df6396024e04b960a5",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-839780-667",
+      "totalAmount": 229
+    },
+    "dedupeKey": "ORDER_PLACED:6afd66df6396024e04b960a5:6aeee18032a0ed6c25406e5c",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-839780-667",
+      "totalAmount": 229
+    },
+    "createdAt": "2026-11-18T08:50:42.886Z",
+    "updatedAt": "2026-11-18T08:50:42.886Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afd66e26396024e04b960bc",
+    "recipientType": "STORE",
+    "recipientId": "6aa277a7fc02997cbe281ac3",
+    "role": "STORE",
+    "storeId": "6aa277a7fc02997cbe281ac3",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-839780-667 • ₹229 • 1 items",
+    "body": "Order #WORM-839780-667 • ₹229 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6afd66df6396024e04b960a5",
+    "orderId": "6afd66df6396024e04b960a5",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-839780-667",
+      "totalAmount": 229,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6afd66df6396024e04b960a5:6aa277a7fc02997cbe281ac3",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-839780-667",
+      "totalAmount": 229,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-18T08:50:42.888Z",
+    "updatedAt": "2026-11-18T08:50:42.888Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afd6d266396024e04b9648f",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6aeee18032a0ed6c25406e5c",
+    "userId": "6aeee18032a0ed6c25406e5c",
+    "role": "CUSTOMER",
+    "storeId": "6aeda3ada64cec48b93b13f6",
+    "customerId": "6aeee18032a0ed6c25406e5c",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-443329-783 has been placed successfully.",
+    "body": "Your WormUp order #WORM-443329-783 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6afd6d236396024e04b96477",
+    "orderId": "6afd6d236396024e04b96477",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-443329-783",
+      "totalAmount": 205
+    },
+    "dedupeKey": "ORDER_PLACED:6afd6d236396024e04b96477:6aeee18032a0ed6c25406e5c",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-443329-783",
+      "totalAmount": 205
+    },
+    "createdAt": "2026-11-18T09:17:26.444Z",
+    "updatedAt": "2026-11-18T09:17:26.444Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afd6d266396024e04b96491",
+    "recipientType": "STORE",
+    "recipientId": "6aeda3ada64cec48b93b13f6",
+    "role": "STORE",
+    "storeId": "6aeda3ada64cec48b93b13f6",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-443329-783 • ₹205 • 1 items",
+    "body": "Order #WORM-443329-783 • ₹205 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6afd6d236396024e04b96477",
+    "orderId": "6afd6d236396024e04b96477",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-443329-783",
+      "totalAmount": 205,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6afd6d236396024e04b96477:6aeda3ada64cec48b93b13f6",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-443329-783",
+      "totalAmount": 205,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-18T09:17:26.445Z",
+    "updatedAt": "2026-11-18T09:17:26.445Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afd6efa6396024e04b965e4",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6aeee18032a0ed6c25406e5c",
+    "userId": "6aeee18032a0ed6c25406e5c",
+    "role": "CUSTOMER",
+    "storeId": "6aeda3ada64cec48b93b13f6",
+    "customerId": "6aeee18032a0ed6c25406e5c",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-910941-124 has been placed successfully.",
+    "body": "Your WormUp order #WORM-910941-124 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6afd6ef66396024e04b965cd",
+    "orderId": "6afd6ef66396024e04b965cd",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-910941-124",
+      "totalAmount": 115
+    },
+    "dedupeKey": "ORDER_PLACED:6afd6ef66396024e04b965cd:6aeee18032a0ed6c25406e5c",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-910941-124",
+      "totalAmount": 115
+    },
+    "createdAt": "2026-11-18T09:25:14.615Z",
+    "updatedAt": "2026-11-18T09:25:14.615Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afd6efa6396024e04b965e6",
+    "recipientType": "STORE",
+    "recipientId": "6aeda3ada64cec48b93b13f6",
+    "role": "STORE",
+    "storeId": "6aeda3ada64cec48b93b13f6",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-910941-124 • ₹115 • 1 items",
+    "body": "Order #WORM-910941-124 • ₹115 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6afd6ef66396024e04b965cd",
+    "orderId": "6afd6ef66396024e04b965cd",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-910941-124",
+      "totalAmount": 115,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6afd6ef66396024e04b965cd:6aeda3ada64cec48b93b13f6",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-910941-124",
+      "totalAmount": 115,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-18T09:25:14.617Z",
+    "updatedAt": "2026-11-18T09:25:14.617Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afd6f3c6396024e04b9669c",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6aeee18032a0ed6c25406e5c",
+    "userId": "6aeee18032a0ed6c25406e5c",
+    "role": "CUSTOMER",
+    "storeId": "6aeda3ada64cec48b93b13f6",
+    "customerId": "6aeee18032a0ed6c25406e5c",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-976620-291 has been placed successfully.",
+    "body": "Your WormUp order #WORM-976620-291 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6afd6f386396024e04b96685",
+    "orderId": "6afd6f386396024e04b96685",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-976620-291",
+      "totalAmount": 115
+    },
+    "dedupeKey": "ORDER_PLACED:6afd6f386396024e04b96685:6aeee18032a0ed6c25406e5c",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-976620-291",
+      "totalAmount": 115
+    },
+    "createdAt": "2026-11-18T09:26:20.495Z",
+    "updatedAt": "2026-11-18T09:26:20.495Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afd6f3c6396024e04b9669e",
+    "recipientType": "STORE",
+    "recipientId": "6aeda3ada64cec48b93b13f6",
+    "role": "STORE",
+    "storeId": "6aeda3ada64cec48b93b13f6",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-976620-291 • ₹115 • 1 items",
+    "body": "Order #WORM-976620-291 • ₹115 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6afd6f386396024e04b96685",
+    "orderId": "6afd6f386396024e04b96685",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-976620-291",
+      "totalAmount": 115,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6afd6f386396024e04b96685:6aeda3ada64cec48b93b13f6",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-976620-291",
+      "totalAmount": 115,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-18T09:26:20.499Z",
+    "updatedAt": "2026-11-18T09:26:20.499Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afd6f7f6396024e04b96753",
+    "recipientType": "STORE",
+    "recipientId": "6aeda3ada64cec48b93b13f6",
+    "role": "STORE",
+    "storeId": "6aeda3ada64cec48b93b13f6",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-043714-275 • ₹115 • 1 items",
+    "body": "Order #WORM-043714-275 • ₹115 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6afd6f7b6396024e04b9673d",
+    "orderId": "6afd6f7b6396024e04b9673d",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-043714-275",
+      "totalAmount": 115,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6afd6f7b6396024e04b9673d:6aeda3ada64cec48b93b13f6",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-043714-275",
+      "totalAmount": 115,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-18T09:27:27.227Z",
+    "updatedAt": "2026-11-18T09:27:27.227Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afd6f7f6396024e04b96755",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6aeee18032a0ed6c25406e5c",
+    "userId": "6aeee18032a0ed6c25406e5c",
+    "role": "CUSTOMER",
+    "storeId": "6aeda3ada64cec48b93b13f6",
+    "customerId": "6aeee18032a0ed6c25406e5c",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-043714-275 has been placed successfully.",
+    "body": "Your WormUp order #WORM-043714-275 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6afd6f7b6396024e04b9673d",
+    "orderId": "6afd6f7b6396024e04b9673d",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-043714-275",
+      "totalAmount": 115
+    },
+    "dedupeKey": "ORDER_PLACED:6afd6f7b6396024e04b9673d:6aeee18032a0ed6c25406e5c",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-043714-275",
+      "totalAmount": 115
+    },
+    "createdAt": "2026-11-18T09:27:27.234Z",
+    "updatedAt": "2026-11-18T09:27:27.234Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afd76a76396024e04b969cf",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6aeee18032a0ed6c25406e5c",
+    "userId": "6aeee18032a0ed6c25406e5c",
+    "role": "CUSTOMER",
+    "storeId": "6aeda3ada64cec48b93b13f6",
+    "customerId": "6aeee18032a0ed6c25406e5c",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-870953-148 has been placed successfully.",
+    "body": "Your WormUp order #WORM-870953-148 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6afd769e6396024e04b9698e",
+    "orderId": "6afd769e6396024e04b9698e",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-870953-148",
+      "totalAmount": 580
+    },
+    "dedupeKey": "ORDER_PLACED:6afd769e6396024e04b9698e:6aeee18032a0ed6c25406e5c",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-870953-148",
+      "totalAmount": 580
+    },
+    "createdAt": "2026-11-18T09:57:59.879Z",
+    "updatedAt": "2026-11-18T09:57:59.879Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afd76a76396024e04b969d1",
+    "recipientType": "STORE",
+    "recipientId": "6aeda3ada64cec48b93b13f6",
+    "role": "STORE",
+    "storeId": "6aeda3ada64cec48b93b13f6",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-870953-148 • ₹580 • 6 items",
+    "body": "Order #WORM-870953-148 • ₹580 • 6 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6afd769e6396024e04b9698e",
+    "orderId": "6afd769e6396024e04b9698e",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-870953-148",
+      "totalAmount": 580,
+      "itemCount": 6
+    },
+    "dedupeKey": "NEW_ORDER:6afd769e6396024e04b9698e:6aeda3ada64cec48b93b13f6",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-870953-148",
+      "totalAmount": 580,
+      "itemCount": 6
+    },
+    "createdAt": "2026-11-18T09:57:59.903Z",
+    "updatedAt": "2026-11-18T09:57:59.903Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afe00b8e0f7d2a2163024a2",
+    "recipientType": "STORE",
+    "recipientId": "6aa277a8fc02997cbe281ac7",
+    "role": "STORE",
+    "storeId": "6aa277a8fc02997cbe281ac7",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-221473-159 • ₹39 • 1 items",
+    "body": "Order #WORM-221473-159 • ₹39 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6afe00b5e0f7d2a216302488",
+    "orderId": "6afe00b5e0f7d2a216302488",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-221473-159",
+      "totalAmount": 39,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6afe00b5e0f7d2a216302488:6aa277a8fc02997cbe281ac7",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-221473-159",
+      "totalAmount": 39,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-18T19:47:04.782Z",
+    "updatedAt": "2026-11-18T19:47:04.782Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afe00b8e0f7d2a2163024a5",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6afc95705dfb520af538adb0",
+    "userId": "6afc95705dfb520af538adb0",
+    "role": "CUSTOMER",
+    "storeId": "6aa277a8fc02997cbe281ac7",
+    "customerId": "6afc95705dfb520af538adb0",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-221473-159 has been placed successfully.",
+    "body": "Your WormUp order #WORM-221473-159 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6afe00b5e0f7d2a216302488",
+    "orderId": "6afe00b5e0f7d2a216302488",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-221473-159",
+      "totalAmount": 39
+    },
+    "dedupeKey": "ORDER_PLACED:6afe00b5e0f7d2a216302488:6afc95705dfb520af538adb0",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-221473-159",
+      "totalAmount": 39
+    },
+    "createdAt": "2026-11-18T19:47:04.797Z",
+    "updatedAt": "2026-11-18T19:47:04.797Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afec29de0f7d2a216302ea3",
+    "recipientType": "STORE",
+    "recipientId": "6aeda3ada64cec48b93b13f6",
+    "role": "STORE",
+    "storeId": "6aeda3ada64cec48b93b13f6",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-856625-170 • ₹534 • 2 items",
+    "body": "Order #WORM-856625-170 • ₹534 • 2 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6afec298e0f7d2a216302e84",
+    "orderId": "6afec298e0f7d2a216302e84",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-856625-170",
+      "totalAmount": 534,
+      "itemCount": 2
+    },
+    "dedupeKey": "NEW_ORDER:6afec298e0f7d2a216302e84:6aeda3ada64cec48b93b13f6",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-856625-170",
+      "totalAmount": 534,
+      "itemCount": 2
+    },
+    "createdAt": "2026-11-19T09:34:21.994Z",
+    "updatedAt": "2026-11-19T09:34:21.994Z",
+    "__v": 0
+  },
+  {
+    "_id": "6afec29ee0f7d2a216302ea5",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6aeee18032a0ed6c25406e5c",
+    "userId": "6aeee18032a0ed6c25406e5c",
+    "role": "CUSTOMER",
+    "storeId": "6aeda3ada64cec48b93b13f6",
+    "customerId": "6aeee18032a0ed6c25406e5c",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-856625-170 has been placed successfully.",
+    "body": "Your WormUp order #WORM-856625-170 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6afec298e0f7d2a216302e84",
+    "orderId": "6afec298e0f7d2a216302e84",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-856625-170",
+      "totalAmount": 534
+    },
+    "dedupeKey": "ORDER_PLACED:6afec298e0f7d2a216302e84:6aeee18032a0ed6c25406e5c",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-856625-170",
+      "totalAmount": 534
+    },
+    "createdAt": "2026-11-19T09:34:22.005Z",
+    "updatedAt": "2026-11-19T09:34:22.005Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b000f3be0f7d2a2163036fa",
+    "recipientType": "STORE",
+    "recipientId": "6aeda3ada64cec48b93b13f6",
+    "role": "STORE",
+    "storeId": "6aeda3ada64cec48b93b13f6",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-007672-527 • ₹164 • 1 items",
+    "body": "Order #WORM-007672-527 • ₹164 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6b000f37e0f7d2a2163036dc",
+    "orderId": "6b000f37e0f7d2a2163036dc",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-007672-527",
+      "totalAmount": 164,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6b000f37e0f7d2a2163036dc:6aeda3ada64cec48b93b13f6",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-007672-527",
+      "totalAmount": 164,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-20T09:13:31.021Z",
+    "updatedAt": "2026-11-20T09:13:31.021Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b000f3be0f7d2a2163036fc",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6aeee18032a0ed6c25406e5c",
+    "userId": "6aeee18032a0ed6c25406e5c",
+    "role": "CUSTOMER",
+    "storeId": "6aeda3ada64cec48b93b13f6",
+    "customerId": "6aeee18032a0ed6c25406e5c",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-007672-527 has been placed successfully.",
+    "body": "Your WormUp order #WORM-007672-527 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6b000f37e0f7d2a2163036dc",
+    "orderId": "6b000f37e0f7d2a2163036dc",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-007672-527",
+      "totalAmount": 164
+    },
+    "dedupeKey": "ORDER_PLACED:6b000f37e0f7d2a2163036dc:6aeee18032a0ed6c25406e5c",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-007672-527",
+      "totalAmount": 164
+    },
+    "createdAt": "2026-11-20T09:13:31.035Z",
+    "updatedAt": "2026-11-20T09:13:31.035Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b001163e0f7d2a216303be8",
+    "recipientType": "STORE",
+    "recipientId": "6aa277a8fc02997cbe281ac7",
+    "role": "STORE",
+    "storeId": "6aa277a8fc02997cbe281ac7",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-559720-132 • ₹381 • 1 items",
+    "body": "Order #WORM-559720-132 • ₹381 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6b00115fe0f7d2a216303bca",
+    "orderId": "6b00115fe0f7d2a216303bca",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-559720-132",
+      "totalAmount": 381,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6b00115fe0f7d2a216303bca:6aa277a8fc02997cbe281ac7",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-559720-132",
+      "totalAmount": 381,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-20T09:22:43.696Z",
+    "updatedAt": "2026-11-20T09:22:43.696Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b001163e0f7d2a216303bea",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6afc95705dfb520af538adb0",
+    "userId": "6afc95705dfb520af538adb0",
+    "role": "CUSTOMER",
+    "storeId": "6aa277a8fc02997cbe281ac7",
+    "customerId": "6afc95705dfb520af538adb0",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-559720-132 has been placed successfully.",
+    "body": "Your WormUp order #WORM-559720-132 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6b00115fe0f7d2a216303bca",
+    "orderId": "6b00115fe0f7d2a216303bca",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-559720-132",
+      "totalAmount": 381
+    },
+    "dedupeKey": "ORDER_PLACED:6b00115fe0f7d2a216303bca:6afc95705dfb520af538adb0",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-559720-132",
+      "totalAmount": 381
+    },
+    "createdAt": "2026-11-20T09:22:43.698Z",
+    "updatedAt": "2026-11-20T09:22:43.698Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b001a1de0f7d2a2163040d3",
+    "recipientType": "ADMIN",
+    "recipientId": "admin",
+    "role": "ADMIN",
+    "title": "👤 New Customer KYC Submitted",
+    "message": "Abc Abc submitted KYC & bank details for verification.",
+    "body": "Abc Abc submitted KYC & bank details for verification.",
+    "type": "CUSTOMER_KYC_REQUEST",
+    "entityType": "CUSTOMER_KYC",
+    "entityId": "6b0019d6e0f7d2a21630407f",
+    "isRead": false,
+    "actionType": "CUSTOMER_APPROVAL",
+    "actionPayload": "CUSTOMER_APPROVAL",
+    "metadata": {
+      "userId": "6b0019d6e0f7d2a21630407f",
+      "userName": "Abc Abc",
+      "phone": "9787545131"
+    },
+    "dedupeKey": "CUSTOMER_KYC_SUBMITTED:6b0019d6e0f7d2a21630407f:1795168797063",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "userId": "6b0019d6e0f7d2a21630407f",
+      "userName": "Abc Abc",
+      "phone": "9787545131"
+    },
+    "createdAt": "2026-11-20T09:59:57.470Z",
+    "updatedAt": "2026-11-20T09:59:57.470Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0044384a0e62e138b804db",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6afc95705dfb520af538adb0",
+    "userId": "6afc95705dfb520af538adb0",
+    "role": "CUSTOMER",
+    "customerId": "6afc95705dfb520af538adb0",
+    "title": "📍 Pincode Change Rejected",
+    "message": "Your pincode change request was rejected: Address proof mismatch",
+    "body": "Your pincode change request was rejected: Address proof mismatch",
+    "type": "SYSTEM",
+    "entityType": "USER",
+    "entityId": "6afc95705dfb520af538adb0",
+    "isRead": false,
+    "actionType": "ACCOUNT_STATUS",
+    "actionPayload": "ACCOUNT_STATUS",
+    "dedupeKey": "PINCODE_REJECTED:6b0043f44a0e62e138b804ca",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "createdAt": "2026-11-20T12:59:36.785Z",
+    "updatedAt": "2026-11-20T12:59:36.785Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b00459c4a0e62e138b807ef",
+    "recipientType": "STORE",
+    "recipientId": "6aa277a8fc02997cbe281ac7",
+    "role": "STORE",
+    "storeId": "6aa277a8fc02997cbe281ac7",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-929118-136 • ₹381 • 1 items",
+    "body": "Order #WORM-929118-136 • ₹381 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6b0045994a0e62e138b807d3",
+    "orderId": "6b0045994a0e62e138b807d3",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-929118-136",
+      "totalAmount": 381,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6b0045994a0e62e138b807d3:6aa277a8fc02997cbe281ac7",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-929118-136",
+      "totalAmount": 381,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-20T13:05:32.714Z",
+    "updatedAt": "2026-11-20T13:05:32.714Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b00459c4a0e62e138b807ed",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6afc95705dfb520af538adb0",
+    "userId": "6afc95705dfb520af538adb0",
+    "role": "CUSTOMER",
+    "storeId": "6aa277a8fc02997cbe281ac7",
+    "customerId": "6afc95705dfb520af538adb0",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-929118-136 has been placed successfully.",
+    "body": "Your WormUp order #WORM-929118-136 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6b0045994a0e62e138b807d3",
+    "orderId": "6b0045994a0e62e138b807d3",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-929118-136",
+      "totalAmount": 381
+    },
+    "dedupeKey": "ORDER_PLACED:6b0045994a0e62e138b807d3:6afc95705dfb520af538adb0",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-929118-136",
+      "totalAmount": 381
+    },
+    "createdAt": "2026-11-20T13:05:32.711Z",
+    "updatedAt": "2026-11-20T13:05:32.711Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0046024a0e62e138b8086a",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6afc95705dfb520af538adb0",
+    "userId": "6afc95705dfb520af538adb0",
+    "role": "CUSTOMER",
+    "storeId": "6aa277a8fc02997cbe281ac7",
+    "customerId": "6afc95705dfb520af538adb0",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-030861-141 has been placed successfully.",
+    "body": "Your WormUp order #WORM-030861-141 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6b0045fe4a0e62e138b80851",
+    "orderId": "6b0045fe4a0e62e138b80851",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-030861-141",
+      "totalAmount": 460
+    },
+    "dedupeKey": "ORDER_PLACED:6b0045fe4a0e62e138b80851:6afc95705dfb520af538adb0",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-030861-141",
+      "totalAmount": 460
+    },
+    "createdAt": "2026-11-20T13:07:14.187Z",
+    "updatedAt": "2026-11-20T13:07:14.187Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0046024a0e62e138b8086c",
+    "recipientType": "STORE",
+    "recipientId": "6aa277a8fc02997cbe281ac7",
+    "role": "STORE",
+    "storeId": "6aa277a8fc02997cbe281ac7",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-030861-141 • ₹460 • 1 items",
+    "body": "Order #WORM-030861-141 • ₹460 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6b0045fe4a0e62e138b80851",
+    "orderId": "6b0045fe4a0e62e138b80851",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-030861-141",
+      "totalAmount": 460,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6b0045fe4a0e62e138b80851:6aa277a8fc02997cbe281ac7",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-030861-141",
+      "totalAmount": 460,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-20T13:07:14.201Z",
+    "updatedAt": "2026-11-20T13:07:14.201Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b00465c4a0e62e138b80911",
+    "recipientType": "STORE",
+    "recipientId": "6aa277a8fc02997cbe281ac7",
+    "role": "STORE",
+    "storeId": "6aa277a8fc02997cbe281ac7",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-121098-836 • ₹460 • 1 items",
+    "body": "Order #WORM-121098-836 • ₹460 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6b0046594a0e62e138b808f8",
+    "orderId": "6b0046594a0e62e138b808f8",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-121098-836",
+      "totalAmount": 460,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6b0046594a0e62e138b808f8:6aa277a8fc02997cbe281ac7",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-121098-836",
+      "totalAmount": 460,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-20T13:08:44.683Z",
+    "updatedAt": "2026-11-20T13:08:44.683Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b00465c4a0e62e138b80914",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6afc95705dfb520af538adb0",
+    "userId": "6afc95705dfb520af538adb0",
+    "role": "CUSTOMER",
+    "storeId": "6aa277a8fc02997cbe281ac7",
+    "customerId": "6afc95705dfb520af538adb0",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-121098-836 has been placed successfully.",
+    "body": "Your WormUp order #WORM-121098-836 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6b0046594a0e62e138b808f8",
+    "orderId": "6b0046594a0e62e138b808f8",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-121098-836",
+      "totalAmount": 460
+    },
+    "dedupeKey": "ORDER_PLACED:6b0046594a0e62e138b808f8:6afc95705dfb520af538adb0",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-121098-836",
+      "totalAmount": 460
+    },
+    "createdAt": "2026-11-20T13:08:44.699Z",
+    "updatedAt": "2026-11-20T13:08:44.699Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0046c84a0e62e138b80982",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6afc95705dfb520af538adb0",
+    "userId": "6afc95705dfb520af538adb0",
+    "role": "CUSTOMER",
+    "storeId": "6aa277a8fc02997cbe281ac7",
+    "customerId": "6afc95705dfb520af538adb0",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-229172-927 has been placed successfully.",
+    "body": "Your WormUp order #WORM-229172-927 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6b0046c54a0e62e138b80968",
+    "orderId": "6b0046c54a0e62e138b80968",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-229172-927",
+      "totalAmount": 381
+    },
+    "dedupeKey": "ORDER_PLACED:6b0046c54a0e62e138b80968:6afc95705dfb520af538adb0",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-229172-927",
+      "totalAmount": 381
+    },
+    "createdAt": "2026-11-20T13:10:32.693Z",
+    "updatedAt": "2026-11-20T13:10:32.693Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0046c84a0e62e138b80984",
+    "recipientType": "STORE",
+    "recipientId": "6aa277a8fc02997cbe281ac7",
+    "role": "STORE",
+    "storeId": "6aa277a8fc02997cbe281ac7",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-229172-927 • ₹381 • 1 items",
+    "body": "Order #WORM-229172-927 • ₹381 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6b0046c54a0e62e138b80968",
+    "orderId": "6b0046c54a0e62e138b80968",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-229172-927",
+      "totalAmount": 381,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6b0046c54a0e62e138b80968:6aa277a8fc02997cbe281ac7",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-229172-927",
+      "totalAmount": 381,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-20T13:10:32.705Z",
+    "updatedAt": "2026-11-20T13:10:32.705Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0049664a0e62e138b80a94",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6afc95705dfb520af538adb0",
+    "userId": "6afc95705dfb520af538adb0",
+    "role": "CUSTOMER",
+    "storeId": "6aa277a8fc02997cbe281ac7",
+    "customerId": "6afc95705dfb520af538adb0",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-898665-607 has been placed successfully.",
+    "body": "Your WormUp order #WORM-898665-607 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6b0049624a0e62e138b80a7b",
+    "orderId": "6b0049624a0e62e138b80a7b",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-898665-607",
+      "totalAmount": 460
+    },
+    "dedupeKey": "ORDER_PLACED:6b0049624a0e62e138b80a7b:6afc95705dfb520af538adb0",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-898665-607",
+      "totalAmount": 460
+    },
+    "createdAt": "2026-11-20T13:21:42.083Z",
+    "updatedAt": "2026-11-20T13:21:42.083Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0049664a0e62e138b80a97",
+    "recipientType": "STORE",
+    "recipientId": "6aa277a8fc02997cbe281ac7",
+    "role": "STORE",
+    "storeId": "6aa277a8fc02997cbe281ac7",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-898665-607 • ₹460 • 1 items",
+    "body": "Order #WORM-898665-607 • ₹460 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6b0049624a0e62e138b80a7b",
+    "orderId": "6b0049624a0e62e138b80a7b",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-898665-607",
+      "totalAmount": 460,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6b0049624a0e62e138b80a7b:6aa277a8fc02997cbe281ac7",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-898665-607",
+      "totalAmount": 460,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-20T13:21:42.095Z",
+    "updatedAt": "2026-11-20T13:21:42.095Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0049e74a0e62e138b80bb5",
+    "recipientType": "STORE",
+    "recipientId": "6aa277a8fc02997cbe281ac7",
+    "role": "STORE",
+    "storeId": "6aa277a8fc02997cbe281ac7",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-028160-338 • ₹460 • 1 items",
+    "body": "Order #WORM-028160-338 • ₹460 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6b0049e44a0e62e138b80b9b",
+    "orderId": "6b0049e44a0e62e138b80b9b",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-028160-338",
+      "totalAmount": 460,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6b0049e44a0e62e138b80b9b:6aa277a8fc02997cbe281ac7",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-028160-338",
+      "totalAmount": 460,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-20T13:23:51.702Z",
+    "updatedAt": "2026-11-20T13:23:51.702Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0049e74a0e62e138b80bb7",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6afc95705dfb520af538adb0",
+    "userId": "6afc95705dfb520af538adb0",
+    "role": "CUSTOMER",
+    "storeId": "6aa277a8fc02997cbe281ac7",
+    "customerId": "6afc95705dfb520af538adb0",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-028160-338 has been placed successfully.",
+    "body": "Your WormUp order #WORM-028160-338 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6b0049e44a0e62e138b80b9b",
+    "orderId": "6b0049e44a0e62e138b80b9b",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-028160-338",
+      "totalAmount": 460
+    },
+    "dedupeKey": "ORDER_PLACED:6b0049e44a0e62e138b80b9b:6afc95705dfb520af538adb0",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-028160-338",
+      "totalAmount": 460
+    },
+    "createdAt": "2026-11-20T13:23:51.704Z",
+    "updatedAt": "2026-11-20T13:23:51.704Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0049eebabfbbc9ce03550b",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6afc95705dfb520af538adb0",
+    "userId": "6afc95705dfb520af538adb0",
+    "role": "CUSTOMER",
+    "storeId": "6aa277a8fc02997cbe281ac7",
+    "customerId": "6afc95705dfb520af538adb0",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-038599-541 has been placed successfully.",
+    "body": "Your WormUp order #WORM-038599-541 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6b0049eebabfbbc9ce0354f9",
+    "orderId": "6b0049eebabfbbc9ce0354f9",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-038599-541",
+      "totalAmount": 380
+    },
+    "dedupeKey": "ORDER_PLACED:6b0049eebabfbbc9ce0354f9:6afc95705dfb520af538adb0",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-038599-541",
+      "totalAmount": 380
+    },
+    "createdAt": "2026-11-20T13:23:58.989Z",
+    "updatedAt": "2026-11-20T13:23:58.989Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0049eebabfbbc9ce03550d",
+    "recipientType": "STORE",
+    "recipientId": "6aa277a8fc02997cbe281ac7",
+    "role": "STORE",
+    "storeId": "6aa277a8fc02997cbe281ac7",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-038599-541 • ₹380 • 1 items",
+    "body": "Order #WORM-038599-541 • ₹380 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6b0049eebabfbbc9ce0354f9",
+    "orderId": "6b0049eebabfbbc9ce0354f9",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-038599-541",
+      "totalAmount": 380,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6b0049eebabfbbc9ce0354f9:6aa277a8fc02997cbe281ac7",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-038599-541",
+      "totalAmount": 380,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-20T13:23:58.991Z",
+    "updatedAt": "2026-11-20T13:23:58.991Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b004ac0babfbbc9ce035593",
+    "recipientType": "STORE",
+    "recipientId": "6aa277a8fc02997cbe281ac7",
+    "role": "STORE",
+    "storeId": "6aa277a8fc02997cbe281ac7",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-247946-129 • ₹574 • 1 items",
+    "body": "Order #WORM-247946-129 • ₹574 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6b004abfbabfbbc9ce035580",
+    "orderId": "6b004abfbabfbbc9ce035580",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-247946-129",
+      "totalAmount": 574,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6b004abfbabfbbc9ce035580:6aa277a8fc02997cbe281ac7",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-247946-129",
+      "totalAmount": 574,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-20T13:27:28.391Z",
+    "updatedAt": "2026-11-20T13:27:28.391Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b004ac0babfbbc9ce035595",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6afc95705dfb520af538adb0",
+    "userId": "6afc95705dfb520af538adb0",
+    "role": "CUSTOMER",
+    "storeId": "6aa277a8fc02997cbe281ac7",
+    "customerId": "6afc95705dfb520af538adb0",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-247946-129 has been placed successfully.",
+    "body": "Your WormUp order #WORM-247946-129 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6b004abfbabfbbc9ce035580",
+    "orderId": "6b004abfbabfbbc9ce035580",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-247946-129",
+      "totalAmount": 574
+    },
+    "dedupeKey": "ORDER_PLACED:6b004abfbabfbbc9ce035580:6afc95705dfb520af538adb0",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-247946-129",
+      "totalAmount": 574
+    },
+    "createdAt": "2026-11-20T13:27:28.401Z",
+    "updatedAt": "2026-11-20T13:27:28.401Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b004afbbabfbbc9ce035602",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6afc95705dfb520af538adb0",
+    "userId": "6afc95705dfb520af538adb0",
+    "role": "CUSTOMER",
+    "storeId": "6aa277a8fc02997cbe281ac7",
+    "customerId": "6afc95705dfb520af538adb0",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-307239-213 has been placed successfully.",
+    "body": "Your WormUp order #WORM-307239-213 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6b004afbbabfbbc9ce0355ef",
+    "orderId": "6b004afbbabfbbc9ce0355ef",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-307239-213",
+      "totalAmount": 380
+    },
+    "dedupeKey": "ORDER_PLACED:6b004afbbabfbbc9ce0355ef:6afc95705dfb520af538adb0",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-307239-213",
+      "totalAmount": 380
+    },
+    "createdAt": "2026-11-20T13:28:27.554Z",
+    "updatedAt": "2026-11-20T13:28:27.554Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b004afbbabfbbc9ce035604",
+    "recipientType": "STORE",
+    "recipientId": "6aa277a8fc02997cbe281ac7",
+    "role": "STORE",
+    "storeId": "6aa277a8fc02997cbe281ac7",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-307239-213 • ₹380 • 1 items",
+    "body": "Order #WORM-307239-213 • ₹380 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6b004afbbabfbbc9ce0355ef",
+    "orderId": "6b004afbbabfbbc9ce0355ef",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-307239-213",
+      "totalAmount": 380,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6b004afbbabfbbc9ce0355ef:6aa277a8fc02997cbe281ac7",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-307239-213",
+      "totalAmount": 380,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-20T13:28:27.565Z",
+    "updatedAt": "2026-11-20T13:28:27.565Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b004f02babfbbc9ce035983",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-338273-785 • ₹25 • 1 items",
+    "body": "Order #WORM-338273-785 • ₹25 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6b004f02babfbbc9ce035970",
+    "orderId": "6b004f02babfbbc9ce035970",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-338273-785",
+      "totalAmount": 25,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6b004f02babfbbc9ce035970:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-338273-785",
+      "totalAmount": 25,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-20T13:45:38.804Z",
+    "updatedAt": "2026-11-20T13:45:38.804Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b004f02babfbbc9ce035985",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6b004cb4babfbbc9ce0356c5",
+    "userId": "6b004cb4babfbbc9ce0356c5",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6b004cb4babfbbc9ce0356c5",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-338273-785 has been placed successfully.",
+    "body": "Your WormUp order #WORM-338273-785 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6b004f02babfbbc9ce035970",
+    "orderId": "6b004f02babfbbc9ce035970",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-338273-785",
+      "totalAmount": 25
+    },
+    "dedupeKey": "ORDER_PLACED:6b004f02babfbbc9ce035970:6b004cb4babfbbc9ce0356c5",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-338273-785",
+      "totalAmount": 25
+    },
+    "createdAt": "2026-11-20T13:45:38.816Z",
+    "updatedAt": "2026-11-20T13:45:38.816Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b004f1bbabfbbc9ce0359e5",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6b004cb4babfbbc9ce0356c5",
+    "userId": "6b004cb4babfbbc9ce0356c5",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6b004cb4babfbbc9ce0356c5",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-362809-791 has been placed successfully.",
+    "body": "Your WormUp order #WORM-362809-791 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6b004f1ababfbbc9ce0359d2",
+    "orderId": "6b004f1ababfbbc9ce0359d2",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-362809-791",
+      "totalAmount": 18
+    },
+    "dedupeKey": "ORDER_PLACED:6b004f1ababfbbc9ce0359d2:6b004cb4babfbbc9ce0356c5",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-362809-791",
+      "totalAmount": 18
+    },
+    "createdAt": "2026-11-20T13:46:03.302Z",
+    "updatedAt": "2026-11-20T13:46:03.302Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b004f1bbabfbbc9ce0359e7",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-362809-791 • ₹18 • 1 items",
+    "body": "Order #WORM-362809-791 • ₹18 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6b004f1ababfbbc9ce0359d2",
+    "orderId": "6b004f1ababfbbc9ce0359d2",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-362809-791",
+      "totalAmount": 18,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6b004f1ababfbbc9ce0359d2:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-362809-791",
+      "totalAmount": 18,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-20T13:46:03.305Z",
+    "updatedAt": "2026-11-20T13:46:03.305Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0052bcbabfbbc9ce035c25",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-292360-770 • ₹21 • 1 items",
+    "body": "Order #WORM-292360-770 • ₹21 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6b0052bcbabfbbc9ce035c12",
+    "orderId": "6b0052bcbabfbbc9ce035c12",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-292360-770",
+      "totalAmount": 21,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6b0052bcbabfbbc9ce035c12:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-292360-770",
+      "totalAmount": 21,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-20T14:01:32.798Z",
+    "updatedAt": "2026-11-20T14:01:32.798Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0052bcbabfbbc9ce035c28",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6b004cb4babfbbc9ce0356c5",
+    "userId": "6b004cb4babfbbc9ce0356c5",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6b004cb4babfbbc9ce0356c5",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-292360-770 has been placed successfully.",
+    "body": "Your WormUp order #WORM-292360-770 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6b0052bcbabfbbc9ce035c12",
+    "orderId": "6b0052bcbabfbbc9ce035c12",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-292360-770",
+      "totalAmount": 21
+    },
+    "dedupeKey": "ORDER_PLACED:6b0052bcbabfbbc9ce035c12:6b004cb4babfbbc9ce0356c5",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-292360-770",
+      "totalAmount": 21
+    },
+    "createdAt": "2026-11-20T14:01:32.809Z",
+    "updatedAt": "2026-11-20T14:01:32.809Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b005511c6a0c2d3ad76b2df",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6afd56f56396024e04b957e5",
+    "userId": "6afd56f56396024e04b957e5",
+    "role": "CUSTOMER",
+    "customerId": "6afd56f56396024e04b957e5",
+    "title": "✓ KYC Approved",
+    "message": "Your KYC verification has been approved! Income features are now unlocked.",
+    "body": "Your KYC verification has been approved! Income features are now unlocked.",
+    "type": "CUSTOMER_KYC_APPROVED",
+    "entityType": "USER",
+    "entityId": "6afd56f56396024e04b957e5",
+    "isRead": false,
+    "actionType": "KYC_STATUS",
+    "actionPayload": "KYC_STATUS",
+    "metadata": {
+      "customerKycStatus": 2
+    },
+    "dedupeKey": "CUSTOMER_KYC_APPROVED:6afd56f56396024e04b957e5",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "customerKycStatus": 2
+    },
+    "createdAt": "2026-11-20T14:11:29.024Z",
+    "updatedAt": "2026-11-20T14:11:29.024Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b005516c6a0c2d3ad76b2f7",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6afd590b6396024e04b958df",
+    "userId": "6afd590b6396024e04b958df",
+    "role": "CUSTOMER",
+    "customerId": "6afd590b6396024e04b958df",
+    "title": "✓ KYC Approved",
+    "message": "Your KYC verification has been approved! Income features are now unlocked.",
+    "body": "Your KYC verification has been approved! Income features are now unlocked.",
+    "type": "CUSTOMER_KYC_APPROVED",
+    "entityType": "USER",
+    "entityId": "6afd590b6396024e04b958df",
+    "isRead": false,
+    "actionType": "KYC_STATUS",
+    "actionPayload": "KYC_STATUS",
+    "metadata": {
+      "customerKycStatus": 2
+    },
+    "dedupeKey": "CUSTOMER_KYC_APPROVED:6afd590b6396024e04b958df",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "customerKycStatus": 2
+    },
+    "createdAt": "2026-11-20T14:11:34.308Z",
+    "updatedAt": "2026-11-20T14:11:34.308Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b00551bc6a0c2d3ad76b30f",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6afd59a66396024e04b95975",
+    "userId": "6afd59a66396024e04b95975",
+    "role": "CUSTOMER",
+    "customerId": "6afd59a66396024e04b95975",
+    "title": "✓ KYC Approved",
+    "message": "Your KYC verification has been approved! Income features are now unlocked.",
+    "body": "Your KYC verification has been approved! Income features are now unlocked.",
+    "type": "CUSTOMER_KYC_APPROVED",
+    "entityType": "USER",
+    "entityId": "6afd59a66396024e04b95975",
+    "isRead": false,
+    "actionType": "KYC_STATUS",
+    "actionPayload": "KYC_STATUS",
+    "metadata": {
+      "customerKycStatus": 2
+    },
+    "dedupeKey": "CUSTOMER_KYC_APPROVED:6afd59a66396024e04b95975",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "customerKycStatus": 2
+    },
+    "createdAt": "2026-11-20T14:11:39.260Z",
+    "updatedAt": "2026-11-20T14:11:39.260Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0057361b70282aedd37765",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6b004cb4babfbbc9ce0356c5",
+    "userId": "6b004cb4babfbbc9ce0356c5",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6b004cb4babfbbc9ce0356c5",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-438431-315 has been placed successfully.",
+    "body": "Your WormUp order #WORM-438431-315 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6b0057361b70282aedd37752",
+    "orderId": "6b0057361b70282aedd37752",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-438431-315",
+      "totalAmount": 72
+    },
+    "dedupeKey": "ORDER_PLACED:6b0057361b70282aedd37752:6b004cb4babfbbc9ce0356c5",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-438431-315",
+      "totalAmount": 72
+    },
+    "createdAt": "2026-11-20T14:20:38.926Z",
+    "updatedAt": "2026-11-20T14:20:38.926Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0057361b70282aedd37768",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-438431-315 • ₹72 • 1 items",
+    "body": "Order #WORM-438431-315 • ₹72 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6b0057361b70282aedd37752",
+    "orderId": "6b0057361b70282aedd37752",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-438431-315",
+      "totalAmount": 72,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6b0057361b70282aedd37752:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-438431-315",
+      "totalAmount": 72,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-20T14:20:38.930Z",
+    "updatedAt": "2026-11-20T14:20:38.930Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b00605d1b70282aedd37f45",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-781208-567 • ₹18 • 1 items",
+    "body": "Order #WORM-781208-567 • ₹18 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6b00605d1b70282aedd37f31",
+    "orderId": "6b00605d1b70282aedd37f31",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-781208-567",
+      "totalAmount": 18,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6b00605d1b70282aedd37f31:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-781208-567",
+      "totalAmount": 18,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-20T14:59:41.702Z",
+    "updatedAt": "2026-11-20T14:59:41.702Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b00605d1b70282aedd37f47",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6b004cb4babfbbc9ce0356c5",
+    "userId": "6b004cb4babfbbc9ce0356c5",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6b004cb4babfbbc9ce0356c5",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-781208-567 has been placed successfully.",
+    "body": "Your WormUp order #WORM-781208-567 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6b00605d1b70282aedd37f31",
+    "orderId": "6b00605d1b70282aedd37f31",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-781208-567",
+      "totalAmount": 18
+    },
+    "dedupeKey": "ORDER_PLACED:6b00605d1b70282aedd37f31:6b004cb4babfbbc9ce0356c5",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-781208-567",
+      "totalAmount": 18
+    },
+    "createdAt": "2026-11-20T14:59:41.704Z",
+    "updatedAt": "2026-11-20T14:59:41.704Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0061031b70282aedd381ae",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6b004cb4babfbbc9ce0356c5",
+    "userId": "6b004cb4babfbbc9ce0356c5",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6b004cb4babfbbc9ce0356c5",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-947043-249 has been placed successfully.",
+    "body": "Your WormUp order #WORM-947043-249 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6b0061031b70282aedd3819b",
+    "orderId": "6b0061031b70282aedd3819b",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-947043-249",
+      "totalAmount": 916
+    },
+    "dedupeKey": "ORDER_PLACED:6b0061031b70282aedd3819b:6b004cb4babfbbc9ce0356c5",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-947043-249",
+      "totalAmount": 916
+    },
+    "createdAt": "2026-11-20T15:02:27.544Z",
+    "updatedAt": "2026-11-20T15:02:27.544Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0061031b70282aedd381b1",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-947043-249 • ₹916 • 1 items",
+    "body": "Order #WORM-947043-249 • ₹916 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6b0061031b70282aedd3819b",
+    "orderId": "6b0061031b70282aedd3819b",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-947043-249",
+      "totalAmount": 916,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6b0061031b70282aedd3819b:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-947043-249",
+      "totalAmount": 916,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-20T15:02:27.548Z",
+    "updatedAt": "2026-11-20T15:02:27.548Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0061e41b70282aedd38447",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-171870-121 • ₹18 • 1 items",
+    "body": "Order #WORM-171870-121 • ₹18 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6b0061e31b70282aedd38434",
+    "orderId": "6b0061e31b70282aedd38434",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-171870-121",
+      "totalAmount": 18,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6b0061e31b70282aedd38434:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-171870-121",
+      "totalAmount": 18,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-20T15:06:12.349Z",
+    "updatedAt": "2026-11-20T15:06:12.349Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0061e41b70282aedd38449",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6b004cb4babfbbc9ce0356c5",
+    "userId": "6b004cb4babfbbc9ce0356c5",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6b004cb4babfbbc9ce0356c5",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-171870-121 has been placed successfully.",
+    "body": "Your WormUp order #WORM-171870-121 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6b0061e31b70282aedd38434",
+    "orderId": "6b0061e31b70282aedd38434",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-171870-121",
+      "totalAmount": 18
+    },
+    "dedupeKey": "ORDER_PLACED:6b0061e31b70282aedd38434:6b004cb4babfbbc9ce0356c5",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-171870-121",
+      "totalAmount": 18
+    },
+    "createdAt": "2026-11-20T15:06:12.351Z",
+    "updatedAt": "2026-11-20T15:06:12.351Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0066f35dde0f9a427940e3",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6afc95705dfb520af538adb0",
+    "userId": "6afc95705dfb520af538adb0",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6afc95705dfb520af538adb0",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-464405-504 has been placed successfully.",
+    "body": "Your WormUp order #WORM-464405-504 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6b0066f05dde0f9a427940c4",
+    "orderId": "6b0066f05dde0f9a427940c4",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-464405-504",
+      "totalAmount": 28
+    },
+    "dedupeKey": "ORDER_PLACED:6b0066f05dde0f9a427940c4:6afc95705dfb520af538adb0",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-464405-504",
+      "totalAmount": 28
+    },
+    "createdAt": "2026-11-20T15:27:47.538Z",
+    "updatedAt": "2026-11-20T15:27:47.538Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0066f35dde0f9a427940e5",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-464405-504 • ₹28 • 1 items",
+    "body": "Order #WORM-464405-504 • ₹28 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6b0066f05dde0f9a427940c4",
+    "orderId": "6b0066f05dde0f9a427940c4",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-464405-504",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6b0066f05dde0f9a427940c4:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-464405-504",
+      "totalAmount": 28,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-20T15:27:47.540Z",
+    "updatedAt": "2026-11-20T15:27:47.540Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0069dc5dde0f9a42794453",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-209010-189 • ₹368 • 1 items",
+    "body": "Order #WORM-209010-189 • ₹368 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6b0069d95dde0f9a4279443d",
+    "orderId": "6b0069d95dde0f9a4279443d",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-209010-189",
+      "totalAmount": 368,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6b0069d95dde0f9a4279443d:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-209010-189",
+      "totalAmount": 368,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-20T15:40:12.330Z",
+    "updatedAt": "2026-11-20T15:40:12.330Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0069dc5dde0f9a42794457",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6b004cb4babfbbc9ce0356c5",
+    "userId": "6b004cb4babfbbc9ce0356c5",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6b004cb4babfbbc9ce0356c5",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-209010-189 has been placed successfully.",
+    "body": "Your WormUp order #WORM-209010-189 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6b0069d95dde0f9a4279443d",
+    "orderId": "6b0069d95dde0f9a4279443d",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-209010-189",
+      "totalAmount": 368
+    },
+    "dedupeKey": "ORDER_PLACED:6b0069d95dde0f9a4279443d:6b004cb4babfbbc9ce0356c5",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-209010-189",
+      "totalAmount": 368
+    },
+    "createdAt": "2026-11-20T15:40:12.358Z",
+    "updatedAt": "2026-11-20T15:40:12.358Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0172837e152d2766b27475",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6aeee5a032a0ed6c254070c1",
+    "userId": "6aeee5a032a0ed6c254070c1",
+    "role": "CUSTOMER",
+    "storeId": "6aa277a7fc02997cbe281ac3",
+    "customerId": "6aeee5a032a0ed6c254070c1",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-957424-550 has been placed successfully.",
+    "body": "Your WormUp order #WORM-957424-550 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6b01727d7e152d2766b2744a",
+    "orderId": "6b01727d7e152d2766b2744a",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-957424-550",
+      "totalAmount": 411
+    },
+    "dedupeKey": "ORDER_PLACED:6b01727d7e152d2766b2744a:6aeee5a032a0ed6c254070c1",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-957424-550",
+      "totalAmount": 411
+    },
+    "createdAt": "2026-11-21T10:29:23.748Z",
+    "updatedAt": "2026-11-21T10:29:23.748Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0172837e152d2766b27477",
+    "recipientType": "STORE",
+    "recipientId": "6aa277a7fc02997cbe281ac3",
+    "role": "STORE",
+    "storeId": "6aa277a7fc02997cbe281ac3",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-957424-550 • ₹411 • 3 items",
+    "body": "Order #WORM-957424-550 • ₹411 • 3 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6b01727d7e152d2766b2744a",
+    "orderId": "6b01727d7e152d2766b2744a",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-957424-550",
+      "totalAmount": 411,
+      "itemCount": 3
+    },
+    "dedupeKey": "NEW_ORDER:6b01727d7e152d2766b2744a:6aa277a7fc02997cbe281ac3",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-957424-550",
+      "totalAmount": 411,
+      "itemCount": 3
+    },
+    "createdAt": "2026-11-21T10:29:23.750Z",
+    "updatedAt": "2026-11-21T10:29:23.750Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b03d8559094c001dadee781",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6aeee18032a0ed6c25406e5c",
+    "userId": "6aeee18032a0ed6c25406e5c",
+    "role": "CUSTOMER",
+    "storeId": "6aa277a7fc02997cbe281ac3",
+    "customerId": "6aeee18032a0ed6c25406e5c",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-096121-227 has been placed successfully.",
+    "body": "Your WormUp order #WORM-096121-227 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6b03d8509094c001dadee758",
+    "orderId": "6b03d8509094c001dadee758",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-096121-227",
+      "totalAmount": 77
+    },
+    "dedupeKey": "ORDER_PLACED:6b03d8509094c001dadee758:6aeee18032a0ed6c25406e5c",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-096121-227",
+      "totalAmount": 77
+    },
+    "createdAt": "2026-11-23T06:08:21.258Z",
+    "updatedAt": "2026-11-23T06:08:21.258Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b03d8559094c001dadee783",
+    "recipientType": "STORE",
+    "recipientId": "6aa277a7fc02997cbe281ac3",
+    "role": "STORE",
+    "storeId": "6aa277a7fc02997cbe281ac3",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-096121-227 • ₹77 • 3 items",
+    "body": "Order #WORM-096121-227 • ₹77 • 3 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6b03d8509094c001dadee758",
+    "orderId": "6b03d8509094c001dadee758",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-096121-227",
+      "totalAmount": 77,
+      "itemCount": 3
+    },
+    "dedupeKey": "NEW_ORDER:6b03d8509094c001dadee758:6aa277a7fc02997cbe281ac3",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-096121-227",
+      "totalAmount": 77,
+      "itemCount": 3
+    },
+    "createdAt": "2026-11-23T06:08:21.272Z",
+    "updatedAt": "2026-11-23T06:08:21.272Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b03da499094c001dadee968",
+    "recipientType": "STORE",
+    "recipientId": "6aa277a7fc02997cbe281ac3",
+    "role": "STORE",
+    "storeId": "6aa277a7fc02997cbe281ac3",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-597535-346 • ₹308 • 2 items",
+    "body": "Order #WORM-597535-346 • ₹308 • 2 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6b03da459094c001dadee949",
+    "orderId": "6b03da459094c001dadee949",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-597535-346",
+      "totalAmount": 308,
+      "itemCount": 2
+    },
+    "dedupeKey": "NEW_ORDER:6b03da459094c001dadee949:6aa277a7fc02997cbe281ac3",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-597535-346",
+      "totalAmount": 308,
+      "itemCount": 2
+    },
+    "createdAt": "2026-11-23T06:16:41.957Z",
+    "updatedAt": "2026-11-23T06:16:41.957Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b03da499094c001dadee96a",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6b015d685dde0f9a42794966",
+    "userId": "6b015d685dde0f9a42794966",
+    "role": "CUSTOMER",
+    "storeId": "6aa277a7fc02997cbe281ac3",
+    "customerId": "6b015d685dde0f9a42794966",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-597535-346 has been placed successfully.",
+    "body": "Your WormUp order #WORM-597535-346 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6b03da459094c001dadee949",
+    "orderId": "6b03da459094c001dadee949",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-597535-346",
+      "totalAmount": 308
+    },
+    "dedupeKey": "ORDER_PLACED:6b03da459094c001dadee949:6b015d685dde0f9a42794966",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-597535-346",
+      "totalAmount": 308
+    },
+    "createdAt": "2026-11-23T06:16:41.977Z",
+    "updatedAt": "2026-11-23T06:16:41.977Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b03e0019094c001dadeeb4c",
+    "recipientType": "STORE",
+    "recipientId": "6aa277a7fc02997cbe281ac3",
+    "role": "STORE",
+    "storeId": "6aa277a7fc02997cbe281ac3",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-059817-680 • ₹658 • 3 items",
+    "body": "Order #WORM-059817-680 • ₹658 • 3 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6b03dffb9094c001dadeeb29",
+    "orderId": "6b03dffb9094c001dadeeb29",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-059817-680",
+      "totalAmount": 658,
+      "itemCount": 3
+    },
+    "dedupeKey": "NEW_ORDER:6b03dffb9094c001dadeeb29:6aa277a7fc02997cbe281ac3",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-059817-680",
+      "totalAmount": 658,
+      "itemCount": 3
+    },
+    "createdAt": "2026-11-23T06:41:05.971Z",
+    "updatedAt": "2026-11-23T06:41:05.971Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b03e0019094c001dadeeb4f",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6aeee18032a0ed6c25406e5c",
+    "userId": "6aeee18032a0ed6c25406e5c",
+    "role": "CUSTOMER",
+    "storeId": "6aa277a7fc02997cbe281ac3",
+    "customerId": "6aeee18032a0ed6c25406e5c",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-059817-680 has been placed successfully.",
+    "body": "Your WormUp order #WORM-059817-680 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6b03dffb9094c001dadeeb29",
+    "orderId": "6b03dffb9094c001dadeeb29",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-059817-680",
+      "totalAmount": 658
+    },
+    "dedupeKey": "ORDER_PLACED:6b03dffb9094c001dadeeb29:6aeee18032a0ed6c25406e5c",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-059817-680",
+      "totalAmount": 658
+    },
+    "createdAt": "2026-11-23T06:41:05.974Z",
+    "updatedAt": "2026-11-23T06:41:05.974Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b03e32c9094c001dadeec88",
+    "recipientType": "STORE",
+    "recipientId": "6aa277a7fc02997cbe281ac3",
+    "role": "STORE",
+    "storeId": "6aa277a7fc02997cbe281ac3",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-872276-415 • ₹162 • 2 items",
+    "body": "Order #WORM-872276-415 • ₹162 • 2 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6b03e3289094c001dadeec68",
+    "orderId": "6b03e3289094c001dadeec68",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-872276-415",
+      "totalAmount": 162,
+      "itemCount": 2
+    },
+    "dedupeKey": "NEW_ORDER:6b03e3289094c001dadeec68:6aa277a7fc02997cbe281ac3",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-872276-415",
+      "totalAmount": 162,
+      "itemCount": 2
+    },
+    "createdAt": "2026-11-23T06:54:36.965Z",
+    "updatedAt": "2026-11-23T06:54:36.965Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b03e32c9094c001dadeec8b",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6aeee18032a0ed6c25406e5c",
+    "userId": "6aeee18032a0ed6c25406e5c",
+    "role": "CUSTOMER",
+    "storeId": "6aa277a7fc02997cbe281ac3",
+    "customerId": "6aeee18032a0ed6c25406e5c",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-872276-415 has been placed successfully.",
+    "body": "Your WormUp order #WORM-872276-415 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6b03e3289094c001dadeec68",
+    "orderId": "6b03e3289094c001dadeec68",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-872276-415",
+      "totalAmount": 162
+    },
+    "dedupeKey": "ORDER_PLACED:6b03e3289094c001dadeec68:6aeee18032a0ed6c25406e5c",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-872276-415",
+      "totalAmount": 162
+    },
+    "createdAt": "2026-11-23T06:54:36.996Z",
+    "updatedAt": "2026-11-23T06:54:36.996Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b03f49a1d88e378abb9da76",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6b01623c5dde0f9a42794deb",
+    "userId": "6b01623c5dde0f9a42794deb",
+    "role": "CUSTOMER",
+    "storeId": "6aeda3ada64cec48b93b13f6",
+    "customerId": "6b01623c5dde0f9a42794deb",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-334648-344 has been placed successfully.",
+    "body": "Your WormUp order #WORM-334648-344 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6b03f4961d88e378abb9da57",
+    "orderId": "6b03f4961d88e378abb9da57",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-334648-344",
+      "totalAmount": 2600
+    },
+    "dedupeKey": "ORDER_PLACED:6b03f4961d88e378abb9da57:6b01623c5dde0f9a42794deb",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-334648-344",
+      "totalAmount": 2600
+    },
+    "createdAt": "2026-11-23T08:08:58.283Z",
+    "updatedAt": "2026-11-23T08:08:58.283Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b03f49a1d88e378abb9da78",
+    "recipientType": "STORE",
+    "recipientId": "6aeda3ada64cec48b93b13f6",
+    "role": "STORE",
+    "storeId": "6aeda3ada64cec48b93b13f6",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-334648-344 • ₹2600 • 2 items",
+    "body": "Order #WORM-334648-344 • ₹2600 • 2 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6b03f4961d88e378abb9da57",
+    "orderId": "6b03f4961d88e378abb9da57",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-334648-344",
+      "totalAmount": 2600,
+      "itemCount": 2
+    },
+    "dedupeKey": "NEW_ORDER:6b03f4961d88e378abb9da57:6aeda3ada64cec48b93b13f6",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-334648-344",
+      "totalAmount": 2600,
+      "itemCount": 2
+    },
+    "createdAt": "2026-11-23T08:08:58.285Z",
+    "updatedAt": "2026-11-23T08:08:58.285Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b03f49a1d88e378abb9da7a",
+    "recipientType": "ADMIN",
+    "recipientId": "admin",
+    "role": "ADMIN",
+    "storeId": "6aeda3ada64cec48b93b13f6",
+    "title": "High-value order received",
+    "message": "High-value order #WORM-334648-344 received for ₹2600.",
+    "body": "High-value order #WORM-334648-344 received for ₹2600.",
+    "type": "LARGE_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6b03f4961d88e378abb9da57",
+    "orderId": "6b03f4961d88e378abb9da57",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-334648-344",
+      "totalAmount": 2600
+    },
+    "dedupeKey": "LARGE_ORDER:6b03f4961d88e378abb9da57",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-334648-344",
+      "totalAmount": 2600
+    },
+    "createdAt": "2026-11-23T08:08:58.293Z",
+    "updatedAt": "2026-11-23T08:08:58.293Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0426c39a8e1fcbd0f6ce00",
+    "recipientType": "CUSTOMER",
+    "recipientId": "6afc95705dfb520af538adb0",
+    "userId": "6afc95705dfb520af538adb0",
+    "role": "CUSTOMER",
+    "storeId": "6aac257b8f337240651ef43b",
+    "customerId": "6afc95705dfb520af538adb0",
+    "title": "🛒 Order placed successfully",
+    "message": "Your WormUp order #WORM-176632-379 has been placed successfully.",
+    "body": "Your WormUp order #WORM-176632-379 has been placed successfully.",
+    "type": "ORDER_PLACED",
+    "entityType": "ORDER",
+    "entityId": "6b0426c09a8e1fcbd0f6cde8",
+    "orderId": "6b0426c09a8e1fcbd0f6cde8",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-176632-379",
+      "totalAmount": 448
+    },
+    "dedupeKey": "ORDER_PLACED:6b0426c09a8e1fcbd0f6cde8:6afc95705dfb520af538adb0",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-176632-379",
+      "totalAmount": 448
+    },
+    "createdAt": "2026-11-23T11:42:59.767Z",
+    "updatedAt": "2026-11-23T11:42:59.767Z",
+    "__v": 0
+  },
+  {
+    "_id": "6b0426c39a8e1fcbd0f6ce02",
+    "recipientType": "STORE",
+    "recipientId": "6aac257b8f337240651ef43b",
+    "role": "STORE",
+    "storeId": "6aac257b8f337240651ef43b",
+    "title": "🛒 New order received",
+    "message": "Order #WORM-176632-379 • ₹448 • 1 items",
+    "body": "Order #WORM-176632-379 • ₹448 • 1 items",
+    "type": "NEW_ORDER",
+    "entityType": "ORDER",
+    "entityId": "6b0426c09a8e1fcbd0f6cde8",
+    "orderId": "6b0426c09a8e1fcbd0f6cde8",
+    "isRead": false,
+    "actionType": "ORDER_DETAILS",
+    "actionPayload": "ORDER_DETAILS",
+    "metadata": {
+      "orderNumber": "WORM-176632-379",
+      "totalAmount": 448,
+      "itemCount": 1
+    },
+    "dedupeKey": "NEW_ORDER:6b0426c09a8e1fcbd0f6cde8:6aac257b8f337240651ef43b",
+    "deepLink": "",
+    "channels": [
+      "websocket",
+      "push",
+      "db"
+    ],
+    "data": {
+      "orderNumber": "WORM-176632-379",
+      "totalAmount": 448,
+      "itemCount": 1
+    },
+    "createdAt": "2026-11-23T11:42:59.769Z",
+    "updatedAt": "2026-11-23T11:42:59.769Z",
+    "__v": 0
+  }
+]

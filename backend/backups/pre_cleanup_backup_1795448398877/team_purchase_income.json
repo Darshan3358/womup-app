@@ -1,0 +1,1136 @@
+[
+  {
+    "_id": "6ae6627ce818850a75d80613",
+    "userId": "6aced63befa48112216b4587",
+    "month": "2026-10",
+    "__v": 0,
+    "availableFrom": "2026-11-01T00:00:00.000Z",
+    "calculatedAt": "2026-10-31T21:49:48.294Z",
+    "createdAt": "2026-10-31T21:49:48.295Z",
+    "direct5ActiveCount": 1,
+    "isEligible": false,
+    "levelBreakdown": [
+      {
+        "level": 1,
+        "memberCount": 1,
+        "activeMemberCount": 1,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": [
+          {
+            "id": "6adfa92ecf1461616763aa7a",
+            "name": "Darshan Thanki",
+            "phone": "798****855",
+            "memberCode": "WOM7701",
+            "isActive": true,
+            "isIncomeEligible": true,
+            "registrationPincode": "382501",
+            "monthlyPurchaseValue": 2500,
+            "vegetableGMV": 0,
+            "otherGMV": 0,
+            "incomeEarned": 0
+          }
+        ]
+      },
+      {
+        "level": 2,
+        "memberCount": 2,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": [
+          {
+            "id": "6adfb37348316a078aeff2b2",
+            "name": "Mukesh Thanki",
+            "phone": "982****030",
+            "memberCode": "WOM1010",
+            "isActive": false,
+            "isIncomeEligible": true,
+            "monthlyPurchaseValue": 0,
+            "vegetableGMV": 0,
+            "otherGMV": 0,
+            "incomeEarned": 0
+          },
+          {
+            "id": "6ae5b477a64cec48b93ac835",
+            "name": "Dhyana  Modha",
+            "phone": "987****013",
+            "memberCode": "WOM97142",
+            "isActive": false,
+            "isIncomeEligible": true,
+            "registrationPincode": "382470",
+            "monthlyPurchaseValue": 0,
+            "vegetableGMV": 0,
+            "otherGMV": 0,
+            "incomeEarned": 0
+          }
+        ]
+      },
+      {
+        "level": 3,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 4,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 5,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 6,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 7,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      }
+    ],
+    "otherIncome": 0,
+    "otherPurchaseValue": 0,
+    "personalPurchaseValue": 0,
+    "status": "LAPSED",
+    "teamSize": 3,
+    "totalIncome": 0,
+    "updatedAt": "2026-10-31T21:49:48.295Z",
+    "vegetableIncome": 0,
+    "vegetablePurchaseValue": 0
+  },
+  {
+    "_id": "6ae6627ee818850a75d80614",
+    "userId": "6adf9665b1c611656a1bc266",
+    "month": "2026-10",
+    "__v": 0,
+    "availableFrom": "2026-11-01T00:00:00.000Z",
+    "calculatedAt": "2026-10-31T21:49:50.314Z",
+    "createdAt": "2026-10-31T21:49:50.314Z",
+    "direct5ActiveCount": 1,
+    "isEligible": false,
+    "levelBreakdown": [
+      {
+        "level": 1,
+        "memberCount": 1,
+        "activeMemberCount": 1,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": [
+          {
+            "id": "6adfa92ecf1461616763aa7a",
+            "name": "Darshan Thanki",
+            "phone": "798****855",
+            "memberCode": "WOM7701",
+            "isActive": true,
+            "isIncomeEligible": true,
+            "registrationPincode": "382501",
+            "monthlyPurchaseValue": 2500,
+            "vegetableGMV": 0,
+            "otherGMV": 0,
+            "incomeEarned": 0
+          }
+        ]
+      },
+      {
+        "level": 2,
+        "memberCount": 2,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": [
+          {
+            "id": "6adfb37348316a078aeff2b2",
+            "name": "Mukesh Thanki",
+            "phone": "982****030",
+            "memberCode": "WOM1010",
+            "isActive": false,
+            "isIncomeEligible": true,
+            "monthlyPurchaseValue": 0,
+            "vegetableGMV": 0,
+            "otherGMV": 0,
+            "incomeEarned": 0
+          },
+          {
+            "id": "6ae5b477a64cec48b93ac835",
+            "name": "Dhyana  Modha",
+            "phone": "987****013",
+            "memberCode": "WOM97142",
+            "isActive": false,
+            "isIncomeEligible": true,
+            "registrationPincode": "382470",
+            "monthlyPurchaseValue": 0,
+            "vegetableGMV": 0,
+            "otherGMV": 0,
+            "incomeEarned": 0
+          }
+        ]
+      },
+      {
+        "level": 3,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 4,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 5,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 6,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 7,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      }
+    ],
+    "otherIncome": 0,
+    "otherPurchaseValue": 0,
+    "personalPurchaseValue": 0,
+    "status": "LAPSED",
+    "teamSize": 3,
+    "totalIncome": 0,
+    "updatedAt": "2026-10-31T21:49:50.314Z",
+    "vegetableIncome": 0,
+    "vegetablePurchaseValue": 0
+  },
+  {
+    "_id": "6ae66280e818850a75d80615",
+    "month": "2026-10",
+    "userId": "6adfa92ecf1461616763aa7a",
+    "__v": 0,
+    "availableFrom": "2026-11-01T00:00:00.000Z",
+    "calculatedAt": "2026-10-31T21:49:51.934Z",
+    "createdAt": "2026-10-31T21:49:51.935Z",
+    "direct5ActiveCount": 0,
+    "isEligible": false,
+    "levelBreakdown": [
+      {
+        "level": 1,
+        "memberCount": 2,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": [
+          {
+            "id": "6adfb37348316a078aeff2b2",
+            "name": "Mukesh Thanki",
+            "phone": "982****030",
+            "memberCode": "WOM1010",
+            "isActive": false,
+            "isIncomeEligible": true,
+            "monthlyPurchaseValue": 0,
+            "vegetableGMV": 0,
+            "otherGMV": 0,
+            "incomeEarned": 0
+          },
+          {
+            "id": "6ae5b477a64cec48b93ac835",
+            "name": "Dhyana  Modha",
+            "phone": "987****013",
+            "memberCode": "WOM97142",
+            "isActive": false,
+            "isIncomeEligible": true,
+            "registrationPincode": "382470",
+            "monthlyPurchaseValue": 0,
+            "vegetableGMV": 0,
+            "otherGMV": 0,
+            "incomeEarned": 0
+          }
+        ]
+      },
+      {
+        "level": 2,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 3,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 4,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 5,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 6,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 7,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      }
+    ],
+    "otherIncome": 0,
+    "otherPurchaseValue": 0,
+    "personalPurchaseValue": 2500,
+    "status": "LAPSED",
+    "teamSize": 2,
+    "totalIncome": 0,
+    "updatedAt": "2026-10-31T21:49:51.935Z",
+    "vegetableIncome": 0,
+    "vegetablePurchaseValue": 0
+  },
+  {
+    "_id": "6afc60a4b3587c2ddc60798c",
+    "userId": "6adf9665b1c611656a1bc266",
+    "month": "2026-11",
+    "__v": 0,
+    "availableFrom": "2026-11-18T00:00:00.000Z",
+    "calculatedAt": "2026-11-17T14:11:48.780Z",
+    "createdAt": "2026-11-17T14:11:48.780Z",
+    "direct5ActiveCount": 0,
+    "isEligible": false,
+    "levelBreakdown": [
+      {
+        "level": 1,
+        "memberCount": 2,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": [
+          {
+            "id": "6afc501e88ae17b096618c43",
+            "name": "Test Customer",
+            "phone": "987****210",
+            "memberCode": "WOMTEST01",
+            "isActive": false,
+            "isIncomeEligible": true,
+            "monthlyPurchaseValue": 0,
+            "vegetableGMV": 0,
+            "otherGMV": 0,
+            "incomeEarned": 0
+          },
+          {
+            "id": "6afc59229189c0b0663cca7f",
+            "name": "User Level 1",
+            "phone": "987****001",
+            "memberCode": "WOMLEVEL1",
+            "isActive": false,
+            "isIncomeEligible": true,
+            "registrationPincode": "382481",
+            "monthlyPurchaseValue": 0,
+            "vegetableGMV": 0,
+            "otherGMV": 0,
+            "incomeEarned": 0
+          }
+        ]
+      },
+      {
+        "level": 2,
+        "memberCount": 1,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": [
+          {
+            "id": "6afc59239189c0b0663cca80",
+            "name": "Test User Level 2",
+            "phone": "987****002",
+            "memberCode": "WOMLEVEL2",
+            "isActive": false,
+            "isIncomeEligible": true,
+            "monthlyPurchaseValue": 0,
+            "vegetableGMV": 0,
+            "otherGMV": 0,
+            "incomeEarned": 0
+          }
+        ]
+      },
+      {
+        "level": 3,
+        "memberCount": 1,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": [
+          {
+            "id": "6afc59249189c0b0663cca81",
+            "name": "Test User Level 3",
+            "phone": "987****003",
+            "memberCode": "WOMLEVEL3",
+            "isActive": false,
+            "isIncomeEligible": true,
+            "monthlyPurchaseValue": 0,
+            "vegetableGMV": 0,
+            "otherGMV": 0,
+            "incomeEarned": 0
+          }
+        ]
+      },
+      {
+        "level": 4,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 5,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 6,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 7,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      }
+    ],
+    "otherIncome": 0,
+    "otherPurchaseValue": 0,
+    "personalPurchaseValue": 0,
+    "status": "LAPSED",
+    "teamSize": 4,
+    "totalIncome": 0,
+    "updatedAt": "2026-11-17T14:11:48.780Z",
+    "vegetableIncome": 0,
+    "vegetablePurchaseValue": 0
+  },
+  {
+    "_id": "6afc60a6b3587c2ddc60798d",
+    "userId": "6aeee18032a0ed6c25406e5c",
+    "month": "2026-11",
+    "__v": 0,
+    "availableFrom": "2026-11-18T00:00:00.000Z",
+    "calculatedAt": "2026-11-17T14:11:50.433Z",
+    "createdAt": "2026-11-17T14:11:50.434Z",
+    "direct5ActiveCount": 0,
+    "isEligible": false,
+    "levelBreakdown": [
+      {
+        "level": 1,
+        "memberCount": 1,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": [
+          {
+            "id": "6aeee5a032a0ed6c254070c1",
+            "name": "Vikash Shah",
+            "phone": "942****996",
+            "memberCode": "WOM85259",
+            "isActive": false,
+            "isIncomeEligible": true,
+            "registrationPincode": "382210",
+            "monthlyPurchaseValue": 0,
+            "vegetableGMV": 0,
+            "otherGMV": 0,
+            "incomeEarned": 0
+          }
+        ]
+      },
+      {
+        "level": 2,
+        "memberCount": 4,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": [
+          {
+            "id": "6aef08a46ef450c2c9caf44d",
+            "name": "Prayag Patel 1",
+            "phone": "990****575",
+            "memberCode": "WOM50307",
+            "isActive": false,
+            "isIncomeEligible": true,
+            "registrationPincode": "382210",
+            "monthlyPurchaseValue": 0,
+            "vegetableGMV": 0,
+            "otherGMV": 0,
+            "incomeEarned": 0
+          },
+          {
+            "id": "6aef09956ef450c2c9caf4c7",
+            "name": "Prayag Patel 2",
+            "phone": "950****802",
+            "memberCode": "WOM33789",
+            "isActive": false,
+            "isIncomeEligible": true,
+            "registrationPincode": "382210",
+            "monthlyPurchaseValue": 0,
+            "vegetableGMV": 0,
+            "otherGMV": 0,
+            "incomeEarned": 0
+          },
+          {
+            "id": "6aef0a7a6ef450c2c9caf554",
+            "name": "Prayag Patel 3",
+            "phone": "985****021",
+            "memberCode": "WOM85484",
+            "isActive": false,
+            "isIncomeEligible": true,
+            "registrationPincode": "382210",
+            "monthlyPurchaseValue": 0,
+            "vegetableGMV": 0,
+            "otherGMV": 0,
+            "incomeEarned": 0
+          },
+          {
+            "id": "6af87f0b59ee50c9a2cf998e",
+            "name": "Prayag Patel",
+            "phone": "895****654",
+            "memberCode": "WOM32968",
+            "isActive": false,
+            "isIncomeEligible": true,
+            "registrationPincode": "383001",
+            "monthlyPurchaseValue": 0,
+            "vegetableGMV": 0,
+            "otherGMV": 0,
+            "incomeEarned": 0
+          }
+        ]
+      },
+      {
+        "level": 3,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 4,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 5,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 6,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 7,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      }
+    ],
+    "otherIncome": 0,
+    "otherPurchaseValue": 0,
+    "personalPurchaseValue": 0,
+    "status": "LAPSED",
+    "teamSize": 5,
+    "totalIncome": 0,
+    "updatedAt": "2026-11-17T14:11:50.434Z",
+    "vegetableIncome": 0,
+    "vegetablePurchaseValue": 0
+  },
+  {
+    "_id": "6afc60a8b3587c2ddc60798e",
+    "userId": "6aeee5a032a0ed6c254070c1",
+    "month": "2026-11",
+    "__v": 0,
+    "availableFrom": "2026-11-18T00:00:00.000Z",
+    "calculatedAt": "2026-11-17T14:11:52.075Z",
+    "createdAt": "2026-11-17T14:11:52.076Z",
+    "direct5ActiveCount": 0,
+    "isEligible": false,
+    "levelBreakdown": [
+      {
+        "level": 1,
+        "memberCount": 4,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": [
+          {
+            "id": "6aef08a46ef450c2c9caf44d",
+            "name": "Prayag Patel 1",
+            "phone": "990****575",
+            "memberCode": "WOM50307",
+            "isActive": false,
+            "isIncomeEligible": true,
+            "registrationPincode": "382210",
+            "monthlyPurchaseValue": 0,
+            "vegetableGMV": 0,
+            "otherGMV": 0,
+            "incomeEarned": 0
+          },
+          {
+            "id": "6aef09956ef450c2c9caf4c7",
+            "name": "Prayag Patel 2",
+            "phone": "950****802",
+            "memberCode": "WOM33789",
+            "isActive": false,
+            "isIncomeEligible": true,
+            "registrationPincode": "382210",
+            "monthlyPurchaseValue": 0,
+            "vegetableGMV": 0,
+            "otherGMV": 0,
+            "incomeEarned": 0
+          },
+          {
+            "id": "6aef0a7a6ef450c2c9caf554",
+            "name": "Prayag Patel 3",
+            "phone": "985****021",
+            "memberCode": "WOM85484",
+            "isActive": false,
+            "isIncomeEligible": true,
+            "registrationPincode": "382210",
+            "monthlyPurchaseValue": 0,
+            "vegetableGMV": 0,
+            "otherGMV": 0,
+            "incomeEarned": 0
+          },
+          {
+            "id": "6af87f0b59ee50c9a2cf998e",
+            "name": "Prayag Patel",
+            "phone": "895****654",
+            "memberCode": "WOM32968",
+            "isActive": false,
+            "isIncomeEligible": true,
+            "registrationPincode": "383001",
+            "monthlyPurchaseValue": 0,
+            "vegetableGMV": 0,
+            "otherGMV": 0,
+            "incomeEarned": 0
+          }
+        ]
+      },
+      {
+        "level": 2,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 3,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 4,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 5,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 6,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 7,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      }
+    ],
+    "otherIncome": 0,
+    "otherPurchaseValue": 0,
+    "personalPurchaseValue": 0,
+    "status": "LAPSED",
+    "teamSize": 4,
+    "totalIncome": 0,
+    "updatedAt": "2026-11-17T14:11:52.076Z",
+    "vegetableIncome": 0,
+    "vegetablePurchaseValue": 0
+  },
+  {
+    "_id": "6afc60aab3587c2ddc607990",
+    "month": "2026-11",
+    "userId": "6af858814ec5de25e3ab9d4a",
+    "__v": 0,
+    "availableFrom": "2026-11-18T00:00:00.000Z",
+    "calculatedAt": "2026-11-17T14:11:54.410Z",
+    "createdAt": "2026-11-17T14:11:54.411Z",
+    "direct5ActiveCount": 0,
+    "isEligible": false,
+    "levelBreakdown": [
+      {
+        "level": 1,
+        "memberCount": 2,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": [
+          {
+            "id": "6afc501e88ae17b096618c43",
+            "name": "Test Customer",
+            "phone": "987****210",
+            "memberCode": "WOMTEST01",
+            "isActive": false,
+            "isIncomeEligible": true,
+            "monthlyPurchaseValue": 0,
+            "vegetableGMV": 0,
+            "otherGMV": 0,
+            "incomeEarned": 0
+          },
+          {
+            "id": "6afc59229189c0b0663cca7f",
+            "name": "User Level 1",
+            "phone": "987****001",
+            "memberCode": "WOMLEVEL1",
+            "isActive": false,
+            "isIncomeEligible": true,
+            "registrationPincode": "382481",
+            "monthlyPurchaseValue": 0,
+            "vegetableGMV": 0,
+            "otherGMV": 0,
+            "incomeEarned": 0
+          }
+        ]
+      },
+      {
+        "level": 2,
+        "memberCount": 1,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": [
+          {
+            "id": "6afc59239189c0b0663cca80",
+            "name": "Test User Level 2",
+            "phone": "987****002",
+            "memberCode": "WOMLEVEL2",
+            "isActive": false,
+            "isIncomeEligible": true,
+            "monthlyPurchaseValue": 0,
+            "vegetableGMV": 0,
+            "otherGMV": 0,
+            "incomeEarned": 0
+          }
+        ]
+      },
+      {
+        "level": 3,
+        "memberCount": 1,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": [
+          {
+            "id": "6afc59249189c0b0663cca81",
+            "name": "Test User Level 3",
+            "phone": "987****003",
+            "memberCode": "WOMLEVEL3",
+            "isActive": false,
+            "isIncomeEligible": true,
+            "monthlyPurchaseValue": 0,
+            "vegetableGMV": 0,
+            "otherGMV": 0,
+            "incomeEarned": 0
+          }
+        ]
+      },
+      {
+        "level": 4,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 5,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 6,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 7,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      }
+    ],
+    "otherIncome": 0,
+    "otherPurchaseValue": 0,
+    "personalPurchaseValue": 0,
+    "status": "LAPSED",
+    "teamSize": 4,
+    "totalIncome": 0,
+    "updatedAt": "2026-11-17T14:11:54.411Z",
+    "vegetableIncome": 0,
+    "vegetablePurchaseValue": 0
+  },
+  {
+    "_id": "6afc60acb3587c2ddc607991",
+    "userId": "6afc59229189c0b0663cca7f",
+    "month": "2026-11",
+    "__v": 0,
+    "availableFrom": "2026-11-18T00:00:00.000Z",
+    "calculatedAt": "2026-11-17T14:11:56.277Z",
+    "createdAt": "2026-11-17T14:11:56.277Z",
+    "direct5ActiveCount": 0,
+    "isEligible": false,
+    "levelBreakdown": [
+      {
+        "level": 1,
+        "memberCount": 1,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": [
+          {
+            "id": "6afc59239189c0b0663cca80",
+            "name": "Test User Level 2",
+            "phone": "987****002",
+            "memberCode": "WOMLEVEL2",
+            "isActive": false,
+            "isIncomeEligible": true,
+            "monthlyPurchaseValue": 0,
+            "vegetableGMV": 0,
+            "otherGMV": 0,
+            "incomeEarned": 0
+          }
+        ]
+      },
+      {
+        "level": 2,
+        "memberCount": 1,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": [
+          {
+            "id": "6afc59249189c0b0663cca81",
+            "name": "Test User Level 3",
+            "phone": "987****003",
+            "memberCode": "WOMLEVEL3",
+            "isActive": false,
+            "isIncomeEligible": true,
+            "monthlyPurchaseValue": 0,
+            "vegetableGMV": 0,
+            "otherGMV": 0,
+            "incomeEarned": 0
+          }
+        ]
+      },
+      {
+        "level": 3,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 4,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 5,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 6,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 7,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      }
+    ],
+    "otherIncome": 0,
+    "otherPurchaseValue": 0,
+    "personalPurchaseValue": 0,
+    "status": "LAPSED",
+    "teamSize": 2,
+    "totalIncome": 0,
+    "updatedAt": "2026-11-17T14:11:56.277Z",
+    "vegetableIncome": 0,
+    "vegetablePurchaseValue": 0
+  },
+  {
+    "_id": "6afc60aeb3587c2ddc607992",
+    "month": "2026-11",
+    "userId": "6afc59239189c0b0663cca80",
+    "__v": 0,
+    "availableFrom": "2026-11-18T00:00:00.000Z",
+    "calculatedAt": "2026-11-17T14:11:57.909Z",
+    "createdAt": "2026-11-17T14:11:57.909Z",
+    "direct5ActiveCount": 0,
+    "isEligible": false,
+    "levelBreakdown": [
+      {
+        "level": 1,
+        "memberCount": 1,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": [
+          {
+            "id": "6afc59249189c0b0663cca81",
+            "name": "Test User Level 3",
+            "phone": "987****003",
+            "memberCode": "WOMLEVEL3",
+            "isActive": false,
+            "isIncomeEligible": true,
+            "monthlyPurchaseValue": 0,
+            "vegetableGMV": 0,
+            "otherGMV": 0,
+            "incomeEarned": 0
+          }
+        ]
+      },
+      {
+        "level": 2,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 3,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 4,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 5,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 6,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      },
+      {
+        "level": 7,
+        "memberCount": 0,
+        "activeMemberCount": 0,
+        "vegetableGMV": 0,
+        "otherGMV": 0,
+        "incomeEarned": 0,
+        "members": []
+      }
+    ],
+    "otherIncome": 0,
+    "otherPurchaseValue": 0,
+    "personalPurchaseValue": 0,
+    "status": "LAPSED",
+    "teamSize": 1,
+    "totalIncome": 0,
+    "updatedAt": "2026-11-17T14:11:57.909Z",
+    "vegetableIncome": 0,
+    "vegetablePurchaseValue": 0
+  }
+]

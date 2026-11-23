@@ -15,7 +15,7 @@ import { TYPOGRAPHY } from '../../theme/typography';
 import { AppIcon } from './AppIcon';
 import { BlinkitProduct } from '../../types';
 import { useApp } from '../../context/AppContext';
-import { resolveImageThumbnail } from '../../utils/imageUrl';
+import { resolveImageThumbnail, resolveProductImageSource } from '../../utils/imageUrl';
 
 interface BlinkitProductCardProps {
   product: BlinkitProduct;
@@ -136,7 +136,7 @@ const BlinkitProductCardComponent: React.FC<BlinkitProductCardProps> = ({
         {/* Left: Product Image Box */}
         <View style={styles.wishlistImageWrapper}>
           <Image
-            source={{ uri: resolveImageThumbnail(product.imageUrl) }}
+            source={resolveProductImageSource(product.imageUrl)}
             style={styles.wishlistProductImage}
             resizeMode="cover"
           />
@@ -283,7 +283,7 @@ const BlinkitProductCardComponent: React.FC<BlinkitProductCardProps> = ({
       {/* Product Image Box with Real Online Photo */}
       <View style={[styles.imageContainer, isHorizontal && styles.horizontalImageContainer]}>
         <Image
-          source={{ uri: resolveImageThumbnail(product.imageUrl) }}
+          source={resolveProductImageSource(product.imageUrl)}
           style={styles.productImage}
           resizeMode="cover"
         />

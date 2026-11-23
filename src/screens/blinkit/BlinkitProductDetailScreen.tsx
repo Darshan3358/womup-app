@@ -20,7 +20,7 @@ import { FloatingCartPill } from '../../components/common/FloatingCartPill';
 import { ProductService } from '../../services/productService';
 import { useApp, mapProductToBlinkit } from '../../context/AppContext';
 import { BlinkitProduct } from '../../types';
-import { resolveImageDetail } from '../../utils/imageUrl';
+import { resolveImageDetail, resolveProductImageSource } from '../../utils/imageUrl';
 
 export const BlinkitProductDetailScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -184,7 +184,7 @@ export const BlinkitProductDetailScreen: React.FC = () => {
         <View style={styles.imageCarouselWrapper}>
           <View style={styles.carouselImageContainer}>
             <Image
-              source={{ uri: resolveImageDetail(product.galleryImages?.[activeImageIndex] || product.imageUrl) }}
+              source={resolveProductImageSource(product.galleryImages?.[activeImageIndex] || product.imageUrl)}
               style={styles.carouselImage}
               resizeMode="cover"
             />

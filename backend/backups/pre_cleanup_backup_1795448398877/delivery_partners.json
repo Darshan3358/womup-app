@@ -1,0 +1,78 @@
+[
+  {
+    "_id": "6b00503174dbac6e14818c5c",
+    "userId": "6b00503174dbac6e14818c5b",
+    "partnerCode": "RDR-9001",
+    "fullName": "Ramesh Kumar",
+    "phoneNumber": "9876543299",
+    "email": "rider@womup.com",
+    "city": "Ahmedabad",
+    "cityName": "Ahmedabad",
+    "hubId": "6aac257b8f337240651ef43b",
+    "hubName": "Wom Up Chandlodiya - Tragad Dark Store",
+    "status": "APPROVED",
+    "verificationStatus": "VERIFIED",
+    "isApproved": true,
+    "isVerified": true,
+    "isOnline": true,
+    "isAvailable": true,
+    "vehicleType": "MOTORCYCLE",
+    "vehicleNumber": "GJ-01-AB-9999",
+    "drivingLicenseNumber": "GJ0120220019999",
+    "aadharNumber": "555566667777",
+    "passwordHash": "$2a$10$x98CgbtJsrRvJF8zgk59AO5X76wwmhqDOzMD32HWwqoODC0b5QobW",
+    "rating": 4.95,
+    "averageRating": 4.95,
+    "totalDeliveries": 146,
+    "completedDeliveries": 144,
+    "cancelledDeliveries": 2,
+    "walletBalance": 850,
+    "dutySession": {
+      "isOnline": true,
+      "startedAt": "2026-11-20T13:50:41.741Z"
+    },
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        72.51,
+        23.05
+      ]
+    },
+    "updatedAt": "2026-11-21T11:06:18.492Z",
+    "createdAt": "2026-11-20T13:50:41.741Z",
+    "__v": 1,
+    "acceptanceRate": 94,
+    "avgDeliveryMinutes": 11.4,
+    "completionRate": 99,
+    "currentLocation": {
+      "type": "Point",
+      "coordinates": [
+        72.55050349970882,
+        23.128701693288953
+      ]
+    },
+    "currentOutstandingCash": 894,
+    "emailVerified": false,
+    "isActive": true,
+    "isBlocked": false,
+    "isOrderBlocked": false,
+    "isSuspended": false,
+    "lastLoginAt": "2026-11-20T14:05:08.171Z",
+    "onTimeRate": 97.2,
+    "outstandingCashLimit": 500,
+    "ratingBreakdown": {
+      "five": 104,
+      "four": 18,
+      "three": 4,
+      "two": 1,
+      "one": 1
+    },
+    "registeredAt": "2026-11-20T13:50:53.782Z",
+    "totalCodCollected": 80,
+    "totalEarnings": 80,
+    "totalOnlineEarnings": 0,
+    "totalReviews": 128,
+    "locationUpdatedAt": "2026-11-21T11:06:18.491Z",
+    "netBalance": 80
+  }
+]

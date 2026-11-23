@@ -1,0 +1,18 @@
+[
+  {
+    "_id": "6abf83dfe816e4a072cba1e1",
+    "scope": "GLOBAL",
+    "cityId": null,
+    "cityName": null,
+    "areaId": null,
+    "areaName": null,
+    "ratePerKm": 5,
+    "minimumPayout": 20,
+    "maximumPayout": 80,
+    "isActive": true,
+    "effectiveFrom": "2026-10-02T10:13:51.216Z",
+    "description": "Universal fallback payout rate for all standard deliveries",
+    "createdAt": "2026-10-02T10:13:51.216Z",
+    "updatedAt": "2026-10-20T19:23:34.985Z"
+  }
+]

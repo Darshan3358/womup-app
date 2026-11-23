@@ -1,0 +1,50 @@
+[
+  {
+    "_id": "6a9ffe88d4a21fe082fbbe71",
+    "code": "FESTIVE20",
+    "description": "20% OFF on Festive & Pooja essentials up to ₹75",
+    "discountType": "PERCENTAGE",
+    "discountValue": 20,
+    "minOrderValue": 299,
+    "maxDiscountAmount": 75,
+    "isActive": true,
+    "validFrom": "2026-09-08T12:24:40.576Z",
+    "validUntil": "2026-11-07T12:24:40.576Z",
+    "perUserLimit": 2,
+    "createdAt": "2026-09-08T12:24:40.577Z",
+    "updatedAt": "2026-09-08T12:24:40.577Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a9ffe88d4a21fe082fbbe70",
+    "code": "WORM100",
+    "description": "Flat ₹100 OFF on orders above ₹499",
+    "discountType": "FLAT",
+    "discountValue": 100,
+    "minOrderValue": 499,
+    "maxDiscountAmount": 100,
+    "isActive": true,
+    "validFrom": "2026-09-08T12:24:40.576Z",
+    "validUntil": "2027-03-07T12:24:40.576Z",
+    "perUserLimit": 3,
+    "createdAt": "2026-09-08T12:24:40.577Z",
+    "updatedAt": "2026-09-08T12:24:40.577Z",
+    "__v": 0
+  },
+  {
+    "_id": "6a9ffe88d4a21fe082fbbe6f",
+    "code": "WELCOME50",
+    "description": "Flat ₹50 OFF on your first order above ₹199",
+    "discountType": "FLAT",
+    "discountValue": 50,
+    "minOrderValue": 199,
+    "maxDiscountAmount": 50,
+    "isActive": true,
+    "validFrom": "2026-09-08T12:24:40.576Z",
+    "validUntil": "2027-09-08T12:24:40.576Z",
+    "perUserLimit": 1,
+    "createdAt": "2026-09-08T12:24:40.577Z",
+    "updatedAt": "2026-09-08T12:24:40.577Z",
+    "__v": 0
+  }
+]

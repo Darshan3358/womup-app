@@ -1,0 +1,42 @@
+[
+  {
+    "_id": "6b005db01b70282aedd37d9f",
+    "storeId": "6aac257b8f337240651ef43b",
+    "storeName": "Wom Up Chandlodiya - Tragad Dark Store",
+    "storeCode": "STORE-CHANDLODIYA_TRAGAD",
+    "storeCity": "Ahmedabad",
+    "storeArea": "",
+    "amount": 66,
+    "utrNumber": "122121221",
+    "paymentMethod": "UPI",
+    "status": "APPROVED",
+    "notes": "31313",
+    "adminRemarks": "Settlement verified and approved by Admin",
+    "requestedBy": "Store Owner",
+    "requestedAt": "2026-11-20T14:48:16.998Z",
+    "createdAt": "2026-11-20T14:48:17.001Z",
+    "updatedAt": "2026-11-20T14:48:17.001Z",
+    "__v": 0,
+    "approvedAt": "2026-11-20T14:49:46.995Z"
+  },
+  {
+    "_id": "6b0062e71b70282aedd3862e",
+    "storeId": "6aac257b8f337240651ef43b",
+    "storeName": "Wom Up Chandlodiya - Tragad Dark Store",
+    "storeCode": "STORE-CHANDLODIYA_TRAGAD",
+    "storeCity": "Ahmedabad",
+    "storeArea": "",
+    "amount": 1011,
+    "utrNumber": "3232323232323",
+    "paymentMethod": "UPI",
+    "status": "APPROVED",
+    "notes": "3232323232",
+    "adminRemarks": "Settlement verified and approved by Admin",
+    "requestedBy": "Store Owner",
+    "requestedAt": "2026-11-20T15:10:31.151Z",
+    "createdAt": "2026-11-20T15:10:31.153Z",
+    "updatedAt": "2026-11-20T15:10:31.153Z",
+    "__v": 0,
+    "approvedAt": "2026-11-20T15:10:50.520Z"
+  }
+]
