@@ -186,7 +186,13 @@ export const CustomersScreen: React.FC = () => {
       c.phone.includes(searchQuery) ||
       c.id.toLowerCase().includes(searchQuery.toLowerCase());
     let matchesFilter = activeCustomerFilter === 'All' || c.status === activeCustomerFilter;
-    if (activeCustomerFilter === 'Pending KYC') {
+    if (activeCustomerFilter === 'Active') {
+      const currentMonthlySpend = c.spend || (c as any).currentMonthShoppingGmv || 0;
+      matchesFilter =
+        c.status === 'Active' ||
+        (c as any).personalStatus === 'ACTIVE' ||
+        currentMonthlySpend >= 2000;
+    } else if (activeCustomerFilter === 'Pending KYC') {
       matchesFilter =
         c.kycStatus === 'Pending' ||
         (c as any).kycStatus === 'Submitted' ||

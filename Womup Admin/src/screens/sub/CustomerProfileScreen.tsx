@@ -200,21 +200,88 @@ export const CustomerProfileScreen: React.FC = () => {
               </Text>
             </View>
 
+            {/* Active Spend Tag */}
+            {(() => {
+              const currentMonthlySpend = selectedCustomer.spend || (selectedCustomer as any).currentMonthShoppingGmv || 0;
+              const isSpendActive = (selectedCustomer as any).personalStatus === 'ACTIVE' || currentMonthlySpend >= 2000;
+              return (
+                <View
+                  style={[
+                    styles.statusPill,
+                    {
+                      backgroundColor: isSpendActive ? '#DCFCE7' : '#F1F5F9',
+                      borderColor: isSpendActive ? '#86EFAC' : '#CBD5E1',
+                      borderWidth: 1,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.statusText,
+                      { color: isSpendActive ? '#15803D' : '#64748B', fontWeight: '700' },
+                    ]}
+                  >
+                    {isSpendActive
+                      ? `🟢 ACTIVE (₹${currentMonthlySpend.toLocaleString()} / ₹2,000)`
+                      : `⚪ INACTIVE (₹${currentMonthlySpend.toLocaleString()} / ₹2,000)`}
+                  </Text>
+                </View>
+              );
+            })()}
+
+            {/* Income Eligibility Tag */}
+            {(() => {
+              const isIncomeEligible = (selectedCustomer as any).isIncomeEligible !== false;
+              return (
+                <View
+                  style={[
+                    styles.statusPill,
+                    {
+                      backgroundColor: isIncomeEligible ? '#EFF6FF' : '#FEF2F2',
+                      borderColor: isIncomeEligible ? '#BFDBFE' : '#FECACA',
+                      borderWidth: 1,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.statusText,
+                      { color: isIncomeEligible ? '#1D4ED8' : '#DC2626', fontWeight: '700' },
+                    ]}
+                  >
+                    {isIncomeEligible ? '🟢 Income Eligible' : '🔴 Outside Service Pincode'}
+                  </Text>
+                </View>
+              );
+            })()}
+
+            {/* KYC Status Tag */}
+            <View
+              style={[
+                styles.statusPill,
+                {
+                  backgroundColor: selectedCustomer.kycStatus === 'Verified' ? '#ECFDF5' : '#FEF3C7',
+                  borderColor: selectedCustomer.kycStatus === 'Verified' ? '#A7F3D0' : '#FDE68A',
+                  borderWidth: 1,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.statusText,
+                  { color: selectedCustomer.kycStatus === 'Verified' ? '#059669' : '#D97706', fontWeight: '700' },
+                ]}
+              >
+                {selectedCustomer.kycStatus === 'Verified' ? '🟢 KYC Verified' : '🟡 KYC Pending'}
+              </Text>
+            </View>
+
             {selectedCustomer.referralCode ? (
               <View style={styles.refPill}>
                 <Text style={styles.refPillLabel}>REF: </Text>
                 <Text style={styles.refPillCode}>{selectedCustomer.referralCode}</Text>
               </View>
             ) : null}
-
-            {Boolean(selectedCustomer.customerOtp || selectedCustomer.otp) && (
-              <View style={[styles.refPill, { backgroundColor: '#EEF2FF', borderColor: '#C7D2FE' }]}>
-                <Text style={[styles.refPillLabel, { color: '#4F46E5' }]}>OTP: </Text>
-                <Text style={[styles.refPillCode, { color: '#4338CA', fontWeight: '800', letterSpacing: 1 }]}>
-                  {selectedCustomer.customerOtp || selectedCustomer.otp}
-                </Text>
-              </View>
-            )}
 
             {Boolean(selectedCustomer.customerOtp || selectedCustomer.otp) && (
               <View style={[styles.refPill, { backgroundColor: '#EEF2FF', borderColor: '#C7D2FE' }]}>
@@ -264,34 +331,104 @@ export const CustomerProfileScreen: React.FC = () => {
             <Text style={styles.value}>{selectedCustomer.email}</Text>
           </View>
 
-          <View style={styles.infoGroup}>
-            <Text style={styles.label}>Registration OTP (Used on Signup)</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-              {selectedCustomer.customerOtp || selectedCustomer.otp ? (
-                <View style={{ backgroundColor: '#EEF2FF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: '#C7D2FE' }}>
-                  <Text style={{ fontWeight: '800', color: '#4338CA', fontSize: 16, letterSpacing: 2 }}>
-                    {selectedCustomer.customerOtp || selectedCustomer.otp}
-                  </Text>
+          {/* Active Status & MLM Income Eligibility Box */}
+          <View style={{ backgroundColor: '#F8FAFC', padding: 14, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', marginTop: 12, marginBottom: 8 }}>
+            <Text style={{ fontSize: 13, fontWeight: '800', color: COLORS.navy, marginBottom: 10 }}>
+              Active User & Income Eligibility Status
+            </Text>
+
+            {(() => {
+              const currentMonthlySpend = selectedCustomer.spend || (selectedCustomer as any).currentMonthShoppingGmv || 0;
+              const isSpendActive = (selectedCustomer as any).personalStatus === 'ACTIVE' || currentMonthlySpend >= 2000;
+              const isIncomeEligible = (selectedCustomer as any).isIncomeEligible !== false;
+              const userPincode = selectedCustomer.pincode || (selectedCustomer as any).customerPincode || (selectedCustomer as any).registrationPincode || 'Not Set';
+
+              return (
+                <View style={{ gap: 8 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>Active User (Monthly ₹2,000 Spend)</Text>
+                    <View style={{ backgroundColor: isSpendActive ? '#DCFCE7' : '#F1F5F9', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '800', color: isSpendActive ? '#15803D' : '#64748B' }}>
+                        {isSpendActive ? `🟢 ACTIVE (₹${currentMonthlySpend.toLocaleString()})` : `⚪ INACTIVE (₹${currentMonthlySpend.toLocaleString()})`}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>Registered Area Pincode</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: COLORS.navy }}>{userPincode}</Text>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>Pincode Income Eligibility</Text>
+                    <View style={{ backgroundColor: isIncomeEligible ? '#EFF6FF' : '#FEF2F2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '800', color: isIncomeEligible ? '#1D4ED8' : '#DC2626' }}>
+                        {isIncomeEligible ? '🟢 Eligible (Service Area)' : '🔴 Ineligible (Outside Area)'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>KYC Document Status</Text>
+                    <View style={{ backgroundColor: selectedCustomer.kycStatus === 'Verified' ? '#ECFDF5' : '#FEF3C7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '800', color: selectedCustomer.kycStatus === 'Verified' ? '#059669' : '#D97706' }}>
+                        {selectedCustomer.kycStatus === 'Verified' ? '🟢 Verified' : '🟡 Pending Verification'}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
-              ) : (
-                <Text style={[styles.value, { color: COLORS.textMuted }]}>None / Not Available</Text>
-              )}
-            </View>
+              );
+            })()}
           </View>
 
-          <View style={styles.infoGroup}>
-            <Text style={styles.label}>Registration OTP (Used on Signup)</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-              {selectedCustomer.customerOtp || selectedCustomer.otp ? (
-                <View style={{ backgroundColor: '#EEF2FF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: '#C7D2FE' }}>
-                  <Text style={{ fontWeight: '800', color: '#4338CA', fontSize: 16, letterSpacing: 2 }}>
-                    {selectedCustomer.customerOtp || selectedCustomer.otp}
-                  </Text>
+          {/* Active Status & MLM Income Eligibility Box */}
+          <View style={{ backgroundColor: '#F8FAFC', padding: 14, borderRadius: 10, borderWidth: 1, borderColor: '#E2E8F0', marginTop: 12, marginBottom: 8 }}>
+            <Text style={{ fontSize: 13, fontWeight: '800', color: COLORS.navy, marginBottom: 10 }}>
+              Active User & Income Eligibility Status
+            </Text>
+
+            {(() => {
+              const currentMonthlySpend = selectedCustomer.spend || (selectedCustomer as any).currentMonthShoppingGmv || 0;
+              const isSpendActive = (selectedCustomer as any).personalStatus === 'ACTIVE' || currentMonthlySpend >= 2000;
+              const isIncomeEligible = (selectedCustomer as any).isIncomeEligible !== false;
+              const userPincode = selectedCustomer.pincode || (selectedCustomer as any).customerPincode || (selectedCustomer as any).registrationPincode || 'Not Set';
+
+              return (
+                <View style={{ gap: 8 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>Active User (Monthly ₹2,000 Spend)</Text>
+                    <View style={{ backgroundColor: isSpendActive ? '#DCFCE7' : '#F1F5F9', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '800', color: isSpendActive ? '#15803D' : '#64748B' }}>
+                        {isSpendActive ? `🟢 ACTIVE (₹${currentMonthlySpend.toLocaleString()})` : `⚪ INACTIVE (₹${currentMonthlySpend.toLocaleString()})`}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>Registered Area Pincode</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: COLORS.navy }}>{userPincode}</Text>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>Pincode Income Eligibility</Text>
+                    <View style={{ backgroundColor: isIncomeEligible ? '#EFF6FF' : '#FEF2F2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '800', color: isIncomeEligible ? '#1D4ED8' : '#DC2626' }}>
+                        {isIncomeEligible ? '🟢 Eligible (Service Area)' : '🔴 Ineligible (Outside Area)'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>KYC Document Status</Text>
+                    <View style={{ backgroundColor: selectedCustomer.kycStatus === 'Verified' ? '#ECFDF5' : '#FEF3C7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '800', color: selectedCustomer.kycStatus === 'Verified' ? '#059669' : '#D97706' }}>
+                        {selectedCustomer.kycStatus === 'Verified' ? '🟢 Verified' : '🟡 Pending Verification'}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
-              ) : (
-                <Text style={[styles.value, { color: COLORS.textMuted }]}>None / Not Available</Text>
-              )}
-            </View>
+              );
+            })()}
           </View>
 
           <Text style={[styles.cardTitle, { marginTop: SPACING.md }]}>Saved Delivery Addresses</Text>
