@@ -27,7 +27,7 @@ interface DrilldownEntry {
 }
 
 export const MyTeamScreen: React.FC = () => {
-  const { goBack } = useApp();
+  const { goBack, user } = useApp();
 
   // State
   const [selectedLevel, setSelectedLevel] = useState<string>('all');
@@ -41,6 +41,7 @@ export const MyTeamScreen: React.FC = () => {
 
   // Team data
   const [members, setMembers] = useState<TeamMember[]>([]);
+  const [targetUserSponsorCode, setTargetUserSponsorCode] = useState<string>('');
   const [totalUsers, setTotalUsers] = useState<number>(0);
   const [levelCounts, setLevelCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState<boolean>(true);
@@ -95,6 +96,9 @@ export const MyTeamScreen: React.FC = () => {
         });
 
         if (res.success && res.data) {
+          if (res.data.targetUser?.sponsorCode) {
+            setTargetUserSponsorCode(res.data.targetUser.sponsorCode);
+          }
           if (nextPage === 1) {
             setMembers(res.data.users);
           } else {
@@ -224,9 +228,19 @@ export const MyTeamScreen: React.FC = () => {
             </View>
           </View>
 
-          {/* User ID in top right corner */}
-          <View style={styles.userIdBadge}>
-            <Text style={styles.userIdText}>{item.userCode}</Text>
+          {/* User ID & Sponsor ID in top right corner */}
+          <View style={styles.cardTopRightCol}>
+            <View style={styles.userIdBadge}>
+              <Text style={styles.userIdText}>{item.userCode}</Text>
+            </View>
+            {Boolean(item.sponsorCode) && (
+              <View style={styles.sponsorBadge}>
+                <Text style={styles.sponsorBadgeText}>
+                  <Text style={styles.sponsorBadgeLabel}>Sponsor: </Text>
+                  {item.sponsorCode}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -288,6 +302,12 @@ export const MyTeamScreen: React.FC = () => {
             {currentTargetUserName ? `Team of ${currentTargetUserName}` : 'My Team / My Network'}
           </Text>
           <Text style={styles.headerSubtitle}>Track your 7-level referrals & earnings</Text>
+          {Boolean(targetUserSponsorCode || user?.sponsorCode) && (
+            <View style={styles.headerSponsorRow}>
+              <Text style={styles.headerSponsorLabel}>Sponsor ID: </Text>
+              <Text style={styles.headerSponsorCode}>{targetUserSponsorCode || user?.sponsorCode}</Text>
+            </View>
+          )}
         </View>
         <View style={styles.networkStatBadge}>
           <AppIcon name="users" size={14} color={COLORS.primary} />
@@ -985,10 +1005,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.success,
   },
+  cardTopRightCol: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    gap: 4,
+  },
   userIdBadge: {
     backgroundColor: '#EFF6FF',
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3.5,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#BFDBFE',
@@ -997,6 +1022,39 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#1D4ED8',
+  },
+  sponsorBadge: {
+    backgroundColor: '#FDF4FF',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#F0ABFC',
+  },
+  sponsorBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#86198F',
+  },
+  sponsorBadgeLabel: {
+    fontSize: 9.5,
+    fontWeight: '600',
+    color: '#A21CAF',
+  },
+  headerSponsorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 3,
+  },
+  headerSponsorLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.secondaryText,
+  },
+  headerSponsorCode: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: COLORS.primary,
   },
   cardDivider: {
     height: 1,

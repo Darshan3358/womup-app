@@ -997,6 +997,30 @@ export class UsersService {
     const startIndex = (page - 1) * limit;
     const paginated = selectedMembers.slice(startIndex, startIndex + limit);
 
+    // Collect parent IDs to lookup sponsor referral codes if missing
+    const parentIdsToLookup = new Set<string>();
+    paginated.forEach(({ member }) => {
+      const sId = (member.referredBy || member.sponsorId)?.toString();
+      if (sId && !member.sponsorCode) {
+        parentIdsToLookup.add(sId);
+      }
+    });
+
+    const parentCodeMap = new Map<string, string>();
+    if (parentIdsToLookup.size > 0) {
+      try {
+        const parents = await this.userModel.find({
+          _id: { $in: Array.from(parentIdsToLookup).map((id) => new Types.ObjectId(id)) }
+        }).select('_id referralCode customerCode').lean().exec();
+        parents.forEach((p: any) => {
+          const pCode = (p.referralCode || p.customerCode || '').replace(/^WORMUP/i, 'WOMUP').replace(/^WORM/i, 'WOM');
+          if (pCode) parentCodeMap.set(p._id.toString(), pCode);
+        });
+      } catch (err) {
+        // Safe fallback
+      }
+    }
+
     // Map output records:
     const users = paginated.map(({ member, level }) => {
       const cleanCode = (member.referralCode || (member as any).customerCode || `WOM${member._id.toString().slice(-6).toUpperCase()}`)
@@ -1008,11 +1032,23 @@ export class UsersService {
       const totalShopping = Number((member.monthlyPurchaseValue || 0).toFixed(2));
       const isActive = totalShopping >= 2000 || member.isActive === true;
 
+      const sIdStr = (member.referredBy || member.sponsorId)?.toString();
+      let cleanSponsorCode = (member.sponsorCode || '').trim();
+      if (!cleanSponsorCode && sIdStr && parentCodeMap.has(sIdStr)) {
+        cleanSponsorCode = parentCodeMap.get(sIdStr)!;
+      }
+      if (!cleanSponsorCode && level === 1 && targetUser.referralCode) {
+        cleanSponsorCode = (targetUser.referralCode || '').replace(/^WORMUP/i, 'WOMUP').replace(/^WORM/i, 'WOM');
+      }
+      cleanSponsorCode = cleanSponsorCode.replace(/^WORMUP/i, 'WOMUP').replace(/^WORM/i, 'WOM');
+
       return {
         id: member._id.toString(),
         name,
         userCode: cleanCode,
         referralCode: cleanCode,
+        sponsorCode: cleanSponsorCode,
+        sponsorId: member.sponsorId ? member.sponsorId.toString() : '',
         phone: member.phone || member.phoneNumber || '',
         level,
         levelLabel: `Level ${level}`,
@@ -1034,6 +1070,7 @@ export class UsersService {
           id: targetUser._id.toString(),
           name: targetUser.fullNameAsPerAadhaar || (targetUser as any).fullName || targetUser.name || 'Womup Member',
           userCode: (targetUser.referralCode || (targetUser as any).customerCode || '').replace(/^WORMUP/i, 'WOMUP').replace(/^WORM/i, 'WOM'),
+          sponsorCode: (targetUser.sponsorCode || '').replace(/^WORMUP/i, 'WOMUP').replace(/^WORM/i, 'WOM'),
         },
         users,
         totalUsers: totalFiltered,

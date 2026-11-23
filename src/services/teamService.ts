@@ -5,6 +5,8 @@ export interface TeamMember {
   name: string;
   userCode: string;
   referralCode: string;
+  sponsorCode?: string;
+  sponsorId?: string;
   phone: string;
   level: number;
   levelLabel: string;
@@ -23,6 +25,7 @@ export interface MyTeamResponse {
     id: string;
     name: string;
     userCode: string;
+    sponsorCode?: string;
   };
   users: TeamMember[];
   totalUsers: number;
