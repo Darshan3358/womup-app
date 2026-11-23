@@ -80,50 +80,104 @@ export class CartService {
       await cart.save();
     }
 
+    const tSummaryStart = Date.now();
     const detailedItems: any[] = [];
     let itemSubtotal = 0;
     let mrpTotal = 0;
     const seenItemKeys = new Set<string>();
 
+    // Batch fetch all products, variants, and area_pricing in parallel to eliminate N+1 queries
+    const validProductIds: Types.ObjectId[] = [];
+    const validVariantIds: Types.ObjectId[] = [];
     for (const entry of cart.items) {
       if (!entry || !entry.productId || entry.quantity <= 0) continue;
-      const product = await this.productModel.findById(entry.productId).exec();
+      const pStr = entry.productId.toString();
+      if (Types.ObjectId.isValid(pStr)) {
+        validProductIds.push(new Types.ObjectId(pStr));
+      }
+      if (entry.variantId) {
+        const vStr = entry.variantId.toString();
+        if (Types.ObjectId.isValid(vStr)) {
+          validVariantIds.push(new Types.ObjectId(vStr));
+        }
+      }
+    }
+
+    const tBatchStart = Date.now();
+    const targetAreaObjId = targetAreaId && Types.ObjectId.isValid(targetAreaId)
+      ? new Types.ObjectId(targetAreaId)
+      : targetAreaId;
+
+    const [productsList, variantsList, areaPricingList] = await Promise.all([
+      validProductIds.length > 0
+        ? this.productModel.find({ _id: { $in: validProductIds } }).lean().exec()
+        : Promise.resolve([]),
+      validVariantIds.length > 0
+        ? this.connection.collection('product_variants').find({ _id: { $in: validVariantIds } }).toArray()
+        : Promise.resolve([]),
+      targetAreaId && (validVariantIds.length > 0 || validProductIds.length > 0)
+        ? this.connection.collection('area_pricing').find({
+            $and: [
+              {
+                $or: [
+                  { areaId: targetAreaObjId },
+                  { areaId: targetAreaId.toString() },
+                ],
+              },
+              {
+                $or: [
+                  ...(validVariantIds.length > 0 ? [{ variantId: { $in: [...validVariantIds, ...validVariantIds.map((v) => v.toString())] } }] : []),
+                  ...(validProductIds.length > 0 ? [{ productId: { $in: [...validProductIds, ...validProductIds.map((p) => p.toString())] } }] : []),
+                ],
+              },
+            ],
+          }).toArray()
+        : Promise.resolve([]),
+    ]);
+    const tBatchDuration = Date.now() - tBatchStart;
+
+    const productMap = new Map<string, any>();
+    for (const p of productsList) {
+      productMap.set(p._id.toString(), p);
+    }
+
+    const variantMap = new Map<string, any>();
+    for (const v of variantsList) {
+      variantMap.set(v._id.toString(), v);
+    }
+
+    const areaPricingVariantMap = new Map<string, any>();
+    const areaPricingProductMap = new Map<string, any>();
+    for (const ap of areaPricingList) {
+      if (ap.variantId) {
+        areaPricingVariantMap.set(ap.variantId.toString(), ap);
+      }
+      if (ap.productId) {
+        areaPricingProductMap.set(ap.productId.toString(), ap);
+      }
+    }
+
+    for (const entry of cart.items) {
+      if (!entry || !entry.productId || entry.quantity <= 0) continue;
+      const product = productMap.get(entry.productId.toString());
       if (product && product.isActive) {
         let sellingPrice = Number(product.sellingPrice || 0);
         let mrp = Number(product.mrp || sellingPrice);
         let quantityLabel = product.quantityLabel;
         let variantObj: any = null;
 
-        if (entry.variantId && Types.ObjectId.isValid(entry.variantId.toString())) {
-          const vObjId = new Types.ObjectId(entry.variantId.toString());
-          const varDoc = await this.connection.collection('product_variants').findOne({
-            _id: vObjId,
-          });
+        const vIdStr = entry.variantId ? entry.variantId.toString() : '';
+        if (vIdStr) {
+          const varDoc = variantMap.get(vIdStr);
           if (varDoc) {
             sellingPrice = Number(varDoc.sellingPrice ?? sellingPrice);
             mrp = Number(varDoc.mrp ?? mrp);
             quantityLabel = varDoc.weightOrVolume ?? quantityLabel;
 
-            // Dynamic area pricing lookup matching user's selected area
-            if (targetAreaId) {
-              try {
-                const targetAreaObjId = Types.ObjectId.isValid(targetAreaId)
-                  ? new Types.ObjectId(targetAreaId)
-                  : targetAreaId;
-                const areaPricing = await this.connection.collection('area_pricing').findOne({
-                  variantId: { $in: [vObjId, entry.variantId.toString()] },
-                  $or: [
-                    { areaId: targetAreaObjId },
-                    { areaId: targetAreaId.toString() },
-                  ],
-                });
-                if (areaPricing && typeof areaPricing.price === 'number') {
-                  sellingPrice = areaPricing.price;
-                  if (areaPricing.mrp) mrp = areaPricing.mrp;
-                }
-              } catch {
-                // fallback to varDoc
-              }
+            const areaPricing = areaPricingVariantMap.get(vIdStr);
+            if (areaPricing && typeof areaPricing.price === 'number') {
+              sellingPrice = areaPricing.price;
+              if (areaPricing.mrp) mrp = areaPricing.mrp;
             }
 
             variantObj = {
@@ -135,47 +189,11 @@ export class CartService {
             };
           }
         } else if (targetAreaId) {
-          // Dynamic master product area pricing lookup
-          try {
-            const targetAreaObjId = Types.ObjectId.isValid(targetAreaId)
-              ? new Types.ObjectId(targetAreaId)
-              : targetAreaId;
-            const areaPricing = await this.connection.collection('area_pricing').findOne({
-              productId: { $in: [product._id, product._id.toString()] },
-              $or: [
-                { areaId: targetAreaObjId },
-                { areaId: targetAreaId.toString() },
-              ],
-            });
-            if (areaPricing && typeof areaPricing.price === 'number') {
-              sellingPrice = areaPricing.price;
-              if (areaPricing.mrp) mrp = areaPricing.mrp;
-            }
-          } catch {}
-        }
-
-        // Price safety fallback: if sellingPrice is 0 or unpriced, resolve from product_variants
-        if (sellingPrice <= 0) {
-          try {
-            const fallbackVar = await this.connection.collection('product_variants').findOne({
-              productId: product._id,
-              isActive: true,
-            });
-            if (fallbackVar && typeof fallbackVar.sellingPrice === 'number' && fallbackVar.sellingPrice > 0) {
-              sellingPrice = fallbackVar.sellingPrice;
-              mrp = fallbackVar.mrp || mrp || sellingPrice;
-              quantityLabel = quantityLabel || fallbackVar.weightOrVolume;
-              if (!variantObj) {
-                variantObj = {
-                  id: fallbackVar._id.toString(),
-                  _id: fallbackVar._id.toString(),
-                  label: fallbackVar.weightOrVolume,
-                  price: sellingPrice,
-                  mrp: mrp,
-                };
-              }
-            }
-          } catch {}
+          const areaPricing = areaPricingProductMap.get(product._id.toString());
+          if (areaPricing && typeof areaPricing.price === 'number') {
+            sellingPrice = areaPricing.price;
+            if (areaPricing.mrp) mrp = areaPricing.mrp;
+          }
         }
 
         // Never emit a zero-price item if product has a valid price
@@ -185,15 +203,14 @@ export class CartService {
         }
 
         const prodIdStr = product._id.toString();
-        const vIdStr = entry.variantId ? entry.variantId.toString() : (variantObj?.id || '');
-        const dedupKey = vIdStr ? `${prodIdStr}_${vIdStr}` : prodIdStr;
+        const activeVIdStr = vIdStr || (variantObj?.id || '');
+        const dedupKey = activeVIdStr ? `${prodIdStr}_${activeVIdStr}` : prodIdStr;
 
-        // Skip exact duplicate items or coalesce if same product already added
-        if (seenItemKeys.has(dedupKey) || seenItemKeys.has(prodIdStr)) {
+        // Skip exact duplicate items or coalesce if same product/variant already processed
+        if (seenItemKeys.has(dedupKey)) {
           continue;
         }
         seenItemKeys.add(dedupKey);
-        if (vIdStr) seenItemKeys.add(prodIdStr);
 
         const linePrice = sellingPrice * entry.quantity;
         const lineMrp = mrp * entry.quantity;
@@ -208,12 +225,12 @@ export class CartService {
             imageUrl: product.imageUrl,
             sellingPrice: sellingPrice,
             mrp: mrp,
-            discountPercent: mrp > sellingPrice ? Math.round(((mrp - sellingPrice) / mrp) * 100) : product.discountPercent,
+            discountPercent: mrp > sellingPrice ? Math.round(((mrp - sellingPrice) / mrp) * 100) : (product.discountPercent || 0),
             quantityLabel: quantityLabel,
-            stock: product.stock,
+            stock: product.stock ?? 100,
           },
           variant: variantObj,
-          variantId: vIdStr || undefined,
+          variantId: activeVIdStr || undefined,
           quantity: entry.quantity,
           subtotal: linePrice,
           totalMrp: lineMrp,
@@ -348,7 +365,7 @@ export class CartService {
       orderSubtotal - coinDiscount + tip,
     );
 
-    return {
+    const summaryResult = {
       items: detailedItems,
       itemCount: detailedItems.reduce((acc, curr) => acc + curr.quantity, 0),
       itemSubtotal,
@@ -379,6 +396,8 @@ export class CartService {
       totalAmount,
       deliveryInstructions: cart.deliveryInstructions,
     };
+    console.log(`[CartPerf] user=${userId} | action=getCartSummary | items=${detailedItems.length} | total=${Date.now() - tSummaryStart}ms | batch=${tBatchDuration}ms`);
+    return summaryResult;
   }
 
   async addItem(userId: string, productId: string, quantity: number, variantId?: string, areaId?: string, storeId?: string) {
@@ -389,7 +408,7 @@ export class CartService {
     const product = Types.ObjectId.isValid(productId)
       ? await this.productModel.findById(productId).exec()
       : await this.productModel.findOne({
-          $or: [{ slug: productId }, { name: new RegExp(productId, 'i') }],
+          $or: [{ slug: productId }, { name: productId }],
         }).exec();
 
     if (!product || !product.isActive) {
@@ -417,8 +436,8 @@ export class CartService {
       return !reqVIdStr && !itemVIdStr;
     });
 
-    // If exact variant match not found, check if a single un-varianted entry exists for this product
-    if (existingIndex === -1) {
+    // If exact variant match not found, only check for an un-varianted entry if no variant was requested
+    if (existingIndex === -1 && !reqVIdStr) {
       existingIndex = cart.items.findIndex((i) => i.productId.toString() === resolvedProductId.toString());
     }
 
@@ -443,10 +462,11 @@ export class CartService {
   }
 
   async updateQuantity(userId: string, productId: string, delta: number, variantId?: string, areaId?: string, storeId?: string) {
+    const t0 = Date.now();
     const product = Types.ObjectId.isValid(productId)
       ? await this.productModel.findById(productId).exec()
       : await this.productModel.findOne({
-          $or: [{ slug: productId }, { name: new RegExp(productId, 'i') }],
+          $or: [{ slug: productId }, { name: productId }],
         }).exec();
 
     const targetIdStr = product ? product._id.toString() : productId;
@@ -470,7 +490,8 @@ export class CartService {
       return !reqVIdStr && !itemVIdStr;
     });
 
-    if (existingIndex === -1) {
+    // Only fall back to an un-varianted entry if no specific variant was requested
+    if (existingIndex === -1 && !reqVIdStr) {
       existingIndex = cart.items.findIndex((i) => i.productId.toString() === targetIdStr || i.productId.toString() === productId);
     }
 
@@ -494,6 +515,8 @@ export class CartService {
     await cart.save();
 
     const summary = await this.getCartSummary(userId, areaId, storeId);
+    const tTotal = Date.now() - t0;
+    console.log(`[CartPerf] user=${userId} | action=updateQty | prod=${targetIdStr} | variant=${reqVIdStr || 'none'} | delta=${delta} | total=${tTotal}ms`);
     this.trackingGateway.emitCartUpdated(userId, summary);
     return summary;
   }
@@ -529,10 +552,11 @@ export class CartService {
   }
 
   async setExactQuantity(userId: string, productId: string, quantity: number, variantId?: string, areaId?: string, storeId?: string) {
+    const t0 = Date.now();
     const product = Types.ObjectId.isValid(productId)
       ? await this.productModel.findById(productId).exec()
       : await this.productModel.findOne({
-          $or: [{ slug: productId }, { name: new RegExp(productId, 'i') }],
+          $or: [{ slug: productId }, { name: productId }],
         }).exec();
 
     const targetIdStr = product ? product._id.toString() : productId;
@@ -556,7 +580,8 @@ export class CartService {
       return !reqVIdStr && !itemVIdStr;
     });
 
-    if (existingIndex === -1) {
+    // Only fall back to an un-varianted entry if no specific variant was requested
+    if (existingIndex === -1 && !reqVIdStr) {
       existingIndex = cart.items.findIndex((i) => i.productId.toString() === targetIdStr || i.productId.toString() === productId);
     }
 
@@ -583,15 +608,18 @@ export class CartService {
     await cart.save();
 
     const summary = await this.getCartSummary(userId, areaId, storeId);
+    const tTotal = Date.now() - t0;
+    console.log(`[CartPerf] user=${userId} | action=setExactQty | prod=${targetIdStr} | variant=${reqVIdStr || 'none'} | qty=${quantity} | total=${tTotal}ms`);
     this.trackingGateway.emitCartUpdated(userId, summary);
     return summary;
   }
 
   async removeItem(userId: string, productId: string, variantId?: string) {
+    const t0 = Date.now();
     const product = Types.ObjectId.isValid(productId)
       ? await this.productModel.findById(productId).exec()
       : await this.productModel.findOne({
-          $or: [{ slug: productId }, { name: new RegExp(productId, 'i') }],
+          $or: [{ slug: productId }, { name: productId }],
         }).exec();
     const targetIdStr = product ? product._id.toString() : productId;
     const reqVIdStr = variantId ? variantId.toString() : '';
@@ -601,7 +629,7 @@ export class CartService {
       const pMatch = i.productId.toString() === targetIdStr || i.productId.toString() === productId;
       if (!pMatch) return true;
       const itemVIdStr = i.variantId ? i.variantId.toString() : '';
-      if (reqVIdStr && itemVIdStr) {
+      if (reqVIdStr) {
         return itemVIdStr !== reqVIdStr;
       }
       return false;
@@ -609,6 +637,8 @@ export class CartService {
     await cart.save();
 
     const summary = await this.getCartSummary(userId);
+    const tTotal = Date.now() - t0;
+    console.log(`[CartPerf] user=${userId} | action=removeItem | prod=${targetIdStr} | variant=${reqVIdStr || 'none'} | total=${tTotal}ms`);
     this.trackingGateway.emitCartUpdated(userId, summary);
     return summary;
   }

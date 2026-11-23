@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -67,17 +67,46 @@ export const BlinkitCartScreen: React.FC = () => {
 
   const [couponInput, setCouponInput] = useState('');
 
+  const feeCalculationItems = useMemo(
+    () =>
+      blinkitCartList.map((item) => ({
+        id: item.product.id,
+        productId: item.product.id,
+        name: item.product.name,
+        price: item.product.sellingPrice,
+        sellingPrice: item.product.sellingPrice,
+        mrp: item.product.mrp,
+        quantity: item.quantity,
+        variantId: (item.product as any).selectedVariantId,
+      })),
+    [blinkitCartList]
+  );
+
+  const cartFingerprint = useMemo(
+    () =>
+      blinkitCartList
+        .map((item) => `${item.product.id}_${(item.product as any).selectedVariantId || ''}_${item.quantity}`)
+        .sort()
+        .join('|'),
+    [blinkitCartList]
+  );
+
+  const latestFingerprintRef = useRef(cartFingerprint);
+  latestFingerprintRef.current = cartFingerprint;
+
   // Check cached delivery fee synchronously to avoid any 1-frame price flicker
   const initialCachedFee = CartService.getCachedDeliveryFee({
     cityName: cityKey,
     areaName: areaKey,
+    storeId: currentStoreId || undefined,
     distanceKm: currentDistanceKm,
-    items: blinkitCartList.map((item) => ({
-      name: item.product.name,
-      price: item.product.sellingPrice,
-      mrp: item.product.mrp,
-      quantity: item.quantity,
-    })),
+    deliveryAddress: {
+      latitude: activeLat,
+      longitude: activeLng,
+      area: areaKey,
+      city: cityKey,
+    },
+    items: feeCalculationItems,
   });
 
   const [dynamicDeliveryFee, setDynamicDeliveryFee] = useState<number | null>(
@@ -92,46 +121,43 @@ export const BlinkitCartScreen: React.FC = () => {
     let isMounted = true;
     const abortController = new AbortController();
     let timer: any = null;
+    const activeFingerprint = cartFingerprint;
 
     const fetchFee = async () => {
-      // Check cache first
+      // 1. Check synchronous compound cache first
       const cached = CartService.getCachedDeliveryFee({
         cityName: cityKey,
         areaName: areaKey,
+        storeId: currentStoreId || undefined,
         distanceKm: currentDistanceKm,
-        items: blinkitCartList.map((item) => ({
-          name: item.product.name,
-          price: item.product.sellingPrice,
-          mrp: item.product.mrp,
-          quantity: item.quantity,
-        })),
+        deliveryAddress: {
+          latitude: activeLat,
+          longitude: activeLng,
+          area: areaKey,
+          city: cityKey,
+        },
+        items: feeCalculationItems,
       });
 
       if (cached) {
-        if (isMounted) {
+        if (isMounted && latestFingerprintRef.current === activeFingerprint) {
           setDynamicDeliveryFee(cached.deliveryFee);
           if (cached.breakdown) {
             setFeeBreakdown(cached.breakdown);
           }
           setIsCalculatingFee(false);
         }
-      } else if (dynamicDeliveryFee === null) {
+        return;
+      }
+
+      if (dynamicDeliveryFee === null) {
         setIsCalculatingFee(true);
       }
 
       try {
         const res = await CartService.calculateDynamicDeliveryFee(
           {
-            items: blinkitCartList.map((item) => ({
-              id: item.product.id,
-              productId: item.product.id,
-              name: item.product.name,
-              price: item.product.sellingPrice,
-              sellingPrice: item.product.sellingPrice,
-              mrp: item.product.mrp,
-              quantity: item.quantity,
-              variantId: (item.product as any).selectedVariantId,
-            })),
+            items: feeCalculationItems,
             cityName: cityKey,
             areaName: areaKey,
             storeId: currentStoreId || undefined,
@@ -142,12 +168,13 @@ export const BlinkitCartScreen: React.FC = () => {
               area: areaKey,
               city: cityKey,
             },
-            forceRefresh: true,
+            forceRefresh: false,
           },
           abortController.signal
         );
 
-        if (isMounted && res) {
+        // Discard response if component unmounted or cart contents changed during in-flight request
+        if (isMounted && res && latestFingerprintRef.current === activeFingerprint) {
           setDynamicDeliveryFee(res.deliveryFee);
           if (res.breakdown) {
             setFeeBreakdown({
@@ -157,27 +184,27 @@ export const BlinkitCartScreen: React.FC = () => {
               areaName: res.areaName || areaKey,
             });
           }
-          // Do not call syncCartFromSummary inside fetchFee to avoid triggering infinite re-renders
         }
       } catch (err: any) {
-        if (err?.name !== 'AbortError') {
+        if (err?.name !== 'AbortError' && err?.name !== 'CanceledError') {
           console.warn('[BlinkitCart] calculate fee error:', err);
         }
       } finally {
-        if (isMounted) {
+        if (isMounted && latestFingerprintRef.current === activeFingerprint) {
           setIsCalculatingFee(false);
         }
       }
     };
 
-    timer = setTimeout(fetchFee, 200);
+    // 400ms debounce to prevent rapid steppers from recalculating on every intermediate click
+    timer = setTimeout(fetchFee, 400);
 
     return () => {
       isMounted = false;
       abortController.abort();
       if (timer) clearTimeout(timer);
     };
-  }, [blinkitCartCount, areaKey, cityKey, activeLat, activeLng, currentStoreId]);
+  }, [cartFingerprint, areaKey, cityKey, activeLat, activeLng, currentStoreId, currentDistanceKm]);
 
   const deliveryFee = dynamicDeliveryFee ?? 0;
   const handlingFee = 5;

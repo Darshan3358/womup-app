@@ -35,9 +35,12 @@ export const FloatingCartPill: React.FC<FloatingCartPillProps> = ({
   // We ensure it never dips below (insets.bottom + 80px) to prevent overlap.
   const effectiveBottom = Math.max(bottomOffset, (insets.bottom || 0) + 80);
 
-  // Pre-warm dynamic delivery fee calculation cache before user navigates to cart
+  // Pre-warm dynamic delivery fee calculation cache before user navigates to cart (debounced 500ms)
   useEffect(() => {
-    if (blinkitCartCount > 0) {
+    if (blinkitCartCount <= 0) return;
+    const abortController = new AbortController();
+
+    const timer = setTimeout(() => {
       const isSavedAddress = selectedAddressSource === 'SAVED' && selectedAddress && selectedAddress.type !== 'Current';
       const matchedArea = matchAreaByName(
         (isSavedAddress ? (selectedAddress?.areaLandmark || (selectedAddress as any)?.area || selectedAddress?.street || selectedAddress?.houseFlat) : null) ||
@@ -54,13 +57,19 @@ export const FloatingCartPill: React.FC<FloatingCartPillProps> = ({
         matchedArea?.name || currentAreaName || selectedAddress?.areaLandmark || 'Prahlad Nagar';
       const cityKey = (isSavedAddress ? selectedAddress?.city : null) || currentCityName || 'Ahmedabad';
 
-      CartService.calculateDynamicDeliveryFee({
-        items: blinkitCartList.map((item) => ({
-          name: item.product.name,
-          price: item.product.sellingPrice,
-          mrp: item.product.mrp,
-          quantity: item.quantity,
-        })),
+      const itemsPayload = blinkitCartList.map((item) => ({
+        id: item.product.id,
+        productId: item.product.id,
+        name: item.product.name,
+        price: item.product.sellingPrice,
+        sellingPrice: item.product.sellingPrice,
+        mrp: item.product.mrp,
+        quantity: item.quantity,
+        variantId: (item.product as any).selectedVariantId,
+      }));
+
+      // Only invoke backend if not already in memory cache
+      const cached = CartService.getCachedDeliveryFee({
         cityName: cityKey,
         areaName: areaKey,
         storeId: currentStoreId || undefined,
@@ -71,8 +80,34 @@ export const FloatingCartPill: React.FC<FloatingCartPillProps> = ({
           area: areaKey,
           city: cityKey,
         },
-      }).catch(() => {});
-    }
+        items: itemsPayload,
+      });
+
+      if (!cached) {
+        CartService.calculateDynamicDeliveryFee(
+          {
+            items: itemsPayload,
+            cityName: cityKey,
+            areaName: areaKey,
+            storeId: currentStoreId || undefined,
+            distanceKm: 1.2,
+            deliveryAddress: {
+              latitude: activeLat,
+              longitude: activeLng,
+              area: areaKey,
+              city: cityKey,
+            },
+            forceRefresh: false,
+          },
+          abortController.signal
+        ).catch(() => {});
+      }
+    }, 500);
+
+    return () => {
+      clearTimeout(timer);
+      abortController.abort();
+    };
   }, [blinkitCartCount, currentAreaName, currentCityName, currentStoreId, selectedAddress, selectedAddressSource]);
 
   if (blinkitCartCount <= 0) return null;

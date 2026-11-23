@@ -2418,12 +2418,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let activeCartKey = getCartKey(targetProdId, resolvedVariantId);
     let existingEntry = latestBlinkitCartRef.current[activeCartKey];
 
-    // If not found with activeCartKey, check if this product is under another key in latestBlinkitCartRef
-    if (!existingEntry) {
+    // If not found with activeCartKey and no specific variant was passed, check for un-suffixed key
+    if (!existingEntry && !variantId) {
       for (const [k, v] of Object.entries(latestBlinkitCartRef.current)) {
         if (!v || v.quantity <= 0) continue;
         const pId = String(v.product?.id || (v.product as any)?._id || '').trim();
-        if (k === targetProdId || k.startsWith(`${targetProdId}_`) || pId === targetProdId) {
+        if (k === targetProdId || pId === targetProdId) {
           activeCartKey = k;
           existingEntry = v;
           resolvedVariantId = (v.product as any)?.selectedVariantId || resolvedVariantId;
@@ -2443,22 +2443,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     // Synchronously mutate latestBlinkitCartRef immediately
-    // Clean up any other keys for this product to prevent duplicate items
-    const keysToDelete: string[] = [];
-    for (const k of Object.keys(latestBlinkitCartRef.current)) {
-      if (k === targetProdId || k.startsWith(`${targetProdId}_`)) {
-        if (finalQty <= 0 || k !== activeCartKey) {
-          keysToDelete.push(k);
-        }
-      }
-    }
-    keysToDelete.forEach((k) => delete latestBlinkitCartRef.current[k]);
-
-    if (finalQty > 0) {
+    if (finalQty <= 0) {
+      delete latestBlinkitCartRef.current[activeCartKey];
+    } else {
       latestBlinkitCartRef.current[activeCartKey] = {
         product: effectiveProd,
         quantity: finalQty,
       };
+      // Clean up legacy un-suffixed key if variant is present
+      if (resolvedVariantId && latestBlinkitCartRef.current[targetProdId]) {
+        delete latestBlinkitCartRef.current[targetProdId];
+      }
     }
 
     // Monotonic mutation sequence number per item for strict stale-response rejection
@@ -2473,18 +2468,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Update React state immediately
     setBlinkitCart((prev) => {
       const copy = { ...prev };
-      for (const k of Object.keys(copy)) {
-        if (k === targetProdId || k.startsWith(`${targetProdId}_`)) {
-          if (finalQty <= 0 || k !== activeCartKey) {
-            delete copy[k];
-          }
-        }
-      }
-      if (finalQty > 0) {
+      if (finalQty <= 0) {
+        delete copy[activeCartKey];
+      } else {
         copy[activeCartKey] = {
           product: effectiveProd,
           quantity: finalQty,
         };
+        if (resolvedVariantId && copy[targetProdId]) {
+          delete copy[targetProdId];
+        }
       }
 
       if (Object.keys(copy).length === 0) {

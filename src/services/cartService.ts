@@ -14,6 +14,32 @@ export interface CartSummary {
   totalCoinsEarnable: number;
 }
 
+export const getDynamicDeliveryFeeCacheKey = (params: {
+  storeId?: string;
+  cityName?: string;
+  areaName?: string;
+  distanceKm?: number;
+  deliveryAddress?: any;
+  items?: any[];
+}): string => {
+  const lat = params.deliveryAddress?.latitude ?? params.deliveryAddress?.lat ?? '';
+  const lng = params.deliveryAddress?.longitude ?? params.deliveryAddress?.lng ?? '';
+  const city = (params.cityName || '').trim().toLowerCase();
+  const area = (params.areaName || '').trim().toLowerCase();
+  const store = (params.storeId || '').trim();
+  const itemsFingerprint = (params.items || [])
+    .map((i: any) => {
+      const pId = String(i.productId || i.product?.id || i.id || i.name || '').trim();
+      const vId = String(i.variantId || i.product?.selectedVariantId || '').trim();
+      const qty = Number(i.quantity) || 1;
+      return `${pId}:${vId}:${qty}`;
+    })
+    .sort()
+    .join('|');
+
+  return `${city}_${area}_${store}_${lat}_${lng}_${params.distanceKm || ''}_${itemsFingerprint}`;
+};
+
 const _feeCache = new Map<string, { data: any; ts: number }>();
 const _inFlightRequests = new Map<string, Promise<any>>();
 
@@ -165,9 +191,7 @@ export const CartService = {
       explanation?: string;
     };
   }> {
-    const lat = params.deliveryAddress?.latitude ?? params.deliveryAddress?.lat ?? '';
-    const lng = params.deliveryAddress?.longitude ?? params.deliveryAddress?.lng ?? '';
-    const cacheKey = `${params.storeId || ''}_${params.areaName || ''}_${lat}_${lng}_${params.items?.length || 0}`;
+    const cacheKey = getDynamicDeliveryFeeCacheKey(params);
 
     // 1. Check completed cache first (60s TTL) - skipped if forceRefresh is true
     if (!params.forceRefresh) {
@@ -258,10 +282,11 @@ export const CartService = {
     cityName?: string;
     areaName?: string;
     distanceKm?: number;
-    items?: Array<{ name?: string; price?: number; mrp?: number; quantity?: number }>;
+    deliveryAddress?: any;
+    items?: Array<any>;
   }): any | null {
     if (params) {
-      const cacheKey = `${params.storeId || ''}_${params.areaName || ''}_${params.cityName || ''}_${params.distanceKm || 3.26}_${params.items?.length || 0}`;
+      const cacheKey = getDynamicDeliveryFeeCacheKey(params);
       const cached = _feeCache.get(cacheKey);
       if (cached && Date.now() - cached.ts < 60000) {
         return cached.data;
