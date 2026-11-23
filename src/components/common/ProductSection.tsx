@@ -15,7 +15,8 @@ import { ChevronRight } from 'lucide-react-native';
 import { COLORS } from '../../theme/colors';
 import { SECTION_ICONS } from '../../theme/sectionIcons';
 import { BlinkitProduct } from '../../types';
-import { useApp } from '../../context/AppContext';
+import { useApp, mapProductToBlinkit } from '../../context/AppContext';
+import { PRODUCTS } from '../../data/products';
 import { ProductSectionSkeleton } from './Skeleton';
 import { resolveImageThumbnail, resolveProductImageSource } from '../../utils/imageUrl';
 
@@ -91,7 +92,59 @@ const ProductSectionComponent: React.FC<ProductSectionProps> = ({
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
 
-  const totalProducts = products?.length || 0;
+  const sectionProducts = useMemo(() => {
+    if (products && products.length > 0) return products;
+    const fallbackList = PRODUCTS.map(mapProductToBlinkit);
+    if (id === 'deals') {
+      const deals = fallbackList.filter((p) => p.mrp > p.sellingPrice);
+      return deals.length > 0 ? deals.slice(0, 10) : fallbackList.slice(0, 8);
+    }
+    if (id === 'fast_delivery') {
+      const fast = fallbackList.filter((p) => p.stock > 0 && p.deliveryMinutes <= 15);
+      return fast.length > 0 ? fast.slice(0, 10) : fallbackList.slice(0, 8);
+    }
+    if (id === 'fresh_veggies') {
+      const veg = fallbackList.filter((p) => {
+        const text = `${p.category || ''} ${p.name || ''}`.toLowerCase();
+        return (
+          text.includes('veg') ||
+          text.includes('fruit') ||
+          text.includes('tomato') ||
+          text.includes('onion') ||
+          text.includes('banana') ||
+          text.includes('potato') ||
+          text.includes('apple')
+        );
+      });
+      return veg.length > 0 ? veg.slice(0, 10) : fallbackList.slice(0, 8);
+    }
+    if (id === 'dairy_bread') {
+      const dairy = fallbackList.filter((p) => {
+        const text = `${p.category || ''} ${p.name || ''}`.toLowerCase();
+        return (
+          text.includes('dairy') ||
+          text.includes('milk') ||
+          text.includes('bread') ||
+          text.includes('egg') ||
+          text.includes('paneer') ||
+          text.includes('butter') ||
+          text.includes('curd')
+        );
+      });
+      return dairy.length > 0 ? dairy.slice(0, 10) : fallbackList.slice(0, 8);
+    }
+    if (id === 'bestsellers') {
+      const bs = fallbackList.filter((p) => p.rating >= 4.5);
+      return bs.length > 0 ? bs.slice(0, 10) : fallbackList.slice(0, 8);
+    }
+    if (id === 'under_50') {
+      const u50 = fallbackList.filter((p) => p.sellingPrice <= 50);
+      return u50.length > 0 ? u50.slice(0, 10) : fallbackList.slice(0, 8);
+    }
+    return fallbackList.slice(0, 8);
+  }, [products, id]);
+
+  const totalProducts = sectionProducts?.length || 0;
   const handleScrollStep = useCallback((dir: 'left' | 'right') => {
     if (totalProducts === 0) return;
     const step = 3;
@@ -304,11 +357,11 @@ const ProductSectionComponent: React.FC<ProductSectionProps> = ({
 
   const IconComponent = iconConfig?.icon;
 
-  if (isLoading && (!products || products.length === 0)) {
+  if (isLoading && sectionProducts.length === 0) {
     return <ProductSectionSkeleton title={title} subtitle={subtitle} />;
   }
 
-  if (!products || products.length === 0) {
+  if (sectionProducts.length === 0) {
     return null;
   }
 
@@ -342,7 +395,7 @@ const ProductSectionComponent: React.FC<ProductSectionProps> = ({
         </View>
 
         <View style={styles.headerRightWrap}>
-          {!isSmall && products.length > 4 && (
+          {!isSmall && sectionProducts.length > 4 && (
             <View style={styles.arrowsWrap}>
               <TouchableOpacity
                 activeOpacity={0.7}
@@ -378,7 +431,7 @@ const ProductSectionComponent: React.FC<ProductSectionProps> = ({
       {/* Horizontal product rail — virtualised */}
       <FlatList
         ref={flatListRef}
-        data={products}
+        data={sectionProducts}
         extraData={blinkitCart}
         horizontal
         keyExtractor={(item) => item.id}

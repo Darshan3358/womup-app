@@ -111,6 +111,7 @@ export const BlinkitHomeScreen: React.FC = () => {
   useEffect(() => {
     let isMounted = true;
     const epoch = ++requestEpochRef.current;
+    setIsLoading(true);
 
     (async () => {
       try {
@@ -303,29 +304,37 @@ export const BlinkitHomeScreen: React.FC = () => {
   // Each entry is one virtualised row. Sections that are heavy (ProductSection)
   // are deferred by FlatList — only visible ones mount.
   type HomeSection =
-    | { type: 'deals' }
-    | { type: 'fast_delivery' }
+    | { type: 'deals'; products: BlinkitProduct[] }
+    | { type: 'fast_delivery'; products: BlinkitProduct[] }
     | { type: 'banner_veggies' }
-    | { type: 'fresh_veggies' }
-    | { type: 'bestsellers' }
+    | { type: 'fresh_veggies'; products: BlinkitProduct[] }
+    | { type: 'bestsellers'; products: BlinkitProduct[] }
     | { type: 'banner_dairy' }
-    | { type: 'dairy_bread' }
+    | { type: 'dairy_bread'; products: BlinkitProduct[] }
     | { type: 'popular_brands' }
-    | { type: 'new_arrivals' }
-    | { type: 'under_50' };
+    | { type: 'new_arrivals'; products: BlinkitProduct[] }
+    | { type: 'under_50'; products: BlinkitProduct[] };
 
   const SECTION_DATA: HomeSection[] = useMemo(() => [
-    { type: 'deals' },
-    { type: 'fast_delivery' },
+    { type: 'deals', products: dealsList },
+    { type: 'fast_delivery', products: fastDeliveryList },
     { type: 'banner_veggies' },
-    { type: 'fresh_veggies' },
-    { type: 'bestsellers' },
+    { type: 'fresh_veggies', products: freshVegFruitsList },
+    { type: 'bestsellers', products: bestsellersList },
     { type: 'banner_dairy' },
-    { type: 'dairy_bread' },
+    { type: 'dairy_bread', products: dairyBreadEggsList },
     { type: 'popular_brands' },
-    { type: 'new_arrivals' },
-    { type: 'under_50' },
-  ], []);
+    { type: 'new_arrivals', products: newArrivalsList },
+    { type: 'under_50', products: under50List },
+  ], [
+    dealsList,
+    fastDeliveryList,
+    freshVegFruitsList,
+    bestsellersList,
+    dairyBreadEggsList,
+    newArrivalsList,
+    under50List,
+  ]);
 
   const renderSection = useCallback(({ item }: { item: HomeSection }) => {
     switch (item.type) {
@@ -335,7 +344,7 @@ export const BlinkitHomeScreen: React.FC = () => {
             id="deals"
             title="Deals of the Day"
             subtitle="Save big on daily essentials"
-            products={dealsList}
+            products={item.products}
             onOpenProduct={handleOpenProductDetail}
             onViewAll={() => setActiveScreen('C15_ProductListing')}
             viewAllText="View All"
@@ -349,7 +358,7 @@ export const BlinkitHomeScreen: React.FC = () => {
             id="fast_delivery"
             title="Fresh Grocery & Essentials"
             subtitle="In stock at your nearest dark store"
-            products={fastDeliveryList}
+            products={item.products}
             onOpenProduct={handleOpenProductDetail}
             onViewAll={() => setActiveScreen('C15_ProductListing')}
             viewAllText="View All"
@@ -386,7 +395,7 @@ export const BlinkitHomeScreen: React.FC = () => {
             id="fresh_veggies"
             title="Fresh Vegetables & Fruits"
             subtitle="Farm fresh, delivered directly to your doorstep"
-            products={freshVegFruitsList}
+            products={item.products}
             onOpenProduct={handleOpenProductDetail}
             onViewAll={() => handleSelectCategory('Vegetables & Fruits', 'c1')}
             viewAllText="View All"
@@ -400,7 +409,7 @@ export const BlinkitHomeScreen: React.FC = () => {
             id="bestsellers"
             title="Bestsellers"
             subtitle="Loved by 1000+ customers"
-            products={bestsellersList}
+            products={item.products}
             onOpenProduct={handleOpenProductDetail}
             onViewAll={() => setActiveScreen('C15_ProductListing')}
             viewAllText="View All"
@@ -437,7 +446,7 @@ export const BlinkitHomeScreen: React.FC = () => {
             id="dairy_bread"
             title="Dairy, Bread & Eggs"
             subtitle="Start your day right"
-            products={dairyBreadEggsList}
+            products={item.products}
             onOpenProduct={handleOpenProductDetail}
             onViewAll={() => handleSelectCategory('Dairy, Bread & Eggs', 'c3')}
             viewAllText="View All"
@@ -458,7 +467,7 @@ export const BlinkitHomeScreen: React.FC = () => {
             id="new_arrivals"
             title="New Arrivals"
             subtitle="Just landed in our stores"
-            products={newArrivalsList}
+            products={item.products}
             onOpenProduct={handleOpenProductDetail}
             onViewAll={() => setActiveScreen('C15_ProductListing')}
             viewAllText="View All"
@@ -472,7 +481,7 @@ export const BlinkitHomeScreen: React.FC = () => {
             id="under_50"
             title="Under ₹50"
             subtitle="Everyday savings"
-            products={under50List}
+            products={item.products}
             onOpenProduct={handleOpenProductDetail}
             onViewAll={() => setActiveScreen('C15_ProductListing')}
             viewAllText="View All"
@@ -483,10 +492,7 @@ export const BlinkitHomeScreen: React.FC = () => {
       default:
         return null;
     }
-  }, [dealsList, fastDeliveryList, freshVegFruitsList, bestsellersList,
-      dairyBreadEggsList, newArrivalsList, under50List, isLoading,
-      handleOpenProductDetail, handleSelectCategory, navigateToProductListing, setActiveScreen,
-      blinkitCart, blinkitCartCount]);
+  }, [isLoading, handleOpenProductDetail, handleSelectCategory, navigateToProductListing, setActiveScreen, blinkitCartCount, activeBanners.length, veggieSpotlight, dairySpotlight]);
 
   const ListHeader = useMemo(() => (
     <>
@@ -587,7 +593,23 @@ export const BlinkitHomeScreen: React.FC = () => {
       {/* Virtualised homepage body — only visible sections are mounted */}
       <FlatList
         data={SECTION_DATA}
-        extraData={blinkitCart}
+        extraData={useMemo(() => ({
+          cart: blinkitCart,
+          cartCount: blinkitCartCount,
+          secKeys: Object.keys(backendSections).join(','),
+          dbProdsCount: dbProducts.length,
+          dealsCount: dealsList.length,
+          fastCount: fastDeliveryList.length,
+          freshCount: freshVegFruitsList.length,
+        }), [
+          blinkitCart,
+          blinkitCartCount,
+          backendSections,
+          dbProducts.length,
+          dealsList.length,
+          fastDeliveryList.length,
+          freshVegFruitsList.length,
+        ])}
         keyExtractor={(item) => item.type}
         renderItem={renderSection}
         ListHeaderComponent={ListHeader}

@@ -266,11 +266,13 @@ export const ProductService = {
     if (res.success && res.data?.items) {
       const mapped: Product[] = res.data.items.map(mapRawItemToProduct);
 
-      // If fetching general catalog, update cachedProducts
+      // If fetching general catalog, update cachedProducts only when non-empty so we never wipe the catalog
       if (!params.categoryId && (!params.categoryIds || params.categoryIds.length === 0) && !params.search) {
-        cachedProducts = mapped;
+        if (mapped.length > 0) {
+          cachedProducts = mapped;
+        }
       }
-      return mapped;
+      return mapped.length > 0 ? mapped : (cachedProducts.length > 0 ? cachedProducts : PRODUCTS);
     }
 
     return cachedProducts.length > 0 ? cachedProducts : PRODUCTS;
