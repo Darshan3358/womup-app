@@ -285,7 +285,7 @@ const BlinkitProductCardComponent: React.FC<BlinkitProductCardProps> = ({
         <Image
           source={resolveProductImageSource(product.imageUrl, product.name, (product as any).slug)}
           style={styles.productImage}
-          resizeMode="contain"
+          resizeMode="cover"
         />
 
         {/* Wishlist Heart Top Right */}
@@ -472,10 +472,10 @@ const styles = StyleSheet.create({
   imageContainer: {
     width: '100%',
     aspectRatio: 1,
-    backgroundColor: '#F7F7F7',
-    borderRadius: 10,
-    position: 'relative',
     overflow: 'hidden',
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
   },

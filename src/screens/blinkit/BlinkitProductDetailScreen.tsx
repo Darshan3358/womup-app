@@ -190,7 +190,7 @@ export const BlinkitProductDetailScreen: React.FC = () => {
                 (product as any).slug
               )}
               style={styles.carouselImage}
-              resizeMode="contain"
+              resizeMode="cover"
             />
           </View>
 
@@ -585,7 +585,7 @@ const styles = StyleSheet.create({
   carouselImage: {
     width: '100%',
     height: '100%',
-    resizeMode: 'contain',
+    resizeMode: 'cover',
   },
   dotsRow: {
     flexDirection: 'row',

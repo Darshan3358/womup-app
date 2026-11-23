@@ -85,7 +85,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             <Image
               source={product.image || resolveProductImageSource(product.imageUrl, product.name, (product as any).slug)}
               style={styles.horizontalImage}
-              resizeMode="contain"
+              resizeMode="cover"
             />
           ) : (
             <View style={styles.iconCircle}>
@@ -200,7 +200,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           <Image
             source={product.image || resolveProductImageSource(product.imageUrl, product.name, (product as any).slug)}
             style={styles.gridProductImage}
-            resizeMode="contain"
+            resizeMode="cover"
           />
         ) : (
           <View style={styles.iconCircleLarge}>
@@ -312,12 +312,12 @@ const styles = StyleSheet.create({
   gridImageContainer: {
     width: '100%',
     aspectRatio: 1,
-    backgroundColor: '#F7F7F7',
+    overflow: 'hidden',
     borderRadius: 10,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,
-    overflow: 'hidden',
   },
   gridProductImage: {
     width: '100%',

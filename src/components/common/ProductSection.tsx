@@ -245,7 +245,7 @@ const ProductSectionComponent: React.FC<ProductSectionProps> = ({
           <Image
             source={resolveProductImageSource(item.imageUrl, item.name, (item as any).slug)}
             style={styles.productImage}
-            resizeMode="contain"
+            resizeMode="cover"
           />
         </TouchableOpacity>
 
@@ -672,9 +672,9 @@ const styles = StyleSheet.create({
   imageContainer: {
     width: '100%',
     aspectRatio: 1,
-    backgroundColor: '#F7F7F7',
-    borderRadius: 10,
     overflow: 'hidden',
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 6,
