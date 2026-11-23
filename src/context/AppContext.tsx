@@ -736,6 +736,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Guard against out-of-order or stale server/socket responses overwriting newer optimistic cart state
   const pendingCartMutationsRef = useRef<Map<string, { expectedQty: number; timestamp: number }>>(new Map());
 
+  // Synchronous latest cart mirror to eliminate React render closure stale-state on rapid clicks
+  const latestBlinkitCartRef = useRef<Record<string, BlinkitCartEntry>>(blinkitCart);
+  latestBlinkitCartRef.current = blinkitCart;
+
+  // Monotonic sequence number per cart item to reject stale responses and prevent out-of-order rollbacks
+  const mutationSeqRef = useRef<Map<string, number>>(new Map());
+
+  // Per-item action queue to serialize quantity updates and coalesce rapid clicks
+  const cartActionQueueRef = useRef<Map<string, Promise<any>>>(new Map());
+  const pendingDesiredQtyRef = useRef<Map<string, number>>(new Map());
+
   const isAuthenticated = !!(
     api.getToken() &&
     user &&
@@ -1021,17 +1032,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
           const resolvedVId = it.variantId || it.variant?.id || it.variant?._id || prod.selectedVariantId;
           const cartKey = getCartKey(resolvedPId, resolvedVId);
-
-          // Check if user mutated this exact item locally recently (< 3 seconds)
-          const pending = pendingCartMutationsRef.current.get(cartKey);
+          const localSeq = mutationSeqRef.current.get(cartKey) || 0;
+          const localEntry = latestBlinkitCartRef.current[cartKey];
 
           let effectiveQty = it.quantity;
-          if (pending && now - pending.timestamp < 3000) {
-            if (pending.expectedQty <= 0) {
-              // User explicitly set to 0 locally: do not restore
+          // Protect user's local optimistic mutation against stale server responses
+          if (localSeq > 0) {
+            if (localEntry !== undefined) {
+              effectiveQty = localEntry.quantity;
+            } else {
+              // Item was explicitly removed locally: do not let server restore it
               return;
             }
-            effectiveQty = pending.expectedQty;
           }
 
           if (effectiveQty <= 0) return;
@@ -1083,20 +1095,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         });
 
-        // 2. Preserve any recent optimistic additions that the server response hasn't captured yet
-        Object.entries(prevBlinkit).forEach(([k, v]) => {
-          const pending = pendingCartMutationsRef.current.get(k);
-          if (pending && now - pending.timestamp < 3000 && pending.expectedQty > 0) {
-            if (!newBlinkitCart[k]) {
-              newBlinkitCart[k] = { ...v, quantity: pending.expectedQty };
-              newCart.push({
-                product: mapBlinkitToProduct(v.product),
-                quantity: pending.expectedQty,
-              });
-            }
+        // 2. Preserve any local optimistic items that the server response hasn't captured yet
+        Object.entries(latestBlinkitCartRef.current).forEach(([k, v]) => {
+          if (!newBlinkitCart[k] && v.quantity > 0) {
+            newBlinkitCart[k] = v;
+            newCart.push({
+              product: mapBlinkitToProduct(v.product),
+              quantity: v.quantity,
+            });
           }
         });
 
+        latestBlinkitCartRef.current = newBlinkitCart;
         setCart(newCart);
         if (Object.keys(newBlinkitCart).length === 0) {
           StorageService.removeItem(StorageService.KEYS.BLINKIT_CART);
@@ -2311,32 +2321,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const getBlinkitQty = useCallback((productId: string, variantId?: string): number => {
     if (!productId) return 0;
     const cleanPId = String(productId).trim();
+    const sourceCart = latestBlinkitCartRef.current || blinkitCart;
 
     // 1. If variantId provided, check exact variant matches ONLY
     if (variantId) {
       const varKey = `${cleanPId}_${variantId}`;
-      if (blinkitCart[varKey]?.quantity !== undefined) {
-        return blinkitCart[varKey].quantity;
+      if (sourceCart[varKey]?.quantity !== undefined) {
+        return sourceCart[varKey].quantity;
       }
       if (
-        blinkitCart[cleanPId]?.quantity !== undefined &&
-        ((blinkitCart[cleanPId]?.product as any)?.selectedVariantId === variantId ||
-         (blinkitCart[cleanPId]?.product as any)?.variantId === variantId)
+        sourceCart[cleanPId]?.quantity !== undefined &&
+        ((sourceCart[cleanPId]?.product as any)?.selectedVariantId === variantId ||
+         (sourceCart[cleanPId]?.product as any)?.variantId === variantId)
       ) {
-        return blinkitCart[cleanPId].quantity;
+        return sourceCart[cleanPId].quantity;
       }
       return 0;
     }
 
     // 2. Direct lookup by cleanPId
-    if (blinkitCart[cleanPId]?.quantity !== undefined) {
-      return blinkitCart[cleanPId].quantity;
+    if (sourceCart[cleanPId]?.quantity !== undefined) {
+      return sourceCart[cleanPId].quantity;
     }
 
     // 3. Aggregate all variants of this product if no specific variant was asked
     let total = 0;
     let foundInBlinkit = false;
-    for (const [k, v] of Object.entries(blinkitCart)) {
+    for (const [k, v] of Object.entries(sourceCart)) {
       const itemPId = String(v.product?.id || (v.product as any)?._id || '');
       if (k === cleanPId || k.startsWith(`${cleanPId}_`) || itemPId === cleanPId) {
         total += v.quantity || 0;
@@ -2377,8 +2388,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       (product.variants && product.variants.find((v) => v.isDefault)?.id);
     const cartKey = getCartKey(targetProdId, resolvedVariantId);
 
-    // Calculate current quantity synchronously upfront
-    const existingEntry = blinkitCart[cartKey] || (resolvedVariantId ? undefined : blinkitCart[targetProdId]);
+    // 1. Synchronously lookup from latest mutable ref to prevent React render closure stale-state on rapid clicks
+    const existingEntry = latestBlinkitCartRef.current[cartKey] || (resolvedVariantId ? undefined : latestBlinkitCartRef.current[targetProdId]);
     const currentQty = existingEntry ? existingEntry.quantity : 0;
 
     const nextQty = Math.max(0, currentQty + delta);
@@ -2390,15 +2401,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       selectedVariantId: resolvedVariantId,
     };
 
-    // Register optimistic pending mutation timestamp to block older server responses from reverting
-    const now = Date.now();
-    pendingCartMutationsRef.current.set(cartKey, { expectedQty: finalQty, timestamp: now });
+    // 2. Synchronously mutate latestBlinkitCartRef immediately so consecutive rapid clicks read the updated quantity
+    if (finalQty <= 0) {
+      delete latestBlinkitCartRef.current[cartKey];
+      if (resolvedVariantId && latestBlinkitCartRef.current[targetProdId] && (latestBlinkitCartRef.current[targetProdId].product as any)?.selectedVariantId === resolvedVariantId) {
+        delete latestBlinkitCartRef.current[targetProdId];
+      }
+    } else {
+      latestBlinkitCartRef.current[cartKey] = {
+        product: effectiveProd,
+        quantity: finalQty,
+      };
+      if (resolvedVariantId && latestBlinkitCartRef.current[targetProdId]) {
+        delete latestBlinkitCartRef.current[targetProdId];
+      }
+    }
 
-    // Snapshot current state for rollback if server request fails
+    // 3. Monotonic mutation sequence number per item for strict stale-response rejection
+    const mutationSeq = (mutationSeqRef.current.get(cartKey) || 0) + 1;
+    mutationSeqRef.current.set(cartKey, mutationSeq);
+    pendingDesiredQtyRef.current.set(cartKey, finalQty);
+
+    // Snapshot current state for rollback if server request fails and no newer mutation has occurred
     const prevBlinkitSnapshot = { ...blinkitCart };
     const prevCartSnapshot = [...cart];
 
-    // 1. Update blinkitCart immediately
+    // 4. Update React state immediately
     setBlinkitCart((prev) => {
       const copy = { ...prev };
       if (finalQty <= 0) {
@@ -2411,7 +2439,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           product: effectiveProd,
           quantity: finalQty,
         };
-        // Clean up un-suffixed key if variant is present to avoid key duplication
         if (resolvedVariantId && copy[targetProdId]) {
           delete copy[targetProdId];
         }
@@ -2425,7 +2452,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return copy;
     });
 
-    // 2. Synchronize to legacy cart immediately
     setCart((prev) => {
       const matchIndex = prev.findIndex((item) => {
         const itemPId = String(item.product.id || (item.product as any)._id || '');
@@ -2446,34 +2472,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     });
 
-    // 3. Sync to backend API with authoritative exact quantity update
+    // 5. Per-Product Queue: serialize network requests per unique cartKey and coalesce rapid clicks
     if (isAuthenticated) {
-      const syncPromise = finalQty > 0
-        ? CartService.setExactQuantityOnServer(
-            targetProdId,
-            finalQty,
-            resolvedVariantId,
-            currentAreaId || undefined,
-            currentStoreId || undefined
-          )
-        : CartService.removeItemFromServer(targetProdId, resolvedVariantId);
-
-      syncPromise
-        .then((serverCart) => {
-          if (serverCart && Array.isArray(serverCart.items)) {
-            syncCartFromSummary(serverCart);
+      const currentQueue = cartActionQueueRef.current.get(cartKey) || Promise.resolve();
+      const nextQueue = currentQueue
+        .then(async () => {
+          // Check if another mutation happened while this request was waiting in queue
+          const targetQty = pendingDesiredQtyRef.current.get(cartKey);
+          if (targetQty === undefined || targetQty !== finalQty) {
+            // A newer mutation has already been scheduled; skip this intermediate API call
+            return;
           }
-          setTimeout(() => {
-            pendingCartMutationsRef.current.delete(cartKey);
-          }, 2000);
+
+          const serverCart = finalQty > 0
+            ? await CartService.setExactQuantityOnServer(
+                targetProdId,
+                finalQty,
+                resolvedVariantId,
+                currentAreaId || undefined,
+                currentStoreId || undefined
+              )
+            : await CartService.removeItemFromServer(targetProdId, resolvedVariantId);
+
+          // Stale response protection: only sync if this response matches the latest mutation sequence
+          if (mutationSeqRef.current.get(cartKey) === mutationSeq) {
+            if (serverCart && Array.isArray(serverCart.items)) {
+              syncCartFromSummary(serverCart);
+            }
+          }
         })
         .catch((err) => {
-          console.warn('[Cart] Server update failed, rolling back local cart state:', err);
-          setBlinkitCart(prevBlinkitSnapshot);
-          setCart(prevCartSnapshot);
-          StorageService.saveItem(StorageService.KEYS.BLINKIT_CART, prevBlinkitSnapshot);
-          pendingCartMutationsRef.current.delete(cartKey);
+          console.warn(`[CartQueue] Sync failed for ${cartKey}:`, err);
+          // Only rollback if no newer mutation has occurred since this request was queued
+          if (mutationSeqRef.current.get(cartKey) === mutationSeq) {
+            setBlinkitCart(prevBlinkitSnapshot);
+            latestBlinkitCartRef.current = prevBlinkitSnapshot;
+            setCart(prevCartSnapshot);
+            StorageService.saveItem(StorageService.KEYS.BLINKIT_CART, prevBlinkitSnapshot);
+          }
         });
+
+      cartActionQueueRef.current.set(cartKey, nextQueue);
     }
   };
 
