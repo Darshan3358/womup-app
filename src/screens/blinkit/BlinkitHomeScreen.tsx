@@ -30,6 +30,55 @@ import {
 import { Product, Category, BlinkitProduct } from '../../types';
 import { api } from '../../services/api';
 
+const getInitialHomeSectionsMap = (): Record<string, BlinkitProduct[]> => {
+  const fallbackList = PRODUCTS.map(mapProductToBlinkit);
+  const map: Record<string, BlinkitProduct[]> = {};
+
+  const deals = fallbackList.filter((p) => p.mrp > p.sellingPrice);
+  map['deals'] = deals.length > 0 ? deals.slice(0, 10) : fallbackList.slice(0, 8);
+
+  const fast = fallbackList.filter((p) => p.stock > 0 && p.deliveryMinutes <= 15);
+  map['fast_delivery'] = fast.length > 0 ? fast.slice(0, 10) : fallbackList.slice(0, 8);
+
+  const veg = fallbackList.filter((p) => {
+    const text = `${p.category || ''} ${p.name || ''}`.toLowerCase();
+    return (
+      text.includes('veg') ||
+      text.includes('fruit') ||
+      text.includes('tomato') ||
+      text.includes('onion') ||
+      text.includes('banana') ||
+      text.includes('potato') ||
+      text.includes('apple')
+    );
+  });
+  map['fresh_veggies'] = veg.length > 0 ? veg.slice(0, 10) : fallbackList.slice(0, 8);
+
+  const dairy = fallbackList.filter((p) => {
+    const text = `${p.category || ''} ${p.name || ''}`.toLowerCase();
+    return (
+      text.includes('dairy') ||
+      text.includes('milk') ||
+      text.includes('bread') ||
+      text.includes('egg') ||
+      text.includes('paneer') ||
+      text.includes('butter') ||
+      text.includes('curd')
+    );
+  });
+  map['dairy_bread'] = dairy.length > 0 ? dairy.slice(0, 10) : fallbackList.slice(0, 8);
+
+  const bs = fallbackList.filter((p) => p.rating >= 4.5);
+  map['bestsellers'] = bs.length > 0 ? bs.slice(0, 10) : fallbackList.slice(0, 8);
+
+  map['new_arrivals'] = fallbackList.slice(0, 8);
+
+  const u50 = fallbackList.filter((p) => p.sellingPrice <= 50);
+  map['under_50'] = u50.length > 0 ? u50.slice(0, 10) : fallbackList.slice(0, 8);
+
+  return map;
+};
+
 export const BlinkitHomeScreen: React.FC = () => {
   const { width } = useWindowDimensions();
   const bannerWidth = Math.min(width - 24, 1400);
@@ -104,14 +153,13 @@ export const BlinkitHomeScreen: React.FC = () => {
     const list = ProductService.getAllProducts();
     return list && list.length > 0 ? list : PRODUCTS;
   });
-  const [backendSections, setBackendSections] = useState<Record<string, BlinkitProduct[]>>({});
+  const [backendSections, setBackendSections] = useState<Record<string, BlinkitProduct[]>>(() => getInitialHomeSectionsMap());
   const requestEpochRef = useRef(0);
 
-  // Fetch unified home data — sections already contain all product lists
+  // Fetch unified home data in background — initial sections are already pre-seeded so zero reload delay
   useEffect(() => {
     let isMounted = true;
     const epoch = ++requestEpochRef.current;
-    setIsLoading(true);
 
     (async () => {
       try {
