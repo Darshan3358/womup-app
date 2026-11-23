@@ -160,7 +160,7 @@ export class CartService {
     for (const entry of cart.items) {
       if (!entry || !entry.productId || entry.quantity <= 0) continue;
       const product = productMap.get(entry.productId.toString());
-      if (product && product.isActive) {
+      if (product && product.isActive !== false) {
         let sellingPrice = Number(product.sellingPrice || 0);
         let mrp = Number(product.mrp || sellingPrice);
         let quantityLabel = product.quantityLabel;
@@ -227,7 +227,7 @@ export class CartService {
             mrp: mrp,
             discountPercent: mrp > sellingPrice ? Math.round(((mrp - sellingPrice) / mrp) * 100) : (product.discountPercent || 0),
             quantityLabel: quantityLabel,
-            stock: product.stock ?? 100,
+            stock: typeof product.stock === 'number' && product.stock > 0 ? product.stock : 100,
           },
           variant: variantObj,
           variantId: activeVIdStr || undefined,

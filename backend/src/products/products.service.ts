@@ -105,7 +105,9 @@ export class ProductsService {
       const effectivePrice = defaultVariant?.price ?? product.sellingPrice;
       const effectiveMrp = defaultVariant?.mrp ?? product.mrp;
       const storeStock = inventoryByProduct.get(prodId);
-      const effectiveStock = storeStock !== undefined ? storeStock : ((product as any).stock ?? 100);
+      const effectiveStock = storeStock !== undefined
+        ? Math.max(0, storeStock)
+        : (typeof (product as any).stock === 'number' && (product as any).stock > 0 ? (product as any).stock : 100);
 
       return {
         ...(product as any).toObject(),

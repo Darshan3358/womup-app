@@ -38,8 +38,8 @@ export const mapProductToBlinkit = (p: Product): BlinkitProduct => ({
   deliveryMinutes: p.deliveryMinutes || 9,
   rating: p.rating || 4.8,
   reviewCount: p.reviewCount || 120,
-  stockUrgency: p.stock < 10 ? `Only ${p.stock} left` : undefined,
-  stock: p.stock || 100,
+  stockUrgency: typeof p.stock === 'number' && p.stock > 0 && p.stock < 10 ? `Only ${p.stock} left` : undefined,
+  stock: typeof p.stock === 'number' && p.stock > 0 ? p.stock : 100,
   imageUrl: p.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&q=80',
   galleryImages: [p.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&q=80'],
   specifications: p.specifications || {},
@@ -75,6 +75,27 @@ export const getCartKey = (productId: string, variantId?: string | null): string
   const pId = String(productId || '').trim();
   const vId = variantId ? String(variantId).trim() : '';
   return vId ? `${pId}_${vId}` : pId;
+};
+
+export const formatCartAuditLog = (
+  tag: string,
+  items: Array<{
+    productId?: string;
+    variantId?: string;
+    productName?: string;
+    quantity?: number;
+    sellingPrice?: number;
+    mrp?: number;
+    canonicalCartKey?: string;
+  }>
+) => {
+  console.log(`[CART_AUDIT] ===== ${tag} (total items: ${items.length}) =====`);
+  items.forEach((item, index) => {
+    console.log(
+      `[CART_AUDIT] #${index + 1} | ${item.productId || 'NONE'} | ${item.variantId || 'NONE'} | ${item.productName || 'UNKNOWN'} | qty: ${item.quantity ?? 0} | sp: ₹${item.sellingPrice ?? 0} | mrp: ₹${item.mrp ?? 0} | key: ${item.canonicalCartKey || 'NONE'}`
+    );
+  });
+  console.log(`[CART_AUDIT] ==========================================`);
 };
 
 const DEFAULT_FALLBACK_PRODUCT: Product = {
@@ -1004,6 +1025,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (Array.isArray(cartSummary.items)) {
       const now = Date.now();
 
+      // Log raw server items before transformation
+      const rawAudit = cartSummary.items.map((it: any) => {
+        const prod = it.product || it;
+        const pId = String(prod.id || prod._id || prod.productId || it.productId || it.id || '').trim();
+        const vId = it.variantId || it.variant?.id || it.variant?._id || prod.selectedVariantId;
+        const vPrice = it.variant?.price ?? prod.sellingPrice ?? prod.price ?? 0;
+        const vMrp = it.variant?.mrp ?? prod.mrp ?? vPrice;
+        return {
+          productId: pId,
+          variantId: vId ? String(vId).trim() : undefined,
+          productName: prod.name || it.name || 'Raw Item',
+          quantity: it.quantity,
+          sellingPrice: Number(vPrice),
+          mrp: Number(vMrp),
+          canonicalCartKey: getCartKey(pId, vId),
+        };
+      });
+      formatCartAuditLog('RAW_SERVER_RESPONSE', rawAudit);
+
       // If server returned empty array and user has no pending additions
       if (cartSummary.items.length === 0) {
         let hasPendingAdditions = false;
@@ -1016,14 +1056,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (!hasPendingAdditions) {
           setCart([]);
           setBlinkitCart({});
+          latestBlinkitCartRef.current = {};
           StorageService.removeItem(StorageService.KEYS.BLINKIT_CART);
+          formatCartAuditLog('SYNCED_CART_RESULT (EMPTY)', []);
           return;
         }
       }
 
       setBlinkitCart((prevBlinkit) => {
         const newBlinkitCart: Record<string, { product: BlinkitProduct; quantity: number }> = {};
-        const processedProductIds = new Set<string>();
+        const processedCanonicalKeys = new Set<string>();
 
         // 1. Process server items, respecting optimistic quantities
         cartSummary.items.forEach((it: any) => {
@@ -1034,14 +1076,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const resolvedVId = it.variantId || it.variant?.id || it.variant?._id || prod.selectedVariantId;
           const cartKey = getCartKey(resolvedPId, resolvedVId);
           const localSeq = mutationSeqRef.current.get(cartKey) || 0;
-          const localEntry = latestBlinkitCartRef.current[cartKey] || (resolvedVId ? undefined : latestBlinkitCartRef.current[resolvedPId]);
+
+          // Robust local entry lookup
+          let localEntry = latestBlinkitCartRef.current[cartKey];
+          if (!localEntry && resolvedVId) {
+            localEntry = latestBlinkitCartRef.current[resolvedPId];
+          }
+          if (!localEntry) {
+            for (const [k, v] of Object.entries(latestBlinkitCartRef.current)) {
+              if (!v || v.quantity <= 0) continue;
+              const pId = String(v.product?.id || (v.product as any)?._id || '').trim();
+              const vId = (v.product as any)?.selectedVariantId;
+              if (pId === resolvedPId && (!resolvedVId || vId === resolvedVId)) {
+                localEntry = v;
+                break;
+              }
+            }
+          }
 
           let effectiveQty = it.quantity;
           // Protect user's local optimistic mutation against stale server responses
           if (localSeq > 0) {
-            if (localEntry !== undefined) {
+            if (localEntry !== undefined && localEntry.quantity > 0) {
               effectiveQty = localEntry.quantity;
-            } else {
+            } else if (pendingDesiredQtyRef.current.get(cartKey) === 0) {
               // Item was explicitly removed locally: do not let server restore it
               return;
             }
@@ -1083,24 +1141,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             product: bp,
             quantity: effectiveQty,
           };
-          processedProductIds.add(resolvedPId);
+          processedCanonicalKeys.add(cartKey);
+          if (resolvedPId) processedCanonicalKeys.add(resolvedPId);
         });
 
         // 2. Preserve any local optimistic items that the server response hasn't captured yet
-        // CRITICAL: NEVER add an item if the server response already returned this product!
+        // Never discard an item that the user has in their local cart unless explicitly removed (desiredQty === 0)
         Object.entries(latestBlinkitCartRef.current).forEach(([k, v]) => {
           if (!v || v.quantity <= 0) return;
           const pId = String(v.product?.id || (v.product as any)?._id || '').trim();
           if (!pId) return;
+          const vId = (v.product as any)?.selectedVariantId;
+          const canonicalKey = getCartKey(pId, vId);
 
-          // If the server response already captured this product, skip to avoid double counting
-          if (processedProductIds.has(pId) || newBlinkitCart[k]) return;
+          if (newBlinkitCart[canonicalKey] || newBlinkitCart[k]) return;
 
-          // Only preserve if there is an active local mutation in flight
-          const hasPending = mutationSeqRef.current.has(k) || pendingDesiredQtyRef.current.has(k);
-          if (hasPending) {
-            newBlinkitCart[k] = v;
-          }
+          const desiredQty = pendingDesiredQtyRef.current.get(canonicalKey) ?? pendingDesiredQtyRef.current.get(k);
+          if (desiredQty === 0) return; // User explicitly deleted
+
+          newBlinkitCart[canonicalKey] = {
+            ...v,
+            product: {
+              ...v.product,
+              selectedVariantId: vId || undefined,
+            },
+          };
         });
 
         // 3. Build unified legacy cart from newBlinkitCart (strictly 1:1)
@@ -1116,6 +1181,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         } else {
           StorageService.saveItem(StorageService.KEYS.BLINKIT_CART, newBlinkitCart);
         }
+
+        const resultAudit = Object.entries(newBlinkitCart).map(([key, entry]) => ({
+          productId: entry.product?.id,
+          variantId: (entry.product as any)?.selectedVariantId,
+          productName: entry.product?.name,
+          quantity: entry.quantity,
+          sellingPrice: entry.product?.sellingPrice,
+          mrp: entry.product?.mrp,
+          canonicalCartKey: key,
+        }));
+        formatCartAuditLog('SYNCED_CART_RESULT', resultAudit);
+
         return newBlinkitCart;
       });
     }
@@ -1996,13 +2073,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Re-reconcile cart whenever user navigates to Cart Screen or returns to Home Screen
   useEffect(() => {
     if ((activeScreen === 'Blinkit_Cart' || activeScreen === 'Blinkit_Home') && (currentAreaId || currentStoreId)) {
-      CartService.getServerCart(currentAreaId || undefined, currentStoreId || undefined)
-        .then((serverCart) => {
-          if (serverCart) {
-            syncCartFromSummary(serverCart);
-          }
-        })
-        .catch(() => {});
+      let isCurrent = true;
+      (async () => {
+        // Log local cart audit before navigation reconciliation
+        const localAudit = Object.entries(latestBlinkitCartRef.current).map(([key, entry]) => ({
+          productId: entry.product?.id,
+          variantId: (entry.product as any)?.selectedVariantId,
+          productName: entry.product?.name,
+          quantity: entry.quantity,
+          sellingPrice: entry.product?.sellingPrice,
+          mrp: entry.product?.mrp,
+          canonicalCartKey: key,
+        }));
+        formatCartAuditLog(`BEFORE_NAV_${activeScreen}`, localAudit);
+
+        // Await any in-flight queue mutations to prevent race conditions
+        const inFlight = Array.from(cartActionQueueRef.current.values());
+        if (inFlight.length > 0) {
+          await Promise.allSettled(inFlight);
+        }
+
+        if (!isCurrent) return;
+
+        const serverCart = await CartService.getServerCart(currentAreaId || undefined, currentStoreId || undefined).catch(() => null);
+        if (isCurrent && serverCart) {
+          syncCartFromSummary(serverCart);
+        }
+      })();
+
+      return () => {
+        isCurrent = false;
+      };
     }
   }, [activeScreen, currentAreaId, currentStoreId, syncCartFromSummary]);
 
@@ -2434,7 +2535,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const currentQty = existingEntry ? existingEntry.quantity : 0;
     const nextQty = Math.max(0, currentQty + delta);
-    const finalQty = product.stock ? Math.min(nextQty, product.stock) : nextQty;
+    const maxStock = typeof product.stock === 'number' && product.stock > 0 ? product.stock : 999;
+    const finalQty = Math.min(nextQty, maxStock);
 
     const effectiveProd: BlinkitProduct = {
       ...product,
@@ -2530,10 +2632,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .catch((err) => {
           console.warn(`[CartQueue] Sync failed for ${activeCartKey}:`, err);
           if (mutationSeqRef.current.get(activeCartKey) === mutationSeq) {
-            setBlinkitCart(prevBlinkitSnapshot);
-            latestBlinkitCartRef.current = prevBlinkitSnapshot;
-            setCart(prevCartSnapshot);
-            StorageService.saveItem(StorageService.KEYS.BLINKIT_CART, prevBlinkitSnapshot);
+            setBlinkitCart((curr) => {
+              const reverted = { ...curr };
+              if (prevBlinkitSnapshot[activeCartKey]) {
+                reverted[activeCartKey] = prevBlinkitSnapshot[activeCartKey];
+              } else {
+                delete reverted[activeCartKey];
+              }
+              latestBlinkitCartRef.current = reverted;
+              StorageService.saveItem(StorageService.KEYS.BLINKIT_CART, reverted);
+              return reverted;
+            });
+            setCart((curr) => {
+              const filtered = curr.filter((i) => String(i.product.id || (i.product as any)._id) !== targetProdId);
+              const prevItem = prevCartSnapshot.find((i) => String(i.product.id || (i.product as any)._id) === targetProdId);
+              return prevItem ? [...filtered, prevItem] : filtered;
+            });
           }
         });
 
