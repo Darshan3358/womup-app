@@ -138,7 +138,7 @@ const BlinkitProductCardComponent: React.FC<BlinkitProductCardProps> = ({
           <Image
             source={resolveProductImageSource(product.imageUrl, product.name, (product as any).slug)}
             style={styles.wishlistProductImage}
-            resizeMode="contain"
+            resizeMode="cover"
           />
           {product.discountBadge && (
             <View style={styles.wishlistDiscountBadge}>
@@ -474,10 +474,8 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     overflow: 'hidden',
     borderRadius: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7F7F7',
     position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   horizontalImageContainer: {
     width: '100%',
@@ -725,21 +723,19 @@ const styles = StyleSheet.create({
   wishlistImageWrapper: {
     width: 105,
     height: 105,
-    aspectRatio: 1,
     borderRadius: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F7F7F7',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
     overflow: 'hidden',
-    padding: 4,
+    padding: 0,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
   wishlistProductImage: {
     width: '100%',
     height: '100%',
-    resizeMode: 'contain',
   },
   wishlistDiscountBadge: {
     position: 'absolute',
