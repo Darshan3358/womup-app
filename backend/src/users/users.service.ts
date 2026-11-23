@@ -2147,10 +2147,22 @@ export class UsersService {
     const newPin = (req.requestedPincode || '').trim();
     user.registrationPincode = newPin;
     user.customerPincode = newPin;
+    user.customerPin = newPin;
+    (user as any).pincode = newPin;
 
     const isEligible = await this.evaluatePincodeEligibility(newPin);
     user.isIncomeEligible = isEligible;
     await user.save();
+
+    // Directly update user's address documents in MongoDB so all subsequent orders and dispatches use the new approved pincode directly
+    try {
+      await this.userModel.db.collection('addresses').updateMany(
+        { userId: user._id },
+        { $set: { pincode: newPin, updatedAt: new Date() } }
+      );
+    } catch (addrErr: any) {
+      this.logger.warn(`Failed updating addresses for user ${user._id}: ${addrErr?.message}`);
+    }
 
     req.status = 'APPROVED';
     req.adminNotes = adminNotes || req.adminNotes || 'Approved by Admin';

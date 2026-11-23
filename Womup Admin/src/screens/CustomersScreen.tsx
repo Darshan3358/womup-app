@@ -43,6 +43,7 @@ import {
   Eye,
   Trash2,
 } from 'lucide-react-native';
+import { DateRangeFilter, DateFilterRange } from '../components/common/DateRangeFilter';
 import { COLORS, RADIUS, SPACING } from '../theme';
 import { useAdminState } from '../context/AdminStateContext';
 import { Customer, DeliveryPartnerItem } from '../types/admin';
@@ -98,6 +99,7 @@ export const CustomersScreen: React.FC = () => {
   const [activeRiderFilter, setActiveRiderFilter] = useState<'All' | 'Online' | 'Approved' | 'Pending'>('All');
   const [selectedCityId, setSelectedCityId] = useState<string>('ALL');
   const [selectedAreaId, setSelectedAreaId] = useState<string>('ALL');
+  const [dateRange, setDateRange] = useState<DateFilterRange>({ preset: 'All Time' });
 
   // Modal pickers
   const [showCityPicker, setShowCityPicker] = useState(false);
@@ -193,6 +195,15 @@ export const CustomersScreen: React.FC = () => {
     }
     if (!matchesSearch || !matchesFilter) return false;
 
+    if (dateRange.startDate) {
+      const cDate = c.createdAt ? new Date(c.createdAt) : null;
+      if (cDate && !isNaN(cDate.getTime())) {
+        const itemDateStr = cDate.toISOString().split('T')[0];
+        if (itemDateStr < dateRange.startDate) return false;
+        if (dateRange.endDate && itemDateStr > dateRange.endDate) return false;
+      }
+    }
+
     const { cityName, areaName } = resolveCustomerHierarchy(c);
 
     if (selectedCityId !== 'ALL' && currentCity) {
@@ -223,6 +234,15 @@ export const CustomersScreen: React.FC = () => {
     else if (activeRiderFilter === 'Pending') matchesFilter = r.status === 'PENDING';
 
     if (!matchesSearch || !matchesFilter) return false;
+
+    if (dateRange.startDate) {
+      const rDate = (r as any).createdAt ? new Date((r as any).createdAt) : null;
+      if (rDate && !isNaN(rDate.getTime())) {
+        const itemDateStr = rDate.toISOString().split('T')[0];
+        if (itemDateStr < dateRange.startDate) return false;
+        if (dateRange.endDate && itemDateStr > dateRange.endDate) return false;
+      }
+    }
 
     const { cityName, areaName } = resolveRiderHierarchy(r);
 
@@ -614,6 +634,13 @@ export const CustomersScreen: React.FC = () => {
             })}
           </View>
         )}
+
+        {/* Date Filter Bar */}
+        <DateRangeFilter
+          currentPreset={dateRange.preset}
+          onFilterChange={setDateRange}
+          compact
+        />
       </View>
 
       {/* Main List */}

@@ -52,6 +52,7 @@ import {
   WalletsSummaryData,
 } from '../types/admin';
 import { ApiService } from '../services/api';
+import { DateRangeFilter, DateFilterRange } from '../components/common/DateRangeFilter';
 
 type ActiveSubTab = 'OVERVIEW' | 'STORES' | 'RIDERS' | 'UPI_SETTLEMENTS' | 'PLATFORM' | 'LEDGER';
 
@@ -101,6 +102,7 @@ export const WalletsRevenueScreen: React.FC = () => {
   // Search & Filter for Ledger
   const [search, setSearch] = useState<string>('');
   const [ledgerFilter, setLedgerFilter] = useState<'ALL' | 'STORE' | 'RIDER' | 'PLATFORM'>('ALL');
+  const [dateRange, setDateRange] = useState<DateFilterRange>({ preset: 'All Time' });
 
   // Store Payout Modal
   const [selectedStore, setSelectedStore] = useState<any | null>(null);
