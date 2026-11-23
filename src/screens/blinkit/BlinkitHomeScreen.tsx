@@ -23,6 +23,7 @@ import { KYCBanner } from '../../components/KYCBanner';
 
 import { useApp, mapProductToBlinkit } from '../../context/AppContext';
 import { ProductService } from '../../services/productService';
+import { PRODUCTS } from '../../data/products';
 import {
   resolveCategoryGroup,
 } from '../../data/blinkitData';
@@ -98,8 +99,11 @@ export const BlinkitHomeScreen: React.FC = () => {
   }, []);
 
   const [activeTab, setActiveTab] = useState('Home');
-  const [isLoading, setIsLoading] = useState(true);
-  const [dbProducts, setDbProducts] = useState<Product[]>(() => ProductService.getAllProducts());
+  const [isLoading, setIsLoading] = useState(false);
+  const [dbProducts, setDbProducts] = useState<Product[]>(() => {
+    const list = ProductService.getAllProducts();
+    return list && list.length > 0 ? list : PRODUCTS;
+  });
   const [backendSections, setBackendSections] = useState<Record<string, BlinkitProduct[]>>({});
   const requestEpochRef = useRef(0);
 
@@ -110,15 +114,12 @@ export const BlinkitHomeScreen: React.FC = () => {
 
     (async () => {
       try {
-        if (dbProducts.length === 0) {
-          setIsLoading(true);
-        }
         const homeData = await ProductService.fetchHomeSections({
           areaId: currentAreaId || undefined,
           storeId: currentStoreId || undefined,
         }).catch(() => null);
 
-        if (!isMounted || epoch !== requestEpochRef.current) return;
+        if (!isMounted) return;
 
         if (homeData && homeData.sections && homeData.sections.length > 0) {
           // Populate section map from the unified home response
@@ -139,11 +140,13 @@ export const BlinkitHomeScreen: React.FC = () => {
               }
             }
           }
-          if (allProds.length > 0) setDbProducts(allProds);
+          if (allProds.length > 0) {
+            setDbProducts(allProds);
+          }
         } else {
           // Fallback: If unified homeData returned empty sections, fetch catalog directly
           const fallbackProds = await ProductService.fetchProducts({ limit: 120 }).catch(() => []);
-          if (isMounted && epoch === requestEpochRef.current && fallbackProds.length > 0) {
+          if (isMounted && fallbackProds.length > 0) {
             setDbProducts(fallbackProds);
           }
         }
@@ -207,34 +210,31 @@ export const BlinkitHomeScreen: React.FC = () => {
   };
 
   // Convert live DB products to BlinkitProduct format
-  const liveBlinkitProducts = useMemo(
-    () => dbProducts.map(mapProductToBlinkit),
-    [dbProducts]
-  );
+  const liveBlinkitProducts = useMemo(() => {
+    const list = dbProducts && dbProducts.length > 0 ? dbProducts : PRODUCTS;
+    return list.map(mapProductToBlinkit);
+  }, [dbProducts]);
 
   // 1. Deals of the Day (combines backend section, live products with discount)
   const dealsList = useMemo(() => {
-    if (isLoading && liveBlinkitProducts.length === 0) return [];
     const fromApi = backendSections['deals'];
     if (fromApi && fromApi.length > 0) return fromApi;
     const liveDeals = liveBlinkitProducts.filter((p) => p.mrp > p.sellingPrice);
     if (liveDeals.length > 0) return liveDeals.slice(0, 10);
     return liveBlinkitProducts.slice(0, 8);
-  }, [isLoading, backendSections, liveBlinkitProducts]);
+  }, [backendSections, liveBlinkitProducts]);
 
   // 2. 9-Minute Delivery (Fast-Moving Items)
   const fastDeliveryList = useMemo(() => {
-    if (isLoading && liveBlinkitProducts.length === 0) return [];
     const fromApi = backendSections['fast_delivery'];
     if (fromApi && fromApi.length > 0) return fromApi;
     const liveFast = liveBlinkitProducts.filter((p) => p.stock > 0 && p.deliveryMinutes <= 15);
     if (liveFast.length > 0) return liveFast.slice(0, 10);
     return liveBlinkitProducts.slice(0, 8);
-  }, [isLoading, backendSections, liveBlinkitProducts]);
+  }, [backendSections, liveBlinkitProducts]);
 
   // 3. Fresh Vegetables & Fruits
   const freshVegFruitsList = useMemo(() => {
-    if (isLoading && liveBlinkitProducts.length === 0) return [];
     const fromApi = backendSections['fresh_veggies'];
     if (fromApi && fromApi.length > 0) return fromApi;
     const liveVeg = liveBlinkitProducts.filter((p) => {
@@ -251,11 +251,10 @@ export const BlinkitHomeScreen: React.FC = () => {
     });
     if (liveVeg.length > 0) return liveVeg.slice(0, 10);
     return liveBlinkitProducts.slice(0, 8);
-  }, [isLoading, backendSections, liveBlinkitProducts]);
+  }, [backendSections, liveBlinkitProducts]);
 
   // 4. Dairy, Bread & Eggs
   const dairyBreadEggsList = useMemo(() => {
-    if (isLoading && liveBlinkitProducts.length === 0) return [];
     const fromApi = backendSections['dairy_bread'];
     if (fromApi && fromApi.length > 0) return fromApi;
     const liveDairy = liveBlinkitProducts.filter((p) => {
@@ -272,36 +271,33 @@ export const BlinkitHomeScreen: React.FC = () => {
     });
     if (liveDairy.length > 0) return liveDairy.slice(0, 10);
     return liveBlinkitProducts.slice(0, 8);
-  }, [isLoading, backendSections, liveBlinkitProducts]);
+  }, [backendSections, liveBlinkitProducts]);
 
   // 5. Bestsellers (Rated 4.5+, high sales)
   const bestsellersList = useMemo(() => {
-    if (isLoading && liveBlinkitProducts.length === 0) return [];
     const fromApi = backendSections['bestsellers'];
     if (fromApi && fromApi.length > 0) return fromApi;
     const liveBs = liveBlinkitProducts.filter((p) => p.rating >= 4.5);
     if (liveBs.length > 0) return liveBs.slice(0, 10);
     return liveBlinkitProducts.slice(0, 8);
-  }, [isLoading, backendSections, liveBlinkitProducts]);
+  }, [backendSections, liveBlinkitProducts]);
 
   // 6. New Arrivals
   const newArrivalsList = useMemo(() => {
-    if (isLoading && liveBlinkitProducts.length === 0) return [];
     const fromApi = backendSections['new_arrivals'];
     if (fromApi && fromApi.length > 0) return fromApi;
     if (liveBlinkitProducts.length > 0) return liveBlinkitProducts.slice(0, 8);
-    return [];
-  }, [isLoading, backendSections, liveBlinkitProducts]);
+    return PRODUCTS.slice(0, 8).map(mapProductToBlinkit);
+  }, [backendSections, liveBlinkitProducts]);
 
   // 7. Under ₹50 (Everyday Savings)
   const under50List = useMemo(() => {
-    if (isLoading && liveBlinkitProducts.length === 0) return [];
     const fromApi = backendSections['under_50'];
     if (fromApi && fromApi.length > 0) return fromApi;
     const liveU50 = liveBlinkitProducts.filter((p) => p.sellingPrice <= 50);
     if (liveU50.length > 0) return liveU50.slice(0, 10);
     return liveBlinkitProducts.slice(0, 8);
-  }, [isLoading, backendSections, liveBlinkitProducts]);
+  }, [backendSections, liveBlinkitProducts]);
 
   // ── FlatList section data ─────────────────────────────────────────────────
   // Each entry is one virtualised row. Sections that are heavy (ProductSection)

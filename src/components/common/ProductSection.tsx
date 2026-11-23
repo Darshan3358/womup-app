@@ -304,7 +304,7 @@ const ProductSectionComponent: React.FC<ProductSectionProps> = ({
 
   const IconComponent = iconConfig?.icon;
 
-  if (isLoading) {
+  if (isLoading && (!products || products.length === 0)) {
     return <ProductSectionSkeleton title={title} subtitle={subtitle} />;
   }
 

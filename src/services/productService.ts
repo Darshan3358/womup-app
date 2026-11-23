@@ -1,11 +1,12 @@
 import { Product, FilterSortState, Category, SubCategory, ProductVariantPriced } from '../types';
 import { api } from './api';
+import { PRODUCTS } from '../data/products';
 
 // ---------------------------------------------------------------------------
 // Simple TTL caches (in-memory, process-lifetime)
 // ---------------------------------------------------------------------------
-// Flat in-memory cache (backward-compat, used by synchronous getters)
-let cachedProducts: Product[] = [];
+// Flat in-memory cache pre-seeded with authoritative 34 catalog products
+let cachedProducts: Product[] = Array.isArray(PRODUCTS) && PRODUCTS.length > 0 ? [...PRODUCTS] : [];
 let cachedCategories: Category[] = [];
 
 let _categoryCacheEntry: { data: Category[]; ts: number } | null = null;
@@ -136,96 +137,93 @@ export const ProductService = {
       console.warn('[ProductService] fetchHomeSections network error:', e);
     }
 
-    // Secondary fallback: synthesize 7 home sections from fetchProducts directly
-    try {
-      const allItems = await ProductService.fetchProducts({ limit: 120 });
-      if (allItems && allItems.length > 0) {
-        cachedProducts = allItems;
-        const synthSections = [
-          {
-            id: 'deals',
-            title: 'Deals of the Day',
-            subtitle: 'Save big on daily essentials',
-            icon: '🔥',
-            products: allItems.filter((p) => p.mrp > p.sellingPrice).slice(0, 8),
-          },
-          {
-            id: 'fast_delivery',
-            title: 'Fresh Grocery & Essentials',
-            subtitle: 'In stock at your nearest dark store',
-            icon: '⚡',
-            products: allItems.slice(0, 8),
-          },
-          {
-            id: 'fresh_veggies',
-            title: 'Fresh Vegetables & Fruits',
-            subtitle: 'Farm fresh, delivered directly to your doorstep',
-            icon: '🌱',
-            products: allItems
-              .filter((p) => {
-                const t = `${p.categoryName || ''} ${p.name || ''}`.toLowerCase();
-                return (
-                  t.includes('veg') ||
-                  t.includes('fruit') ||
-                  t.includes('tomato') ||
-                  t.includes('onion') ||
-                  t.includes('apple') ||
-                  t.includes('banana') ||
-                  t.includes('potato')
-                );
-              })
-              .slice(0, 8),
-          },
-          {
-            id: 'dairy_bread',
-            title: 'Dairy, Bread & Eggs',
-            subtitle: 'Start your day right',
-            icon: '🥛',
-            products: allItems
-              .filter((p) => {
-                const t = `${p.categoryName || ''} ${p.name || ''}`.toLowerCase();
-                return (
-                  t.includes('dairy') ||
-                  t.includes('milk') ||
-                  t.includes('bread') ||
-                  t.includes('egg') ||
-                  t.includes('paneer') ||
-                  t.includes('butter') ||
-                  t.includes('curd')
-                );
-              })
-              .slice(0, 8),
-          },
-          {
-            id: 'bestsellers',
-            title: 'Bestsellers',
-            subtitle: 'Loved by 1000+ customers',
-            icon: '⭐',
-            products: allItems.filter((p) => p.rating >= 4.5).slice(0, 8),
-          },
-          {
-            id: 'new_arrivals',
-            title: 'New Arrivals',
-            subtitle: 'Just landed in our stores',
-            icon: '🆕',
-            products: allItems.slice(0, 8),
-          },
-          {
-            id: 'under_50',
-            title: 'Under ₹50',
-            subtitle: 'Everyday savings',
-            icon: '💰',
-            products: allItems.filter((p) => p.sellingPrice <= 50).slice(0, 8),
-          },
-        ];
+    // Secondary fallback: synthesize 7 home sections from cached/bundled catalog directly
+    const fallbackItems = cachedProducts.length > 0 ? cachedProducts : PRODUCTS;
+    if (fallbackItems && fallbackItems.length > 0) {
+      const synthSections = [
+        {
+          id: 'deals',
+          title: 'Deals of the Day',
+          subtitle: 'Save big on daily essentials',
+          icon: '🔥',
+          products: fallbackItems.filter((p) => p.mrp > p.sellingPrice).slice(0, 10),
+        },
+        {
+          id: 'fast_delivery',
+          title: 'Fresh Grocery & Essentials',
+          subtitle: 'In stock at your nearest dark store',
+          icon: '⚡',
+          products: fallbackItems.slice(0, 10),
+        },
+        {
+          id: 'fresh_veggies',
+          title: 'Fresh Vegetables & Fruits',
+          subtitle: 'Farm fresh, delivered directly to your doorstep',
+          icon: '🌱',
+          products: fallbackItems
+            .filter((p) => {
+              const t = `${p.categoryName || ''} ${p.name || ''} ${p.categorySlug || ''}`.toLowerCase();
+              return (
+                t.includes('veg') ||
+                t.includes('fruit') ||
+                t.includes('tomato') ||
+                t.includes('onion') ||
+                t.includes('apple') ||
+                t.includes('banana') ||
+                t.includes('potato')
+              );
+            })
+            .slice(0, 10),
+        },
+        {
+          id: 'dairy_bread',
+          title: 'Dairy, Bread & Eggs',
+          subtitle: 'Start your day right',
+          icon: '🥛',
+          products: fallbackItems
+            .filter((p) => {
+              const t = `${p.categoryName || ''} ${p.name || ''} ${p.categorySlug || ''}`.toLowerCase();
+              return (
+                t.includes('dairy') ||
+                t.includes('milk') ||
+                t.includes('bread') ||
+                t.includes('egg') ||
+                t.includes('paneer') ||
+                t.includes('butter') ||
+                t.includes('curd')
+              );
+            })
+            .slice(0, 10),
+        },
+        {
+          id: 'bestsellers',
+          title: 'Bestsellers',
+          subtitle: 'Loved by 1000+ customers',
+          icon: '⭐',
+          products: fallbackItems.filter((p) => p.rating >= 4.5).slice(0, 10),
+        },
+        {
+          id: 'new_arrivals',
+          title: 'New Arrivals',
+          subtitle: 'Just landed in our stores',
+          icon: '🆕',
+          products: fallbackItems.slice(0, 10),
+        },
+        {
+          id: 'under_50',
+          title: 'Under ₹50',
+          subtitle: 'Everyday savings',
+          icon: '💰',
+          products: fallbackItems.filter((p) => p.sellingPrice <= 50).slice(0, 10),
+        },
+      ];
 
-        return {
-          hero: [],
-          categories: cachedCategories,
-          sections: synthSections,
-        };
-      }
-    } catch (_) {}
+      return {
+        hero: [],
+        categories: cachedCategories,
+        sections: synthSections,
+      };
+    }
 
     return null;
   },
@@ -275,7 +273,7 @@ export const ProductService = {
       return mapped;
     }
 
-    return cachedProducts;
+    return cachedProducts.length > 0 ? cachedProducts : PRODUCTS;
   },
 
   async fetchCategories(): Promise<Category[]> {
@@ -311,7 +309,7 @@ export const ProductService = {
 
   // --- Synchronous methods backed by current server cache ---
   getAllProducts(): Product[] {
-    return cachedProducts;
+    return cachedProducts.length > 0 ? cachedProducts : PRODUCTS;
   },
 
   getProductById(id: string): Product | undefined {
