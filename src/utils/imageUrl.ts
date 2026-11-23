@@ -20,6 +20,13 @@ export const resolveProductImageSource = (
   const remote = resolveImageUrl(url);
   let optimizedRemote = remote || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80';
 
+  // Optimize Cloudinary URLs with auto format and compression for blazing fast CDN delivery
+  if (optimizedRemote.includes('res.cloudinary.com') && optimizedRemote.includes('/upload/')) {
+    if (!optimizedRemote.includes('/upload/f_auto,q_auto') && !optimizedRemote.includes('/upload/w_')) {
+      optimizedRemote = optimizedRemote.replace('/upload/', '/upload/f_auto,q_auto,w_400,c_fill/');
+    }
+  }
+
   // Optimize Unsplash remote URLs to load fast compressed thumbnails instead of 1200px uncompressed images
   if (optimizedRemote.includes('images.unsplash.com')) {
     optimizedRemote = optimizedRemote
