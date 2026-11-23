@@ -32,13 +32,11 @@ export const resolveImageUrl = (url?: string | null): string => {
     return trimmed;
   }
 
-  // External CDN URLs (Cloudinary, Unsplash, Google, etc.) - keep unchanged
-  if (
-    trimmed.includes('res.cloudinary.com') ||
-    trimmed.includes('images.unsplash.com') ||
-    trimmed.includes('googleusercontent.com')
-  ) {
-    return trimmed;
+  // External HTTP/HTTPS URLs (Cloudinary, Unsplash, Google, Wikimedia, CDNs, etc.) - keep unchanged
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    if (!trimmed.includes('/uploads/files/products/')) {
+      return trimmed;
+    }
   }
 
   // If URL starts with api uploads path
