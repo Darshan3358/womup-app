@@ -216,11 +216,14 @@ export class OrdersService {
             `Sorry, WormUp delivery is currently inactive in PIN code ${orderPincode} (${approvedPin.areaName || approvedPin.cityName}). Please choose a different delivery address.`
           );
         }
-        const areaMatch = await db.collection('areas').findOne({ pincodes: orderPincode });
-        if (areaMatch && areaMatch.isActive === false) {
-          throw new BadRequestException(
-            `Sorry, WormUp delivery is currently inactive in ${areaMatch.name} (PIN code ${orderPincode}).`
-          );
+        const activeArea = await db.collection('areas').findOne({ pincodes: orderPincode, isActive: { $ne: false } });
+        if (!activeArea) {
+          const inactiveMatch = await db.collection('areas').findOne({ pincodes: orderPincode });
+          if (inactiveMatch && inactiveMatch.isActive === false) {
+            throw new BadRequestException(
+              `Sorry, WormUp delivery is currently inactive in ${inactiveMatch.name} (PIN code ${orderPincode}).`
+            );
+          }
         }
       }
     }

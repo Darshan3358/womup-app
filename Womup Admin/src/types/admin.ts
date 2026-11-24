@@ -405,6 +405,8 @@ export interface DarkStoreItem {
   serviceRadiusKm?: number;
   estimatedDeliveryMinutes?: number;
   lastLoginAt?: string;
+  latitude?: number;
+  longitude?: number;
   coordinates?: [number, number];
   createdAt?: string;
 }

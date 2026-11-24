@@ -41,6 +41,7 @@ import {
   Maximize2,
   Minimize2,
   ChevronLeft,
+  Edit3,
 } from 'lucide-react-native';
 import { COLORS, GRADIENTS, RADIUS, SPACING } from '../theme';
 import { ApiService } from '../services/api';
@@ -96,6 +97,28 @@ export const StoresManagementScreen: React.FC = () => {
     loginId: string;
     password: string;
   } | null>(null);
+
+  // Edit Store Modal State
+  const [editModalStore, setEditModalStore] = useState<DarkStoreItem | null>(null);
+  const [editStoreName, setEditStoreName] = useState('');
+  const [editStoreCode, setEditStoreCode] = useState('');
+  const [editLoginId, setEditLoginId] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+  const [editCityId, setEditCityId] = useState('');
+  const [editCityName, setEditCityName] = useState('Ahmedabad');
+  const [editAreaId, setEditAreaId] = useState('');
+  const [editAreaName, setEditAreaName] = useState('');
+  const [editPincode, setEditPincode] = useState('382210');
+  const [editLatitude, setEditLatitude] = useState('22.986131');
+  const [editLongitude, setEditLongitude] = useState('72.495389');
+  const [editRadius, setEditRadius] = useState('6.0');
+  const [editDeliveryMins, setEditDeliveryMins] = useState('9');
+  const [editIsActive, setEditIsActive] = useState(true);
+  const [editIsOnShift, setEditIsOnShift] = useState(true);
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [showEditCityPicker, setShowEditCityPicker] = useState(false);
+  const [showEditAreaPicker, setShowEditAreaPicker] = useState(false);
+  const [editSuccessMsg, setEditSuccessMsg] = useState<string | null>(null);
 
   // Reset Password Modal State
   const [resetModalStore, setResetModalStore] = useState<DarkStoreItem | null>(null);
@@ -326,6 +349,104 @@ export const StoresManagementScreen: React.FC = () => {
       alert(err.message || 'Error occurred creating store.');
     } finally {
       setCreateSubmitting(false);
+    }
+  };
+
+  const openEditStoreModal = (store: DarkStoreItem) => {
+    setEditModalStore(store);
+    setEditStoreName(store.name || '');
+    setEditStoreCode(store.code || '');
+    setEditLoginId(store.loginId || '');
+    setEditAddress(store.address || '');
+    setEditCityId(store.cityId || '');
+    setEditCityName(store.cityName || store.city || 'Ahmedabad');
+    setEditAreaId(store.areaId || '');
+    setEditAreaName(store.areaName || '');
+    setEditPincode(store.pincode || '382210');
+    const latVal = store.latitude ?? (Array.isArray(store.coordinates) ? store.coordinates[0] : 22.986131);
+    const lngVal = store.longitude ?? (Array.isArray(store.coordinates) ? store.coordinates[1] : 72.495389);
+    setEditLatitude(latVal ? String(latVal) : '22.986131');
+    setEditLongitude(lngVal ? String(lngVal) : '72.495389');
+    setEditRadius(store.serviceRadiusKm ? String(store.serviceRadiusKm) : '6.0');
+    setEditDeliveryMins(store.estimatedDeliveryMinutes ? String(store.estimatedDeliveryMinutes) : '9');
+    setEditIsActive(store.isActive !== false);
+    setEditIsOnShift(store.isOnShift !== false);
+    setEditSuccessMsg(null);
+  };
+
+  const handleSelectEditCity = (city: CityItem) => {
+    const cityIdStr = city.id || city._id || '';
+    setEditCityId(cityIdStr);
+    setEditCityName(city.name);
+    setShowEditCityPicker(false);
+  };
+
+  const handleSelectEditArea = (area: Zone) => {
+    const areaIdStr = area.id || area._id || '';
+    setEditAreaId(areaIdStr);
+    setEditAreaName(area.name);
+    setShowEditAreaPicker(false);
+
+    if (area.pincodes && area.pincodes.length > 0) {
+      setEditPincode(area.pincodes[0]);
+    }
+    if (area.centerLat) {
+      setEditLatitude(String(area.centerLat));
+    }
+    if (area.centerLng) {
+      setEditLongitude(String(area.centerLng));
+    }
+    if (area.radiusKm) {
+      setEditRadius(String(area.radiusKm));
+    }
+  };
+
+  const handleSaveEditStore = async () => {
+    if (!editModalStore) return;
+    if (!editStoreName.trim() || !editStoreCode.trim() || !editAddress.trim()) {
+      Alert.alert('Validation Error', 'Store Name, Code, and Address are required.');
+      return;
+    }
+
+    setEditSubmitting(true);
+    try {
+      const payload: any = {
+        name: editStoreName.trim(),
+        code: editStoreCode.trim().toUpperCase(),
+        loginId: editLoginId.trim() || undefined,
+        address: editAddress.trim(),
+        city: editCityName.trim(),
+        cityName: editCityName.trim(),
+        cityId: editCityId || undefined,
+        areaId: editAreaId || undefined,
+        areaName: editAreaName.trim() || undefined,
+        pincode: editPincode.trim(),
+        latitude: parseFloat(editLatitude) || 22.986131,
+        longitude: parseFloat(editLongitude) || 72.495389,
+        serviceRadiusKm: parseFloat(editRadius) || 6.0,
+        estimatedDeliveryMinutes: parseInt(editDeliveryMins, 10) || 9,
+        isActive: editIsActive,
+        isOnShift: editIsOnShift,
+      };
+
+      const res = await ApiService.updateStore(editModalStore.id, payload);
+      if (res.success) {
+        setEditSuccessMsg('Dark Store updated successfully!');
+        await loadStores();
+        if (refreshFromDb) {
+          await refreshFromDb();
+        }
+        setTimeout(() => {
+          setEditModalStore(null);
+          setEditSuccessMsg(null);
+        }, 900);
+      } else {
+        Alert.alert('Update Failed', res.error || 'Failed to update store');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Error saving store');
+    } finally {
+      setEditSubmitting(false);
     }
   };
 
@@ -900,6 +1021,15 @@ export const StoresManagementScreen: React.FC = () => {
                         )}
 
                         <TouchableOpacity
+                          style={styles.editBtn}
+                          onPress={() => openEditStoreModal(store)}
+                          activeOpacity={0.7}
+                        >
+                          <Edit3 size={13} color="#FFFFFF" />
+                          <Text style={styles.editBtnText}>Edit Store</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
                           style={styles.resetBtn}
                           onPress={() => openResetPasswordModal(store)}
                           activeOpacity={0.7}
@@ -1131,6 +1261,14 @@ export const StoresManagementScreen: React.FC = () => {
                             )}
 
                             <TouchableOpacity
+                              style={styles.editBtn}
+                              onPress={() => openEditStoreModal(store)}
+                            >
+                              <Edit3 size={13} color="#FFFFFF" />
+                              <Text style={styles.editBtnText}>Edit Store</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
                               style={styles.resetBtn}
                               onPress={() => openResetPasswordModal(store)}
                             >
@@ -1217,6 +1355,13 @@ export const StoresManagementScreen: React.FC = () => {
                                 ? `Last Login: ${new Date(store.lastLoginAt!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
                                 : 'Shift: Shared Store Tablet'}
                             </Text>
+
+                            <TouchableOpacity
+                              style={styles.footerEditBtn}
+                              onPress={() => openEditStoreModal(store)}
+                            >
+                              <Edit3 size={14} color={COLORS.purple} />
+                            </TouchableOpacity>
 
                             <TouchableOpacity
                               style={styles.deleteBtn}
@@ -1836,6 +1981,358 @@ export const StoresManagementScreen: React.FC = () => {
                         </View>
                       </View>
                       {newAreaName === a.name && <Check size={16} color={COLORS.purple} />}
+                    </TouchableOpacity>
+                  );
+                })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ================= MODAL: EDIT DARK STORE ================= */}
+      <Modal
+        visible={!!editModalStore}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditModalStore(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalPanel}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleRow}>
+                <Edit3 size={20} color={COLORS.purple} />
+                <View>
+                  <Text style={styles.modalTitle}>Edit Dark Store</Text>
+                  <Text style={styles.modalSubtitle}>{editModalStore?.name}</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setEditModalStore(null)}>
+                <X size={20} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            {editSuccessMsg ? (
+              <View style={styles.successCredBox}>
+                <CheckCircle2 size={36} color={COLORS.success} style={{ marginBottom: 12 }} />
+                <Text style={styles.successTitle}>Changes Saved Successfully!</Text>
+                <Text style={styles.successDesc}>{editSuccessMsg}</Text>
+              </View>
+            ) : (
+              <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+                {/* Section 1: Store Status & Shift Controls */}
+                <Text style={styles.inputSectionTitle}>1. Store Status & Availability</Text>
+                <View style={styles.statusToggleRow}>
+                  <TouchableOpacity
+                    style={[
+                      styles.statusToggleBtn,
+                      editIsActive ? styles.statusToggleBtnActive : styles.statusToggleBtnInactive,
+                    ]}
+                    onPress={() => setEditIsActive(!editIsActive)}
+                  >
+                    <CheckCircle2 size={16} color={editIsActive ? COLORS.success : COLORS.error} />
+                    <Text
+                      style={[
+                        styles.statusToggleText,
+                        editIsActive ? styles.statusToggleTextActive : styles.statusToggleTextInactive,
+                      ]}
+                    >
+                      {editIsActive ? 'Store Active (Live)' : 'Store Inactive (Offline)'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.statusToggleBtn,
+                      editIsOnShift ? styles.statusToggleBtnActive : styles.statusToggleBtnInactive,
+                    ]}
+                    onPress={() => setEditIsOnShift(!editIsOnShift)}
+                  >
+                    <Users size={16} color={editIsOnShift ? COLORS.success : COLORS.textMuted} />
+                    <Text
+                      style={[
+                        styles.statusToggleText,
+                        editIsOnShift ? styles.statusToggleTextActive : undefined,
+                      ]}
+                    >
+                      {editIsOnShift ? 'Pickers On-Shift' : 'No Pickers (Off-Shift)'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Section 2: City & Area Assignment */}
+                <Text style={styles.inputSectionTitle}>2. Location Assignment</Text>
+                <Text style={styles.helperText}>
+                  Operating Area and City identity for delivery dispatch.
+                </Text>
+
+                {/* City Picker in Edit Flow */}
+                <Text style={styles.inputLabel}>City *</Text>
+                <TouchableOpacity
+                  style={styles.modalSelectorBtn}
+                  onPress={() => setShowEditCityPicker(true)}
+                >
+                  <View style={styles.cascadeBtnContent}>
+                    <Building2 size={16} color={COLORS.hotPink} />
+                    <Text style={styles.modalSelectorText}>{editCityName || 'Ahmedabad'}</Text>
+                  </View>
+                  <ChevronDown size={16} color={COLORS.textMuted} />
+                </TouchableOpacity>
+
+                {/* Area Picker in Edit Flow */}
+                <Text style={styles.inputLabel}>Operating Area *</Text>
+                <TouchableOpacity
+                  style={[
+                    styles.modalSelectorBtn,
+                    !editAreaName && styles.modalSelectorBtnPlaceholder,
+                  ]}
+                  onPress={() => setShowEditAreaPicker(true)}
+                >
+                  <View style={styles.cascadeBtnContent}>
+                    <MapPin size={16} color={editAreaName ? COLORS.purple : COLORS.textMuted} />
+                    <Text
+                      style={[
+                        styles.modalSelectorText,
+                        !editAreaName && { color: COLORS.textMuted },
+                      ]}
+                    >
+                      {editAreaName || 'Select an area...'}
+                    </Text>
+                  </View>
+                  <ChevronDown size={16} color={COLORS.textMuted} />
+                </TouchableOpacity>
+
+                {/* Section 3: Identity & Login */}
+                <Text style={[styles.inputSectionTitle, { marginTop: 14 }]}>3. Store Identity & Code</Text>
+
+                <Text style={styles.inputLabel}>Store Name *</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="e.g. Wom Up Sarkhej Dark Store"
+                  value={editStoreName}
+                  onChangeText={setEditStoreName}
+                />
+
+                <Text style={styles.inputLabel}>Store Code * (Prefix used in inventory and orders)</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="e.g. SARKHEJ_DS_01"
+                  value={editStoreCode}
+                  onChangeText={(v) => setEditStoreCode(v.toUpperCase())}
+                  autoCapitalize="characters"
+                />
+
+                <Text style={styles.inputLabel}>Store Login ID (Used on Dark Store Tablet)</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="e.g. sarkhej.store"
+                  value={editLoginId}
+                  onChangeText={setEditLoginId}
+                  autoCapitalize="none"
+                />
+
+                {/* Section 4: Address, Coordinates & SLA */}
+                <Text style={[styles.inputSectionTitle, { marginTop: 14 }]}>4. Physical Address & Coordinates</Text>
+
+                <Text style={styles.inputLabel}>Physical Address *</Text>
+                <TextInput
+                  style={[styles.textInput, { height: 50 }]}
+                  placeholder="Shop No, Building, Road, Area"
+                  value={editAddress}
+                  onChangeText={setEditAddress}
+                  multiline
+                />
+
+                <View style={styles.formRow}>
+                  <View style={styles.formCol}>
+                    <Text style={styles.inputLabel}>Pincode *</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      value={editPincode}
+                      onChangeText={setEditPincode}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <View style={styles.formCol}>
+                    <Text style={styles.inputLabel}>Service Radius (km)</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      value={editRadius}
+                      onChangeText={setEditRadius}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.formRow}>
+                  <View style={styles.formCol}>
+                    <Text style={styles.inputLabel}>Est. Delivery SLA (mins)</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      value={editDeliveryMins}
+                      onChangeText={setEditDeliveryMins}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </View>
+
+                {/* GPS Coordinates */}
+                <View style={{ backgroundColor: '#EEF2FF', borderWidth: 1, borderColor: '#C7D2FE', borderRadius: 8, padding: 10, marginTop: 10, marginBottom: 8 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#3730A3', marginBottom: 2 }}>
+                    📍 Store GPS Coordinates
+                  </Text>
+                  <Text style={{ fontSize: 10, color: '#4338CA', lineHeight: 14 }}>
+                    Coordinates are used to calculate the nearest dark store for customer delivery routing.
+                  </Text>
+                </View>
+
+                <View style={styles.formRow}>
+                  <View style={styles.formCol}>
+                    <Text style={styles.inputLabel}>Store Latitude</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      value={editLatitude}
+                      onChangeText={setEditLatitude}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <View style={styles.formCol}>
+                    <Text style={styles.inputLabel}>Store Longitude</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      value={editLongitude}
+                      onChangeText={setEditLongitude}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </View>
+
+                {/* Action Buttons */}
+                <View style={{ marginTop: 16, marginBottom: 12 }}>
+                  <TouchableOpacity
+                    style={styles.submitCreateBtn}
+                    onPress={handleSaveEditStore}
+                    disabled={editSubmitting}
+                  >
+                    <LinearGradient colors={GRADIENTS.primary} style={styles.submitGradient}>
+                      {editSubmitting ? (
+                        <ActivityIndicator size="small" color={COLORS.white} />
+                      ) : (
+                        <>
+                          <CheckCircle2 size={16} color={COLORS.white} style={{ marginRight: 6 }} />
+                          <Text style={styles.submitBtnText}>Save Store Changes</Text>
+                        </>
+                      )}
+                    </LinearGradient>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.doneBtn, { marginTop: 8 }]}
+                    onPress={() => setEditModalStore(null)}
+                    disabled={editSubmitting}
+                  >
+                    <Text style={styles.doneBtnText}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Picker Modal for City in Edit Flow */}
+      <Modal
+        visible={showEditCityPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowEditCityPicker(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalPanel, { maxHeight: 380 }]}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleRow}>
+                <Building2 size={18} color={COLORS.hotPink} />
+                <Text style={styles.modalTitle}>Choose City</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowEditCityPicker(false)}>
+                <X size={18} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalBody}>
+              {activeCities.map((c) => (
+                <TouchableOpacity
+                  key={c.id || c._id || c.name}
+                  style={[
+                    styles.filterOptionItem,
+                    editCityName === c.name && styles.filterOptionItemActive,
+                  ]}
+                  onPress={() => handleSelectEditCity(c)}
+                >
+                  <View style={styles.filterOptionLeft}>
+                    <Text style={styles.cityOptionEmoji}>🏙️</Text>
+                    <Text style={styles.filterOptionText}>{c.name}</Text>
+                  </View>
+                  {editCityName === c.name && <Check size={16} color={COLORS.hotPink} />}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Picker Modal for Area in Edit Flow */}
+      <Modal
+        visible={showEditAreaPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowEditAreaPicker(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalPanel, { maxHeight: 460 }]}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleRow}>
+                <MapPin size={18} color={COLORS.purple} />
+                <View>
+                  <Text style={styles.modalTitle}>Choose Area for Store</Text>
+                  <Text style={styles.modalSubtitle}>Select Operating Area</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setShowEditAreaPicker(false)}>
+                <X size={18} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalBody}>
+              {zones
+                .filter((z) => {
+                  if (!editCityName) return true;
+                  if (z.cityName && z.cityName.toLowerCase() === editCityName.toLowerCase()) return true;
+                  if (z.city && z.city.toLowerCase() === editCityName.toLowerCase()) return true;
+                  if (z.cityId && editCityId && String(z.cityId) === String(editCityId)) return true;
+                  return false;
+                })
+                .map((a) => {
+                  const areaIdStr = a.id || a._id || '';
+                  const isSelected = editAreaName === a.name || editAreaId === areaIdStr;
+                  return (
+                    <TouchableOpacity
+                      key={areaIdStr || a.name}
+                      style={[
+                        styles.filterOptionItem,
+                        isSelected && styles.filterOptionItemActive,
+                      ]}
+                      onPress={() => handleSelectEditArea(a)}
+                    >
+                      <View style={styles.filterOptionLeft}>
+                        <MapPin size={14} color={COLORS.purple} />
+                        <View style={{ flex: 1, marginLeft: 6 }}>
+                          <Text style={styles.filterOptionText}>{a.name}</Text>
+                          {a.pincodes && a.pincodes.length > 0 && (
+                            <Text style={styles.filterOptionSubtext}>
+                              PIN: {a.pincodes.join(', ')}
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                      {isSelected && <Check size={16} color={COLORS.purple} />}
                     </TouchableOpacity>
                   );
                 })}
@@ -3294,5 +3791,67 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: COLORS.error,
+  },
+  editBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.purple,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 4,
+  },
+  editBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  footerEditBtn: {
+    padding: 5,
+    borderRadius: 6,
+    backgroundColor: '#F3E8FF',
+  },
+  statusToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 6,
+    marginBottom: 12,
+  },
+  statusToggleBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.white,
+    gap: 6,
+  },
+  statusToggleBtnActive: {
+    borderColor: COLORS.success,
+    backgroundColor: '#ECFDF5',
+  },
+  statusToggleBtnInactive: {
+    borderColor: COLORS.error,
+    backgroundColor: '#FEF2F2',
+  },
+  statusToggleText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textMuted,
+  },
+  statusToggleTextActive: {
+    color: COLORS.success,
+    fontWeight: '700',
+  },
+  statusToggleTextInactive: {
+    color: COLORS.error,
+    fontWeight: '700',
   },
 });
