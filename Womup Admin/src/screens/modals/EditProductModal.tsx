@@ -29,7 +29,8 @@ import {
 import { COLORS } from '../../theme';
 import { useAdminState } from '../../context/AdminStateContext';
 import { ProductVariantItem } from '../../types/admin';
-import { ApiService } from '../../services/api';
+import { ApiService, API_BASE_URL } from '../../services/api';
+import * as ImagePicker from 'expo-image-picker';
 import { resolveProductImageSource } from '../../utils/imageUrl';
 
 interface FormVariant {
@@ -71,6 +72,7 @@ export const EditProductModal: React.FC = () => {
   // Media
   const [imageUrl, setImageUrl] = useState('');
   const [imagePreview, setImagePreview] = useState('');
+  const [imageSource, setImageSource] = useState<'url' | 'upload' | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
 
   // Variants
@@ -97,6 +99,7 @@ export const EditProductModal: React.FC = () => {
       const img = selectedProduct.imageUrl || selectedProduct.image || '';
       setImageUrl(img);
       setImagePreview(img);
+      setImageSource(img ? 'upload' : null);
       setErrorMsg(null);
 
       // Resolve store & inventory if available
@@ -193,7 +196,64 @@ export const EditProductModal: React.FC = () => {
     setActiveModal('none');
   };
 
-  const handlePickImage = () => {
+  const handlePickImage = async () => {
+    // 1. Native Mobile (iOS/Android) via expo-image-picker
+    if (Platform.OS !== 'web') {
+      try {
+        const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permissionResult.granted) {
+          setErrorMsg('Permission to access photo library is required.');
+          return;
+        }
+
+        const pickerResult = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.85,
+        });
+
+        if (pickerResult.canceled || !pickerResult.assets?.[0]) return;
+        const asset = pickerResult.assets[0];
+
+        setImagePreview(asset.uri);
+        setUploadingImage(true);
+        setErrorMsg(null);
+
+        const formData = new FormData();
+        formData.append('file', {
+          uri: asset.uri,
+          type: asset.mimeType || 'image/jpeg',
+          name: asset.fileName || 'upload.jpg',
+        } as any);
+
+        const res = await fetch(`${API_BASE_URL}/api/v1/media/upload?folder=wormup/products`, {
+          method: 'POST',
+          body: formData,
+        });
+        const json = await res.json();
+
+        if (json.success && json.data) {
+          const uploadedUrl = json.data.url || json.data.secureUrl;
+          if (!uploadedUrl) throw new Error('No URL returned from upload server');
+          setImageUrl(uploadedUrl);
+          setImagePreview(uploadedUrl); // preview = verified CDN URL
+          setImageSource('upload');
+          setErrorMsg(null);
+        } else {
+          throw new Error(json.message || 'Upload failed');
+        }
+      } catch (err: any) {
+        setErrorMsg(err?.message || 'Upload failed. Please try again.');
+        setImagePreview(imageUrl || ''); // rollback
+        setImageSource(imageUrl ? 'upload' : null);
+      } finally {
+        setUploadingImage(false);
+      }
+      return;
+    }
+
+    // 2. Web Browser via input[type=file]
     if (typeof document !== 'undefined') {
       const input = document.createElement('input');
       input.type = 'file';
@@ -221,20 +281,30 @@ export const EditProductModal: React.FC = () => {
 
         try {
           setUploadingImage(true);
+          setErrorMsg(null);
+
           const formData = new FormData();
           formData.append('file', file);
-          const res = await fetch('https://womup-app-uquz.onrender.com/api/v1/media/upload?folder=wormup/products', {
+          const res = await fetch(`${API_BASE_URL}/api/v1/media/upload?folder=wormup/products`, {
             method: 'POST',
             body: formData,
           });
           const json = await res.json();
+
           if (json.success && json.data) {
             const uploadedUrl = json.data.url || json.data.secureUrl;
+            if (!uploadedUrl) throw new Error('No URL returned from upload server');
             setImageUrl(uploadedUrl);
+            setImagePreview(uploadedUrl); // preview = verified CDN URL
+            setImageSource('upload');
             setErrorMsg(null);
+          } else {
+            throw new Error(json.message || 'Upload failed');
           }
-        } catch (err) {
-          console.warn('Image upload error:', err);
+        } catch (err: any) {
+          setErrorMsg(err?.message || 'Upload failed. Please try again.');
+          setImagePreview(imageUrl || ''); // rollback
+          setImageSource(imageUrl ? 'upload' : null);
         } finally {
           setUploadingImage(false);
         }
@@ -339,15 +409,18 @@ export const EditProductModal: React.FC = () => {
       const defaultVar = formattedVariants.find((v) => v.isDefault) || formattedVariants[0];
       const chosenCat = categories.find((c) => c.id === selectedCategoryId) || categories[0];
 
+      const finalImage = (imageUrl || '').trim(); // NEVER save base64 imagePreview to database
+
       const success = await updateProductItem(selectedProduct.id, {
         name: name.trim(),
         category: chosenCat?.name || selectedProduct.category || 'Vegetables',
         categoryId: chosenCat?.id || selectedProduct.categoryId,
         brand: brand.trim() || 'Womup Fresh',
         description: description.trim(),
-        imageUrl: imageUrl || imagePreview,
-        image: imageUrl || imagePreview,
-        images: imageUrl || imagePreview ? [imageUrl || imagePreview] : [],
+        imageUrl: finalImage,
+        image: finalImage,
+        images: finalImage ? [finalImage] : [],
+        thumbnailUrl: finalImage,
         sellingPrice: defaultVar.sellingPrice,
         mrp: defaultVar.mrp,
         basePrice: defaultVar.sellingPrice,
@@ -631,6 +704,7 @@ export const EditProductModal: React.FC = () => {
                         onPress={() => {
                           setImageUrl('');
                           setImagePreview('');
+                          setImageSource(null);
                         }}
                       >
                         <X size={11} color="#FFFFFF" />
@@ -654,8 +728,10 @@ export const EditProductModal: React.FC = () => {
                       placeholderTextColor="#94A3B8"
                       value={imageUrl}
                       onChangeText={(val) => {
-                        setImageUrl(val);
-                        setImagePreview(val);
+                        const trimmed = val.trim();
+                        setImageUrl(trimmed);
+                        setImagePreview(trimmed);
+                        setImageSource(trimmed ? 'url' : null);
                       }}
                     />
                   </View>

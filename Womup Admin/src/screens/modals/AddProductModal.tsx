@@ -28,6 +28,8 @@ import {
 import { useAdminState } from '../../context/AdminStateContext';
 import { ProductVariantItem } from '../../types/admin';
 import { resolveProductImageSource } from '../../utils/imageUrl';
+import { API_BASE_URL } from '../../services/api';
+import * as ImagePicker from 'expo-image-picker';
 
 interface FormVariant {
   id: string;
@@ -53,6 +55,7 @@ export const AddProductModal: React.FC = () => {
   // Image Upload / URL
   const [imageUrl, setImageUrl] = useState('');
   const [imagePreview, setImagePreview] = useState('');
+  const [imageSource, setImageSource] = useState<'url' | 'upload' | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
 
   // Multi-Variant Pack Size Matrix
@@ -99,7 +102,64 @@ export const AddProductModal: React.FC = () => {
     setErrorMsg(null);
   };
 
-  const handlePickImage = () => {
+  const handlePickImage = async () => {
+    // 1. Native Mobile (iOS/Android) via expo-image-picker
+    if (Platform.OS !== 'web') {
+      try {
+        const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permissionResult.granted) {
+          setErrorMsg('Permission to access photo library is required.');
+          return;
+        }
+
+        const pickerResult = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.85,
+        });
+
+        if (pickerResult.canceled || !pickerResult.assets?.[0]) return;
+        const asset = pickerResult.assets[0];
+
+        setImagePreview(asset.uri);
+        setUploadingImage(true);
+        setErrorMsg(null);
+
+        const formData = new FormData();
+        formData.append('file', {
+          uri: asset.uri,
+          type: asset.mimeType || 'image/jpeg',
+          name: asset.fileName || 'upload.jpg',
+        } as any);
+
+        const res = await fetch(`${API_BASE_URL}/api/v1/media/upload?folder=wormup/products`, {
+          method: 'POST',
+          body: formData,
+        });
+        const json = await res.json();
+
+        if (json.success && json.data) {
+          const uploadedUrl = json.data.url || json.data.secureUrl;
+          if (!uploadedUrl) throw new Error('No URL returned from upload server');
+          setImageUrl(uploadedUrl);
+          setImagePreview(uploadedUrl); // preview = verified CDN URL
+          setImageSource('upload');
+          setErrorMsg(null);
+        } else {
+          throw new Error(json.message || 'Upload failed');
+        }
+      } catch (err: any) {
+        setErrorMsg(err?.message || 'Upload failed. Please try again.');
+        setImagePreview(imageUrl || ''); // rollback
+        setImageSource(imageUrl ? 'upload' : null);
+      } finally {
+        setUploadingImage(false);
+      }
+      return;
+    }
+
+    // 2. Web Browser via input[type=file]
     if (typeof document !== 'undefined') {
       const input = document.createElement('input');
       input.type = 'file';
@@ -127,20 +187,30 @@ export const AddProductModal: React.FC = () => {
 
         try {
           setUploadingImage(true);
+          setErrorMsg(null);
+
           const formData = new FormData();
           formData.append('file', file);
-          const res = await fetch('https://womup-app-uquz.onrender.com/api/v1/media/upload?folder=wormup/products', {
+          const res = await fetch(`${API_BASE_URL}/api/v1/media/upload?folder=wormup/products`, {
             method: 'POST',
             body: formData,
           });
           const json = await res.json();
+
           if (json.success && json.data) {
             const uploadedUrl = json.data.url || json.data.secureUrl;
+            if (!uploadedUrl) throw new Error('No URL returned from upload server');
             setImageUrl(uploadedUrl);
+            setImagePreview(uploadedUrl); // preview = verified CDN URL
+            setImageSource('upload');
             setErrorMsg(null);
+          } else {
+            throw new Error(json.message || 'Upload failed');
           }
-        } catch (err) {
-          console.warn('Image upload error:', err);
+        } catch (err: any) {
+          setErrorMsg(err?.message || 'Upload failed. Please try again.');
+          setImagePreview(imageUrl || ''); // rollback
+          setImageSource(imageUrl ? 'upload' : null);
         } finally {
           setUploadingImage(false);
         }
@@ -243,6 +313,7 @@ export const AddProductModal: React.FC = () => {
       }));
 
       const defaultVar = formattedVariants.find((v) => v.isDefault) || formattedVariants[0];
+      const finalImage = (imageUrl || '').trim() || 'https://images.unsplash.com/photo-1546094096-0df4bcaaa337?w=400&q=80';
 
       const success = await addProductItem({
         name: name.trim(),
@@ -250,9 +321,10 @@ export const AddProductModal: React.FC = () => {
         categoryId: chosenCat?.id || '',
         brand: brand.trim() || 'Womup Fresh',
         description: description.trim(),
-        imageUrl: imageUrl || imagePreview || 'https://images.unsplash.com/photo-1546094096-0df4bcaaa337?w=400&q=80',
-        image: imageUrl || imagePreview || 'https://images.unsplash.com/photo-1546094096-0df4bcaaa337?w=400&q=80',
-        images: [imageUrl || imagePreview || 'https://images.unsplash.com/photo-1546094096-0df4bcaaa337?w=400&q=80'],
+        imageUrl: finalImage,
+        image: finalImage,
+        images: [finalImage],
+        thumbnailUrl: finalImage,
         sellingPrice: defaultVar.sellingPrice,
         mrp: defaultVar.mrp,
         basePrice: defaultVar.sellingPrice,
@@ -432,6 +504,7 @@ export const AddProductModal: React.FC = () => {
                         onPress={() => {
                           setImageUrl('');
                           setImagePreview('');
+                          setImageSource(null);
                         }}
                       >
                         <X size={11} color="#FFFFFF" />
@@ -454,8 +527,10 @@ export const AddProductModal: React.FC = () => {
                       placeholderTextColor="#94A3B8"
                       value={imageUrl}
                       onChangeText={(val) => {
-                        setImageUrl(val);
-                        setImagePreview(val);
+                        const trimmed = val.trim();
+                        setImageUrl(trimmed);
+                        setImagePreview(trimmed);
+                        setImageSource(trimmed ? 'url' : null);
                       }}
                     />
                   </View>
