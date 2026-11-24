@@ -82,6 +82,7 @@ export const DashboardScreen: React.FC = () => {
   const availableAreas = useMemo(
     () =>
       zones.filter((z) => {
+        if (z.isActive === false) return false;
         if (selectedCityId === 'ALL') return true;
         if (!currentCity) return true;
         const currentCityIdStr = currentCity.id || currentCity._id;

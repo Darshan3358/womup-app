@@ -46,8 +46,9 @@ export const StaffScreen: React.FC = () => {
     (c) => (c.id && c.id === selectedCityId) || (c._id && c._id === selectedCityId)
   );
 
-  // 2. Resolve Available Areas for Selected City
+  // 2. Resolve Available Areas for Selected City (Database-Driven, Only Active Areas)
   const availableAreas = zones.filter((z) => {
+    if (z.isActive === false) return false;
     if (selectedCityId === 'ALL') return true;
     if (!currentCity) return true;
     const currentCityIdStr = currentCity.id || currentCity._id;
@@ -484,39 +485,47 @@ export const StaffScreen: React.FC = () => {
                   {selectedAreaId === 'ALL' && <Check size={18} color={COLORS.purple} />}
                 </TouchableOpacity>
 
-                {availableAreas
-                  .filter(
-                    (a) =>
-                      a.name.toLowerCase().includes(areaSearch.toLowerCase()) ||
-                      (a.code && a.code.toLowerCase().includes(areaSearch.toLowerCase()))
-                  )
-                  .map((area) => {
-                    const isSelected = selectedAreaId === (area.id || area._id);
-                    return (
-                      <TouchableOpacity
-                        key={area.id || area._id}
-                        style={[styles.modalItem, isSelected && styles.modalItemActive]}
-                        onPress={() => {
-                          setSelectedAreaId(area.id || area._id || '');
-                          setShowAreaPicker(false);
-                          setAreaSearch('');
-                        }}
-                      >
-                        <View style={styles.modalItemLeft}>
-                          <View style={styles.areaMiniDot} />
-                          <View>
-                            <Text style={[styles.modalItemText, isSelected && styles.modalItemTextActive]}>
-                              {area.name}
-                            </Text>
-                            <Text style={styles.modalItemSub}>
-                              {area.darkStore || 'Dark Store Hub'}
-                            </Text>
+                {availableAreas.length === 0 ? (
+                  <View style={{ padding: 24, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 13, color: COLORS.textMuted, textAlign: 'center' }}>
+                      No active areas found. Please add areas from Location Management.
+                    </Text>
+                  </View>
+                ) : (
+                  availableAreas
+                    .filter(
+                      (a) =>
+                        a.name.toLowerCase().includes(areaSearch.toLowerCase()) ||
+                        (a.code && a.code.toLowerCase().includes(areaSearch.toLowerCase()))
+                    )
+                    .map((area) => {
+                      const isSelected = selectedAreaId === (area.id || area._id);
+                      return (
+                        <TouchableOpacity
+                          key={area.id || area._id}
+                          style={[styles.modalItem, isSelected && styles.modalItemActive]}
+                          onPress={() => {
+                            setSelectedAreaId(area.id || area._id || '');
+                            setShowAreaPicker(false);
+                            setAreaSearch('');
+                          }}
+                        >
+                          <View style={styles.modalItemLeft}>
+                            <View style={styles.areaMiniDot} />
+                            <View>
+                              <Text style={[styles.modalItemText, isSelected && styles.modalItemTextActive]}>
+                                {area.name}
+                              </Text>
+                              <Text style={styles.modalItemSub}>
+                                {area.darkStore || 'Dark Store Hub'}
+                              </Text>
+                            </View>
                           </View>
-                        </View>
-                        {isSelected && <Check size={18} color={COLORS.purple} />}
-                      </TouchableOpacity>
-                    );
-                  })}
+                          {isSelected && <Check size={18} color={COLORS.purple} />}
+                        </TouchableOpacity>
+                      );
+                    })
+                )}
               </ScrollView>
             </View>
           </View>

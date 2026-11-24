@@ -173,19 +173,62 @@ export class AdminRealtimeController {
    * Admin Areas List
    */
   @Get(['api/admin/areas', 'admin/areas', 'api/v1/admin/areas'])
-  @ApiOperation({ summary: 'Admin areas list' })
+  @ApiOperation({ summary: 'Admin areas list with populated assigned stores from live MongoDB' })
   async getAdminAreas() {
     try {
       const db = this.db;
       if (!db) return [];
-      const areas = await db.collection('areas').find({}).toArray();
-      return areas.map((a: any) => ({
-        id: a._id?.toString() || a.id,
-        _id: a._id?.toString() || a.id,
-        name: a.name,
-        cityId: a.cityId,
-        isActive: a.isActive ?? true,
-      }));
+      const [areas, stores] = await Promise.all([
+        db.collection('areas').find({ isActive: { $ne: false } }).toArray(),
+        db.collection('stores').find({ isActive: { $ne: false }, deletedAt: { $exists: false } }).toArray(),
+      ]);
+
+      return areas.map((a: any) => {
+        const aId = a._id?.toString() || a.id;
+        const matchingStore = stores.find((s: any) => {
+          if (s.areaId && s.areaId.toString() === aId) return true;
+          if (a.hubStoreId && s._id.toString() === a.hubStoreId.toString()) return true;
+          if (s.areaName && a.name && s.areaName.toLowerCase() === a.name.toLowerCase()) return true;
+          if (a.darkStore && s.name && s.name.toLowerCase() === a.darkStore.toLowerCase()) return true;
+          return false;
+        });
+
+        const assignedStore = matchingStore ? {
+          id: matchingStore._id.toString(),
+          _id: matchingStore._id,
+          name: matchingStore.name,
+          code: matchingStore.code,
+          address: matchingStore.address,
+          coordinates: matchingStore.location?.coordinates || (matchingStore.longitude && matchingStore.latitude ? [matchingStore.longitude, matchingStore.latitude] : undefined),
+          serviceRadiusKm: matchingStore.serviceRadiusKm || 5.0,
+          estimatedDeliveryMinutes: matchingStore.estimatedDeliveryMinutes || 9,
+          isActive: matchingStore.isActive !== false,
+        } : null;
+
+        return {
+          id: aId,
+          _id: aId,
+          name: a.name,
+          code: a.code || a.name?.toUpperCase().replace(/\s+/g, '_'),
+          city: a.cityName || a.city || 'Ahmedabad',
+          cityName: a.cityName || a.city || 'Ahmedabad',
+          cityId: a.cityId?.toString ? a.cityId.toString() : (a.cityId || null),
+          pincodes: a.pincodes || (a.pincode ? [a.pincode] : []),
+          darkStore: matchingStore?.name || a.darkStore || `Wom Up ${a.name} Dark Store`,
+          hubStoreId: matchingStore?._id?.toString() || a.hubStoreId?.toString() || null,
+          assignedStore,
+          assignedStores: assignedStore ? [assignedStore] : [],
+          currentStoreCount: matchingStore ? 1 : 0,
+          maxStores: Math.max(1, Number(a.maxStores) || 1),
+          hasActiveStore: Boolean(matchingStore),
+          isActive: a.isActive !== false,
+          centerLat: a.centerLat || a.latitude,
+          centerLng: a.centerLng || a.longitude,
+          radiusKm: a.radiusKm || 5.0,
+          defaultDeliveryMinutes: a.defaultDeliveryMinutes || 9,
+          updatedAt: a.updatedAt,
+        };
+      });
     } catch {
       return [];
     }
@@ -245,7 +288,7 @@ export class AdminRealtimeController {
 
       const products = await db.collection('products').find({}).toArray();
       const categories = await db.collection('categories').find({}).toArray();
-      const rawAreas = await db.collection('areas').find({}).toArray();
+      const rawAreas = await db.collection('areas').find({ isActive: { $ne: false } }).toArray();
       const rawStores = await db.collection('stores').find({
         deletedAt: { $exists: false },
         isActive: { $ne: false },

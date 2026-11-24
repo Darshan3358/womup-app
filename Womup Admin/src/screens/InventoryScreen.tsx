@@ -47,6 +47,8 @@ export const InventoryScreen: React.FC = () => {
     categories,
     cities,
     zones,
+    selectedZone,
+    setSelectedZone,
     darkStores,
     selectedDarkStore,
     setSelectedDarkStore,
@@ -127,8 +129,9 @@ export const InventoryScreen: React.FC = () => {
     activeCities.find((c) => c.code === 'AHM' || c.name.toLowerCase() === 'ahmedabad') ||
     activeCities[0];
 
-  // 2. Resolve Available Areas for Selected City
+  // 2. Resolve Available Areas for Selected City (Database-Driven, Only Active Areas)
   const availableAreas = zones.filter((z) => {
+    if (z.isActive === false) return false;
     if (!currentCity) return true;
     const currentCityIdStr = currentCity.id || (currentCity as any)._id;
     if (z.cityId && currentCityIdStr && String(z.cityId) === String(currentCityIdStr)) return true;
@@ -167,6 +170,18 @@ export const InventoryScreen: React.FC = () => {
       return true;
     });
   }, [currentArea, currentCity, darkStores]);
+
+  // Auto-sync selectedAreaId to first available active area if not set or invalid
+  useEffect(() => {
+    if (availableAreas.length > 0) {
+      const exists = availableAreas.some((a: any) => (a.id && a.id === selectedAreaId) || ((a as any)._id && (a as any)._id === selectedAreaId));
+      if (!exists && selectedAreaId !== 'ALL') {
+        const firstAreaId = String(availableAreas[0].id || (availableAreas[0] as any)._id || availableAreas[0].name);
+        setSelectedAreaId(firstAreaId);
+        if (setSelectedZone) setSelectedZone(availableAreas[0].name);
+      }
+    }
+  }, [availableAreas, selectedAreaId, setSelectedZone]);
 
   // Default to first store in area when area changes
   useEffect(() => {
@@ -1223,23 +1238,31 @@ export const InventoryScreen: React.FC = () => {
                   <Text style={styles.pickerItemText}>All City Areas ({availableAreas.length})</Text>
                   {selectedAreaId === 'ALL' && <Check size={16} color="#4F46E5" />}
                 </TouchableOpacity>
-                {availableAreas
-                  .filter((a) => a.name.toLowerCase().includes(areaSearch.toLowerCase()))
-                  .map((a) => (
-                    <TouchableOpacity
-                      key={a.id || (a as any)._id}
-                      style={styles.pickerItemRow}
-                      onPress={() => {
-                        setSelectedAreaId(a.id || (a as any)._id);
-                        setShowAreaPicker(false);
-                      }}
-                    >
-                      <Text style={styles.pickerItemText}>
-                        {a.name} • {a.code || 'ZONE'}
-                      </Text>
-                      {currentArea?.id === a.id && <Check size={16} color="#4F46E5" />}
-                    </TouchableOpacity>
-                  ))}
+                {availableAreas.length === 0 ? (
+                  <View style={{ padding: 24, alignItems: 'center' }}>
+                    <Text style={{ color: '#94A3B8', fontSize: 13, textAlign: 'center' }}>
+                      No active areas found. Please add areas from Location Management.
+                    </Text>
+                  </View>
+                ) : (
+                  availableAreas
+                    .filter((a) => a.name.toLowerCase().includes(areaSearch.toLowerCase()) || (a.code && a.code.toLowerCase().includes(areaSearch.toLowerCase())))
+                    .map((a) => (
+                      <TouchableOpacity
+                        key={a.id || (a as any)._id}
+                        style={styles.pickerItemRow}
+                        onPress={() => {
+                          setSelectedAreaId(a.id || (a as any)._id);
+                          setShowAreaPicker(false);
+                        }}
+                      >
+                        <Text style={styles.pickerItemText}>
+                          {a.name} • {a.code || 'ZONE'}
+                        </Text>
+                        {currentArea?.id === a.id && <Check size={16} color="#4F46E5" />}
+                      </TouchableOpacity>
+                    ))
+                )}
               </ScrollView>
             </View>
           </View>

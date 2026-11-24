@@ -85,8 +85,9 @@ export const AreaPricingScreen: React.FC = () => {
     activeCities.find((c) => c.code === 'AHM' || c.name.toLowerCase() === 'ahmedabad') ||
     activeCities[0];
 
-  // 2. Resolve Available Areas for Selected City
+  // 2. Resolve Available Areas for Selected City (Database-Driven, Only Active Areas)
   const availableAreas = zones.filter((z) => {
+    if (z.isActive === false) return false;
     if (!currentCity) return true;
     const currentCityIdStr = currentCity.id || currentCity._id;
     if (z.cityId && currentCityIdStr && String(z.cityId) === String(currentCityIdStr)) return true;
@@ -773,46 +774,54 @@ export const AreaPricingScreen: React.FC = () => {
               </View>
 
               <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={true}>
-                {availableAreas
-                  .filter(
-                    (a) =>
-                      a.name.toLowerCase().includes(areaSearch.toLowerCase()) ||
-                      (a.code && a.code.toLowerCase().includes(areaSearch.toLowerCase()))
-                  )
-                  .map((area) => {
-                    const isSelected =
-                      currentArea?.id === area.id || currentArea?.name === area.name;
-                    return (
-                      <TouchableOpacity
-                        key={area.id || area._id}
-                        style={[styles.modalItem, isSelected && styles.modalItemActive]}
-                        onPress={() => {
-                          setSelectedAreaId(area.id || area._id || '');
-                          setSelectedZone(area.name);
-                          setShowAreaPicker(false);
-                          setAreaSearch('');
-                        }}
-                      >
-                        <View style={styles.modalItemLeft}>
-                          <View style={styles.areaMiniDot} />
-                          <View>
-                            <Text
-                              style={[
-                                styles.modalItemText,
-                                isSelected && styles.modalItemTextActive,
-                              ]}
-                            >
-                              {area.name}
-                            </Text>
-                            <Text style={styles.modalItemSub}>
-                              {area.darkStore || `Wom Up ${area.name} Dark Store`}
-                            </Text>
+                {availableAreas.length === 0 ? (
+                  <View style={{ padding: 24, alignItems: 'center' }}>
+                    <Text style={{ fontSize: 13, color: COLORS.textMuted, textAlign: 'center' }}>
+                      No active areas found. Please add areas from Location Management.
+                    </Text>
+                  </View>
+                ) : (
+                  availableAreas
+                    .filter(
+                      (a) =>
+                        a.name.toLowerCase().includes(areaSearch.toLowerCase()) ||
+                        (a.code && a.code.toLowerCase().includes(areaSearch.toLowerCase()))
+                    )
+                    .map((area) => {
+                      const isSelected =
+                        currentArea?.id === area.id || currentArea?.name === area.name;
+                      return (
+                        <TouchableOpacity
+                          key={area.id || area._id}
+                          style={[styles.modalItem, isSelected && styles.modalItemActive]}
+                          onPress={() => {
+                            setSelectedAreaId(area.id || area._id || '');
+                            setSelectedZone(area.name);
+                            setShowAreaPicker(false);
+                            setAreaSearch('');
+                          }}
+                        >
+                          <View style={styles.modalItemLeft}>
+                            <View style={styles.areaMiniDot} />
+                            <View>
+                              <Text
+                                style={[
+                                  styles.modalItemText,
+                                  isSelected && styles.modalItemTextActive,
+                                ]}
+                              >
+                                {area.name}
+                              </Text>
+                              <Text style={styles.modalItemSub}>
+                                {area.darkStore || `Wom Up ${area.name} Dark Store`}
+                              </Text>
+                            </View>
                           </View>
-                        </View>
-                        {isSelected && <Check size={18} color={COLORS.purple} />}
-                      </TouchableOpacity>
-                    );
-                  })}
+                          {isSelected && <Check size={18} color={COLORS.purple} />}
+                        </TouchableOpacity>
+                      );
+                    })
+                )}
               </ScrollView>
             </View>
           </View>

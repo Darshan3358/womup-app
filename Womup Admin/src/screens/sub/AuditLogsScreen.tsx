@@ -39,6 +39,7 @@ export const AuditLogsScreen: React.FC = () => {
   );
 
   const availableAreas = zones.filter((z) => {
+    if (z.isActive === false) return false;
     if (selectedCityId === 'ALL') return true;
     if (!currentCity) return true;
     const currentCityIdStr = currentCity.id || currentCity._id;

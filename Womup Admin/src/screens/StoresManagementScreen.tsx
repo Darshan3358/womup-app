@@ -111,8 +111,9 @@ export const StoresManagementScreen: React.FC = () => {
   // Active Cities from Admin Context
   const activeCities = cities.filter((c) => c.status === 'Active' || !c.status);
 
-  // Filterable Areas for the currently selected city filter
+  // Filterable Areas for the currently selected city filter (Only Active Areas)
   const filterableAreas = zones.filter((z) => {
+    if (z.isActive === false) return false;
     if (selectedCityFilter === 'ALL') return true;
     const matchedCity = activeCities.find(
       (c) => c.id === selectedCityFilter || c._id === selectedCityFilter || c.name.toLowerCase() === selectedCityFilter.toLowerCase()

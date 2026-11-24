@@ -265,7 +265,8 @@ export const LIVE_PRODUCTS: ProductItem[] = [
     "stockKg": 100,
     "isActive": true,
     "priceHistory": [],
-    "image": "https://images.unsplash.com/photo-1546094096-0df4bcaaa337?w=400&q=80"
+    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTIJ0j-rSi_Kpm_qq75j6_i_yvhhncVtR-nUCoK1Syaag&s=10",
+    "imageUrl": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTIJ0j-rSi_Kpm_qq75j6_i_yvhhncVtR-nUCoK1Syaag&s=10"
   },
   {
     "id": "6aa11866c6c3e5984e2ef616",
@@ -349,7 +350,8 @@ export const LIVE_PRODUCTS: ProductItem[] = [
     "stockKg": 100,
     "isActive": true,
     "priceHistory": [],
-    "image": "https://images.unsplash.com/photo-1488477181946-6428a0291777?w=400&q=80"
+    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTUOrvWNbMVx9pE7z6mW3u1rCX3VyBWjO_WyvZ_273mkQ&s=10",
+    "imageUrl": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTUOrvWNbMVx9pE7z6mW3u1rCX3VyBWjO_WyvZ_273mkQ&s=10"
   },
   {
     "id": "6aa11869c6c3e5984e2ef6f4",
@@ -373,7 +375,8 @@ export const LIVE_PRODUCTS: ProductItem[] = [
     "stockKg": 100,
     "isActive": true,
     "priceHistory": [],
-    "image": "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&q=80"
+    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT_sb7YZyRR7eojX8jeilrU5YfTr-dKKT1kvte4lhwIZA&s=10",
+    "imageUrl": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT_sb7YZyRR7eojX8jeilrU5YfTr-dKKT1kvte4lhwIZA&s=10"
   },
   {
     "id": "6aa11869c6c3e5984e2ef728",
@@ -409,7 +412,8 @@ export const LIVE_PRODUCTS: ProductItem[] = [
     "stockKg": 100,
     "isActive": true,
     "priceHistory": [],
-    "image": "https://images.unsplash.com/photo-1613478223719-2ab802602423?w=400&q=80"
+    "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSemEkrgiWvWbBgAQBbj7XP9t__p_pIi1gtYcJBGnfBIw&s=10",
+    "imageUrl": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSemEkrgiWvWbBgAQBbj7XP9t__p_pIi1gtYcJBGnfBIw&s=10"
   },
   {
     "id": "6aa1186ac6c3e5984e2ef786",
@@ -500,53 +504,12 @@ export const LIVE_PRODUCTS: ProductItem[] = [
 
 export const LIVE_ZONES: Zone[] = [
   {
-    "id": "6aa11866c6c3e5984e2ef5df",
-    "name": "Prahlad Nagar",
-    "darkStore": "Womup Ahmedabad Central Dark Store",
-    "activeOrders": 2,
-    "gmvSharePercent": 52
-  },
-  {
-    "id": "6aa11866c6c3e5984e2ef5e0",
-    "name": "Satellite",
-    "darkStore": "Womup Ahmedabad Central Dark Store",
+    "id": "6b055cd1537e466c32860f2b",
+    "name": "Sarkhej",
+    "darkStore": "Wom Up Sarkhej Dark Store",
     "activeOrders": 0,
-    "gmvSharePercent": 0
-  },
-  {
-    "id": "6aa11866c6c3e5984e2ef5e1",
-    "name": "Navrangpura",
-    "darkStore": "Womup Ahmedabad Central Dark Store",
-    "activeOrders": 0,
-    "gmvSharePercent": 0
-  },
-  {
-    "id": "6aa11866c6c3e5984e2ef5e2",
-    "name": "Ghatlodia",
-    "darkStore": "Womup Ahmedabad Central Dark Store",
-    "activeOrders": 0,
-    "gmvSharePercent": 0
-  },
-  {
-    "id": "6aa11866c6c3e5984e2ef5e3",
-    "name": "Bopal",
-    "darkStore": "Womup Ahmedabad Central Dark Store",
-    "activeOrders": 0,
-    "gmvSharePercent": 0
-  },
-  {
-    "id": "6aa11866c6c3e5984e2ef5e4",
-    "name": "SG Highway",
-    "darkStore": "Womup Ahmedabad Central Dark Store",
-    "activeOrders": 1,
-    "gmvSharePercent": 48
-  },
-  {
-    "id": "6aa11866c6c3e5984e2ef5e5",
-    "name": "Thaltej",
-    "darkStore": "Womup Ahmedabad Central Dark Store",
-    "activeOrders": 0,
-    "gmvSharePercent": 0
+    "gmvSharePercent": 100,
+    "isActive": true
   }
 ];
 

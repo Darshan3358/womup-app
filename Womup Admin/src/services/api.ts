@@ -483,7 +483,9 @@ export const ApiService = {
 
         // 6. DYNAMICALLY MAP OPERATIONAL ZONES (AREAS) FROM LIVE MONGODB
         const dynamicZones: Zone[] = (data.areas && data.areas.length > 0)
-          ? data.areas.map((a: any, idx: number) => {
+          ? data.areas
+              .filter((a: any) => a && a.isActive !== false)
+              .map((a: any, idx: number) => {
               const maxStores = Math.max(1, Number(a.maxStores) || 1);
               const currentStoreCount = Number(a.currentStoreCount) || (a.assignedStores ? a.assignedStores.length : (a.assignedStore || a.hasActiveStore ? 1 : 0));
               const availableSlots = a.availableSlots !== undefined ? Number(a.availableSlots) : Math.max(0, maxStores - currentStoreCount);
@@ -755,6 +757,48 @@ export const ApiService = {
   }
   return cachedLiveSnapshot;
 },
+
+  // 0. FETCH AUTHORITATIVE ACTIVE AREAS FROM LIVE MONGODB
+  async getAllAreas(): Promise<Zone[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/admin/areas`);
+      const json = await res.json();
+      const raw = Array.isArray(json) ? json : (json?.data || []);
+      return raw
+        .filter((a: any) => a && a.isActive !== false)
+        .map((a: any, idx: number) => ({
+          id: a.id || a._id?.toString() || a._id || `z${idx + 1}`,
+          _id: a._id,
+          name: a.name,
+          code: a.code || a.name?.toUpperCase().replace(/\s+/g, '_'),
+          darkStore: a.darkStore || a.assignedStore?.name || `Wom Up ${a.name} Dark Store`,
+          address: a.address || `${a.name}, ${a.cityName || a.city || 'Ahmedabad'}`,
+          city: a.cityName || a.city || 'Ahmedabad',
+          cityName: a.cityName || a.city || 'Ahmedabad',
+          cityId: a.cityId?.toString ? a.cityId.toString() : (a.cityId || null),
+          isActive: a.isActive !== false,
+          activeOrders: 0,
+          gmvSharePercent: 0,
+          hasActiveStore: a.hasActiveStore || Boolean(a.assignedStore),
+          assignedStore: a.assignedStore || null,
+          assignedStores: a.assignedStores || (a.assignedStore ? [a.assignedStore] : []),
+          centerLat: a.centerLat,
+          centerLng: a.centerLng,
+          radiusKm: a.radiusKm,
+          defaultDeliveryMinutes: a.defaultDeliveryMinutes || 9,
+          pincodes: a.pincodes,
+          sortOrder: a.sortOrder,
+          maxStores: a.maxStores || 1,
+          currentStoreCount: a.currentStoreCount || (a.assignedStore ? 1 : 0),
+          availableSlots: a.availableSlots || 0,
+          isFull: a.isFull || false,
+          storeRoutingStrategy: a.storeRoutingStrategy || 'NEAREST',
+        }));
+    } catch (err) {
+      console.error('[API] Error fetching admin areas:', err);
+      return [];
+    }
+  },
 
   // 1. PERSIST CUSTOMER EDIT TO LIVE MONGODB
   async updateCustomer(id: string, data: Partial<Customer>): Promise<boolean> {
