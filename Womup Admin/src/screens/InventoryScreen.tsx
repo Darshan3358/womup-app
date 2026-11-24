@@ -38,6 +38,7 @@ import {
 import { useAdminState } from '../context/AdminStateContext';
 import { ProductItem, ProductVariantItem } from '../types/admin';
 import { ApiService } from '../services/api';
+import { resolveProductImageSource } from '../utils/localProductAssets';
 import { InventoryListSkeleton } from '../components/common/Skeleton';
 
 export const InventoryScreen: React.FC = () => {
@@ -909,17 +910,11 @@ export const InventoryScreen: React.FC = () => {
                 {/* TOP SECTION: THUMBNAIL, INFO, PRICE, STOCK */}
                 <View style={styles.inventoryCardTopRow}>
                   {/* Thumbnail */}
-                  {thumbUrl ? (
-                    <Image
-                      source={{ uri: thumbUrl }}
-                      style={styles.inventoryCardThumb}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View style={[styles.inventoryCardThumb, { backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }]}>
-                      <Package size={20} color="#94A3B8" />
-                    </View>
-                  )}
+                  <Image
+                    source={resolveProductImageSource(p.image || p.imageUrl, p.name, (p as any).slug)}
+                    style={styles.inventoryCardThumb}
+                    resizeMode="cover"
+                  />
 
                   {/* Middle Info Column */}
                   <View style={styles.inventoryCardInfoCol}>

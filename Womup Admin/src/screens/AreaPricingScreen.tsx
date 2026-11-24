@@ -38,6 +38,7 @@ import {
 } from 'lucide-react-native';
 import { COLORS, RADIUS, SPACING } from '../theme';
 import { useAdminState } from '../context/AdminStateContext';
+import { resolveProductImageSource } from '../utils/localProductAssets';
 import { CategoryItem, ProductItem, ProductVariantItem } from '../types/admin';
 
 export const AreaPricingScreen: React.FC = () => {
@@ -452,17 +453,11 @@ export const AreaPricingScreen: React.FC = () => {
                 {/* TOP HEADER: THUMBNAIL, INFO, ACTIONS */}
                 <View style={styles.pricingCardTopRow}>
                   {/* Thumbnail Image */}
-                  {thumbUrl ? (
-                    <Image
-                      source={{ uri: thumbUrl }}
-                      style={styles.productThumbImg}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View style={[styles.productThumbImg, { backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }]}>
-                      <Package size={18} color="#94A3B8" />
-                    </View>
-                  )}
+                  <Image
+                    source={resolveProductImageSource(p.image || p.imageUrl, p.name, (p as any).slug)}
+                    style={styles.productThumbImg}
+                    resizeMode="cover"
+                  />
 
                   {/* Middle Info */}
                   <View style={styles.productInfoCol}>

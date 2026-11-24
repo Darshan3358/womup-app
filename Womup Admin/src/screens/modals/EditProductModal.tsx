@@ -30,6 +30,7 @@ import { COLORS } from '../../theme';
 import { useAdminState } from '../../context/AdminStateContext';
 import { ProductVariantItem } from '../../types/admin';
 import { ApiService } from '../../services/api';
+import { resolveProductImageSource } from '../../utils/localProductAssets';
 
 interface FormVariant {
   id: string;
@@ -606,7 +607,7 @@ export const EditProductModal: React.FC = () => {
                   {imagePreview || imageUrl ? (
                     <>
                       <Image
-                        source={{ uri: imagePreview || imageUrl }}
+                        source={imagePreview ? { uri: imagePreview } : resolveProductImageSource(imageUrl, selectedProduct?.name, (selectedProduct as any)?.slug)}
                         style={styles.photoImg}
                         resizeMode="cover"
                       />

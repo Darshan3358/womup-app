@@ -27,6 +27,7 @@ import {
 } from 'lucide-react-native';
 import { useAdminState } from '../../context/AdminStateContext';
 import { ProductVariantItem } from '../../types/admin';
+import { resolveProductImageSource } from '../../utils/localProductAssets';
 
 interface FormVariant {
   id: string;
@@ -421,7 +422,7 @@ export const AddProductModal: React.FC = () => {
                   {imagePreview || imageUrl ? (
                     <>
                       <Image
-                        source={{ uri: imagePreview || imageUrl }}
+                        source={imagePreview ? { uri: imagePreview } : resolveProductImageSource(imageUrl, name)}
                         style={styles.photoImg}
                         resizeMode="cover"
                       />

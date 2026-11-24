@@ -1,7 +1,46 @@
 import { Platform } from 'react-native';
+import { getLocalProductAsset } from './localProductAssets';
 
 const getUploadsBaseUrl = (): string => {
   return 'https://womup-app-uquz.onrender.com';
+};
+
+/**
+ * Universal Image Source Resolver
+ * Prioritizes 34 local bundled assets for 0ms loading, falling back to remote URLs.
+ */
+export const resolveProductImageSource = (
+  url?: string | null,
+  name?: string | null,
+  slug?: string | null,
+): any => {
+  const local = getLocalProductAsset(url, name, slug);
+  if (local) return local;
+
+  const remote = resolveImageUrl(url);
+  let optimizedRemote = remote || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80';
+
+  // Optimize Cloudinary URLs with auto format and uniform 400x400 padded fit
+  if (optimizedRemote.includes('res.cloudinary.com') && optimizedRemote.includes('/upload/')) {
+    if (!optimizedRemote.includes('/upload/f_auto,q_auto') && !optimizedRemote.includes('/upload/w_')) {
+      optimizedRemote = optimizedRemote.replace('/upload/', '/upload/f_auto,q_auto,w_400,h_400,c_pad,b_rgb:F7F7F7/');
+    }
+  }
+
+  // Optimize Unsplash remote URLs to load fast compressed thumbnails instead of 1200px uncompressed images
+  if (optimizedRemote.includes('images.unsplash.com')) {
+    optimizedRemote = optimizedRemote
+      .replace(/w=\d+/, 'w=400')
+      .replace(/q=\d+/, 'q=80');
+    if (!optimizedRemote.includes('auto=format')) {
+      optimizedRemote = `${optimizedRemote}&auto=format`;
+    }
+  }
+
+  return {
+    uri: optimizedRemote,
+    cache: 'force-cache',
+  };
 };
 
 /**
@@ -20,13 +59,17 @@ export const resolveImageUrl = (url?: string | null): string => {
     return trimmed;
   }
 
-  // External CDN URLs (Cloudinary, Unsplash, Google, etc.) - keep unchanged
-  if (
-    trimmed.includes('res.cloudinary.com') ||
-    trimmed.includes('images.unsplash.com') ||
-    trimmed.includes('googleusercontent.com')
-  ) {
-    return trimmed;
+  // External HTTP/HTTPS URLs (Cloudinary, Unsplash, Google, Wikimedia, CDNs, etc.) - keep unchanged
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    if (!trimmed.includes('/uploads/files/products/')) {
+      return trimmed;
+    }
+  }
+
+  // If URL starts with api uploads path
+  if (trimmed.startsWith('/api/v1/uploads/files/')) {
+    const base = getUploadsBaseUrl();
+    return `${base}${trimmed}`;
   }
 
   // If the URL contains an /uploads/ asset path
@@ -51,3 +94,17 @@ export const resolveImageUrl = (url?: string | null): string => {
 
   return trimmed;
 };
+
+// ─── Cloudinary Transformation Helpers (SRS §9.1) ────────────────────────────
+
+const _injectCloudinaryTransform = (url: string, transform: string): string => {
+  const resolved = resolveImageUrl(url);
+  if (!resolved.includes('res.cloudinary.com')) return resolved;
+  return resolved.replace('/upload/', `/upload/${transform}/`);
+};
+
+export const resolveImageThumbnail = (url?: string | null): string =>
+  _injectCloudinaryTransform(url || '', 'w_200,c_fill,q_auto,f_auto');
+
+export const resolveImageDetail = (url?: string | null): string =>
+  _injectCloudinaryTransform(url || '', 'w_800,c_limit,q_auto,f_auto');
