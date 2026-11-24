@@ -177,5 +177,3 @@ export const getLocalProductAsset = (
   return null;
 };
 
-export { resolveProductImageSource } from './imageUrl';
-

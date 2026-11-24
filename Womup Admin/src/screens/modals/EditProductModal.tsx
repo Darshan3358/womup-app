@@ -30,7 +30,7 @@ import { COLORS } from '../../theme';
 import { useAdminState } from '../../context/AdminStateContext';
 import { ProductVariantItem } from '../../types/admin';
 import { ApiService } from '../../services/api';
-import { resolveProductImageSource } from '../../utils/localProductAssets';
+import { resolveProductImageSource } from '../../utils/imageUrl';
 
 interface FormVariant {
   id: string;

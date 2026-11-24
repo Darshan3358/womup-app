@@ -38,7 +38,7 @@ import {
 } from 'lucide-react-native';
 import { COLORS, RADIUS, SPACING } from '../theme';
 import { useAdminState } from '../context/AdminStateContext';
-import { resolveProductImageSource } from '../utils/localProductAssets';
+import { resolveProductImageSource } from '../utils/imageUrl';
 import { CategoryItem, ProductItem, ProductVariantItem } from '../types/admin';
 
 export const AreaPricingScreen: React.FC = () => {

@@ -38,7 +38,7 @@ import {
 import { useAdminState } from '../context/AdminStateContext';
 import { ProductItem, ProductVariantItem } from '../types/admin';
 import { ApiService } from '../services/api';
-import { resolveProductImageSource } from '../utils/localProductAssets';
+import { resolveProductImageSource } from '../utils/imageUrl';
 import { InventoryListSkeleton } from '../components/common/Skeleton';
 
 export const InventoryScreen: React.FC = () => {
