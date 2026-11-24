@@ -49,6 +49,7 @@ const ADMIN_CITIES: AdminCity[] = [
 // 📍 ADMIN-CONFIGURED SERVICEABLE AREAS
 const ADMIN_AREAS: AdminArea[] = [
   // Ahmedabad Zones
+  { id: '6b055cd1537e466c32860f2b', name: 'Sarkhej', cityName: 'Ahmedabad', pincode: '382210', deliveryMinutes: 9, darkStoreName: 'Wom Up Sarkhej Dark Store', hubStoreId: '6b055cd0537e466c32860f2a', isActive: true },
   { id: '6aac257b8f337240651ef43c', name: 'Chandlodiya - Tragad', cityName: 'Ahmedabad', pincode: '382481', deliveryMinutes: 9, darkStoreName: 'Chandlodiya Dark Store', hubStoreId: '6aac257b8f337240651ef43b', isActive: true },
   { id: '6aa11866c6c3e5984e2ef5e0', name: 'Prahlad Nagar', cityName: 'Ahmedabad', pincode: '380015', deliveryMinutes: 9, darkStoreName: 'Prahlad Nagar Dark Store', hubStoreId: '6aa277a7fc02997cbe281ac2', isActive: true },
   { id: '6aa11866c6c3e5984e2ef5e5', name: 'Thaltej', cityName: 'Ahmedabad', pincode: '380054', deliveryMinutes: 8, darkStoreName: 'Thaltej Dark Store', hubStoreId: '6aa277a8fc02997cbe281ac7', isActive: true },
