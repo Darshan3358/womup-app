@@ -45,7 +45,9 @@ export const S17_SearchScreen: React.FC = () => {
 
   const [query, setQuery] = useState(searchQuery || '');
   const [products, setProducts] = useState<Product[]>(ProductService.getAllProducts());
-  const [isLoading, setIsLoading] = useState(products.length === 0);
+  const [serverResults, setServerResults] = useState<Product[]>([]);
+  const [isSearchingServer, setIsSearchingServer] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [isVoiceModalVisible, setIsVoiceModalVisible] = useState(false);
 
   // Auto-trigger voice search if arrived from BlinkitHeader mic button
@@ -56,39 +58,79 @@ export const S17_SearchScreen: React.FC = () => {
     }
   }, [isVoiceSearchActive]);
 
-  // Use in-memory catalog cache if available; only fetch from backend if empty
+  // Always load the complete product catalogue (up to 250 products) on mount
   useEffect(() => {
     let isMounted = true;
-    if (products && products.length > 0) {
-      setIsLoading(false);
-      return;
-    }
-    ProductService.fetchProducts()
+    ProductService.fetchProducts({ limit: 250 })
       .then((loaded) => {
         if (isMounted && loaded && loaded.length > 0) {
           setProducts(loaded);
         }
       })
-      .finally(() => {
-        if (isMounted) setIsLoading(false);
-      });
+      .catch(() => {});
 
     return () => {
       isMounted = false;
     };
   }, []);
 
-  // Real-time filtered products based on speech / text query
-  const results = useMemo(() => {
+  // 1. Instant local search match (0ms latency, handles multi-word queries)
+  const localResults = useMemo(() => {
     if (!query.trim()) return [];
     const q = query.toLowerCase().trim();
-    return products.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.brand.toLowerCase().includes(q) ||
-        (p.description && p.description.toLowerCase().includes(q))
-    );
+    const terms = q.split(/\s+/).filter(Boolean);
+    const source = products.length > 0 ? products : ProductService.getAllProducts();
+    return source.filter((p) => {
+      const name = (p.name || '').toLowerCase();
+      const brand = (p.brand || '').toLowerCase();
+      const desc = (p.description || '').toLowerCase();
+      const cat = (p.categoryName || p.categorySlug || p.categoryId || '').toLowerCase();
+      const target = `${name} ${brand} ${desc} ${cat}`;
+      return terms.every((t) => target.includes(t));
+    });
   }, [query, products]);
+
+  // 2. Real-time debounced server search (queries MongoDB directly)
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (!trimmed) {
+      setServerResults([]);
+      setIsSearchingServer(false);
+      return;
+    }
+
+    let isMounted = true;
+    setIsSearchingServer(true);
+    const timer = setTimeout(async () => {
+      try {
+        const liveHits = await ProductService.fetchProducts({
+          search: trimmed,
+          limit: 100,
+        });
+        if (isMounted) {
+          setServerResults(liveHits || []);
+        }
+      } catch (err) {
+        // Fallback gracefully to local results
+      } finally {
+        if (isMounted) setIsSearchingServer(false);
+      }
+    }, 200);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [query]);
+
+  // 3. Combined deduplicated results: local instant + server live
+  const results = useMemo(() => {
+    if (!query.trim()) return [];
+    const map = new Map<string, Product>();
+    localResults.forEach((p) => map.set(p.id, p));
+    serverResults.forEach((p) => map.set(p.id, p));
+    return Array.from(map.values());
+  }, [query, localResults, serverResults]);
 
   const handleSelectQuery = (text: string) => {
     setQuery(text);
@@ -155,6 +197,9 @@ export const S17_SearchScreen: React.FC = () => {
           <Text style={styles.queryStatusText}>
             Showing real-time results for <Text style={styles.queryHighlight}>"{query}"</Text> ({results.length})
           </Text>
+          {isSearchingServer && (
+            <ActivityIndicator size="small" color={COLORS.hotPink} style={{ marginLeft: 6 }} />
+          )}
         </View>
       )}
 
@@ -189,22 +234,29 @@ export const S17_SearchScreen: React.FC = () => {
 
         {/* Suggestion list or Empty state */}
         {query.length > 0 && results.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="search-outline" size={48} color={COLORS.border} />
-            <Text style={styles.emptyTitle}>No products found for "{query}"</Text>
-            <Text style={styles.emptySubtitle}>
-              Try speaking or searching with different keywords like "Milk", "Rice", "Atta"
-            </Text>
+          isSearchingServer ? (
+            <View style={styles.emptyContainer}>
+              <ActivityIndicator size="large" color={COLORS.hotPink} />
+              <Text style={[styles.emptyTitle, { marginTop: 12 }]}>Searching products for "{query}"...</Text>
+            </View>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="search-outline" size={48} color={COLORS.border} />
+              <Text style={styles.emptyTitle}>No products found for "{query}"</Text>
+              <Text style={styles.emptySubtitle}>
+                Try speaking or searching with different keywords like "Milk", "Rice", "Atta"
+              </Text>
 
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => setIsVoiceModalVisible(true)}
-              style={styles.tryVoiceBtn}
-            >
-              <Ionicons name="mic" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-              <Text style={styles.tryVoiceText}>Search by Voice</Text>
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setIsVoiceModalVisible(true)}
+                style={styles.tryVoiceBtn}
+              >
+                <Ionicons name="mic" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                <Text style={styles.tryVoiceText}>Search by Voice</Text>
+              </TouchableOpacity>
+            </View>
+          )
         ) : (
           <>
             {/* Matching Products */}

@@ -121,7 +121,7 @@ export class ProductsService {
   }
 
   async findAll(filters: ProductQueryFilter) {
-    const query: any = { isActive: true };
+    const query: any = { isActive: { $ne: false } };
 
     // Support single categoryId, comma-separated categoryIds, or array of categoryIds (ObjectIds or slugs/names)
     const rawCategoryList: string[] = [];
@@ -189,10 +189,12 @@ export class ProductsService {
       query.subCategoryId = new Types.ObjectId(filters.subCategoryId);
     }
     if (filters.search) {
+      const s = filters.search.trim();
       query.$or = [
-        { name: { $regex: filters.search, $options: 'i' } },
-        { brand: { $regex: filters.search, $options: 'i' } },
-        { description: { $regex: filters.search, $options: 'i' } },
+        { name: { $regex: s, $options: 'i' } },
+        { brand: { $regex: s, $options: 'i' } },
+        { description: { $regex: s, $options: 'i' } },
+        { category: { $regex: s, $options: 'i' } },
       ];
     }
     if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
@@ -224,7 +226,7 @@ export class ProductsService {
     }
 
     const page = Math.max(1, Number(filters.page) || 1);
-    const limit = Math.min(50, Math.max(1, Number(filters.limit) || 20));
+    const limit = Math.min(500, Math.max(1, Number(filters.limit) || 250));
     const skip = (page - 1) * limit;
 
     const [rawItems, total] = await Promise.all([

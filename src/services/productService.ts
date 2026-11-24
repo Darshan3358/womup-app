@@ -292,7 +292,7 @@ export const ProductService = {
     if (params.maxPrice !== undefined) queryParts.push(`maxPrice=${params.maxPrice}`);
     if (params.sort) queryParts.push(`sort=${encodeURIComponent(params.sort)}`);
     if (params.page) queryParts.push(`page=${params.page}`);
-    if (params.limit) queryParts.push(`limit=${params.limit}`);
+    queryParts.push(`limit=${params.limit || 250}`);
 
     const queryString = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
     const res = await api.get<{ items: any[] }>(`/products${queryString}`);
@@ -391,12 +391,35 @@ export const ProductService = {
   searchProducts(query: string): Product[] {
     if (!query.trim()) return [];
     const q = query.toLowerCase().trim();
-    return cachedProducts.filter(
-      (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.brand.toLowerCase().includes(q) ||
-        (p.description && p.description.toLowerCase().includes(q))
-    );
+    const source = cachedProducts.length > 0 ? cachedProducts : PRODUCTS;
+    const terms = q.split(/\s+/).filter(Boolean);
+    return source.filter((p) => {
+      const name = (p.name || '').toLowerCase();
+      const brand = (p.brand || '').toLowerCase();
+      const desc = (p.description || '').toLowerCase();
+      const cat = (p.categoryName || p.categoryId || '').toLowerCase();
+      const target = `${name} ${brand} ${desc} ${cat}`;
+      return terms.every((t) => target.includes(t));
+    });
+  },
+
+  async searchProductsLive(query: string, areaId?: string, storeId?: string): Promise<Product[]> {
+    if (!query.trim()) return [];
+    const local = this.searchProducts(query);
+    try {
+      const server = await this.fetchProducts({
+        search: query.trim(),
+        areaId,
+        storeId,
+        limit: 100,
+      });
+      const map = new Map<string, Product>();
+      local.forEach((p) => map.set(p.id, p));
+      server.forEach((p) => map.set(p.id, p));
+      return Array.from(map.values());
+    } catch {
+      return local;
+    }
   },
 
   filterAndSortProducts(products: Product[], filters: FilterSortState): Product[] {

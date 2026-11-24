@@ -30,7 +30,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onPress,
   style,
 }) => {
-  const { cart, addToCart, updateQuantity, setSelectedProduct, setActiveScreen, getBlinkitQty } = useApp();
+  const { cart, addToCart, updateQuantity, setSelectedProduct, setSelectedBlinkitProduct, setActiveScreen, getBlinkitQty } = useApp();
 
   const variants = product.variants || [];
   const defaultVariant = variants.find((v) => v.isDefault) || variants[0];
@@ -65,10 +65,39 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       quantityLabel: currentLabel,
     };
     setSelectedProduct(enrichedProduct);
+    if (setSelectedBlinkitProduct) {
+      setSelectedBlinkitProduct({
+        id: product.id,
+        name: product.name,
+        brand: product.brand,
+        category: product.categoryName || product.categoryId || '',
+        imageUrl: typeof product.imageUrl === 'string' ? product.imageUrl : (typeof product.image === 'string' ? product.image : ''),
+        packSize: currentLabel,
+        mrp: currentMrp,
+        sellingPrice: currentSellingPrice,
+        discountBadge: currentDiscount > 0 ? `${currentDiscount}% OFF` : undefined,
+        stock: product.stock,
+        rating: product.rating,
+        reviewCount: product.reviewCount || 0,
+        deliveryMinutes: product.deliveryMinutes,
+        description: product.description,
+        variants: variants.map((v) => ({
+          id: v.id,
+          label: v.label,
+          price: v.price,
+          mrp: v.mrp,
+          discountPercent: v.discountPercent,
+          stock: v.stock,
+          isAvailable: v.isAvailable,
+          isDefault: v.isDefault,
+        })),
+        selectedVariantId: activeVariant?.id,
+      });
+    }
     if (onPress) {
       onPress();
     } else {
-      setActiveScreen('C16_ProductDetails');
+      setActiveScreen('Blinkit_ProductDetail');
     }
   };
 
