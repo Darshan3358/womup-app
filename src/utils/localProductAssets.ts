@@ -73,6 +73,7 @@ const NAME_TO_ASSET_KEY: Record<string, string> = {
   ginger: 'ginger.png',
   guwar: 'guwar.png',
   guar: 'guwar.png',
+  guvar: 'guwar.png',
   lemon: 'lemon.png',
   'bottle-gourd': 'bottle-gourd.png',
   bottlegourd: 'bottle-gourd.png',
