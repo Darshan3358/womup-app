@@ -69,7 +69,7 @@ export const CityAreaDropdownModal: React.FC<CityAreaDropdownModalProps> = ({
   const [areas, setAreas] = useState<AdminArea[]>(() => {
     const dynamic = getDynamicAreas();
     return dynamic.map((d) => ({
-      id: d.id || d.storeId || 'sarkhej',
+      id: d.id || d.storeId || 'sanand',
       name: d.name,
       cityName: d.city || 'Ahmedabad',
       pincode: d.pincode,
@@ -146,7 +146,7 @@ export const CityAreaDropdownModal: React.FC<CityAreaDropdownModalProps> = ({
         if (isMounted && synced.length > 0) {
           setAreas(
             synced.map((d) => ({
-              id: d.id || d.storeId || 'sarkhej',
+              id: d.id || d.storeId || 'sanand',
               name: d.name,
               cityName: d.city || 'Ahmedabad',
               pincode: d.pincode,

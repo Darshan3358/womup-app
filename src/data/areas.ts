@@ -20,7 +20,7 @@ export interface AreaOption {
  * 2. Live MongoDB API (/location/areas)
  */
 export const DEFAULT_AHMEDABAD_AREAS: AreaOption[] = [
-  { name: 'Sarkhej', city: 'Ahmedabad', lat: 22.986131, lng: 72.495389, storeName: 'Wom Up Sarkhej Dark Store', pincode: '382210', pincodes: ['382210', '380055'] },
+  { name: 'Sanand', city: 'Ahmedabad', lat: 22.986131, lng: 72.495389, storeName: 'Wom Up Sanand Dark Store', pincode: '382210', pincodes: ['382210'] },
 ];
 
 export const AHMEDABAD_AREAS: AreaOption[] = [...DEFAULT_AHMEDABAD_AREAS];

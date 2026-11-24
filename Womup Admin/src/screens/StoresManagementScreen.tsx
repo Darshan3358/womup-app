@@ -2107,7 +2107,7 @@ export const StoresManagementScreen: React.FC = () => {
                 <Text style={styles.inputLabel}>Store Name *</Text>
                 <TextInput
                   style={styles.textInput}
-                  placeholder="e.g. Wom Up Sarkhej Dark Store"
+                  placeholder="e.g. Wom Up Sanand Dark Store"
                   value={editStoreName}
                   onChangeText={setEditStoreName}
                 />
@@ -2115,7 +2115,7 @@ export const StoresManagementScreen: React.FC = () => {
                 <Text style={styles.inputLabel}>Store Code * (Prefix used in inventory and orders)</Text>
                 <TextInput
                   style={styles.textInput}
-                  placeholder="e.g. SARKHEJ_DS_01"
+                  placeholder="e.g. SANAND_DS_01"
                   value={editStoreCode}
                   onChangeText={(v) => setEditStoreCode(v.toUpperCase())}
                   autoCapitalize="characters"
@@ -2124,7 +2124,7 @@ export const StoresManagementScreen: React.FC = () => {
                 <Text style={styles.inputLabel}>Store Login ID (Used on Dark Store Tablet)</Text>
                 <TextInput
                   style={styles.textInput}
-                  placeholder="e.g. sarkhej.store"
+                  placeholder="e.g. sanand.store"
                   value={editLoginId}
                   onChangeText={setEditLoginId}
                   autoCapitalize="none"

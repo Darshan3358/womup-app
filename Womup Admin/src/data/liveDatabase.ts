@@ -505,8 +505,8 @@ export const LIVE_PRODUCTS: ProductItem[] = [
 export const LIVE_ZONES: Zone[] = [
   {
     "id": "6b055cd1537e466c32860f2b",
-    "name": "Sarkhej",
-    "darkStore": "Wom Up Sarkhej Dark Store",
+    "name": "Sanand",
+    "darkStore": "Wom Up Sanand Dark Store",
     "activeOrders": 0,
     "gmvSharePercent": 100,
     "isActive": true
