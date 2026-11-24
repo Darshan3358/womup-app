@@ -31,8 +31,8 @@ export const MetricGrid: React.FC<MetricGridProps> = ({
         <MetricCard
           label="Total GMV"
           value={totalGmv > 0 ? `₹${totalGmv.toLocaleString()}` : '₹0'}
-          trend="↑ 12.5%"
-          isPositive={true}
+          trend={totalGmv > 0 ? 'Active' : '0.0%'}
+          isPositive={totalGmv > 0}
           icon={ShoppingBag}
           iconBgColor="#8C52FF"
           sparklineColor="#8C52FF"
@@ -42,8 +42,8 @@ export const MetricGrid: React.FC<MetricGridProps> = ({
         <MetricCard
           label="Active Orders"
           value={String(activeOrdersCount)}
-          trend="↑ 0.0%"
-          isPositive={true}
+          trend={activeOrdersCount > 0 ? 'Active' : '0.0%'}
+          isPositive={activeOrdersCount > 0}
           icon={ShoppingCart}
           iconBgColor="#268BFA"
           sparklineColor="#268BFA"

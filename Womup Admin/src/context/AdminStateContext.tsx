@@ -622,8 +622,8 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           }
         }
 
-        if (!resolvedZone) resolvedZone = addr.street || addr.city || 'Prahlad Nagar';
-        if (!resolvedStore) resolvedStore = 'Wom Up Ahmedabad Central Dark Store';
+        if (!resolvedZone) resolvedZone = addr.street || addr.city || '';
+        if (!resolvedStore) resolvedStore = '';
 
         const mappedOrder: Order = {
           id: raw.orderNumber || `#WMP-${(raw._id || raw.id || '').slice(-6).toUpperCase()}`,

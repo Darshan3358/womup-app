@@ -15,21 +15,14 @@ interface ZoneGmvShareCardProps {
 }
 
 export const ZoneGmvShareCard: React.FC<ZoneGmvShareCardProps> = ({
-  shares = [
-    { name: 'Ahmedabad', percentage: 0, color: '#762DEB' },
-    { name: 'Surat', percentage: 0, color: '#268BFA' },
-    { name: 'Vadodara', percentage: 10, color: '#FF922E' },
-  ],
+  shares = [],
   onViewAll,
 }) => {
   // Use real data items
-  const items = shares.length > 0 ? shares : [
-    { name: 'Ahmedabad', percentage: 0, color: '#762DEB' },
-    { name: 'Surat', percentage: 0, color: '#268BFA' },
-    { name: 'Vadodara', percentage: 0, color: '#FF922E' },
-  ];
+  const items = shares;
+  const hasData = items.length > 0 && items.some((i) => i.percentage > 0);
 
-  const topArea = items[0] || { name: 'Ahmedabad', percentage: 78 };
+  const topArea = hasData ? items[0] : { name: 'No Sales Yet', percentage: 0 };
 
   // Calculate donut circumference
   const radius = 42;
@@ -38,16 +31,18 @@ export const ZoneGmvShareCard: React.FC<ZoneGmvShareCardProps> = ({
 
   // Compute dash arrays for 3 segments
   let accumulatedPercent = 0;
-  const segments = items.slice(0, 3).map((item) => {
-    const strokeDasharray = `${(item.percentage / 100) * circumference} ${circumference}`;
-    const strokeDashoffset = -((accumulatedPercent / 100) * circumference);
-    accumulatedPercent += item.percentage;
-    return {
-      ...item,
-      strokeDasharray,
-      strokeDashoffset,
-    };
-  });
+  const segments = hasData
+    ? items.slice(0, 3).map((item) => {
+        const strokeDasharray = `${(item.percentage / 100) * circumference} ${circumference}`;
+        const strokeDashoffset = -((accumulatedPercent / 100) * circumference);
+        accumulatedPercent += item.percentage;
+        return {
+          ...item,
+          strokeDasharray,
+          strokeDashoffset,
+        };
+      })
+    : [];
 
   return (
     <View style={styles.card}>
@@ -115,15 +110,19 @@ export const ZoneGmvShareCard: React.FC<ZoneGmvShareCardProps> = ({
 
         {/* Legend List */}
         <View style={styles.legendCol}>
-          {items.slice(0, 3).map((item, idx) => (
-            <View key={idx} style={styles.legendRow}>
-              <View style={[styles.legendDot, { backgroundColor: item.color }]} />
-              <Text style={styles.legendName} numberOfLines={1}>
-                {item.name}
-              </Text>
-              <Text style={styles.legendPercent}>{item.percentage}%</Text>
-            </View>
-          ))}
+          {hasData ? (
+            items.slice(0, 3).map((item, idx) => (
+              <View key={idx} style={styles.legendRow}>
+                <View style={[styles.legendDot, { backgroundColor: item.color }]} />
+                <Text style={styles.legendName} numberOfLines={1}>
+                  {item.name}
+                </Text>
+                <Text style={styles.legendPercent}>{item.percentage}%</Text>
+              </View>
+            ))
+          ) : (
+            <Text style={styles.noDataLegendText}>No zone sales recorded yet</Text>
+          )}
         </View>
       </View>
 
@@ -223,6 +222,11 @@ const styles = StyleSheet.create({
     paddingLeft: 20,
     justifyContent: 'center',
     gap: 12,
+  },
+  noDataLegendText: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '500',
   },
   legendRow: {
     flexDirection: 'row',

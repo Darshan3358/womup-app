@@ -17,12 +17,12 @@ interface SalesOverviewCardProps {
 
 export const SalesOverviewCard: React.FC<SalesOverviewCardProps> = ({
   totalSales,
-  dailyData = [420, 680, 510, 890, 1250, 740, 620],
+  dailyData = [0, 0, 0, 0, 0, 0, 0],
   selectedRange = 'Last 7 Days',
   onPressRange,
 }) => {
   // Real or proportional normalization for 7 days
-  const values = dailyData.length === 7 ? dailyData : [120, 240, 310, 520, 950, 680, 430];
+  const values = dailyData.length === 7 ? dailyData : [0, 0, 0, 0, 0, 0, 0];
   const maxVal = Math.max(...values, 100);
 
   // Calculate points for the 7 days (Mon to Sun)
@@ -44,7 +44,7 @@ export const SalesOverviewCard: React.FC<SalesOverviewCardProps> = ({
     }
   });
   const peakPoint = points[peakIdx] || points[4];
-  const peakDisplayVal = peakPoint.val > 0 ? Math.round(peakPoint.val) : 569;
+  const peakDisplayVal = peakPoint.val > 0 ? Math.round(peakPoint.val) : 0;
 
   // Construct smooth cubic bezier curve path through the 7 points
   let pathD = `M ${points[0].x} ${points[0].y}`;
@@ -89,14 +89,14 @@ export const SalesOverviewCard: React.FC<SalesOverviewCardProps> = ({
 
       {/* Large Sales Value & Trend */}
       <Text style={styles.salesValue}>
-        {totalSales > 0 ? `₹${totalSales.toLocaleString()}` : '₹3,248'}
+        {totalSales > 0 ? `₹${totalSales.toLocaleString()}` : '₹0'}
       </Text>
 
       <View style={styles.trendRow}>
-        <View style={styles.greenPill}>
-          <Text style={styles.greenPillText}>↑ 12.5%</Text>
+        <View style={[styles.greenPill, totalSales === 0 && { backgroundColor: '#64748B' }]}>
+          <Text style={styles.greenPillText}>{totalSales > 0 ? '↑ 12.5%' : '0.0%'}</Text>
         </View>
-        <Text style={styles.trendSubText}>vs last week</Text>
+        <Text style={styles.trendSubText}>{totalSales > 0 ? 'vs last week' : 'No sales recorded yet'}</Text>
       </View>
 
       {/* 7-Day Chart Area with SVG */}

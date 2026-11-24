@@ -241,27 +241,12 @@ export const DashboardScreen: React.FC = () => {
       }
     });
 
-    // If zero orders in last 7 days, provide natural curve proportion based on totalGmv
-    const sum = days.reduce((a, b) => a + b, 0);
-    if (sum === 0 && totalGmv > 0) {
-      return [
-        Math.round(totalGmv * 0.08),
-        Math.round(totalGmv * 0.12),
-        Math.round(totalGmv * 0.09),
-        Math.round(totalGmv * 0.18),
-        Math.round(totalGmv * 0.28),
-        Math.round(totalGmv * 0.15),
-        Math.round(totalGmv * 0.10),
-      ];
-    }
-
     return days;
-  }, [filteredOrders, totalGmv]);
+  }, [filteredOrders]);
 
   const sales7DaysTotal = useMemo(() => {
-    const sum = last7DaysGmv.reduce((a, b) => a + b, 0);
-    return sum > 0 ? sum : totalGmv;
-  }, [last7DaysGmv, totalGmv]);
+    return last7DaysGmv.reduce((a, b) => a + b, 0);
+  }, [last7DaysGmv]);
 
   // Real-Time Zone GMV Share Calculation
   const zoneGmvShares: ZoneShareItem[] = useMemo(() => {
@@ -285,11 +270,7 @@ export const DashboardScreen: React.FC = () => {
     const entries = Object.entries(map).sort((a, b) => b[1] - a[1]);
 
     if (entries.length === 0 || total === 0) {
-      return [
-        { name: activeCities[0]?.name || 'Ahmedabad', percentage: 78, color: '#762DEB' },
-        { name: activeCities[1]?.name || 'Surat', percentage: 12, color: '#268BFA' },
-        { name: activeCities[2]?.name || 'Vadodara', percentage: 10, color: '#FF922E' },
-      ];
+      return [];
     }
 
     return entries.slice(0, 3).map(([name, amt], idx) => ({
@@ -297,12 +278,12 @@ export const DashboardScreen: React.FC = () => {
       percentage: Math.max(1, Math.round((amt / total) * 100)),
       color: colors[idx % colors.length],
     }));
-  }, [filteredOrders, zones, activeCities]);
+  }, [filteredOrders, zones]);
 
   // Item 4: Real-Time Area Telemetry Breakdown (Vendors & Customers by Area)
   const areaBreakdownData = useMemo(() => {
-    const list = (availableAreas.length > 0 ? availableAreas : zones).slice(0, 10);
-    return list.map((zone) => {
+    const sourceAreas = availableAreas.length > 0 ? availableAreas : zones;
+    const computed = sourceAreas.map((zone) => {
       const zName = (zone.name || '').toLowerCase();
       const zoneCusts = customers.filter(
         (c) =>
@@ -328,6 +309,7 @@ export const DashboardScreen: React.FC = () => {
           (o.address && o.address.toLowerCase().includes(zName))
       );
       const gmv = zoneOrders.reduce((sum, o) => sum + (o.total || 0), 0);
+      const hasRealStore = Boolean(zone.hasActiveStore || (zone.currentStoreCount && zone.currentStoreCount > 0));
 
       return {
         areaId: zone.id || zone._id,
@@ -337,10 +319,24 @@ export const DashboardScreen: React.FC = () => {
         totalCustomers: zoneCusts.length,
         activeCustomers: activeCusts.length,
         totalVendors: zoneVendors.length,
+        hasRealStore,
         gmv,
       };
     });
-  }, [availableAreas, zones, customers, vendorsList, filteredOrders]);
+
+    if (selectedAreaId !== 'ALL') {
+      return computed.filter(
+        (item) => String(item.areaId) === String(selectedAreaId)
+      );
+    }
+
+    // Only display real areas from DB that have actual registered stores, vendors, customers, or GMV
+    const activeAreas = computed.filter(
+      (item) => item.totalVendors > 0 || item.totalCustomers > 0 || item.gmv > 0 || item.hasRealStore
+    );
+
+    return activeAreas;
+  }, [availableAreas, zones, customers, vendorsList, filteredOrders, selectedAreaId]);
 
   return (
     <ScrollView
@@ -510,12 +506,25 @@ export const DashboardScreen: React.FC = () => {
 
         <View style={styles.areaTable}>
           {areaBreakdownData.length === 0 ? (
-            <Text style={styles.emptyAreaText}>No area breakdown data available</Text>
+            <View style={styles.emptyAreaBox}>
+              <Store size={32} color="#CBD5E1" />
+              <Text style={styles.emptyAreaText}>No active stores or vendors in database</Text>
+              <Text style={styles.emptyAreaSubtext}>
+                Dark stores created under Stores and merchants added under Vendors will display here with live customer density.
+              </Text>
+            </View>
           ) : (
             areaBreakdownData.map((item, idx) => (
               <View key={item.areaId || idx} style={styles.areaTableRow}>
                 <View style={styles.areaNameCol}>
-                  <Text style={styles.areaNameText}>{item.areaName}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={styles.areaNameText}>{item.areaName}</Text>
+                    {item.hasRealStore ? (
+                      <View style={styles.storeBadgePill}>
+                        <Text style={styles.storeBadgeText}>Dark Store</Text>
+                      </View>
+                    ) : null}
+                  </View>
                   <Text style={styles.areaCityText}>
                     {item.cityName} {item.pincode ? `• PIN ${item.pincode}` : ''}
                   </Text>
@@ -972,11 +981,36 @@ const styles = StyleSheet.create({
   areaTable: {
     gap: 8,
   },
+  emptyAreaBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    gap: 6,
+  },
   emptyAreaText: {
-    fontSize: 12,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  emptyAreaSubtext: {
+    fontSize: 11,
     color: '#94A3B8',
     textAlign: 'center',
-    paddingVertical: 12,
+    maxWidth: 320,
+    lineHeight: 16,
+  },
+  storeBadgePill: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: '#DBEAFE',
+  },
+  storeBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#1D4ED8',
   },
   areaTableRow: {
     paddingVertical: 8,

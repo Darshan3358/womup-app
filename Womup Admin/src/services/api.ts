@@ -266,10 +266,10 @@ export const ApiService = {
           }
 
           if (!resolvedZoneName) {
-            resolvedZoneName = addr.street || addr.city || 'Prahlad Nagar';
+            resolvedZoneName = addr.street || addr.city || '';
           }
           if (!resolvedDarkStore) {
-            resolvedDarkStore = 'Wom Up Ahmedabad Central Dark Store';
+            resolvedDarkStore = '';
           }
 
           const orderNum = o.orderNumber || (o._id ? `#WMP-${String(o._id).slice(-6).toUpperCase()}` : '#WMP-000000');
@@ -636,7 +636,7 @@ export const ApiService = {
             packSize: matchedVariant?.weightOrVolume || inv.packSize || '1 unit',
             category: matchedProd?.category || inv.category || 'Produce',
             darkStoreId: sId,
-            darkStoreName: matchedStore?.name || inv.storeName || 'Wom Up Ahmedabad Central Dark Store',
+            darkStoreName: matchedStore?.name || inv.storeName || '',
             availableKg: avail,
             reservedKg: reserved,
             lowStockThreshold: threshold,
@@ -654,8 +654,8 @@ export const ApiService = {
             name: u.name || 'Staff Member',
             phone: u.phone || '',
             role: (u.role === 'RIDER' ? 'Rider' : 'Picker') as 'Picker' | 'Rider',
-            zone: 'Ahmedabad Central',
-            darkStore: 'Wom Up Ahmedabad Central Dark Store',
+            zone: (u as any).zone || '',
+            darkStore: (u as any).darkStore || '',
             status: 'On Duty',
             activeOrdersCount: 0,
             rating: 5.0,
