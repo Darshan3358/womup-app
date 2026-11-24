@@ -23,6 +23,7 @@ import { DynamicLiveMap } from '../components/tracking/DynamicLiveMap';
 import { S27_ChatModal } from '../components/tracking/S27_ChatModal';
 import { RiderReviewModal } from '../components/tracking/RiderReviewModal';
 import { api } from '../services/api';
+import { resolveProductImageSource } from '../utils/imageUrl';
 
 export const S24_OrderTrackingScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -1056,18 +1057,25 @@ export const S24_OrderTrackingScreen: React.FC = () => {
               </View>
 
               {items && items.length > 0 ? (
-                items.map((item: any, idx: number) => (
-                  <View key={idx} style={styles.itemRow}>
-                    <View style={styles.itemBullet} />
-                    <View style={styles.itemInfoCol}>
-                      <Text style={styles.itemNameText}>{item.name}</Text>
-                      <Text style={styles.itemQtyText}>Quantity: {item.quantity}</Text>
+                items.map((item: any, idx: number) => {
+                  const imgSource = resolveProductImageSource(item.imageUrl || item.image, item.name);
+                  return (
+                    <View key={idx} style={styles.itemRow}>
+                      <Image
+                        source={imgSource}
+                        style={{ width: 38, height: 38, borderRadius: 8, marginRight: 10, backgroundColor: '#F8FAFC' }}
+                        resizeMode="cover"
+                      />
+                      <View style={styles.itemInfoCol}>
+                        <Text style={styles.itemNameText}>{item.name}</Text>
+                        <Text style={styles.itemQtyText}>Quantity: {item.quantity}</Text>
+                      </View>
+                      <Text style={styles.itemPriceText}>
+                        ₹{item.subtotal || ((item.price || item.unitPrice || 0) * (item.quantity || 1))}
+                      </Text>
                     </View>
-                    <Text style={styles.itemPriceText}>
-                      ₹{item.subtotal || ((item.price || item.unitPrice || 0) * (item.quantity || 1))}
-                    </Text>
-                  </View>
-                ))
+                  );
+                })
               ) : (
                 <Text style={styles.noItemsText}>Order items details not available</Text>
               )}

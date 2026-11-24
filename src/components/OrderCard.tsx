@@ -8,6 +8,7 @@ import {
   ImageSourcePropType,
 } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
+import { resolveProductImageSource } from '../utils/imageUrl';
 
 export interface OrderCardItem {
   productId?: string;
@@ -115,23 +116,11 @@ export const OrderCard: React.FC<OrderCardProps> = ({
 
   const statusConfig = getStatusConfig(rawStatus);
 
-  // Helper to resolve product image
-  const resolveItemImage = (it: OrderCardItem): ImageSourcePropType => {
+  // Helper to resolve product real image
+  const resolveItemImage = (it: OrderCardItem): any => {
     if (it.image) return it.image;
-    if (it.imageUrl) return { uri: it.imageUrl };
-    const n = (it.name || '').toLowerCase();
-    if (n.includes('apple')) {
-      return { uri: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?auto=format&fit=crop&w=400&q=80' };
-    }
-    if (n.includes('tomato')) {
-      return { uri: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=400&q=80' };
-    }
-    if (n.includes('milk') || n.includes('amul')) {
-      return { uri: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=400&q=80' };
-    }
-    if (n.includes('paneer')) {
-      return { uri: 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=400&q=80' };
-    }
+    const resolved = resolveProductImageSource(it.imageUrl, it.name);
+    if (resolved) return resolved;
     return require('../../assets/order_again_box.png');
   };
 
