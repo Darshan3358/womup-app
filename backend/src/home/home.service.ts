@@ -48,59 +48,94 @@ export class HomeService {
     }
 
     // Helper for category match
-    const isVegFruit = (p: any) => {
-      const text = `${p.categoryId?.name || ''} ${p.categoryId?.slug || ''} ${p.category || ''} ${p.name || ''}`.toLowerCase();
-      return text.includes('veg') || text.includes('fruit') || text.includes('tomato') || text.includes('onion') || text.includes('potato') || text.includes('banana') || text.includes('apple');
+    const vegNames = ['potato', 'onion', 'tomato', 'lady fingers', 'cabbage', 'ginger', 'guwar', 'lemon', 'bottle gourd', 'parwal', 'beetroot'];
+    const fruitNames = ['apple', 'banana', 'orange', 'pineapple', 'muskmelon', 'papaya', 'kiwi', 'watermelon'];
+    const attaNames = ['aashirvaad atta', 'basmati rice', 'tata salt', 'sunflower oil'];
+    const dairyNames = ['paneer', 'curd', 'milk', 'bread', 'butter milk', 'dahi'];
+    const personalCareNames = ['shampoo', 'hair oil', 'conditioner', 'body spray', 'body perfume', 'hair colour'];
+
+    const isVegetable = (p: any) => {
+      const catId = p.categoryId?._id?.toString() || p.categoryId?.toString() || '';
+      const catSlug = p.categoryId?.slug || p.categorySlug || '';
+      if (catId === '6aa2712acb3d55073acc2101' || catSlug === 'vegetables') return true;
+      const text = `${p.category || ''} ${p.name || ''}`.toLowerCase();
+      return vegNames.some((v) => text.includes(v)) && !fruitNames.some((f) => text.includes(f));
+    };
+
+    const isFruit = (p: any) => {
+      const catId = p.categoryId?._id?.toString() || p.categoryId?.toString() || '';
+      const catSlug = p.categoryId?.slug || p.categorySlug || '';
+      if (catId === '6aa2712acb3d55073acc2102' || catSlug === 'fruits') return true;
+      const text = `${p.category || ''} ${p.name || ''}`.toLowerCase();
+      return fruitNames.some((f) => text.includes(f));
+    };
+
+    const isAttaRiceDal = (p: any) => {
+      const catId = p.categoryId?._id?.toString() || p.categoryId?.toString() || '';
+      const catSlug = p.categoryId?.slug || p.categorySlug || '';
+      if (catId === '6b046011e457907227bc34cb' || catSlug === 'atta-rice-dal') return true;
+      const text = `${p.category || ''} ${p.name || ''}`.toLowerCase();
+      return (attaNames.some((a) => text.includes(a)) || text.includes('atta') || text.includes('rice') || text.includes('salt') || text.includes('sunflower')) && !text.includes('hair');
     };
 
     const isDairyBread = (p: any) => {
-      const text = `${p.categoryId?.name || ''} ${p.categoryId?.slug || ''} ${p.category || ''} ${p.name || ''}`.toLowerCase();
-      return (
-        text.includes('dairy') ||
-        text.includes('milk') ||
-        text.includes('bread') ||
-        text.includes('egg') ||
-        text.includes('paneer') ||
-        text.includes('butter') ||
-        text.includes('cheese') ||
-        text.includes('yogurt') ||
-        text.includes('curd')
-      );
+      const catId = p.categoryId?._id?.toString() || p.categoryId?.toString() || '';
+      const catSlug = p.categoryId?.slug || p.categorySlug || '';
+      if (catId === '6b046011e457907227bc34cc' || catSlug === 'dairy-bread-eggs' || catSlug === 'dairy') return true;
+      const text = `${p.category || ''} ${p.name || ''}`.toLowerCase();
+      return dairyNames.some((d) => text.includes(d));
+    };
+
+    const isBeautyPersonalCare = (p: any) => {
+      const catId = p.categoryId?._id?.toString() || p.categoryId?.toString() || '';
+      const catSlug = p.categoryId?.slug || p.categorySlug || '';
+      if (catId === '6b046012e457907227bc34cd' || catSlug === 'beauty-personal-care') return true;
+      const text = `${p.category || ''} ${p.name || ''}`.toLowerCase();
+      return personalCareNames.some((pc) => text.includes(pc)) || text.includes('shampoo') || text.includes('perfume') || text.includes('spray') || text.includes('colour') || text.includes('conditioner') || text.includes('hair');
     };
 
     // 1. Deals of the Day (discount >= 10% or isDeal or mrp > sellingPrice)
     const dealsProducts = [...allProducts]
       .filter((p) => p.discountPercent >= 10 || p.isDeal || (p.mrp && p.sellingPrice && p.mrp > p.sellingPrice))
       .sort((a, b) => (b.discountPercent || 0) - (a.discountPercent || 0))
-      .slice(0, 8);
+      .slice(0, 10);
 
     // 2. 9-Minute Delivery (availableQty > 15 / high stock, quick delivery)
     const fastDeliveryProducts = [...allProducts]
       .filter((p) => (p.stock ?? 100) > 15 && (p.deliveryMinutes || 9) <= 10)
-      .slice(0, 8);
+      .slice(0, 10);
 
-    // 3. Fresh Vegetables & Fruits
-    const vegFruitsProducts = [...allProducts].filter(isVegFruit).slice(0, 8);
+    // 3. Fresh Vegetables (all 11 vegetables)
+    const vegetablesProducts = [...allProducts].filter(isVegetable);
 
-    // 4. Dairy, Bread & Eggs
-    const dairyProducts = [...allProducts].filter(isDairyBread).slice(0, 8);
+    // 4. Fresh Fruits (all 8 fruits)
+    const fruitsProducts = [...allProducts].filter(isFruit);
 
-    // 5. Bestsellers (rating >= 4.5 or isPopular)
+    // 5. Atta, Rice & Dal (all 4 staples)
+    const attaProducts = [...allProducts].filter(isAttaRiceDal);
+
+    // 6. Dairy, Bread & Eggs (all 5 dairy items)
+    const dairyProducts = [...allProducts].filter(isDairyBread);
+
+    // 7. Beauty & Personal Care (all 6 personal care items)
+    const personalCareProducts = [...allProducts].filter(isBeautyPersonalCare);
+
+    // 8. Bestsellers (rating >= 4.5 or isPopular)
     const bestsellersProducts = [...allProducts]
       .filter((p) => (p.rating || 0) >= 4.5 || p.isPopular)
       .sort((a, b) => (b.rating || 0) - (a.rating || 0))
-      .slice(0, 8);
+      .slice(0, 10);
 
-    // 6. New Arrivals (sorted by createdAt DESC)
+    // 9. New Arrivals (sorted by createdAt DESC)
     const newArrivalsProducts = [...allProducts]
       .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
-      .slice(0, 8);
+      .slice(0, 10);
 
-    // 7. Under ₹50
+    // 10. Under ₹50
     const under50Products = [...allProducts]
       .filter((p) => (p.sellingPrice || 0) <= 50)
       .sort((a, b) => (a.sellingPrice || 0) - (b.sellingPrice || 0))
-      .slice(0, 8);
+      .slice(0, 10);
 
     const sections: HomeSectionResponse[] = [
       {
@@ -110,7 +145,7 @@ export class HomeService {
         icon: '🔥',
         viewAllFilter: 'deals',
         viewAllLink: '/products?filter=deals',
-        products: dealsProducts.length > 0 ? dealsProducts : allProducts.slice(0, 6),
+        products: dealsProducts.length > 0 ? dealsProducts : allProducts.slice(0, 8),
       },
       {
         id: 'fast_delivery',
@@ -122,6 +157,28 @@ export class HomeService {
         products: fastDeliveryProducts.length > 0 ? fastDeliveryProducts : allProducts.slice(0, 8),
       },
       {
+        id: 'fresh_vegetables',
+        title: 'Fresh Vegetables',
+        subtitle: 'Farm fresh, delivered directly to your doorstep',
+        icon: '🥕',
+        categoryId: '6aa2712acb3d55073acc2101',
+        categoryName: 'Vegetables',
+        viewAllFilter: '6aa2712acb3d55073acc2101',
+        viewAllLink: '/products?category=6aa2712acb3d55073acc2101',
+        products: vegetablesProducts,
+      },
+      {
+        id: 'fresh_fruits',
+        title: 'Fresh Fruits',
+        subtitle: 'Juicy, sweet seasonal fruits',
+        icon: '🍎',
+        categoryId: '6aa2712acb3d55073acc2102',
+        categoryName: 'Fruits',
+        viewAllFilter: '6aa2712acb3d55073acc2102',
+        viewAllLink: '/products?category=6aa2712acb3d55073acc2102',
+        products: fruitsProducts,
+      },
+      {
         id: 'fresh_veggies',
         title: 'Fresh Vegetables & Fruits',
         subtitle: 'Farm fresh, delivered directly to your doorstep',
@@ -129,17 +186,40 @@ export class HomeService {
         categoryName: 'Vegetables & Fruits',
         viewAllFilter: 'c1',
         viewAllLink: '/products?category=c1',
-        products: vegFruitsProducts.length > 0 ? vegFruitsProducts : allProducts.slice(0, 6),
+        products: [...vegetablesProducts, ...fruitsProducts],
+      },
+      {
+        id: 'atta_rice_dal',
+        title: 'Atta, Rice & Dal',
+        subtitle: 'Daily kitchen staples & cooking essentials',
+        icon: '🌾',
+        categoryId: '6b046011e457907227bc34cb',
+        categoryName: 'Atta, Rice & Dal',
+        viewAllFilter: '6b046011e457907227bc34cb',
+        viewAllLink: '/products?category=6b046011e457907227bc34cb',
+        products: attaProducts,
       },
       {
         id: 'dairy_bread',
         title: 'Dairy, Bread & Eggs',
         subtitle: 'Start your day right',
         icon: '🥛',
+        categoryId: '6b046011e457907227bc34cc',
         categoryName: 'Dairy, Bread & Eggs',
-        viewAllFilter: 'c3',
-        viewAllLink: '/products?category=c3',
-        products: dairyProducts.length > 0 ? dairyProducts : allProducts.slice(0, 6),
+        viewAllFilter: '6b046011e457907227bc34cc',
+        viewAllLink: '/products?category=6b046011e457907227bc34cc',
+        products: dairyProducts,
+      },
+      {
+        id: 'beauty_personal_care',
+        title: 'Beauty & Personal Care',
+        subtitle: 'Grooming & self-care essentials',
+        icon: '✨',
+        categoryId: '6b046012e457907227bc34cd',
+        categoryName: 'Beauty & Personal Care',
+        viewAllFilter: '6b046012e457907227bc34cd',
+        viewAllLink: '/products?category=6b046012e457907227bc34cd',
+        products: personalCareProducts,
       },
       {
         id: 'bestsellers',
@@ -157,7 +237,7 @@ export class HomeService {
         icon: '🆕',
         viewAllFilter: 'newest',
         viewAllLink: '/products?sort=newest',
-        products: newArrivalsProducts.length > 0 ? newArrivalsProducts : allProducts.slice(0, 6),
+        products: newArrivalsProducts.length > 0 ? newArrivalsProducts : allProducts.slice(0, 8),
       },
       {
         id: 'under_50',

@@ -137,9 +137,41 @@ export const ProductService = {
       console.warn('[ProductService] fetchHomeSections network error:', e);
     }
 
-    // Secondary fallback: synthesize 7 home sections from cached/bundled catalog directly
+    // Secondary fallback: synthesize home sections from cached/bundled catalog directly
     const fallbackItems = cachedProducts.length > 0 ? cachedProducts : PRODUCTS;
     if (fallbackItems && fallbackItems.length > 0) {
+      const vegNames = ['potato', 'onion', 'tomato', 'lady fingers', 'cabbage', 'ginger', 'guwar', 'lemon', 'bottle gourd', 'parwal', 'beetroot'];
+      const fruitNames = ['apple', 'banana', 'orange', 'pineapple', 'muskmelon', 'papaya', 'kiwi', 'watermelon'];
+      const attaNames = ['aashirvaad atta', 'basmati rice', 'tata salt', 'sunflower oil'];
+      const dairyNames = ['paneer', 'curd', 'milk', 'bread', 'butter milk', 'dahi'];
+      const personalCareNames = ['shampoo', 'hair oil', 'conditioner', 'body spray', 'body perfume', 'hair colour'];
+
+      const isVeg = (p: Product) => {
+        if (p.categoryId === '6aa2712acb3d55073acc2101' || p.categorySlug === 'vegetables') return true;
+        const name = (p.name || '').toLowerCase();
+        return vegNames.some((v) => name.includes(v)) && !fruitNames.some((f) => name.includes(f));
+      };
+      const isFruit = (p: Product) => {
+        if (p.categoryId === '6aa2712acb3d55073acc2102' || p.categorySlug === 'fruits') return true;
+        const name = (p.name || '').toLowerCase();
+        return fruitNames.some((f) => name.includes(f));
+      };
+      const isAtta = (p: Product) => {
+        if (p.categoryId === '6b046011e457907227bc34cb' || p.categorySlug === 'atta-rice-dal') return true;
+        const name = (p.name || '').toLowerCase();
+        return (attaNames.some((a) => name.includes(a)) || name.includes('atta') || name.includes('rice') || name.includes('salt') || name.includes('sunflower')) && !name.includes('hair');
+      };
+      const isDairy = (p: Product) => {
+        if (p.categoryId === '6b046011e457907227bc34cc' || p.categorySlug === 'dairy-bread-eggs') return true;
+        const name = (p.name || '').toLowerCase();
+        return dairyNames.some((d) => name.includes(d));
+      };
+      const isPC = (p: Product) => {
+        if (p.categoryId === '6b046012e457907227bc34cd' || p.categorySlug === 'beauty-personal-care') return true;
+        const name = (p.name || '').toLowerCase();
+        return personalCareNames.some((pc) => name.includes(pc)) || name.includes('shampoo') || name.includes('perfume') || name.includes('spray') || name.includes('colour') || name.includes('conditioner') || name.includes('hair');
+      };
+
       const synthSections = [
         {
           id: 'deals',
@@ -156,44 +188,46 @@ export const ProductService = {
           products: fallbackItems.slice(0, 10),
         },
         {
+          id: 'fresh_vegetables',
+          title: 'Fresh Vegetables',
+          subtitle: 'Farm fresh, delivered directly to your doorstep',
+          icon: '🥕',
+          products: fallbackItems.filter(isVeg),
+        },
+        {
+          id: 'fresh_fruits',
+          title: 'Fresh Fruits',
+          subtitle: 'Juicy, sweet seasonal fruits',
+          icon: '🍎',
+          products: fallbackItems.filter(isFruit),
+        },
+        {
           id: 'fresh_veggies',
           title: 'Fresh Vegetables & Fruits',
           subtitle: 'Farm fresh, delivered directly to your doorstep',
           icon: '🌱',
-          products: fallbackItems
-            .filter((p) => {
-              const t = `${p.categoryName || ''} ${p.name || ''} ${p.categorySlug || ''}`.toLowerCase();
-              return (
-                t.includes('veg') ||
-                t.includes('fruit') ||
-                t.includes('tomato') ||
-                t.includes('onion') ||
-                t.includes('apple') ||
-                t.includes('banana') ||
-                t.includes('potato')
-              );
-            })
-            .slice(0, 10),
+          products: fallbackItems.filter((p) => isVeg(p) || isFruit(p)),
+        },
+        {
+          id: 'atta_rice_dal',
+          title: 'Atta, Rice & Dal',
+          subtitle: 'Daily kitchen staples & cooking essentials',
+          icon: '🌾',
+          products: fallbackItems.filter(isAtta),
         },
         {
           id: 'dairy_bread',
           title: 'Dairy, Bread & Eggs',
           subtitle: 'Start your day right',
           icon: '🥛',
-          products: fallbackItems
-            .filter((p) => {
-              const t = `${p.categoryName || ''} ${p.name || ''} ${p.categorySlug || ''}`.toLowerCase();
-              return (
-                t.includes('dairy') ||
-                t.includes('milk') ||
-                t.includes('bread') ||
-                t.includes('egg') ||
-                t.includes('paneer') ||
-                t.includes('butter') ||
-                t.includes('curd')
-              );
-            })
-            .slice(0, 10),
+          products: fallbackItems.filter(isDairy),
+        },
+        {
+          id: 'beauty_personal_care',
+          title: 'Beauty & Personal Care',
+          subtitle: 'Grooming & self-care essentials',
+          icon: '✨',
+          products: fallbackItems.filter(isPC),
         },
         {
           id: 'bestsellers',

@@ -30,6 +30,52 @@ import {
 import { Product, Category, BlinkitProduct } from '../../types';
 import { api } from '../../services/api';
 
+const vegNames = ['potato', 'onion', 'tomato', 'lady fingers', 'cabbage', 'ginger', 'guwar', 'lemon', 'bottle gourd', 'parwal', 'beetroot'];
+const fruitNames = ['apple', 'banana', 'orange', 'pineapple', 'muskmelon', 'papaya', 'kiwi', 'watermelon'];
+const attaNames = ['aashirvaad atta', 'basmati rice', 'tata salt', 'sunflower oil'];
+const dairyNames = ['paneer', 'curd', 'milk', 'bread', 'butter milk', 'dahi'];
+const personalCareNames = ['shampoo', 'hair oil', 'conditioner', 'body spray', 'body perfume', 'hair colour'];
+
+const isVegetable = (p: BlinkitProduct) => {
+  const anyP = p as any;
+  if (anyP.categoryId === '6aa2712acb3d55073acc2101' || anyP.categorySlug === 'vegetables') return true;
+  const name = (p.name || '').toLowerCase();
+  const cat = (p.category || '').toLowerCase();
+  return (vegNames.some((v) => name.includes(v)) || cat.includes('veg')) && !fruitNames.some((f) => name.includes(f));
+};
+
+const isFruit = (p: BlinkitProduct) => {
+  const anyP = p as any;
+  if (anyP.categoryId === '6aa2712acb3d55073acc2102' || anyP.categorySlug === 'fruits') return true;
+  const name = (p.name || '').toLowerCase();
+  const cat = (p.category || '').toLowerCase();
+  return fruitNames.some((f) => name.includes(f)) || cat.includes('fruit');
+};
+
+const isAttaRiceDal = (p: BlinkitProduct) => {
+  const anyP = p as any;
+  if (anyP.categoryId === '6b046011e457907227bc34cb' || anyP.categorySlug === 'atta-rice-dal') return true;
+  const name = (p.name || '').toLowerCase();
+  const cat = (p.category || '').toLowerCase();
+  return (attaNames.some((a) => name.includes(a)) || cat.includes('atta') || name.includes('atta') || name.includes('rice') || name.includes('salt') || name.includes('sunflower')) && !name.includes('hair');
+};
+
+const isDairyBreadEggs = (p: BlinkitProduct) => {
+  const anyP = p as any;
+  if (anyP.categoryId === '6b046011e457907227bc34cc' || anyP.categorySlug === 'dairy-bread-eggs' || anyP.categorySlug === 'dairy') return true;
+  const name = (p.name || '').toLowerCase();
+  const cat = (p.category || '').toLowerCase();
+  return dairyNames.some((d) => name.includes(d)) || cat.includes('dairy');
+};
+
+const isBeautyPersonalCare = (p: BlinkitProduct) => {
+  const anyP = p as any;
+  if (anyP.categoryId === '6b046012e457907227bc34cd' || anyP.categorySlug === 'beauty-personal-care') return true;
+  const name = (p.name || '').toLowerCase();
+  const cat = (p.category || '').toLowerCase();
+  return personalCareNames.some((pc) => name.includes(pc)) || cat.includes('beauty') || cat.includes('personal') || name.includes('shampoo') || name.includes('perfume') || name.includes('spray') || name.includes('colour') || name.includes('conditioner') || name.includes('hair');
+};
+
 const getInitialHomeSectionsMap = (): Record<string, BlinkitProduct[]> => {
   const fallbackList = PRODUCTS.map(mapProductToBlinkit);
   const map: Record<string, BlinkitProduct[]> = {};
@@ -40,33 +86,12 @@ const getInitialHomeSectionsMap = (): Record<string, BlinkitProduct[]> => {
   const fast = fallbackList.filter((p) => p.stock > 0 && p.deliveryMinutes <= 15);
   map['fast_delivery'] = fast.length > 0 ? fast.slice(0, 10) : fallbackList.slice(0, 8);
 
-  const veg = fallbackList.filter((p) => {
-    const text = `${p.category || ''} ${p.name || ''}`.toLowerCase();
-    return (
-      text.includes('veg') ||
-      text.includes('fruit') ||
-      text.includes('tomato') ||
-      text.includes('onion') ||
-      text.includes('banana') ||
-      text.includes('potato') ||
-      text.includes('apple')
-    );
-  });
-  map['fresh_veggies'] = veg.length > 0 ? veg.slice(0, 10) : fallbackList.slice(0, 8);
-
-  const dairy = fallbackList.filter((p) => {
-    const text = `${p.category || ''} ${p.name || ''}`.toLowerCase();
-    return (
-      text.includes('dairy') ||
-      text.includes('milk') ||
-      text.includes('bread') ||
-      text.includes('egg') ||
-      text.includes('paneer') ||
-      text.includes('butter') ||
-      text.includes('curd')
-    );
-  });
-  map['dairy_bread'] = dairy.length > 0 ? dairy.slice(0, 10) : fallbackList.slice(0, 8);
+  map['fresh_vegetables'] = fallbackList.filter(isVegetable);
+  map['fresh_fruits'] = fallbackList.filter(isFruit);
+  map['fresh_veggies'] = fallbackList.filter((p) => isVegetable(p) || isFruit(p));
+  map['atta_rice_dal'] = fallbackList.filter(isAttaRiceDal);
+  map['dairy_bread'] = fallbackList.filter(isDairyBreadEggs);
+  map['beauty_personal_care'] = fallbackList.filter(isBeautyPersonalCare);
 
   const bs = fallbackList.filter((p) => p.rating >= 4.5);
   map['bestsellers'] = bs.length > 0 ? bs.slice(0, 10) : fallbackList.slice(0, 8);
@@ -282,47 +307,42 @@ export const BlinkitHomeScreen: React.FC = () => {
     return liveBlinkitProducts.slice(0, 8);
   }, [backendSections, liveBlinkitProducts]);
 
-  // 3. Fresh Vegetables & Fruits
-  const freshVegFruitsList = useMemo(() => {
-    const fromApi = backendSections['fresh_veggies'];
+  // 3. Fresh Vegetables (all 11 items)
+  const freshVegetablesList = useMemo(() => {
+    const fromApi = backendSections['fresh_vegetables'];
     if (fromApi && fromApi.length > 0) return fromApi;
-    const liveVeg = liveBlinkitProducts.filter((p) => {
-      const text = `${p.category || ''} ${p.name || ''}`.toLowerCase();
-      return (
-        text.includes('veg') ||
-        text.includes('fruit') ||
-        text.includes('tomato') ||
-        text.includes('onion') ||
-        text.includes('banana') ||
-        text.includes('potato') ||
-        text.includes('apple')
-      );
-    });
-    if (liveVeg.length > 0) return liveVeg.slice(0, 10);
-    return liveBlinkitProducts.slice(0, 8);
+    return liveBlinkitProducts.filter(isVegetable);
   }, [backendSections, liveBlinkitProducts]);
 
-  // 4. Dairy, Bread & Eggs
+  // 4. Fresh Fruits (all 8 items)
+  const freshFruitsList = useMemo(() => {
+    const fromApi = backendSections['fresh_fruits'];
+    if (fromApi && fromApi.length > 0) return fromApi;
+    return liveBlinkitProducts.filter(isFruit);
+  }, [backendSections, liveBlinkitProducts]);
+
+  // 5. Atta, Rice & Dal (all 4 items)
+  const attaRiceDalList = useMemo(() => {
+    const fromApi = backendSections['atta_rice_dal'];
+    if (fromApi && fromApi.length > 0) return fromApi;
+    return liveBlinkitProducts.filter(isAttaRiceDal);
+  }, [backendSections, liveBlinkitProducts]);
+
+  // 6. Dairy, Bread & Eggs (all 5 items)
   const dairyBreadEggsList = useMemo(() => {
     const fromApi = backendSections['dairy_bread'];
     if (fromApi && fromApi.length > 0) return fromApi;
-    const liveDairy = liveBlinkitProducts.filter((p) => {
-      const text = `${p.category || ''} ${p.name || ''}`.toLowerCase();
-      return (
-        text.includes('dairy') ||
-        text.includes('milk') ||
-        text.includes('bread') ||
-        text.includes('egg') ||
-        text.includes('paneer') ||
-        text.includes('butter') ||
-        text.includes('curd')
-      );
-    });
-    if (liveDairy.length > 0) return liveDairy.slice(0, 10);
-    return liveBlinkitProducts.slice(0, 8);
+    return liveBlinkitProducts.filter(isDairyBreadEggs);
   }, [backendSections, liveBlinkitProducts]);
 
-  // 5. Bestsellers (Rated 4.5+, high sales)
+  // 7. Beauty & Personal Care (all 6 items)
+  const beautyPersonalCareList = useMemo(() => {
+    const fromApi = backendSections['beauty_personal_care'];
+    if (fromApi && fromApi.length > 0) return fromApi;
+    return liveBlinkitProducts.filter(isBeautyPersonalCare);
+  }, [backendSections, liveBlinkitProducts]);
+
+  // 8. Bestsellers (Rated 4.5+, high sales)
   const bestsellersList = useMemo(() => {
     const fromApi = backendSections['bestsellers'];
     if (fromApi && fromApi.length > 0) return fromApi;
@@ -331,7 +351,7 @@ export const BlinkitHomeScreen: React.FC = () => {
     return liveBlinkitProducts.slice(0, 8);
   }, [backendSections, liveBlinkitProducts]);
 
-  // 6. New Arrivals
+  // 9. New Arrivals
   const newArrivalsList = useMemo(() => {
     const fromApi = backendSections['new_arrivals'];
     if (fromApi && fromApi.length > 0) return fromApi;
@@ -339,7 +359,7 @@ export const BlinkitHomeScreen: React.FC = () => {
     return PRODUCTS.slice(0, 8).map(mapProductToBlinkit);
   }, [backendSections, liveBlinkitProducts]);
 
-  // 7. Under ₹50 (Everyday Savings)
+  // 10. Under ₹50 (Everyday Savings)
   const under50List = useMemo(() => {
     const fromApi = backendSections['under_50'];
     if (fromApi && fromApi.length > 0) return fromApi;
@@ -355,11 +375,14 @@ export const BlinkitHomeScreen: React.FC = () => {
     | { type: 'deals'; products: BlinkitProduct[] }
     | { type: 'fast_delivery'; products: BlinkitProduct[] }
     | { type: 'banner_veggies' }
-    | { type: 'fresh_veggies'; products: BlinkitProduct[] }
-    | { type: 'bestsellers'; products: BlinkitProduct[] }
+    | { type: 'fresh_vegetables'; products: BlinkitProduct[] }
+    | { type: 'fresh_fruits'; products: BlinkitProduct[] }
+    | { type: 'atta_rice_dal'; products: BlinkitProduct[] }
     | { type: 'banner_dairy' }
     | { type: 'dairy_bread'; products: BlinkitProduct[] }
+    | { type: 'beauty_personal_care'; products: BlinkitProduct[] }
     | { type: 'popular_brands' }
+    | { type: 'bestsellers'; products: BlinkitProduct[] }
     | { type: 'new_arrivals'; products: BlinkitProduct[] }
     | { type: 'under_50'; products: BlinkitProduct[] };
 
@@ -367,19 +390,25 @@ export const BlinkitHomeScreen: React.FC = () => {
     { type: 'deals', products: dealsList },
     { type: 'fast_delivery', products: fastDeliveryList },
     { type: 'banner_veggies' },
-    { type: 'fresh_veggies', products: freshVegFruitsList },
-    { type: 'bestsellers', products: bestsellersList },
+    { type: 'fresh_vegetables', products: freshVegetablesList },
+    { type: 'fresh_fruits', products: freshFruitsList },
+    { type: 'atta_rice_dal', products: attaRiceDalList },
     { type: 'banner_dairy' },
     { type: 'dairy_bread', products: dairyBreadEggsList },
+    { type: 'beauty_personal_care', products: beautyPersonalCareList },
     { type: 'popular_brands' },
+    { type: 'bestsellers', products: bestsellersList },
     { type: 'new_arrivals', products: newArrivalsList },
     { type: 'under_50', products: under50List },
   ], [
     dealsList,
     fastDeliveryList,
-    freshVegFruitsList,
-    bestsellersList,
+    freshVegetablesList,
+    freshFruitsList,
+    attaRiceDalList,
     dairyBreadEggsList,
+    beautyPersonalCareList,
+    bestsellersList,
     newArrivalsList,
     under50List,
   ]);
@@ -424,7 +453,7 @@ export const BlinkitHomeScreen: React.FC = () => {
                 if (veggieSpotlight?.targetType === 'CATEGORY' && veggieSpotlight?.targetId) {
                   handleSelectCategory(veggieSpotlight.title || 'Vegetables & Fruits', veggieSpotlight.targetId);
                 } else {
-                  handleSelectCategory('Vegetables & Fruits', 'c1');
+                  handleSelectCategory('Vegetables & Fruits', '6aa2712acb3d55073acc2101');
                 }
               }}
               style={styles.groceriesBannerCard}
@@ -437,15 +466,43 @@ export const BlinkitHomeScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
         );
-      case 'fresh_veggies':
+      case 'fresh_vegetables':
         return (
           <ProductSection
-            id="fresh_veggies"
-            title="Fresh Vegetables & Fruits"
+            id="fresh_vegetables"
+            title="Fresh Vegetables"
             subtitle="Farm fresh, delivered directly to your doorstep"
             products={item.products}
             onOpenProduct={handleOpenProductDetail}
-            onViewAll={() => handleSelectCategory('Vegetables & Fruits', 'c1')}
+            onViewAll={() => handleSelectCategory('Vegetables', '6aa2712acb3d55073acc2101')}
+            viewAllText="View All"
+            isLoading={isLoading}
+            cartCount={blinkitCartCount}
+          />
+        );
+      case 'fresh_fruits':
+        return (
+          <ProductSection
+            id="fresh_fruits"
+            title="Fresh Fruits"
+            subtitle="Juicy, sweet seasonal fruits"
+            products={item.products}
+            onOpenProduct={handleOpenProductDetail}
+            onViewAll={() => handleSelectCategory('Fruits', '6aa2712acb3d55073acc2102')}
+            viewAllText="View All"
+            isLoading={isLoading}
+            cartCount={blinkitCartCount}
+          />
+        );
+      case 'atta_rice_dal':
+        return (
+          <ProductSection
+            id="atta_rice_dal"
+            title="Atta, Rice & Dal"
+            subtitle="Daily kitchen staples & cooking essentials"
+            products={item.products}
+            onOpenProduct={handleOpenProductDetail}
+            onViewAll={() => handleSelectCategory('Atta, Rice & Dal', '6b046011e457907227bc34cb')}
             viewAllText="View All"
             isLoading={isLoading}
             cartCount={blinkitCartCount}
@@ -475,7 +532,7 @@ export const BlinkitHomeScreen: React.FC = () => {
                 if (dairySpotlight?.targetType === 'CATEGORY' && dairySpotlight?.targetId) {
                   handleSelectCategory(dairySpotlight.title || 'Dairy, Bread & Eggs', dairySpotlight.targetId);
                 } else {
-                  handleSelectCategory('Dairy, Bread & Eggs', 'c3');
+                  handleSelectCategory('Dairy, Bread & Eggs', '6b046011e457907227bc34cc');
                 }
               }}
               style={styles.dairyBannerCard}
@@ -496,7 +553,21 @@ export const BlinkitHomeScreen: React.FC = () => {
             subtitle="Start your day right"
             products={item.products}
             onOpenProduct={handleOpenProductDetail}
-            onViewAll={() => handleSelectCategory('Dairy, Bread & Eggs', 'c3')}
+            onViewAll={() => handleSelectCategory('Dairy, Bread & Eggs', '6b046011e457907227bc34cc')}
+            viewAllText="View All"
+            isLoading={isLoading}
+            cartCount={blinkitCartCount}
+          />
+        );
+      case 'beauty_personal_care':
+        return (
+          <ProductSection
+            id="beauty_personal_care"
+            title="Beauty & Personal Care"
+            subtitle="Grooming & self-care essentials"
+            products={item.products}
+            onOpenProduct={handleOpenProductDetail}
+            onViewAll={() => handleSelectCategory('Beauty & Personal Care', '6b046012e457907227bc34cd')}
             viewAllText="View All"
             isLoading={isLoading}
             cartCount={blinkitCartCount}
@@ -648,7 +719,11 @@ export const BlinkitHomeScreen: React.FC = () => {
           dbProdsCount: dbProducts.length,
           dealsCount: dealsList.length,
           fastCount: fastDeliveryList.length,
-          freshCount: freshVegFruitsList.length,
+          vegCount: freshVegetablesList.length,
+          fruitCount: freshFruitsList.length,
+          attaCount: attaRiceDalList.length,
+          dairyCount: dairyBreadEggsList.length,
+          beautyCount: beautyPersonalCareList.length,
         }), [
           blinkitCart,
           blinkitCartCount,
@@ -656,7 +731,11 @@ export const BlinkitHomeScreen: React.FC = () => {
           dbProducts.length,
           dealsList.length,
           fastDeliveryList.length,
-          freshVegFruitsList.length,
+          freshVegetablesList.length,
+          freshFruitsList.length,
+          attaRiceDalList.length,
+          dairyBreadEggsList.length,
+          beautyPersonalCareList.length,
         ])}
         keyExtractor={(item) => item.type}
         renderItem={renderSection}
