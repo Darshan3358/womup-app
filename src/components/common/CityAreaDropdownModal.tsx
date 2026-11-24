@@ -16,6 +16,8 @@ import { COLORS } from '../../theme/colors';
 import { TYPOGRAPHY } from '../../theme/typography';
 import { useApp } from '../../context/AppContext';
 import { LocationService } from '../../services/locationService';
+import { api } from '../../services/api';
+import { getDynamicAreas, syncAreasFromBackend, AreaOption } from '../../data/areas';
 
 export interface AdminCity {
   id: string;
@@ -36,36 +38,6 @@ export interface AdminArea {
   hubStoreId?: string;
   isActive: boolean;
 }
-
-// 🏛️ ADMIN-VERIFIED CITIES (Strictly no unapproved/unverified cities like Mesana)
-const ADMIN_CITIES: AdminCity[] = [
-  { id: '6abcefe75a521a988d799c02', name: 'Ahmedabad', code: 'AHM', isActive: true, zoneCount: 11 },
-  { id: '6abcefe75a521a988d799c03', name: 'Surat', code: 'SUR', isActive: true, zoneCount: 2 },
-  { id: '6abcefe75a521a988d799c04', name: 'Vadodara', code: 'BDQ', isActive: false, zoneCount: 0 },
-  { id: '6abcefe75a521a988d799c05', name: 'Rajkot', code: 'RAJ', isActive: false, zoneCount: 0 },
-  { id: '6abcefe75a521a988d799c06', name: 'Gandhinagar', code: 'GNR', isActive: false, zoneCount: 0 },
-];
-
-// 📍 ADMIN-CONFIGURED SERVICEABLE AREAS
-const ADMIN_AREAS: AdminArea[] = [
-  // Ahmedabad Zones
-  { id: '6b055cd1537e466c32860f2b', name: 'Sarkhej', cityName: 'Ahmedabad', pincode: '382210', deliveryMinutes: 9, darkStoreName: 'Wom Up Sarkhej Dark Store', hubStoreId: '6b055cd0537e466c32860f2a', isActive: true },
-  { id: '6aac257b8f337240651ef43c', name: 'Chandlodiya - Tragad', cityName: 'Ahmedabad', pincode: '382481', deliveryMinutes: 9, darkStoreName: 'Chandlodiya Dark Store', hubStoreId: '6aac257b8f337240651ef43b', isActive: true },
-  { id: '6aa11866c6c3e5984e2ef5e0', name: 'Prahlad Nagar', cityName: 'Ahmedabad', pincode: '380015', deliveryMinutes: 9, darkStoreName: 'Prahlad Nagar Dark Store', hubStoreId: '6aa277a7fc02997cbe281ac2', isActive: true },
-  { id: '6aa11866c6c3e5984e2ef5e5', name: 'Thaltej', cityName: 'Ahmedabad', pincode: '380054', deliveryMinutes: 8, darkStoreName: 'Thaltej Dark Store', hubStoreId: '6aa277a8fc02997cbe281ac7', isActive: true },
-  { id: '6a9ffe87d4a21fe082fbbe2d', name: 'Satellite', cityName: 'Ahmedabad', pincode: '380015', deliveryMinutes: 10, darkStoreName: 'Satellite Dark Store', hubStoreId: '6aa277a7fc02997cbe281ac1', isActive: true },
-  { id: '6aa11866c6c3e5984e2ef5e1', name: 'Navrangpura', cityName: 'Ahmedabad', pincode: '380009', deliveryMinutes: 9, darkStoreName: 'Navrangpura Dark Store', hubStoreId: '6aa277a7fc02997cbe281ac3', isActive: true },
-  { id: '6aa11866c6c3e5984e2ef5e3', name: 'Bopal', cityName: 'Ahmedabad', pincode: '380058', deliveryMinutes: 12, darkStoreName: 'Bopal Dark Store', hubStoreId: '6aa277a7fc02997cbe281ac5', isActive: true },
-  { id: '6aa11866c6c3e5984e2ef5e4', name: 'SG Highway', cityName: 'Ahmedabad', pincode: '380054', deliveryMinutes: 10, darkStoreName: 'SG Highway Dark Store', hubStoreId: '6aa277a8fc02997cbe281ac6', isActive: true },
-  { id: '6aa279407dab7debc8348c16', name: 'Vastrapur', cityName: 'Ahmedabad', pincode: '380015', deliveryMinutes: 10, darkStoreName: 'Vastrapur Dark Store', hubStoreId: '6aa27940fc02997cbe281af6', isActive: true },
-  { id: '6aa11866c6c3e5984e2ef5e2', name: 'Ghatlodia', cityName: 'Ahmedabad', pincode: '380061', deliveryMinutes: 11, darkStoreName: 'Ghatlodia Dark Store', hubStoreId: '6aa277a7fc02997cbe281ac4', isActive: true },
-  { id: '6abcf767c486687900e11ef4', name: 'Paldi', cityName: 'Ahmedabad', pincode: '380007', deliveryMinutes: 9, darkStoreName: 'Central Dark Store', hubStoreId: '6a9ffe87d4a21fe082fbbe2c', isActive: true },
-  { id: '6abcf767c486687900e11ef3', name: 'Maninagar', cityName: 'Ahmedabad', pincode: '380008', deliveryMinutes: 9, darkStoreName: 'Maninagar Dark Store', hubStoreId: '6ac36432ccb04b37e676d731', isActive: true },
-
-  // Surat Zones
-  { id: '6ac36432ccb04b37e676d732', name: 'Vesu', cityName: 'Surat', pincode: '395007', deliveryMinutes: 10, darkStoreName: 'Vesu Dark Store', hubStoreId: '6ac36432ccb04b37e676d733', isActive: true },
-  { id: '6ac36432ccb04b37e676d734', name: 'Adajan', cityName: 'Surat', pincode: '395009', deliveryMinutes: 10, darkStoreName: 'Adajan Dark Store', hubStoreId: '6ac36432ccb04b37e676d735', isActive: true },
-];
 
 interface CityAreaDropdownModalProps {
   visible: boolean;
@@ -94,11 +66,105 @@ export const CityAreaDropdownModal: React.FC<CityAreaDropdownModalProps> = ({
     setIsServiceable,
   } = useApp();
 
+  const [areas, setAreas] = useState<AdminArea[]>(() => {
+    const dynamic = getDynamicAreas();
+    return dynamic.map((d) => ({
+      id: d.id || d.storeId || 'sarkhej',
+      name: d.name,
+      cityName: d.city || 'Ahmedabad',
+      pincode: d.pincode,
+      deliveryMinutes: 9,
+      darkStoreName: d.storeName || `${d.name} Dark Store`,
+      hubStoreId: d.storeId,
+      isActive: true,
+    }));
+  });
+  const [loadingAreas, setLoadingAreas] = useState(false);
+
   const [activeCity, setActiveCity] = useState<string>(
     currentSelectedCity || currentCityName || 'Ahmedabad'
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [isDetectingGps, setIsDetectingGps] = useState(false);
+
+  // Fetch real database areas and dark stores whenever modal becomes visible
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchDatabaseAreas() {
+      if (!visible) return;
+      setLoadingAreas(true);
+      try {
+        // 1. Fetch live areas from backend MongoDB
+        const res = await api.get<any>('/location/areas');
+        const rawList = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+
+        if (isMounted && rawList.length > 0) {
+          // Only include areas that are active and have an active registered dark store
+          const mapped: AdminArea[] = rawList
+            .filter((a: any) => a && a.isActive !== false)
+            .map((a: any) => {
+              const storeName =
+                a.assignedStore?.storeName ||
+                a.darkStore ||
+                (a.assignedStores && a.assignedStores[0]?.storeName) ||
+                `${a.name} Dark Store`;
+              const storeId =
+                a.assignedStore?.storeId ||
+                a.hubStoreId ||
+                (a.assignedStores && a.assignedStores[0]?.storeId);
+
+              return {
+                id: a.id || (a._id?.toString ? a._id.toString() : String(a._id || '')),
+                name: a.name,
+                cityName: a.cityName || a.city || 'Ahmedabad',
+                cityId: a.cityId?.toString ? a.cityId.toString() : a.cityId,
+                pincode: (Array.isArray(a.pincodes) && a.pincodes[0]) || a.pincode || '',
+                deliveryMinutes: a.defaultDeliveryMinutes || 9,
+                darkStoreName: storeName,
+                hubStoreId: storeId,
+                isActive: a.isActive !== false,
+              };
+            });
+
+          if (mapped.length > 0) {
+            setAreas(mapped);
+            if (mapped[0]?.cityName) {
+              setActiveCity((prev) => prev || mapped[0].cityName);
+            }
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('[CityAreaDropdownModal] Error loading database areas:', e);
+      } finally {
+        if (isMounted) setLoadingAreas(false);
+      }
+
+      // 2. Fallback to synced storage
+      try {
+        const synced = await syncAreasFromBackend();
+        if (isMounted && synced.length > 0) {
+          setAreas(
+            synced.map((d) => ({
+              id: d.id || d.storeId || 'sarkhej',
+              name: d.name,
+              cityName: d.city || 'Ahmedabad',
+              pincode: d.pincode,
+              deliveryMinutes: 9,
+              darkStoreName: d.storeName,
+              hubStoreId: d.storeId,
+              isActive: true,
+            }))
+          );
+        }
+      } catch (_) {}
+    }
+
+    fetchDatabaseAreas();
+    return () => {
+      isMounted = false;
+    };
+  }, [visible]);
 
   useEffect(() => {
     if (visible) {
@@ -107,21 +173,42 @@ export const CityAreaDropdownModal: React.FC<CityAreaDropdownModalProps> = ({
     }
   }, [visible, currentSelectedCity, currentCityName]);
 
-  // Filtered areas for the currently active city or global search
+  // Dynamic cities derived exclusively from active database areas
+  const adminCities: AdminCity[] = useMemo(() => {
+    const cityMap = new Map<string, number>();
+    areas.forEach((a) => {
+      const c = a.cityName || 'Ahmedabad';
+      cityMap.set(c, (cityMap.get(c) || 0) + 1);
+    });
+
+    if (cityMap.size === 0) {
+      return [{ id: 'ahm', name: 'Ahmedabad', code: 'AHM', isActive: true, zoneCount: 1 }];
+    }
+
+    return Array.from(cityMap.entries()).map(([name, count]) => ({
+      id: name.toLowerCase(),
+      name,
+      code: name.substring(0, 3).toUpperCase(),
+      isActive: count > 0,
+      zoneCount: count,
+    }));
+  }, [areas]);
+
+  // Filtered areas from database for the currently active city or search query
   const filteredAreas = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (q) {
-      return ADMIN_AREAS.filter(
+      return areas.filter(
         (a) =>
           a.name.toLowerCase().includes(q) ||
           a.cityName.toLowerCase().includes(q) ||
           (a.pincode && a.pincode.includes(q))
       );
     }
-    return ADMIN_AREAS.filter(
+    return areas.filter(
       (a) => a.cityName.toLowerCase() === activeCity.toLowerCase()
     );
-  }, [activeCity, searchQuery]);
+  }, [areas, activeCity, searchQuery]);
 
   const handleSelectArea = (area: AdminArea) => {
     setCurrentCityName(area.cityName);
@@ -146,7 +233,7 @@ export const CityAreaDropdownModal: React.FC<CityAreaDropdownModalProps> = ({
       if (loc) {
         const resolved = await LocationService.resolveArea(loc.latitude, loc.longitude, true);
         if (resolved) {
-          const match = ADMIN_AREAS.find(
+          const match = areas.find(
             (a) => a.name.toLowerCase() === resolved.areaName.toLowerCase()
           );
           if (match) {
@@ -155,12 +242,13 @@ export const CityAreaDropdownModal: React.FC<CityAreaDropdownModalProps> = ({
           }
         }
       }
-      // Default to Chandlodiya, Ahmedabad
-      const fallback = ADMIN_AREAS[0];
-      handleSelectArea(fallback);
+      if (areas.length > 0) {
+        handleSelectArea(areas[0]);
+      }
     } catch {
-      const fallback = ADMIN_AREAS[0];
-      handleSelectArea(fallback);
+      if (areas.length > 0) {
+        handleSelectArea(areas[0]);
+      }
     } finally {
       setIsDetectingGps(false);
     }
@@ -251,7 +339,7 @@ export const CityAreaDropdownModal: React.FC<CityAreaDropdownModalProps> = ({
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.cityTabsContainer}
           >
-            {ADMIN_CITIES.map((city) => {
+            {adminCities.map((city) => {
               const isSelected = activeCity.toLowerCase() === city.name.toLowerCase() && !searchQuery;
               return (
                 <TouchableOpacity

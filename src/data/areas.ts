@@ -21,25 +21,6 @@ export interface AreaOption {
  */
 export const DEFAULT_AHMEDABAD_AREAS: AreaOption[] = [
   { name: 'Sarkhej', city: 'Ahmedabad', lat: 22.986131, lng: 72.495389, storeName: 'Wom Up Sarkhej Dark Store', pincode: '382210', pincodes: ['382210', '380055'] },
-  { name: 'Thaltej', city: 'Ahmedabad', lat: 23.0623, lng: 72.5106, storeName: 'Wom Up Thaltej Dark Store', pincode: '380059', pincodes: ['380059'] },
-  { name: 'Bopal', city: 'Ahmedabad', lat: 23.0234, lng: 72.4651, storeName: 'Wom Up Bopal Dark Store', pincode: '380058', pincodes: ['380058'] },
-  { name: 'South Bopal', city: 'Ahmedabad', lat: 23.0182, lng: 72.4578, storeName: 'Wom Up South Bopal Dark Store', pincode: '380058', pincodes: ['380058'] },
-  { name: 'Prahlad Nagar', city: 'Ahmedabad', lat: 23.0141, lng: 72.5067, storeName: 'Wom Up Prahlad Nagar Dark Store', pincode: '380015', pincodes: ['380015'] },
-  { name: 'Satellite', city: 'Ahmedabad', lat: 23.0267, lng: 72.5074, storeName: 'Wom Up Satellite Dark Store', pincode: '380015', pincodes: ['380015'] },
-  { name: 'Bodakdev', city: 'Ahmedabad', lat: 23.0416, lng: 72.5126, storeName: 'Wom Up Bodakdev Dark Store', pincode: '380054', pincodes: ['380054'] },
-  { name: 'Vastrapur', city: 'Ahmedabad', lat: 23.0350, lng: 72.5290, storeName: 'Wom Up Vastrapur Dark Store', pincode: '380015', pincodes: ['380015'] },
-  { name: 'SG Highway', city: 'Ahmedabad', lat: 23.0380, lng: 72.4972, storeName: 'Wom Up SG Highway Dark Store', pincode: '380054', pincodes: ['380054'] },
-  { name: 'Chandlodiya - Tragad', city: 'Ahmedabad', lat: 23.1150, lng: 72.5450, storeName: 'Wom Up Chandlodiya Dark Store', pincode: '382481', pincodes: ['382481', '382470'] },
-  { name: 'Ghatlodia', city: 'Ahmedabad', lat: 23.0729, lng: 72.5613, storeName: 'Wom Up Ghatlodia Dark Store', pincode: '380061', pincodes: ['380061'] },
-  { name: 'Navrangpura', city: 'Ahmedabad', lat: 23.0395, lng: 72.5603, storeName: 'Wom Up Navrangpura Dark Store', pincode: '380009', pincodes: ['380009'] },
-  { name: 'Paldi', city: 'Ahmedabad', lat: 23.0129, lng: 72.5632, storeName: 'Wom Up Paldi Dark Store', pincode: '380007', pincodes: ['380007'] },
-  { name: 'Maninagar', city: 'Ahmedabad', lat: 22.9978, lng: 72.6033, storeName: 'Wom Up Maninagar Dark Store', pincode: '380008', pincodes: ['380008'] },
-  { name: 'Gota', city: 'Ahmedabad', lat: 23.1044, lng: 72.5368, storeName: 'Wom Up Gota Dark Store', pincode: '382481', pincodes: ['382481'] },
-  { name: 'Sola', city: 'Ahmedabad', lat: 23.0763, lng: 72.5222, storeName: 'Wom Up Sola Dark Store', pincode: '380060', pincodes: ['380060'] },
-  { name: 'Ramol', city: 'Ahmedabad', lat: 22.9850, lng: 72.6450, storeName: 'Wom Up Ramol Dark Store', pincode: '382449', pincodes: ['382449'] },
-  { name: 'Hathijan / Vatva side', city: 'Ahmedabad', lat: 22.9650, lng: 72.6350, storeName: 'Wom Up Vatva Dark Store', pincode: '382440', pincodes: ['382440'] },
-  { name: 'Lambha', city: 'Ahmedabad', lat: 22.9450, lng: 72.5950, storeName: 'Wom Up Lambha Dark Store', pincode: '382440', pincodes: ['382440'] },
-  { name: 'Isanpur', city: 'Ahmedabad', lat: 22.9820, lng: 72.5980, storeName: 'Wom Up Isanpur Dark Store', pincode: '382443', pincodes: ['382443'] },
 ];
 
 export const AHMEDABAD_AREAS: AreaOption[] = [...DEFAULT_AHMEDABAD_AREAS];
