@@ -984,6 +984,9 @@ export class UsersService {
 
     return {
       personalStatus: {
+        referralCode: cleanUserCode,
+        sponsorCode: user.sponsorCode || 'WORMUP001',
+        sponsorName: user.sponsorName || '',
         monthlyPurchaseValue: personalPurchase,
         personalPurchase,
         requiredPurchase: 2000,

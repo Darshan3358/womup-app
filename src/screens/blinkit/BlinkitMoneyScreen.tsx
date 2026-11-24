@@ -2174,7 +2174,35 @@ export const BlinkitMoneyScreen: React.FC = () => {
                 nestedScrollEnabled={true}
                 bounces={true}
               >
-                
+                {/* 🆔 Sponsor ID & Referral ID Card */}
+                <View style={styles.modalSponsorInfoBar}>
+                  <View style={styles.modalSponsorItem}>
+                    <Text style={styles.modalSponsorItemLabel}>MY SPONSOR / REFERRAL ID</Text>
+                    <View style={styles.modalSponsorItemValueRow}>
+                      <Text style={styles.modalSponsorItemCode}>
+                        {personalStatus?.referralCode || user.referralCode || (user as any).sponsorCode || 'WORMUP001'}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={handleCopyReferralCode}
+                        style={styles.modalCopyBadge}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name={isReferralCopied ? 'checkmark' : 'copy-outline'} size={12} color="#7C3AED" />
+                        <Text style={styles.modalCopyBadgeText}>{isReferralCopied ? 'COPIED' : 'COPY'}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <View style={styles.modalSponsorDividerVertical} />
+
+                  <View style={styles.modalSponsorItem}>
+                    <Text style={styles.modalSponsorItemLabel}>SPONSORED BY (UPLINE)</Text>
+                    <Text style={styles.modalSponsorItemCodeSecondary}>
+                      {user.sponsorCode || personalStatus?.sponsorCode || 'WORMUP001'}
+                    </Text>
+                  </View>
+                </View>
+
                 {/* 🚨 Eligibility Status Banner */}
                 {!isEligible ? (
                   <View style={styles.ineligibleWarningCard}>
@@ -2468,7 +2496,15 @@ export const BlinkitMoneyScreen: React.FC = () => {
                                               </Text>
                                             </View>
                                           </View>
-                                          <Text style={styles.memberCode}>ID: {member.memberCode || 'WORMUP'}</Text>
+                                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
+                                            <Text style={styles.memberCode}>ID: {member.memberCode || member.referralCode || 'WORMUP'}</Text>
+                                            <View style={styles.memberSponsorTag}>
+                                              <Ionicons name="link-outline" size={10} color="#7C3AED" />
+                                              <Text style={styles.memberSponsorTagText}>
+                                                Sponsor: <Text style={{ fontWeight: '800', color: '#6D28D9' }}>{member.sponsorCode || (row.level === 1 ? (personalStatus?.referralCode || user.referralCode || 'WORMUP001') : 'WORMUP001')}</Text>
+                                              </Text>
+                                            </View>
+                                          </View>
                                         </View>
                                         
                                         <View style={{ alignItems: 'flex-end' }}>
@@ -4240,6 +4276,81 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     lineHeight: 15,
+  },
+  modalSponsorInfoBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FAF5FF',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+  },
+  modalSponsorItem: {
+    flex: 1,
+  },
+  modalSponsorItemLabel: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#7C3AED',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  modalSponsorItemValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  modalSponsorItemCode: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#581C87',
+    letterSpacing: 0.8,
+  },
+  modalSponsorItemCodeSecondary: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#6B21A8',
+    letterSpacing: 0.5,
+  },
+  modalCopyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: '#EDE9FE',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  modalCopyBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#7C3AED',
+  },
+  modalSponsorDividerVertical: {
+    width: 1,
+    height: 32,
+    backgroundColor: '#DDD6FE',
+    marginHorizontal: 10,
+  },
+  memberSponsorTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#F5F3FF',
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+  },
+  memberSponsorTagText: {
+    fontSize: 9.5,
+    color: '#5B21B6',
+    fontWeight: '600',
   },
 });
 
