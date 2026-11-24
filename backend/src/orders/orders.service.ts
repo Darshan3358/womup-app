@@ -439,6 +439,9 @@ export class OrdersService {
     if (!matchedArea) {
       throw new BadRequestException('Delivery not available at your location. Selected address is outside all configured service areas.');
     }
+    if (matchedArea.isActive === false) {
+      throw new BadRequestException(`Sorry, WormUp delivery is currently inactive in ${matchedArea.name}.`);
+    }
 
     // Step 3: Find active, eligible stores that service this area or customer's coordinates
     const allActiveStores = await this.storeModel.find({ isActive: true }).exec();

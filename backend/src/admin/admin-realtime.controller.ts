@@ -1631,10 +1631,14 @@ export class AdminRealtimeController {
             (c.name && app.cityName && c.name.toLowerCase() === app.cityName.toLowerCase()) ||
             (c._id?.toString() === app.cityId?.toString())
           );
-          const store = rawStores.find((s: any) =>
-            (s.city && app.cityName && s.city.toLowerCase() === app.cityName.toLowerCase()) ||
-            (s.pincode && s.pincode === cleanPin)
-          );
+          const store = rawStores.find((s: any) => {
+            if (s.isActive === false) return false;
+            if (app.storeId && (s._id?.toString() === app.storeId.toString() || s.id === app.storeId)) return true;
+            if (app.storeName && s.name && s.name.toLowerCase() === app.storeName.toLowerCase()) return true;
+            if (s.pincode && String(s.pincode).trim() === cleanPin) return true;
+            if (app.areaId && s.areaId && s.areaId.toString() === app.areaId.toString()) return true;
+            return false;
+          });
 
           const isActive = app.isActive !== false && app.isDeliveryAllowed !== false;
 
