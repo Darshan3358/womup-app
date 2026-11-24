@@ -24,6 +24,7 @@ import {
   Image as ImageIcon,
   AlertCircle,
   ChevronDown,
+  Link2,
 } from 'lucide-react-native';
 import { useAdminState } from '../../context/AdminStateContext';
 import { ProductVariantItem } from '../../types/admin';
@@ -56,6 +57,7 @@ export const AddProductModal: React.FC = () => {
   const [imageUrl, setImageUrl] = useState('');
   const [imagePreview, setImagePreview] = useState('');
   const [imageSource, setImageSource] = useState<'url' | 'upload' | null>(null);
+  const [imageMode, setImageMode] = useState<'link' | 'upload'>('link');
   const [uploadingImage, setUploadingImage] = useState(false);
 
   // Multi-Variant Pack Size Matrix
@@ -486,16 +488,49 @@ export const AddProductModal: React.FC = () => {
 
             {/* SECTION 2: MEDIA & PRODUCT PHOTO */}
             <View style={styles.sectionWrap}>
-              <Text style={styles.sectionHeading}>
-                <ImageIcon size={13} color="#4F46E5" /> 2. MEDIA & PRODUCT PHOTO
-              </Text>
+              <View style={styles.sectionHeadingRow}>
+                <Text style={styles.sectionHeading}>
+                  <ImageIcon size={13} color="#4F46E5" /> 2. MEDIA & PRODUCT PHOTO
+                </Text>
+
+                {/* Mode Toggle: Link vs Upload */}
+                <View style={styles.toggleRow}>
+                  <TouchableOpacity
+                    style={[styles.toggleBtn, imageMode === 'link' && styles.toggleBtnActive]}
+                    onPress={() => setImageMode('link')}
+                    activeOpacity={0.7}
+                  >
+                    <Link2 size={12} color={imageMode === 'link' ? '#FFFFFF' : '#64748B'} />
+                    <Text style={[styles.toggleBtnText, imageMode === 'link' && styles.toggleBtnTextActive]}>
+                      Link
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.toggleBtn, imageMode === 'upload' && styles.toggleBtnActive]}
+                    onPress={() => setImageMode('upload')}
+                    activeOpacity={0.7}
+                  >
+                    <Upload size={12} color={imageMode === 'upload' ? '#FFFFFF' : '#64748B'} />
+                    <Text style={[styles.toggleBtnText, imageMode === 'upload' && styles.toggleBtnTextActive]}>
+                      Upload
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
 
               <View style={styles.mediaRow}>
                 <View style={styles.photoPreviewBox}>
                   {imagePreview || imageUrl ? (
                     <>
                       <Image
-                        source={imagePreview ? { uri: imagePreview } : resolveProductImageSource(imageUrl, name)}
+                        source={
+                          imagePreview
+                            ? { uri: imagePreview }
+                            : imageMode === 'upload' && imageUrl
+                            ? { uri: imageUrl }
+                            : resolveProductImageSource(imageUrl, name)
+                        }
                         style={styles.photoImg}
                         resizeMode="cover"
                       />
@@ -518,36 +553,50 @@ export const AddProductModal: React.FC = () => {
                   )}
                 </View>
 
-                <View style={{ flex: 1 }}>
-                  <View style={{ marginBottom: 8 }}>
-                    <Text style={styles.formLabel}>Image Web URL</Text>
-                    <TextInput
-                      style={styles.formInput}
-                      placeholder="https://..."
-                      placeholderTextColor="#94A3B8"
-                      value={imageUrl}
-                      onChangeText={(val) => {
-                        const trimmed = val.trim();
-                        setImageUrl(trimmed);
-                        setImagePreview(trimmed);
-                        setImageSource(trimmed ? 'url' : null);
-                      }}
-                    />
-                  </View>
-
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                    <TouchableOpacity
-                      style={styles.replacePhotoBtn}
-                      onPress={handlePickImage}
-                      disabled={uploadingImage}
-                    >
-                      <Upload size={13} color="#071B52" />
-                      <Text style={styles.replacePhotoBtnText}>
-                        {uploadingImage ? 'Uploading...' : 'Upload Photo'}
+                {/* Conditional Body based on imageMode */}
+                <View style={{ flex: 1, justifyContent: 'center' }}>
+                  {imageMode === 'link' ? (
+                    <View>
+                      <Text style={styles.formLabel}>Image Web URL (Direct link or standard asset)</Text>
+                      <TextInput
+                        style={styles.formInput}
+                        placeholder="https://images.unsplash.com/... or CDN link"
+                        placeholderTextColor="#94A3B8"
+                        value={imageUrl}
+                        onChangeText={(val) => {
+                          const trimmed = val.trim();
+                          setImageUrl(trimmed);
+                          setImagePreview(trimmed);
+                          setImageSource(trimmed ? 'url' : null);
+                        }}
+                      />
+                      <Text style={[styles.uploadInfoText, { marginTop: 4 }]}>
+                        Paste any public image link. Bundled catalog assets load instantly.
                       </Text>
-                    </TouchableOpacity>
-                    <Text style={styles.uploadInfoText}>JPG, PNG or WEBP up to 5MB</Text>
-                  </View>
+                    </View>
+                  ) : (
+                    <View>
+                      <Text style={styles.formLabel}>Upload Photo to Cloudinary CDN</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 2 }}>
+                        <TouchableOpacity
+                          style={styles.replacePhotoBtn}
+                          onPress={handlePickImage}
+                          disabled={uploadingImage}
+                        >
+                          <Upload size={13} color="#071B52" />
+                          <Text style={styles.replacePhotoBtnText}>
+                            {uploadingImage ? 'Uploading...' : imageUrl ? 'Replace Photo' : 'Upload Photo'}
+                          </Text>
+                        </TouchableOpacity>
+                        <Text style={styles.uploadInfoText}>JPG, PNG or WEBP up to 5MB</Text>
+                      </View>
+                      {imageUrl && (imageUrl.includes('res.cloudinary.com') || imageUrl.includes('/upload/')) && (
+                        <Text style={[styles.uploadInfoText, { marginTop: 6, color: '#059669', fontWeight: '600' }]} numberOfLines={1}>
+                          ✓ Uploaded to CDN: {imageUrl.split('/').pop()}
+                        </Text>
+                      )}
+                    </View>
+                  )}
                 </View>
               </View>
             </View>
@@ -840,6 +889,47 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#071B52',
     backgroundColor: '#FFFFFF',
+  },
+  sectionHeadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 7,
+    padding: 2,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  toggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 5,
+  },
+  toggleBtnActive: {
+    backgroundColor: '#071B52',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  toggleBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  toggleBtnTextActive: {
+    color: '#FFFFFF',
   },
   threeColRow: {
     flexDirection: 'row',
