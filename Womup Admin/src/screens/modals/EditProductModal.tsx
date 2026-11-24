@@ -410,10 +410,10 @@ export const EditProductModal: React.FC = () => {
           }
         }
 
-        if (refreshFromDb) {
-          await refreshFromDb();
-        }
         handleClose();
+        if (refreshFromDb) {
+          refreshFromDb().catch(() => {});
+        }
       } else {
         setErrorMsg('Failed to update product. Please try again.');
       }
@@ -425,6 +425,19 @@ export const EditProductModal: React.FC = () => {
   };
 
   const handleDelete = () => {
+    const prodId = selectedProduct.id || (selectedProduct as any)._id;
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Are you sure you want to delete "${selectedProduct.name}"? This cannot be undone.`)) {
+        setDeleting(true);
+        handleClose();
+        deleteProductItem(prodId).finally(() => {
+          setDeleting(false);
+          if (refreshFromDb) refreshFromDb().catch(() => {});
+        });
+      }
+      return;
+    }
+
     Alert.alert(
       'Confirm Deletion',
       `Are you sure you want to delete "${selectedProduct.name}"? This cannot be undone.`,
@@ -435,9 +448,10 @@ export const EditProductModal: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             setDeleting(true);
-            await deleteProductItem(selectedProduct.id);
-            setDeleting(false);
             handleClose();
+            await deleteProductItem(prodId);
+            setDeleting(false);
+            if (refreshFromDb) refreshFromDb().catch(() => {});
           },
         },
       ]

@@ -400,7 +400,8 @@ export const LocationManagementScreen: React.FC = () => {
     setCitySubmitting(true);
     try {
       if (editingCity) {
-        const res = await updateCity(editingCity.id, {
+        const cIdStr = String(editingCity.id || (editingCity as any)._id || '');
+        const res = await updateCity(cIdStr, {
           name: cityName.trim(),
           code: cleanCode,
           state: cityState.trim(),
@@ -408,7 +409,9 @@ export const LocationManagementScreen: React.FC = () => {
         });
         if (res.success) {
           setShowCityModal(false);
-          Alert.alert('Success', `City "${cityName}" updated successfully`);
+          if (Platform.OS !== 'web') {
+            Alert.alert('Success', `City "${cityName}" updated successfully`);
+          }
         } else {
           Alert.alert('Error', res.error || 'Failed to update city');
         }
@@ -421,7 +424,9 @@ export const LocationManagementScreen: React.FC = () => {
         });
         if (res.success) {
           setShowCityModal(false);
-          Alert.alert('Success', `City "${cityName}" created successfully`);
+          if (Platform.OS !== 'web') {
+            Alert.alert('Success', `City "${cityName}" created successfully`);
+          }
         } else {
           Alert.alert('Error', res.error || 'Failed to add city');
         }
@@ -433,6 +438,18 @@ export const LocationManagementScreen: React.FC = () => {
 
   // Handle Delete City
   const handleDeleteCity = (city: CityItem) => {
+    const cityIdStr = String(city.id || (city as any)._id || '');
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Are you sure you want to delete "${city.name}"? This will check that no areas are assigned to this city.`)) {
+        deleteCity(cityIdStr).then((res) => {
+          if (!res.success) {
+            window.alert(res.error || 'Failed to delete city');
+          }
+        });
+      }
+      return;
+    }
+
     Alert.alert(
       'Delete City',
       `Are you sure you want to delete ${city.name}? This will check that no areas are assigned to this city.`,
@@ -442,7 +459,7 @@ export const LocationManagementScreen: React.FC = () => {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            const res = await deleteCity(city.id);
+            const res = await deleteCity(cityIdStr);
             if (!res.success) {
               Alert.alert('Cannot Delete', res.error || 'Failed to delete city');
             } else {
@@ -522,9 +539,11 @@ export const LocationManagementScreen: React.FC = () => {
           pincodes: pins.length > 0 ? pins : ['380015'],
         });
         if (res.success) {
-          await refreshFromDb();
           setShowAreaModal(false);
-          Alert.alert('Success', `Area "${areaName}" updated with ${parsedMaxStores} max store capacity`);
+          refreshFromDb().catch(() => {});
+          if (Platform.OS !== 'web') {
+            Alert.alert('Success', `Area "${areaName}" updated with ${parsedMaxStores} max store capacity`);
+          }
         } else {
           Alert.alert('Error', res.error || 'Failed to update area');
         }
@@ -545,9 +564,11 @@ export const LocationManagementScreen: React.FC = () => {
           isActive: true,
         });
         if (res.success) {
-          await refreshFromDb();
           setShowAreaModal(false);
-          Alert.alert('Success', `Area "${areaName}" created with ${parsedMaxStores} store capacity`);
+          refreshFromDb().catch(() => {});
+          if (Platform.OS !== 'web') {
+            Alert.alert('Success', `Area "${areaName}" created with ${parsedMaxStores} store capacity`);
+          }
         } else {
           Alert.alert('Error', res.error || 'Failed to add area');
         }
@@ -559,7 +580,7 @@ export const LocationManagementScreen: React.FC = () => {
 
   // Handle Delete Area
   const handleDeleteArea = (area: Zone) => {
-    const zIdStr = area.id || area._id;
+    const zIdStr = String(area.id || area._id || '');
     const assignedStore = darkStores.find((s) => {
       if (s.areaId && zIdStr && String(s.areaId) === String(zIdStr)) return true;
       if (s.areaName && area.name && s.areaName.toLowerCase() === area.name.toLowerCase()) return true;
@@ -567,10 +588,23 @@ export const LocationManagementScreen: React.FC = () => {
     });
 
     if (area.hasActiveStore || assignedStore) {
-      Alert.alert(
-        'Action Blocked',
-        `Cannot delete area "${area.name}" because active store "${assignedStore?.name || area.assignedStore?.name}" is assigned to it. Reassign or deactivate the store first.`
-      );
+      const msg = `Cannot delete area "${area.name}" because active store "${assignedStore?.name || area.assignedStore?.name}" is assigned to it. Reassign or deactivate the store first.`;
+      if (Platform.OS === 'web') {
+        window.alert(msg);
+      } else {
+        Alert.alert('Action Blocked', msg);
+      }
+      return;
+    }
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Are you sure you want to delete ${area.name}? This action cannot be undone.`)) {
+        deleteAreaSafe(zIdStr).then((res) => {
+          if (!res.success) {
+            window.alert(res.error || 'Failed to delete area');
+          }
+        });
+      }
       return;
     }
 
@@ -583,7 +617,7 @@ export const LocationManagementScreen: React.FC = () => {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            const res = await deleteAreaSafe(area.id);
+            const res = await deleteAreaSafe(zIdStr);
             if (!res.success) {
               Alert.alert('Cannot Delete', res.error || 'Failed to delete area');
             } else {

@@ -1768,8 +1768,10 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     try {
       const res = await ApiService.addCity(payload);
       if (res.success && res.data) {
-        await refreshFromDb();
+        const newCity = res.data;
+        setCities((prev) => [...prev, newCity]);
         logAudit('ADD_CITY', res.data.name, `Created city ${res.data.name} (${res.data.code})`);
+        refreshFromDb().catch(() => {});
         return { success: true };
       }
       return { success: false, error: res.error || 'Failed to add city' };
@@ -1780,42 +1782,56 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const updateCity = async (id: string, payload: Partial<CityItem>) => {
     try {
+      // Optimistic update in 0ms
+      setCities((prev) =>
+        prev.map((c) => (c.id === id || (c as any)._id === id ? { ...c, ...payload } : c))
+      );
       const res = await ApiService.updateCity(id, payload);
       if (res.success) {
-        await refreshFromDb();
         logAudit('UPDATE_CITY', payload.name || id, `Updated city details`);
+        refreshFromDb().catch(() => {});
         return { success: true };
       }
+      refreshFromDb().catch(() => {});
       return { success: false, error: res.error || 'Failed to update city' };
     } catch (err: any) {
+      refreshFromDb().catch(() => {});
       return { success: false, error: err.message };
     }
   };
 
   const deleteCity = async (id: string) => {
     try {
+      // Optimistic delete in 0ms
+      setCities((prev) => prev.filter((c) => c.id !== id && (c as any)._id !== id));
       const res = await ApiService.deleteCity(id);
       if (res.success) {
-        await refreshFromDb();
         logAudit('DELETE_CITY', id, `Deleted city`);
+        refreshFromDb().catch(() => {});
         return { success: true };
       }
+      refreshFromDb().catch(() => {});
       return { success: false, error: res.error || 'Failed to delete city' };
     } catch (err: any) {
+      refreshFromDb().catch(() => {});
       return { success: false, error: err.message };
     }
   };
 
   const deleteAreaSafe = async (id: string) => {
     try {
+      // Optimistic delete in 0ms
+      setZones((prev) => prev.filter((z) => z.id !== id && (z as any)._id !== id));
       const res = await ApiService.deleteArea(id);
       if (res.success) {
-        await refreshFromDb();
         logAudit('DELETE_AREA', id, `Deleted area`);
+        refreshFromDb().catch(() => {});
         return { success: true };
       }
+      refreshFromDb().catch(() => {});
       return { success: false, error: res.error || 'Failed to delete area' };
     } catch (err: any) {
+      refreshFromDb().catch(() => {});
       return { success: false, error: err.message };
     }
   };

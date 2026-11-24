@@ -20,31 +20,39 @@ export const resolveProductImageSource = (
   }
   const rawUrl = typeof url === 'string' ? url : (url?.uri || '');
 
+  // 1. If an explicit remote URL or data URI is provided, ALWAYS prioritize it so admin-updated images reflect immediately
+  if (rawUrl && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://') || rawUrl.startsWith('data:') || rawUrl.startsWith('blob:') || rawUrl.startsWith('/api/v1/uploads/'))) {
+    const remote = resolveImageUrl(rawUrl);
+    let optimizedRemote = remote || rawUrl;
+
+    if (optimizedRemote.includes('res.cloudinary.com') && optimizedRemote.includes('/upload/')) {
+      if (!optimizedRemote.includes('/upload/f_auto,q_auto') && !optimizedRemote.includes('/upload/w_')) {
+        optimizedRemote = optimizedRemote.replace('/upload/', '/upload/f_auto,q_auto,w_400,h_400,c_pad,b_rgb:F7F7F7/');
+      }
+    }
+
+    if (optimizedRemote.includes('images.unsplash.com')) {
+      optimizedRemote = optimizedRemote
+        .replace(/w=\d+/, 'w=400')
+        .replace(/q=\d+/, 'q=80');
+      if (!optimizedRemote.includes('auto=format')) {
+        optimizedRemote = `${optimizedRemote}&auto=format`;
+      }
+    }
+
+    return {
+      uri: optimizedRemote,
+      cache: 'force-cache',
+    };
+  }
+
+  // 2. If no valid remote URL, check local bundled assets (by filename or product name)
   const local = getLocalProductAsset(rawUrl, name, slug);
   if (local) return local;
 
-  const remote = resolveImageUrl(rawUrl);
-  let optimizedRemote = remote || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80';
-
-  // Optimize Cloudinary URLs with auto format and uniform 400x400 padded fit
-  if (optimizedRemote.includes('res.cloudinary.com') && optimizedRemote.includes('/upload/')) {
-    if (!optimizedRemote.includes('/upload/f_auto,q_auto') && !optimizedRemote.includes('/upload/w_')) {
-      optimizedRemote = optimizedRemote.replace('/upload/', '/upload/f_auto,q_auto,w_400,h_400,c_pad,b_rgb:F7F7F7/');
-    }
-  }
-
-  // Optimize Unsplash remote URLs to load fast compressed thumbnails instead of 1200px uncompressed images
-  if (optimizedRemote.includes('images.unsplash.com')) {
-    optimizedRemote = optimizedRemote
-      .replace(/w=\d+/, 'w=400')
-      .replace(/q=\d+/, 'q=80');
-    if (!optimizedRemote.includes('auto=format')) {
-      optimizedRemote = `${optimizedRemote}&auto=format`;
-    }
-  }
-
+  // 3. Fallback placeholder
   return {
-    uri: optimizedRemote,
+    uri: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80&auto=format',
     cache: 'force-cache',
   };
 };

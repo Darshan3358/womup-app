@@ -429,17 +429,19 @@ export const StoresManagementScreen: React.FC = () => {
         isOnShift: editIsOnShift,
       };
 
-      const res = await ApiService.updateStore(editModalStore.id, payload);
+      const storeIdStr = String(editModalStore.id || (editModalStore as any)._id || '');
+      const res = await ApiService.updateStore(storeIdStr, payload);
       if (res.success) {
+        setStores((prev) =>
+          prev.map((s) => (s.id === storeIdStr || (s as any)._id === storeIdStr ? { ...s, ...payload } : s))
+        );
         setEditSuccessMsg('Dark Store updated successfully!');
-        await loadStores();
+        setEditModalStore(null);
+        setEditSuccessMsg(null);
+        loadStores().catch(() => {});
         if (refreshFromDb) {
-          await refreshFromDb();
+          refreshFromDb().catch(() => {});
         }
-        setTimeout(() => {
-          setEditModalStore(null);
-          setEditSuccessMsg(null);
-        }, 900);
       } else {
         Alert.alert('Update Failed', res.error || 'Failed to update store');
       }
@@ -482,19 +484,25 @@ export const StoresManagementScreen: React.FC = () => {
 
   const handleDeleteStore = async () => {
     if (!deleteConfirmStore) return;
+    const storeIdStr = String(deleteConfirmStore.id || (deleteConfirmStore as any)._id || '');
     setDeleteSubmitting(true);
+    // Optimistically remove from local stores list in 0ms
+    setStores((prev) => prev.filter((s) => s.id !== storeIdStr && (s as any)._id !== storeIdStr));
+    setDeleteConfirmStore(null);
     try {
-      const res = await ApiService.deleteStore(deleteConfirmStore.id);
+      const res = await ApiService.deleteStore(storeIdStr);
       if (res.success) {
-        alert(`Store "${deleteConfirmStore.name}" deleted successfully.`);
-        setDeleteConfirmStore(null);
-        await loadStores();
-        await refreshFromDb();
+        loadStores().catch(() => {});
+        if (refreshFromDb) {
+          refreshFromDb().catch(() => {});
+        }
       } else {
         alert(res.error || 'Cannot delete store.');
+        loadStores().catch(() => {});
       }
     } catch (err: any) {
       alert(err.message || 'Error deleting store.');
+      loadStores().catch(() => {});
     } finally {
       setDeleteSubmitting(false);
     }
