@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { PRODUCT_IMAGES } from './productImages';
 
 /**
@@ -118,6 +119,15 @@ const NAME_TO_ASSET_KEY: Record<string, string> = {
   haircolor: 'hair-colour.png',
 };
 
+const resolveAsset = (assetKey: string) => {
+  // On Native Android/iOS, always prioritize the direct Cloudinary CDN URL to prevent
+  // native Android R.drawable numeric asset ID drift across OTA updates
+  if (Platform.OS !== 'web' && PRODUCT_IMAGES[assetKey]) {
+    return { uri: PRODUCT_IMAGES[assetKey], cache: 'force-cache' };
+  }
+  return LOCAL_PRODUCT_ASSETS[assetKey] || (PRODUCT_IMAGES[assetKey] ? { uri: PRODUCT_IMAGES[assetKey], cache: 'force-cache' } : null);
+};
+
 export const getLocalProductAsset = (
   urlOrName?: string | null,
   name?: string | null,
@@ -134,8 +144,9 @@ export const getLocalProductAsset = (
   // 1. Direct URL match via reverse lookup map (Instant match for default 34 HTTP URLs)
   if (isExternalUrl) {
     const matchedKey = URL_TO_ASSET_KEY.get(trimmedUrl) || URL_TO_ASSET_KEY.get(trimmedUrl.split('?')[0]);
-    if (matchedKey && LOCAL_PRODUCT_ASSETS[matchedKey]) {
-      return LOCAL_PRODUCT_ASSETS[matchedKey];
+    if (matchedKey) {
+      const asset = resolveAsset(matchedKey);
+      if (asset) return asset;
     }
     // If an external URL is explicitly set and does not match the default asset map,
     // it is a custom URL set by Admin. Do NOT override it with local assets!
@@ -146,9 +157,11 @@ export const getLocalProductAsset = (
   if (slug) {
     const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const candidate = `${cleanSlug}.png`;
-    if (LOCAL_PRODUCT_ASSETS[candidate]) return LOCAL_PRODUCT_ASSETS[candidate];
-    if (NAME_TO_ASSET_KEY[cleanSlug] && LOCAL_PRODUCT_ASSETS[NAME_TO_ASSET_KEY[cleanSlug]]) {
-      return LOCAL_PRODUCT_ASSETS[NAME_TO_ASSET_KEY[cleanSlug]];
+    const asset1 = resolveAsset(candidate);
+    if (asset1) return asset1;
+    if (NAME_TO_ASSET_KEY[cleanSlug]) {
+      const asset2 = resolveAsset(NAME_TO_ASSET_KEY[cleanSlug]);
+      if (asset2) return asset2;
     }
   }
 
@@ -156,14 +169,17 @@ export const getLocalProductAsset = (
   if (name) {
     const cleanName = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const candidate = `${cleanName}.png`;
-    if (LOCAL_PRODUCT_ASSETS[candidate]) return LOCAL_PRODUCT_ASSETS[candidate];
-    if (NAME_TO_ASSET_KEY[cleanName] && LOCAL_PRODUCT_ASSETS[NAME_TO_ASSET_KEY[cleanName]]) {
-      return LOCAL_PRODUCT_ASSETS[NAME_TO_ASSET_KEY[cleanName]];
+    const asset1 = resolveAsset(candidate);
+    if (asset1) return asset1;
+    if (NAME_TO_ASSET_KEY[cleanName]) {
+      const asset2 = resolveAsset(NAME_TO_ASSET_KEY[cleanName]);
+      if (asset2) return asset2;
     }
     // Partial substring match for common names
     for (const [keyPart, assetKey] of Object.entries(NAME_TO_ASSET_KEY)) {
-      if (cleanName.includes(keyPart) && LOCAL_PRODUCT_ASSETS[assetKey]) {
-        return LOCAL_PRODUCT_ASSETS[assetKey];
+      if (cleanName.includes(keyPart)) {
+        const asset = resolveAsset(assetKey);
+        if (asset) return asset;
       }
     }
   }
@@ -171,16 +187,17 @@ export const getLocalProductAsset = (
   // 4. Filename / path match from urlOrName
   if (urlOrName) {
     const filename = urlOrName.split('/').pop()?.split('?')[0]?.toLowerCase();
-    if (filename && LOCAL_PRODUCT_ASSETS[filename]) {
-      return LOCAL_PRODUCT_ASSETS[filename];
+    if (filename) {
+      const asset = resolveAsset(filename);
+      if (asset) return asset;
     }
     const cleanKey = urlOrName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const candidate = `${cleanKey}.png`;
-    if (LOCAL_PRODUCT_ASSETS[candidate]) {
-      return LOCAL_PRODUCT_ASSETS[candidate];
-    }
-    if (NAME_TO_ASSET_KEY[cleanKey] && LOCAL_PRODUCT_ASSETS[NAME_TO_ASSET_KEY[cleanKey]]) {
-      return LOCAL_PRODUCT_ASSETS[NAME_TO_ASSET_KEY[cleanKey]];
+    const asset1 = resolveAsset(candidate);
+    if (asset1) return asset1;
+    if (NAME_TO_ASSET_KEY[cleanKey]) {
+      const asset2 = resolveAsset(NAME_TO_ASSET_KEY[cleanKey]);
+      if (asset2) return asset2;
     }
   }
 
