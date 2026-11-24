@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -23,6 +23,7 @@ export const ST02_StoreLoginScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const passwordInputRef = useRef<TextInput>(null);
 
   const handleLogin = async () => {
     setLocalError(null);
@@ -59,11 +60,13 @@ export const ST02_StoreLoginScreen: React.FC = () => {
   return (
     <KeyboardAvoidingView
       style={styles.wrapper}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
       <ScrollView
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
         bounces={false}
       >
         {/* Top Cart Icon */}
@@ -109,6 +112,9 @@ export const ST02_StoreLoginScreen: React.FC = () => {
               placeholderTextColor="#94A3B8"
               autoCapitalize="none"
               autoCorrect={false}
+              returnKeyType="next"
+              onSubmitEditing={() => passwordInputRef.current?.focus()}
+              blurOnSubmit={false}
             />
           </View>
 
@@ -119,6 +125,7 @@ export const ST02_StoreLoginScreen: React.FC = () => {
               <Ionicons name="lock-closed-outline" size={18} color="#071B52" />
             </View>
             <TextInput
+              ref={passwordInputRef}
               style={styles.input}
               value={password}
               onChangeText={(text) => {
@@ -130,6 +137,8 @@ export const ST02_StoreLoginScreen: React.FC = () => {
               secureTextEntry={!showPassword}
               autoCapitalize="none"
               autoCorrect={false}
+              returnKeyType="done"
+              onSubmitEditing={handleLogin}
             />
             <TouchableOpacity
               onPress={() => setShowPassword(!showPassword)}
@@ -218,9 +227,8 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 24,
-    paddingTop: 50,
-    paddingBottom: 30,
-    justifyContent: 'space-between',
+    paddingTop: 40,
+    paddingBottom: 140,
   },
   topIconContainer: {
     alignItems: 'center',

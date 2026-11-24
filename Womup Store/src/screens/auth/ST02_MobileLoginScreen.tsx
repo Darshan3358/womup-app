@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../context/StoreContext';
@@ -39,72 +40,81 @@ export const ST02_EmailLoginScreen: React.FC = () => {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
-      <View style={styles.content}>
-        {/* Top Header */}
-        <View style={styles.topLogo}>
-          <View style={styles.iconBox}>
-            <Ionicons name="storefront" size={36} color={COLORS.primary} />
-          </View>
-          <Text style={styles.title}>Dark Store Staff Login</Text>
-          <Text style={styles.subtitle}>
-            Enter registered email to receive Verification Code on your inbox
-          </Text>
-        </View>
-
-        {/* Input Card */}
-        <View style={styles.card}>
-          <Text style={styles.inputLabel}>Registered Email Address</Text>
-          <View style={styles.emailInputRow}>
-            <Ionicons name="mail-outline" size={20} color={COLORS.textMuted} style={styles.emailIcon} />
-            <TextInput
-              style={styles.input}
-              value={email}
-              onChangeText={(text) => {
-                setEmail(text);
-                setValidationError(null);
-              }}
-              placeholder="picker@wormup.com"
-              placeholderTextColor={COLORS.textMuted}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete="email"
-            />
-          </View>
-
-          {(validationError || error) ? (
-            <View style={styles.errorBox}>
-              <Ionicons name="alert-circle" size={16} color={COLORS.danger} />
-              <Text style={styles.errorText}>{validationError || error}</Text>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.content}>
+          {/* Top Header */}
+          <View style={styles.topLogo}>
+            <View style={styles.iconBox}>
+              <Ionicons name="storefront" size={36} color={COLORS.primary} />
             </View>
-          ) : null}
-
-          <TouchableOpacity
-            style={[styles.loginBtn, (!isValidEmail || localLoading) && styles.disabledBtn]}
-            onPress={handleSendOtp}
-            disabled={!isValidEmail || localLoading}
-            activeOpacity={0.8}
-          >
-            {localLoading ? (
-              <ActivityIndicator color="#FFF" />
-            ) : (
-              <>
-                <Text style={styles.loginBtnText}>SEND VERIFICATION CODE</Text>
-                <Ionicons name="arrow-forward" size={18} color="#FFF" />
-              </>
-            )}
-          </TouchableOpacity>
-
-          <View style={styles.hintBox}>
-            <Ionicons name="shield-checkmark" size={16} color={COLORS.primary} />
-            <Text style={styles.hintText}>
-              Authorised dark store pickers and hub managers only.
+            <Text style={styles.title}>Dark Store Staff Login</Text>
+            <Text style={styles.subtitle}>
+              Enter registered email to receive Verification Code on your inbox
             </Text>
           </View>
+
+          {/* Input Card */}
+          <View style={styles.card}>
+            <Text style={styles.inputLabel}>Registered Email Address</Text>
+            <View style={styles.emailInputRow}>
+              <Ionicons name="mail-outline" size={20} color={COLORS.textMuted} style={styles.emailIcon} />
+              <TextInput
+                style={styles.input}
+                value={email}
+                onChangeText={(text) => {
+                  setEmail(text);
+                  setValidationError(null);
+                }}
+                placeholder="picker@wormup.com"
+                placeholderTextColor={COLORS.textMuted}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+                returnKeyType="done"
+                onSubmitEditing={handleSendOtp}
+              />
+            </View>
+
+            {(validationError || error) ? (
+              <View style={styles.errorBox}>
+                <Ionicons name="alert-circle" size={16} color={COLORS.danger} />
+                <Text style={styles.errorText}>{validationError || error}</Text>
+              </View>
+            ) : null}
+
+            <TouchableOpacity
+              style={[styles.loginBtn, (!isValidEmail || localLoading) && styles.disabledBtn]}
+              onPress={handleSendOtp}
+              disabled={!isValidEmail || localLoading}
+              activeOpacity={0.8}
+            >
+              {localLoading ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <>
+                  <Text style={styles.loginBtnText}>SEND VERIFICATION CODE</Text>
+                  <Ionicons name="arrow-forward" size={18} color="#FFF" />
+                </>
+              )}
+            </TouchableOpacity>
+
+            <View style={styles.hintBox}>
+              <Ionicons name="shield-checkmark" size={16} color={COLORS.primary} />
+              <Text style={styles.hintText}>
+                Authorised dark store pickers and hub managers only.
+              </Text>
+            </View>
+          </View>
         </View>
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 };
@@ -116,8 +126,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     padding: 24,
+    paddingBottom: 140,
   },
   content: {
     maxWidth: 440,

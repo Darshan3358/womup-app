@@ -45,6 +45,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onRegisterPress }) => 
   const [mobileOrId, setMobileOrId] = useState('9876543210');
   const [password, setPassword] = useState('admin123');
   const [showPassword, setShowPassword] = useState(false);
+  const passwordRef = useRef<TextInput>(null);
 
   // OTP Login state (Email OTP)
   const [otpEmail, setOtpEmail] = useState('');
@@ -223,10 +224,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onRegisterPress }) => 
   return (
     <LinearGradient colors={GRADIENTS.navyHeader} style={styles.container}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         style={styles.keyboardView}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: 140 }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.card}>
             {/* Store Icon Header */}
             <View style={styles.iconCircle}>
@@ -277,6 +283,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onRegisterPress }) => 
                       placeholder="+91 98765 43210 or VND001"
                       placeholderTextColor="#94A3B8"
                       autoCapitalize="characters"
+                      returnKeyType="next"
+                      onSubmitEditing={() => passwordRef.current?.focus()}
+                      blurOnSubmit={false}
                     />
                   </View>
                 </View>
@@ -291,12 +300,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onRegisterPress }) => 
                   <View style={styles.inputWrapper}>
                     <Lock size={18} color="#64748B" />
                     <TextInput
+                      ref={passwordRef}
                       style={styles.input}
                       value={password}
                       onChangeText={setPassword}
                       placeholder="••••••••"
                       placeholderTextColor="#94A3B8"
                       secureTextEntry={!showPassword}
+                      returnKeyType="done"
+                      onSubmitEditing={handlePasswordLogin}
                     />
                     <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
                       {showPassword ? <EyeOff size={18} color="#64748B" /> : <Eye size={18} color="#64748B" />}

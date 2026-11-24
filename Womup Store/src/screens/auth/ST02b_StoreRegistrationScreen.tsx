@@ -313,9 +313,14 @@ export const ST02b_StoreRegistrationScreen: React.FC = () => {
   return (
     <KeyboardAvoidingView
       style={styles.wrapper}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         {/* Header Bar */}
         <View style={styles.topNav}>
           <TouchableOpacity
@@ -983,7 +988,7 @@ const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
     padding: 16,
-    paddingBottom: 40,
+    paddingBottom: 140,
   },
   topNav: {
     flexDirection: 'row',

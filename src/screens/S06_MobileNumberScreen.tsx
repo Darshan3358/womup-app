@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -35,6 +35,7 @@ export const S06_MobileNumberScreen: React.FC = () => {
   );
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const passwordInputRef = useRef<TextInput>(null);
 
   // Register Form States (Mobile OTP or Email OTP per user choice)
   // Feature flag: SMS gateway is currently inactive; Mobile Number registration is hidden (preserved, not removed). Set to true to re-enable.
@@ -218,14 +219,16 @@ export const S06_MobileNumberScreen: React.FC = () => {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       style={styles.flex}
     >
       <ScrollView
         contentContainerStyle={[
           styles.scrollContainer,
-          { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 20 },
+          { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 140 },
         ]}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
         {/* Top Header & Back Button */}
         <View style={styles.topHeader}>
@@ -373,6 +376,8 @@ export const S06_MobileNumberScreen: React.FC = () => {
                     if (error) setError('');
                   }}
                   returnKeyType="next"
+                  onSubmitEditing={() => passwordInputRef.current?.focus()}
+                  blurOnSubmit={false}
                 />
                 {identifier.length > 0 && (
                   <TouchableOpacity
@@ -394,6 +399,7 @@ export const S06_MobileNumberScreen: React.FC = () => {
                   style={styles.inputIcon}
                 />
                 <TextInput
+                  ref={passwordInputRef}
                   style={styles.input}
                   placeholder="Enter your account password"
                   placeholderTextColor={COLORS.secondaryText}

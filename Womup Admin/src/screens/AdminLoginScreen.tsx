@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -22,6 +22,7 @@ export const AdminLoginScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const passwordRef = useRef<TextInput>(null);
 
   const handleLogin = async (idToUse?: string, passToUse?: string) => {
     setError(null);
@@ -43,11 +44,13 @@ export const AdminLoginScreen: React.FC = () => {
   return (
     <LinearGradient colors={['#05062A', '#0B0D3F', '#15195C']} style={styles.container}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         style={styles.keyboardView}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
           {/* Brand Header */}
@@ -117,6 +120,9 @@ export const AdminLoginScreen: React.FC = () => {
                   }}
                   autoCapitalize="none"
                   autoCorrect={false}
+                  returnKeyType="next"
+                  onSubmitEditing={() => passwordRef.current?.focus()}
+                  blurOnSubmit={false}
                 />
               </View>
             </View>
@@ -127,6 +133,7 @@ export const AdminLoginScreen: React.FC = () => {
               <View style={styles.inputWrapper}>
                 <Lock size={18} color="#94A3B8" style={styles.inputIcon} />
                 <TextInput
+                  ref={passwordRef}
                   style={styles.input}
                   placeholder="••••••••"
                   placeholderTextColor="#64748B"
@@ -137,6 +144,8 @@ export const AdminLoginScreen: React.FC = () => {
                   }}
                   secureTextEntry
                   autoCapitalize="none"
+                  returnKeyType="done"
+                  onSubmitEditing={() => handleLogin()}
                 />
               </View>
             </View>
@@ -188,7 +197,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 24,
     paddingTop: Platform.OS === 'web' ? 40 : 60,
-    paddingBottom: 40,
+    paddingBottom: 140,
     maxWidth: 520,
     width: '100%',
     alignSelf: 'center',
