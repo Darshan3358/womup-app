@@ -26,9 +26,12 @@ import {
   Layers,
   ArrowUpRight,
   PlaySquare,
+  Upload,
+  Link2,
 } from 'lucide-react-native';
 import { COLORS, RADIUS, SPACING } from '../theme';
-import { NEST_API_BASE_URL } from '../services/api';
+import { NEST_API_BASE_URL, API_BASE_URL } from '../services/api';
+import * as ImagePicker from 'expo-image-picker';
 
 interface BannerItem {
   _id: string;
@@ -58,6 +61,10 @@ export const BannerPromotionScreen: React.FC = () => {
   // Form fields
   const [formTitle, setFormTitle] = useState('');
   const [formImageUrl, setFormImageUrl] = useState('');
+  const [imagePreview, setImagePreview] = useState('');
+  const [imageMode, setImageMode] = useState<'link' | 'upload'>('link');
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
   const [formVideoUrl, setFormVideoUrl] = useState('');
   const [formPlacement, setFormPlacement] = useState<'HOME_HERO' | 'CATEGORY_SPOTLIGHT' | 'FESTIVE_RAIL'>('HOME_HERO');
   const [formTargetType, setFormTargetType] = useState('CATEGORY');
@@ -96,6 +103,9 @@ export const BannerPromotionScreen: React.FC = () => {
     setEditingBanner(null);
     setFormTitle('');
     setFormImageUrl('');
+    setImagePreview('');
+    setImageMode('link');
+    setImageError(null);
     setFormVideoUrl('');
     setFormPlacement('HOME_HERO');
     setFormTargetType('CATEGORY');
@@ -109,6 +119,10 @@ export const BannerPromotionScreen: React.FC = () => {
     setEditingBanner(b);
     setFormTitle(b.title || '');
     setFormImageUrl(b.imageUrl || '');
+    setImagePreview(b.imageUrl || '');
+    const isCloudinary = Boolean(b.imageUrl && (b.imageUrl.includes('res.cloudinary.com') || b.imageUrl.includes('/upload/')));
+    setImageMode(isCloudinary ? 'upload' : 'link');
+    setImageError(null);
     setFormVideoUrl(b.videoUrl || '');
     setFormPlacement((b.placement as any) || 'HOME_HERO');
     setFormTargetType(b.targetType || 'CATEGORY');
@@ -118,9 +132,128 @@ export const BannerPromotionScreen: React.FC = () => {
     setShowModal(true);
   };
 
+  const handlePickBannerImage = async () => {
+    // 1. Native Mobile (iOS/Android) via expo-image-picker
+    if (Platform.OS !== 'web') {
+      try {
+        const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permissionResult.granted) {
+          setImageError('Permission to access photo library is required.');
+          return;
+        }
+
+        const pickerResult = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [16, 6],
+          quality: 0.85,
+        });
+
+        if (pickerResult.canceled || !pickerResult.assets?.[0]) return;
+        const asset = pickerResult.assets[0];
+
+        setImagePreview(asset.uri);
+        setUploadingImage(true);
+        setImageError(null);
+
+        const formData = new FormData();
+        formData.append('file', {
+          uri: asset.uri,
+          type: asset.mimeType || 'image/jpeg',
+          name: asset.fileName || 'banner.jpg',
+        } as any);
+
+        const res = await fetch(`${API_BASE_URL}/api/v1/media/upload?folder=wormup/banners`, {
+          method: 'POST',
+          body: formData,
+        });
+        const json = await res.json();
+
+        if (json.success && json.data) {
+          const uploadedUrl = json.data.url || json.data.secureUrl;
+          if (!uploadedUrl) throw new Error('No URL returned from upload server');
+          setFormImageUrl(uploadedUrl);
+          setImagePreview(uploadedUrl);
+          setImageError(null);
+        } else {
+          throw new Error(json.message || 'Upload failed');
+        }
+      } catch (err: any) {
+        setImageError(err?.message || 'Upload failed. Please try again.');
+        setImagePreview(formImageUrl || '');
+      } finally {
+        setUploadingImage(false);
+      }
+      return;
+    }
+
+    // 2. Web Browser via input[type=file]
+    if (typeof document !== 'undefined') {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/jpeg,image/png,image/webp,image/jpg,image/gif';
+      input.onchange = async (e: any) => {
+        const file = e.target?.files?.[0];
+        if (!file) return;
+
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg', 'image/gif'];
+        if (!allowedTypes.includes(file.type)) {
+          setImageError('Only JPG, JPEG, PNG, WEBP, and GIF formats are allowed.');
+          return;
+        }
+
+        if (file.size > 8 * 1024 * 1024) {
+          setImageError('Maximum allowed banner image size is 8MB.');
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = () => {
+          setImagePreview(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+
+        try {
+          setUploadingImage(true);
+          setImageError(null);
+
+          const formData = new FormData();
+          formData.append('file', file);
+          const res = await fetch(`${API_BASE_URL}/api/v1/media/upload?folder=wormup/banners`, {
+            method: 'POST',
+            body: formData,
+          });
+          const json = await res.json();
+
+          if (json.success && json.data) {
+            const uploadedUrl = json.data.url || json.data.secureUrl;
+            if (!uploadedUrl) throw new Error('No URL returned from upload server');
+            setFormImageUrl(uploadedUrl);
+            setImagePreview(uploadedUrl);
+            setImageError(null);
+          } else {
+            throw new Error(json.message || 'Upload failed');
+          }
+        } catch (err: any) {
+          setImageError(err?.message || 'Upload failed. Please try again.');
+          setImagePreview(formImageUrl || '');
+        } finally {
+          setUploadingImage(false);
+        }
+      };
+      input.click();
+    }
+  };
+
   const handleSaveBanner = async () => {
-    if (!formImageUrl.trim()) {
-      Alert.alert('Image URL Required', 'Please provide a valid banner image URL.');
+    const finalUrl = (formImageUrl || '').trim();
+    if (!finalUrl) {
+      Alert.alert('Image URL Required', 'Please provide a valid banner image URL or upload a file.');
+      return;
+    }
+
+    if (finalUrl.startsWith('data:')) {
+      Alert.alert('Upload In Progress', 'Please wait for the image upload to complete before saving.');
       return;
     }
 
@@ -128,7 +261,7 @@ export const BannerPromotionScreen: React.FC = () => {
       setSaving(true);
       const payload = {
         title: formTitle.trim() || 'Promotional Banner',
-        imageUrl: formImageUrl.trim(),
+        imageUrl: finalUrl,
         videoUrl: formVideoUrl.trim() || undefined,
         placement: formPlacement,
         targetType: formTargetType,
@@ -389,18 +522,106 @@ export const BannerPromotionScreen: React.FC = () => {
                 onChangeText={setFormTitle}
               />
 
-              <Text style={[styles.fieldLabel, { marginTop: 10 }]}>Image URL *</Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="https://images.unsplash.com/... or Cloudinary URL"
-                placeholderTextColor="#9CA3AF"
-                value={formImageUrl}
-                onChangeText={setFormImageUrl}
-              />
+              {/* 2. Banner Image: Link vs Upload Mode */}
+              <View style={styles.imageModeHeader}>
+                <Text style={styles.fieldLabel}>Banner Image *</Text>
+                <View style={styles.toggleRow}>
+                  <TouchableOpacity
+                    style={[styles.toggleBtn, imageMode === 'link' && styles.toggleBtnActive]}
+                    onPress={() => setImageMode('link')}
+                    activeOpacity={0.7}
+                  >
+                    <Link2 size={12} color={imageMode === 'link' ? '#FFFFFF' : '#64748B'} />
+                    <Text style={[styles.toggleBtnText, imageMode === 'link' && styles.toggleBtnTextActive]}>
+                      Link
+                    </Text>
+                  </TouchableOpacity>
 
-              {formImageUrl ? (
+                  <TouchableOpacity
+                    style={[styles.toggleBtn, imageMode === 'upload' && styles.toggleBtnActive]}
+                    onPress={() => setImageMode('upload')}
+                    activeOpacity={0.7}
+                  >
+                    <Upload size={12} color={imageMode === 'upload' ? '#FFFFFF' : '#64748B'} />
+                    <Text style={[styles.toggleBtnText, imageMode === 'upload' && styles.toggleBtnTextActive]}>
+                      Upload
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {imageMode === 'link' ? (
+                <View>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="https://images.unsplash.com/... or remote image URL"
+                    placeholderTextColor="#9CA3AF"
+                    value={formImageUrl}
+                    onChangeText={(val) => {
+                      setFormImageUrl(val.trim());
+                      setImagePreview(val.trim());
+                    }}
+                  />
+                  <Text style={styles.helperText}>
+                    Paste any direct image link. Live preview displays below.
+                  </Text>
+                </View>
+              ) : (
+                <View>
+                  <TouchableOpacity
+                    style={[styles.uploadBtn, uploadingImage && { opacity: 0.6 }]}
+                    onPress={handlePickBannerImage}
+                    disabled={uploadingImage}
+                    activeOpacity={0.8}
+                  >
+                    {uploadingImage ? (
+                      <ActivityIndicator size="small" color={COLORS.purple} />
+                    ) : (
+                      <Upload size={15} color={COLORS.purple} />
+                    )}
+                    <Text style={styles.uploadBtnText}>
+                      {uploadingImage
+                        ? 'Uploading to Cloudinary CDN...'
+                        : formImageUrl
+                        ? 'Replace Banner Photo'
+                        : 'Choose File / Upload Banner'}
+                    </Text>
+                  </TouchableOpacity>
+                  {formImageUrl && (formImageUrl.includes('res.cloudinary.com') || formImageUrl.includes('/upload/')) ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                      <Check size={13} color="#16A34A" />
+                      <Text style={{ fontSize: 11, color: '#16A34A', fontWeight: '700' }}>
+                        Cloudinary CDN Synced
+                      </Text>
+                    </View>
+                  ) : null}
+                  <Text style={styles.helperText}>
+                    PNG, JPG, WEBP or GIF up to 8MB. Uploads directly to Cloudinary CDN.
+                  </Text>
+                </View>
+              )}
+
+              {imageError && (
+                <Text style={styles.errorText}>{imageError}</Text>
+              )}
+
+              {imagePreview || formImageUrl ? (
                 <View style={styles.previewImageContainer}>
-                  <Image source={{ uri: formImageUrl }} style={styles.previewImage} resizeMode="cover" />
+                  <Image
+                    source={{ uri: imagePreview || formImageUrl }}
+                    style={styles.previewImage}
+                    resizeMode="cover"
+                  />
+                  <TouchableOpacity
+                    style={styles.previewClearBtn}
+                    onPress={() => {
+                      setFormImageUrl('');
+                      setImagePreview('');
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <X size={13} color="#FFFFFF" />
+                  </TouchableOpacity>
                 </View>
               ) : null}
 
@@ -841,16 +1062,97 @@ const styles = StyleSheet.create({
     color: '#111827',
   },
   previewImageContainer: {
-    height: 100,
+    height: 120,
     borderRadius: RADIUS.sm,
     overflow: 'hidden',
     marginTop: 8,
     borderWidth: 1,
     borderColor: '#E5E7EB',
+    position: 'relative',
+    backgroundColor: '#F8FAFC',
   },
   previewImage: {
     width: '100%',
     height: '100%',
+  },
+  previewClearBtn: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imageModeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 8,
+    padding: 2,
+    gap: 2,
+  },
+  toggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  toggleBtnActive: {
+    backgroundColor: COLORS.purple,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  toggleBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  toggleBtnTextActive: {
+    color: '#FFFFFF',
+  },
+  uploadBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#F5F3FF',
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: '#C4B5FD',
+    borderRadius: RADIUS.sm,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginTop: 4,
+  },
+  uploadBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.purple,
+  },
+  helperText: {
+    fontSize: 11,
+    color: '#94A3B8',
+    marginTop: 4,
+  },
+  errorText: {
+    fontSize: 11,
+    color: '#EF4444',
+    marginTop: 4,
+    fontWeight: '600',
   },
   optionRow: {
     flexDirection: 'row',
