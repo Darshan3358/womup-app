@@ -1145,9 +1145,12 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             });
           }
 
+          const updatedImg = data.imageUrl || data.image || p.imageUrl || p.image;
           return {
             ...p,
             ...data,
+            imageUrl: updatedImg,
+            image: updatedImg,
             basePrice: data.basePrice !== undefined ? Number(data.basePrice) : p.basePrice,
             sellingPrice: data.sellingPrice !== undefined ? Number(data.sellingPrice) : p.sellingPrice,
             mrp: data.mrp !== undefined ? Number(data.mrp) : p.mrp,

@@ -346,6 +346,7 @@ export const EditProductModal: React.FC = () => {
         brand: brand.trim() || 'Womup Fresh',
         description: description.trim(),
         imageUrl: imageUrl || imagePreview,
+        image: imageUrl || imagePreview,
         images: imageUrl || imagePreview ? [imageUrl || imagePreview] : [],
         sellingPrice: defaultVar.sellingPrice,
         mrp: defaultVar.mrp,

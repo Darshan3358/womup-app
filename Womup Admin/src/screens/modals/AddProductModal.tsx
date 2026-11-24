@@ -251,6 +251,7 @@ export const AddProductModal: React.FC = () => {
         brand: brand.trim() || 'Womup Fresh',
         description: description.trim(),
         imageUrl: imageUrl || imagePreview || 'https://images.unsplash.com/photo-1546094096-0df4bcaaa337?w=400&q=80',
+        image: imageUrl || imagePreview || 'https://images.unsplash.com/photo-1546094096-0df4bcaaa337?w=400&q=80',
         images: [imageUrl || imagePreview || 'https://images.unsplash.com/photo-1546094096-0df4bcaaa337?w=400&q=80'],
         sellingPrice: defaultVar.sellingPrice,
         mrp: defaultVar.mrp,
