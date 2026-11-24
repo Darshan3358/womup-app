@@ -48,7 +48,7 @@ export function mapRawItemToProduct(item: any): Product {
     categorySlug: catSlug,
     categoryName: catName,
     subCategoryId: item.subCategoryId,
-    imageUrl: item.imageUrl,
+    imageUrl: item.imageUrl || item.image || (Array.isArray(item.images) && item.images[0]) || '',
     quantityLabel: effectiveLabel,
     mrp: effectiveMrp,
     sellingPrice: effectiveSellingPrice,

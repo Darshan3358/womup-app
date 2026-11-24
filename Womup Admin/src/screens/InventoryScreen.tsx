@@ -911,7 +911,7 @@ export const InventoryScreen: React.FC = () => {
                 <View style={styles.inventoryCardTopRow}>
                   {/* Thumbnail */}
                   <Image
-                    source={resolveProductImageSource(p.image || p.imageUrl, p.name, (p as any).slug)}
+                    source={resolveProductImageSource(p.imageUrl || p.image, p.name, (p as any).slug)}
                     style={styles.inventoryCardThumb}
                     resizeMode="cover"
                   />

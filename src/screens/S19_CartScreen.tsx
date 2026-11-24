@@ -64,7 +64,7 @@ export const S19_CartScreen: React.FC = () => {
               <View style={styles.itemImageWrapper}>
                 {item.product.image || item.product.imageUrl ? (
                   <Image
-                    source={item.product.image || resolveProductImageSource(item.product.imageUrl, item.product.name, (item.product as any).slug)}
+                    source={resolveProductImageSource(item.product.imageUrl || item.product.image, item.product.name, (item.product as any).slug)}
                     style={styles.itemImage}
                     resizeMode="cover"
                   />

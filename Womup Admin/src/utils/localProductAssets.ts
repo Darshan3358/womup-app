@@ -123,16 +123,26 @@ export const getLocalProductAsset = (
   name?: string | null,
   slug?: string | null,
 ): any => {
-  // 1. Direct URL match via reverse lookup map (Instant match for the 34 HTTP URLs)
-  if (urlOrName) {
-    const trimmed = urlOrName.trim();
-    const matchedKey = URL_TO_ASSET_KEY.get(trimmed) || URL_TO_ASSET_KEY.get(trimmed.split('?')[0]);
+  const trimmedUrl = urlOrName ? urlOrName.trim() : '';
+  const isExternalUrl =
+    trimmedUrl.startsWith('http://') ||
+    trimmedUrl.startsWith('https://') ||
+    trimmedUrl.startsWith('data:') ||
+    trimmedUrl.startsWith('blob:') ||
+    trimmedUrl.startsWith('file:');
+
+  // 1. Direct URL match via reverse lookup map (Instant match for default 34 HTTP URLs)
+  if (isExternalUrl) {
+    const matchedKey = URL_TO_ASSET_KEY.get(trimmedUrl) || URL_TO_ASSET_KEY.get(trimmedUrl.split('?')[0]);
     if (matchedKey && LOCAL_PRODUCT_ASSETS[matchedKey]) {
       return LOCAL_PRODUCT_ASSETS[matchedKey];
     }
+    // If an external URL is explicitly set and does not match the default asset map,
+    // it is a custom URL set by Admin. Do NOT override it with local assets!
+    return null;
   }
 
-  // 2. Slug match
+  // 2. Slug match (for offline/local catalog without external URLs)
   if (slug) {
     const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const candidate = `${cleanSlug}.png`;
@@ -142,7 +152,7 @@ export const getLocalProductAsset = (
     }
   }
 
-  // 3. Name match
+  // 3. Name match (for offline/local catalog without external URLs)
   if (name) {
     const cleanName = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const candidate = `${cleanName}.png`;

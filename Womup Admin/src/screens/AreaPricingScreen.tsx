@@ -454,7 +454,7 @@ export const AreaPricingScreen: React.FC = () => {
                 <View style={styles.pricingCardTopRow}>
                   {/* Thumbnail Image */}
                   <Image
-                    source={resolveProductImageSource(p.image || p.imageUrl, p.name, (p as any).slug)}
+                    source={resolveProductImageSource(p.imageUrl || p.image, p.name, (p as any).slug)}
                     style={styles.productThumbImg}
                     resizeMode="cover"
                   />

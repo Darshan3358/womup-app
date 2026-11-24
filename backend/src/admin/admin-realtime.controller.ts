@@ -878,6 +878,9 @@ export class AdminRealtimeController {
       costPrice: Number(costPrice || 0),
       stock: Number(stock || 0),
       imageUrl: imageUrl || image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&q=80',
+      image: imageUrl || image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&q=80',
+      images: [imageUrl || image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&q=80'],
+      thumbnailUrl: imageUrl || image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&q=80',
       unit: unit || 'kg',
       unitWeight: unitWeight || '1 kg',
       barcode: barcode || 'BAR_' + Date.now(),
@@ -943,7 +946,11 @@ export class AdminRealtimeController {
     if (body.costPrice !== undefined) updateSet.costPrice = Number(body.costPrice);
     if (body.stock !== undefined) updateSet.stock = Number(body.stock);
     if (body.imageUrl !== undefined || body.image !== undefined) {
-      updateSet.imageUrl = body.imageUrl || body.image;
+      const img = (body.imageUrl || body.image || '').trim();
+      updateSet.imageUrl = img;
+      updateSet.image = img;
+      updateSet.images = [img];
+      updateSet.thumbnailUrl = img;
     }
     if (body.unit !== undefined) updateSet.unit = body.unit;
     if (body.unitWeight !== undefined) updateSet.unitWeight = body.unitWeight;

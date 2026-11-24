@@ -83,7 +83,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         <View style={styles.horizontalImageContainer}>
           {product.image || product.imageUrl ? (
             <Image
-              source={product.image || resolveProductImageSource(product.imageUrl, product.name, (product as any).slug)}
+              source={resolveProductImageSource(product.imageUrl || product.image, product.name, (product as any).slug)}
               style={styles.horizontalImage}
               resizeMode="cover"
             />
@@ -198,7 +198,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       <View style={styles.gridImageContainer}>
         {product.image || product.imageUrl ? (
           <Image
-            source={product.image || resolveProductImageSource(product.imageUrl, product.name, (product as any).slug)}
+            source={resolveProductImageSource(product.imageUrl || product.image, product.name, (product as any).slug)}
             style={styles.gridProductImage}
             resizeMode="cover"
           />

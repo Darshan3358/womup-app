@@ -65,7 +65,7 @@ export const S16_ProductDetailsScreen: React.FC = () => {
         <View style={styles.imageShowcase}>
           {product.image || product.imageUrl ? (
             <Image
-              source={product.image || resolveProductImageSource(product.imageUrl, product.name, (product as any).slug)}
+              source={resolveProductImageSource(product.imageUrl || product.image, product.name, (product as any).slug)}
               style={styles.showcaseProductImage}
               resizeMode="contain"
             />

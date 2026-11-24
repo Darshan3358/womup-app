@@ -10,14 +10,20 @@ const getUploadsBaseUrl = (): string => {
  * Prioritizes 34 local bundled assets for 0ms loading, falling back to remote URLs.
  */
 export const resolveProductImageSource = (
-  url?: string | null,
+  url?: any,
   name?: string | null,
   slug?: string | null,
 ): any => {
-  const local = getLocalProductAsset(url, name, slug);
+  // If url is already an asset number (from require(...)) or direct source object
+  if (typeof url === 'number' || (typeof url === 'object' && url && !url.uri)) {
+    return url;
+  }
+  const rawUrl = typeof url === 'string' ? url : (url?.uri || '');
+
+  const local = getLocalProductAsset(rawUrl, name, slug);
   if (local) return local;
 
-  const remote = resolveImageUrl(url);
+  const remote = resolveImageUrl(rawUrl);
   let optimizedRemote = remote || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80';
 
   // Optimize Cloudinary URLs with auto format and uniform 400x400 padded fit
