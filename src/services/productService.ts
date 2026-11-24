@@ -1,13 +1,27 @@
 import { Product, FilterSortState, Category, SubCategory, ProductVariantPriced } from '../types';
 import { api } from './api';
-import { PRODUCTS } from '../data/products';
+import { StorageService } from './storageService';
 
 // ---------------------------------------------------------------------------
-// Simple TTL caches (in-memory, process-lifetime)
+// Simple TTL caches (in-memory + offline persistence)
 // ---------------------------------------------------------------------------
-// Flat in-memory cache pre-seeded with authoritative 34 catalog products
-let cachedProducts: Product[] = Array.isArray(PRODUCTS) && PRODUCTS.length > 0 ? [...PRODUCTS] : [];
+const CACHE_KEYS = {
+  CACHED_PRODUCTS: '@wormup_cached_products',
+};
+
+// In-memory cache holding real products loaded from API or local disk persistence
+let cachedProducts: Product[] = [];
 let cachedCategories: Category[] = [];
+
+// Initialize memory cache from persistent disk storage on app startup
+(async () => {
+  try {
+    const saved = await StorageService.getItem<Product[]>(CACHE_KEYS.CACHED_PRODUCTS, []);
+    if (Array.isArray(saved) && saved.length > 0 && cachedProducts.length === 0) {
+      cachedProducts = saved;
+    }
+  } catch {}
+})();
 
 let _categoryCacheEntry: { data: Category[]; ts: number } | null = null;
 const CATEGORY_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -129,6 +143,7 @@ export const ProductService = {
         }
         if (allProds.length > 0) {
           cachedProducts = allProds;
+          StorageService.saveItem(CACHE_KEYS.CACHED_PRODUCTS, allProds).catch(() => {});
         }
 
         return result;
@@ -137,8 +152,8 @@ export const ProductService = {
       console.warn('[ProductService] fetchHomeSections network error:', e);
     }
 
-    // Secondary fallback: synthesize home sections from cached/bundled catalog directly
-    const fallbackItems = cachedProducts.length > 0 ? cachedProducts : PRODUCTS;
+    // Secondary fallback: synthesize home sections from real cached catalog if available
+    const fallbackItems = cachedProducts;
     if (fallbackItems && fallbackItems.length > 0) {
       const vegNames = ['potato', 'onion', 'tomato', 'lady fingers', 'cabbage', 'ginger', 'guwar', 'lemon', 'bottle gourd', 'parwal', 'beetroot'];
       const fruitNames = ['apple', 'banana', 'orange', 'pineapple', 'muskmelon', 'papaya', 'kiwi', 'watermelon'];
@@ -304,12 +319,13 @@ export const ProductService = {
       if (!params.categoryId && (!params.categoryIds || params.categoryIds.length === 0) && !params.search) {
         if (mapped.length > 0) {
           cachedProducts = mapped;
+          StorageService.saveItem(CACHE_KEYS.CACHED_PRODUCTS, mapped).catch(() => {});
         }
       }
-      return mapped.length > 0 ? mapped : (cachedProducts.length > 0 ? cachedProducts : PRODUCTS);
+      return mapped;
     }
 
-    return cachedProducts.length > 0 ? cachedProducts : PRODUCTS;
+    return cachedProducts;
   },
 
   async fetchCategories(): Promise<Category[]> {
@@ -343,9 +359,13 @@ export const ProductService = {
     return [];
   },
 
+  hasCachedProducts(): boolean {
+    return cachedProducts.length > 0;
+  },
+
   // --- Synchronous methods backed by current server cache ---
   getAllProducts(): Product[] {
-    return cachedProducts.length > 0 ? cachedProducts : PRODUCTS;
+    return cachedProducts;
   },
 
   getProductById(id: string): Product | undefined {
@@ -391,7 +411,7 @@ export const ProductService = {
   searchProducts(query: string): Product[] {
     if (!query.trim()) return [];
     const q = query.toLowerCase().trim();
-    const source = cachedProducts.length > 0 ? cachedProducts : PRODUCTS;
+    const source = cachedProducts;
     const terms = q.split(/\s+/).filter(Boolean);
     return source.filter((p) => {
       const name = (p.name || '').toLowerCase();

@@ -16,6 +16,7 @@ import { AppIcon } from './AppIcon';
 import { BlinkitProduct } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { resolveImageThumbnail, resolveProductImageSource } from '../../utils/imageUrl';
+import { Skeleton } from './Skeleton';
 
 interface BlinkitProductCardProps {
   product: BlinkitProduct;
@@ -47,6 +48,7 @@ const BlinkitProductCardComponent: React.FC<BlinkitProductCardProps> = ({
   } = useApp();
   const isWishlisted = isInWishlist(product.id);
   const [isLoading, setIsLoading] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
 
   const variants = product.variants || [];
   const defaultVariant = variants.find((v) => v.isDefault) || variants[0];
@@ -135,10 +137,16 @@ const BlinkitProductCardComponent: React.FC<BlinkitProductCardProps> = ({
       >
         {/* Left: Product Image Box */}
         <View style={styles.wishlistImageWrapper}>
+          {!imgLoaded && (
+            <View style={StyleSheet.absoluteFill}>
+              <Skeleton width="100%" height="100%" borderRadius={8} />
+            </View>
+          )}
           <Image
             source={resolveProductImageSource(product.imageUrl, product.name, (product as any).slug)}
-            style={styles.wishlistProductImage}
+            style={[styles.wishlistProductImage, !imgLoaded && { opacity: 0 }]}
             resizeMode="cover"
+            onLoad={() => setImgLoaded(true)}
           />
           {product.discountBadge && (
             <View style={styles.wishlistDiscountBadge}>
@@ -282,10 +290,16 @@ const BlinkitProductCardComponent: React.FC<BlinkitProductCardProps> = ({
     >
       {/* Product Image Box with Real Online Photo */}
       <View style={[styles.imageContainer, isHorizontal && styles.horizontalImageContainer]}>
+        {!imgLoaded && (
+          <View style={StyleSheet.absoluteFill}>
+            <Skeleton width="100%" height="100%" borderRadius={8} />
+          </View>
+        )}
         <Image
           source={resolveProductImageSource(product.imageUrl, product.name, (product as any).slug)}
-          style={styles.productImage}
+          style={[styles.productImage, !imgLoaded && { opacity: 0 }]}
           resizeMode="cover"
+          onLoad={() => setImgLoaded(true)}
         />
 
         {/* Wishlist Heart Top Right */}

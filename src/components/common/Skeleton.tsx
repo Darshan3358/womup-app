@@ -170,6 +170,25 @@ export const ProductSectionSkeleton: React.FC<{
 };
 
 /**
+ * Horizontal Product Card Skeleton matching S15 / Cart item layouts
+ */
+export const HorizontalProductCardSkeleton: React.FC = () => {
+  return (
+    <View style={styles.horizontalCardContainer}>
+      <View style={styles.horizontalImageWrapper}>
+        <Skeleton width="100%" height="100%" borderRadius={8} />
+      </View>
+      <View style={{ flex: 1, gap: 6, marginLeft: 12 }}>
+        <Skeleton width="75%" height={14} borderRadius={3} />
+        <Skeleton width="45%" height={11} borderRadius={3} />
+        <Skeleton width="35%" height={16} borderRadius={3} style={{ marginTop: 4 }} />
+      </View>
+      <Skeleton width={68} height={32} borderRadius={8} />
+    </View>
+  );
+};
+
+/**
  * Cart Screen Skeleton matching BlinkitCartScreen layout
  */
 export const CartScreenSkeleton: React.FC = () => {
@@ -390,6 +409,23 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 8,
     paddingTop: 4,
+  },
+  horizontalCardContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 12,
+    marginVertical: 6,
+    marginHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  horizontalImageWrapper: {
+    width: 64,
+    height: 64,
+    borderRadius: 8,
+    overflow: 'hidden',
   },
 });
 

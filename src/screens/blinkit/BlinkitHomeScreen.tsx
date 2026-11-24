@@ -7,6 +7,7 @@ import {
   StyleSheet,
   useWindowDimensions,
   Image,
+  RefreshControl,
 } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../theme/colors';
@@ -23,7 +24,6 @@ import { KYCBanner } from '../../components/KYCBanner';
 
 import { useApp, mapProductToBlinkit } from '../../context/AppContext';
 import { ProductService } from '../../services/productService';
-import { PRODUCTS } from '../../data/products';
 import {
   resolveCategoryGroup,
 } from '../../data/blinkitData';
@@ -74,34 +74,6 @@ const isBeautyPersonalCare = (p: BlinkitProduct) => {
   const name = (p.name || '').toLowerCase();
   const cat = (p.category || '').toLowerCase();
   return personalCareNames.some((pc) => name.includes(pc)) || cat.includes('beauty') || cat.includes('personal') || name.includes('shampoo') || name.includes('perfume') || name.includes('spray') || name.includes('colour') || name.includes('conditioner') || name.includes('hair');
-};
-
-const getInitialHomeSectionsMap = (): Record<string, BlinkitProduct[]> => {
-  const fallbackList = PRODUCTS.map(mapProductToBlinkit);
-  const map: Record<string, BlinkitProduct[]> = {};
-
-  const deals = fallbackList.filter((p) => p.mrp > p.sellingPrice);
-  map['deals'] = deals.length > 0 ? deals.slice(0, 10) : fallbackList.slice(0, 8);
-
-  const fast = fallbackList.filter((p) => p.stock > 0 && p.deliveryMinutes <= 15);
-  map['fast_delivery'] = fast.length > 0 ? fast.slice(0, 10) : fallbackList.slice(0, 8);
-
-  map['fresh_vegetables'] = fallbackList.filter(isVegetable);
-  map['fresh_fruits'] = fallbackList.filter(isFruit);
-  map['fresh_veggies'] = fallbackList.filter((p) => isVegetable(p) || isFruit(p));
-  map['atta_rice_dal'] = fallbackList.filter(isAttaRiceDal);
-  map['dairy_bread'] = fallbackList.filter(isDairyBreadEggs);
-  map['beauty_personal_care'] = fallbackList.filter(isBeautyPersonalCare);
-
-  const bs = fallbackList.filter((p) => p.rating >= 4.5);
-  map['bestsellers'] = bs.length > 0 ? bs.slice(0, 10) : fallbackList.slice(0, 8);
-
-  map['new_arrivals'] = fallbackList.slice(0, 8);
-
-  const u50 = fallbackList.filter((p) => p.sellingPrice <= 50);
-  map['under_50'] = u50.length > 0 ? u50.slice(0, 10) : fallbackList.slice(0, 8);
-
-  return map;
 };
 
 export const BlinkitHomeScreen: React.FC = () => {
@@ -173,71 +145,67 @@ export const BlinkitHomeScreen: React.FC = () => {
   }, []);
 
   const [activeTab, setActiveTab] = useState('Home');
-  const [isLoading, setIsLoading] = useState(false);
-  const [dbProducts, setDbProducts] = useState<Product[]>(() => {
-    const list = ProductService.getAllProducts();
-    return list && list.length > 0 ? list : PRODUCTS;
-  });
-  const [backendSections, setBackendSections] = useState<Record<string, BlinkitProduct[]>>(() => getInitialHomeSectionsMap());
+  const [isLoading, setIsLoading] = useState(!ProductService.hasCachedProducts());
+  const [isError, setIsError] = useState(false);
+  const [dbProducts, setDbProducts] = useState<Product[]>(() => ProductService.getAllProducts());
+  const [backendSections, setBackendSections] = useState<Record<string, BlinkitProduct[]>>({});
   const requestEpochRef = useRef(0);
 
-  // Fetch unified home data in background — initial sections are already pre-seeded so zero reload delay
-  useEffect(() => {
-    let isMounted = true;
+  const loadHomeData = useCallback(async () => {
     const epoch = ++requestEpochRef.current;
+    if (!ProductService.hasCachedProducts()) {
+      setIsLoading(true);
+    }
+    setIsError(false);
 
-    (async () => {
-      try {
-        const homeData = await ProductService.fetchHomeSections({
-          areaId: currentAreaId || undefined,
-          storeId: currentStoreId || undefined,
-        }).catch(() => null);
+    try {
+      const homeData = await ProductService.fetchHomeSections({
+        areaId: currentAreaId || undefined,
+        storeId: currentStoreId || undefined,
+      }).catch(() => null);
 
-        if (!isMounted) return;
+      if (homeData && homeData.sections && homeData.sections.length > 0) {
+        // Populate section map from the unified home response
+        const map: Record<string, BlinkitProduct[]> = {};
+        for (const sec of homeData.sections || []) {
+          map[sec.id] = (sec.products || []).map(mapProductToBlinkit);
+        }
+        setBackendSections(map);
 
-        if (homeData && homeData.sections && homeData.sections.length > 0) {
-          // Populate section map from the unified home response
-          const map: Record<string, BlinkitProduct[]> = {};
-          for (const sec of homeData.sections || []) {
-            map[sec.id] = (sec.products || []).map(mapProductToBlinkit);
-          }
-          setBackendSections(map);
-
-          // Build a deduplicated flat product list from the sections for fallback logic
-          const seen = new Set<string>();
-          const allProds: Product[] = [];
-          for (const sec of homeData.sections || []) {
-            for (const p of sec.products || []) {
-              if (!seen.has(p.id)) {
-                seen.add(p.id);
-                allProds.push(p);
-              }
+        // Build a deduplicated flat product list from the sections for fallback logic
+        const seen = new Set<string>();
+        const allProds: Product[] = [];
+        for (const sec of homeData.sections || []) {
+          for (const p of sec.products || []) {
+            if (!seen.has(p.id)) {
+              seen.add(p.id);
+              allProds.push(p);
             }
           }
-          if (allProds.length > 0) {
-            setDbProducts(allProds);
-          }
-        } else {
-          // Fallback: If unified homeData returned empty sections, fetch catalog directly
-          const fallbackProds = await ProductService.fetchProducts({ limit: 120 }).catch(() => []);
-          if (isMounted && fallbackProds.length > 0) {
-            setDbProducts(fallbackProds);
-          }
         }
-      } catch (e: any) {
-        console.warn('Error loading home data:', e);
-      } finally {
-        if (isMounted && epoch === requestEpochRef.current) {
-          setIsLoading(false);
+        if (allProds.length > 0) {
+          setDbProducts(allProds);
+        }
+      } else {
+        // Fallback: If unified homeData returned empty sections, fetch catalog directly
+        const fallbackProds = await ProductService.fetchProducts({ limit: 120 }).catch(() => []);
+        if (fallbackProds.length > 0) {
+          setDbProducts(fallbackProds);
         }
       }
-    })();
+    } catch (e: any) {
+      console.warn('Error loading home data:', e);
+      setIsError(true);
+    } finally {
+      if (epoch === requestEpochRef.current) {
+        setIsLoading(false);
+      }
+    }
+  }, [currentAreaId, currentStoreId]);
 
-    return () => {
-      isMounted = false;
-    };
-  // Auto-refreshes when area changes OR when admin pushes real-time price/catalog update (catalogVersion)
-  }, [currentAreaId, currentStoreId, catalogVersion]);
+  useEffect(() => {
+    loadHomeData();
+  }, [loadHomeData, catalogVersion]);
 
   const handleOpenProductDetail = (prod: BlinkitProduct) => {
     setSelectedBlinkitProduct(prod);
@@ -285,7 +253,7 @@ export const BlinkitHomeScreen: React.FC = () => {
 
   // Convert live DB products to BlinkitProduct format
   const liveBlinkitProducts = useMemo(() => {
-    const list = dbProducts && dbProducts.length > 0 ? dbProducts : PRODUCTS;
+    const list = dbProducts && dbProducts.length > 0 ? dbProducts : [];
     return list.map(mapProductToBlinkit);
   }, [dbProducts]);
 
@@ -295,7 +263,7 @@ export const BlinkitHomeScreen: React.FC = () => {
     if (fromApi && fromApi.length > 0) return fromApi;
     const liveDeals = liveBlinkitProducts.filter((p) => p.mrp > p.sellingPrice);
     if (liveDeals.length > 0) return liveDeals.slice(0, 10);
-    return liveBlinkitProducts.slice(0, 8);
+    return [];
   }, [backendSections, liveBlinkitProducts]);
 
   // 2. 9-Minute Delivery (Fast-Moving Items)
@@ -304,7 +272,7 @@ export const BlinkitHomeScreen: React.FC = () => {
     if (fromApi && fromApi.length > 0) return fromApi;
     const liveFast = liveBlinkitProducts.filter((p) => p.stock > 0 && p.deliveryMinutes <= 15);
     if (liveFast.length > 0) return liveFast.slice(0, 10);
-    return liveBlinkitProducts.slice(0, 8);
+    return [];
   }, [backendSections, liveBlinkitProducts]);
 
   // 3. Fresh Vegetables (all 11 items)
@@ -348,7 +316,7 @@ export const BlinkitHomeScreen: React.FC = () => {
     if (fromApi && fromApi.length > 0) return fromApi;
     const liveBs = liveBlinkitProducts.filter((p) => p.rating >= 4.5);
     if (liveBs.length > 0) return liveBs.slice(0, 10);
-    return liveBlinkitProducts.slice(0, 8);
+    return [];
   }, [backendSections, liveBlinkitProducts]);
 
   // 9. New Arrivals
@@ -356,7 +324,7 @@ export const BlinkitHomeScreen: React.FC = () => {
     const fromApi = backendSections['new_arrivals'];
     if (fromApi && fromApi.length > 0) return fromApi;
     if (liveBlinkitProducts.length > 0) return liveBlinkitProducts.slice(0, 8);
-    return PRODUCTS.slice(0, 8).map(mapProductToBlinkit);
+    return [];
   }, [backendSections, liveBlinkitProducts]);
 
   // 10. Under ₹50 (Everyday Savings)
@@ -365,7 +333,7 @@ export const BlinkitHomeScreen: React.FC = () => {
     if (fromApi && fromApi.length > 0) return fromApi;
     const liveU50 = liveBlinkitProducts.filter((p) => p.sellingPrice <= 50);
     if (liveU50.length > 0) return liveU50.slice(0, 10);
-    return liveBlinkitProducts.slice(0, 8);
+    return [];
   }, [backendSections, liveBlinkitProducts]);
 
   // ── FlatList section data ─────────────────────────────────────────────────
@@ -739,8 +707,30 @@ export const BlinkitHomeScreen: React.FC = () => {
         ])}
         keyExtractor={(item) => item.type}
         renderItem={renderSection}
-        ListHeaderComponent={ListHeader}
+        ListHeaderComponent={
+          <>
+            {ListHeader}
+            {isError && !isLoading && dbProducts.length === 0 && (
+              <View style={styles.errorCard}>
+                <Ionicons name="cloud-offline-outline" size={36} color="#EF4444" style={{ marginBottom: 6 }} />
+                <Text style={styles.errorTitle}>Unable to load products</Text>
+                <Text style={styles.errorSubtitle}>Please check your internet connection and try again</Text>
+                <TouchableOpacity style={styles.retryBtn} onPress={loadHomeData} activeOpacity={0.8}>
+                  <Text style={styles.retryBtnText}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </>
+        }
         ListFooterComponent={ListFooter}
+        refreshControl={
+          <RefreshControl
+            refreshing={isLoading && dbProducts.length > 0}
+            onRefresh={loadHomeData}
+            colors={[COLORS.primary]}
+            tintColor={COLORS.primary}
+          />
+        }
         showsVerticalScrollIndicator={false}
         style={styles.flatListStyle}
         contentContainerStyle={styles.listContent}
@@ -878,5 +868,43 @@ const styles = StyleSheet.create({
   bannerImage: {
     width: '100%',
     height: '100%',
+  },
+  errorCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    marginHorizontal: 16,
+    marginVertical: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  errorTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 4,
+  },
+  errorSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryBtn: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  retryBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

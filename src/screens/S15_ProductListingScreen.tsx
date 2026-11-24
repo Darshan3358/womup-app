@@ -14,6 +14,7 @@ import { SPACING, RADIUS } from '../theme/spacing';
 import { Header } from '../components/common/Header';
 import { ProductCard } from '../components/product/ProductCard';
 import { FloatingCartPill } from '../components/common/FloatingCartPill';
+import { HorizontalProductCardSkeleton } from '../components/common/Skeleton';
 import { useApp } from '../context/AppContext';
 import { ProductService } from '../services/productService';
 import { Product } from '../types';
@@ -133,10 +134,11 @@ export const S15_ProductListingScreen: React.FC = () => {
 
       {/* Product List */}
       {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>Loading products...</Text>
-        </View>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <HorizontalProductCardSkeleton key={i} />
+          ))}
+        </ScrollView>
       ) : filteredProducts.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="basket-outline" size={56} color={COLORS.textMuted} />

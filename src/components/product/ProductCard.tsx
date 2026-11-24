@@ -16,6 +16,7 @@ import { CoinBadge } from '../common/CoinBadge';
 import { QuantityStepper } from './QuantityStepper';
 import { useApp } from '../../context/AppContext';
 import { resolveProductImageSource } from '../../utils/imageUrl';
+import { Skeleton } from '../common/Skeleton';
 
 interface ProductCardProps {
   product: Product;
@@ -31,6 +32,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   style,
 }) => {
   const { cart, addToCart, updateQuantity, setSelectedProduct, setSelectedBlinkitProduct, setActiveScreen, getBlinkitQty } = useApp();
+  const [imgLoaded, setImgLoaded] = useState(false);
 
   const variants = product.variants || [];
   const defaultVariant = variants.find((v) => v.isDefault) || variants[0];
@@ -111,11 +113,19 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         {/* Visual Product Image Container */}
         <View style={styles.horizontalImageContainer}>
           {product.image || product.imageUrl ? (
-            <Image
-              source={resolveProductImageSource(product.imageUrl || product.image, product.name, (product as any).slug)}
-              style={styles.horizontalImage}
-              resizeMode="cover"
-            />
+            <>
+              {!imgLoaded && (
+                <View style={StyleSheet.absoluteFill}>
+                  <Skeleton width="100%" height="100%" borderRadius={8} />
+                </View>
+              )}
+              <Image
+                source={resolveProductImageSource(product.imageUrl || product.image, product.name, (product as any).slug)}
+                style={[styles.horizontalImage, !imgLoaded && { opacity: 0 }]}
+                resizeMode="cover"
+                onLoad={() => setImgLoaded(true)}
+              />
+            </>
           ) : (
             <View style={styles.iconCircle}>
               <Ionicons name="basket-outline" size={28} color={COLORS.purple} />
@@ -226,11 +236,19 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       {/* Product Image */}
       <View style={styles.gridImageContainer}>
         {product.image || product.imageUrl ? (
-          <Image
-            source={resolveProductImageSource(product.imageUrl || product.image, product.name, (product as any).slug)}
-            style={styles.gridProductImage}
-            resizeMode="cover"
-          />
+          <>
+            {!imgLoaded && (
+              <View style={StyleSheet.absoluteFill}>
+                <Skeleton width="100%" height="100%" borderRadius={8} />
+              </View>
+            )}
+            <Image
+              source={resolveProductImageSource(product.imageUrl || product.image, product.name, (product as any).slug)}
+              style={[styles.gridProductImage, !imgLoaded && { opacity: 0 }]}
+              resizeMode="cover"
+              onLoad={() => setImgLoaded(true)}
+            />
+          </>
         ) : (
           <View style={styles.iconCircleLarge}>
             <Ionicons name="fast-food-outline" size={32} color={COLORS.purple} />

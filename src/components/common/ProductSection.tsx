@@ -16,9 +16,31 @@ import { COLORS } from '../../theme/colors';
 import { SECTION_ICONS } from '../../theme/sectionIcons';
 import { BlinkitProduct } from '../../types';
 import { useApp, mapProductToBlinkit } from '../../context/AppContext';
-import { PRODUCTS } from '../../data/products';
-import { ProductSectionSkeleton } from './Skeleton';
+import { ProductSectionSkeleton, Skeleton } from './Skeleton';
 import { resolveImageThumbnail, resolveProductImageSource } from '../../utils/imageUrl';
+
+const ProductImageWithLoading: React.FC<{
+  source: any;
+  style: any;
+  resizeMode?: any;
+}> = ({ source, style, resizeMode = 'cover' }) => {
+  const [loaded, setLoaded] = useState(false);
+  return (
+    <View style={[style, { overflow: 'hidden', backgroundColor: '#F8FAFC' }]}>
+      {!loaded && (
+        <View style={StyleSheet.absoluteFill}>
+          <Skeleton width="100%" height="100%" borderRadius={8} />
+        </View>
+      )}
+      <Image
+        source={source}
+        style={[style, { width: '100%', height: '100%' }, !loaded ? { opacity: 0 } : { opacity: 1 }]}
+        resizeMode={resizeMode}
+        onLoad={() => setLoaded(true)}
+      />
+    </View>
+  );
+};
 
 export interface ProductSectionProps {
   id?: string;
@@ -93,56 +115,8 @@ const ProductSectionComponent: React.FC<ProductSectionProps> = ({
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
 
   const sectionProducts = useMemo(() => {
-    if (products && products.length > 0) return products;
-    const fallbackList = PRODUCTS.map(mapProductToBlinkit);
-    if (id === 'deals') {
-      const deals = fallbackList.filter((p) => p.mrp > p.sellingPrice);
-      return deals.length > 0 ? deals.slice(0, 10) : fallbackList.slice(0, 8);
-    }
-    if (id === 'fast_delivery') {
-      const fast = fallbackList.filter((p) => p.stock > 0 && p.deliveryMinutes <= 15);
-      return fast.length > 0 ? fast.slice(0, 10) : fallbackList.slice(0, 8);
-    }
-    if (id === 'fresh_veggies') {
-      const veg = fallbackList.filter((p) => {
-        const text = `${p.category || ''} ${p.name || ''}`.toLowerCase();
-        return (
-          text.includes('veg') ||
-          text.includes('fruit') ||
-          text.includes('tomato') ||
-          text.includes('onion') ||
-          text.includes('banana') ||
-          text.includes('potato') ||
-          text.includes('apple')
-        );
-      });
-      return veg.length > 0 ? veg.slice(0, 10) : fallbackList.slice(0, 8);
-    }
-    if (id === 'dairy_bread') {
-      const dairy = fallbackList.filter((p) => {
-        const text = `${p.category || ''} ${p.name || ''}`.toLowerCase();
-        return (
-          text.includes('dairy') ||
-          text.includes('milk') ||
-          text.includes('bread') ||
-          text.includes('egg') ||
-          text.includes('paneer') ||
-          text.includes('butter') ||
-          text.includes('curd')
-        );
-      });
-      return dairy.length > 0 ? dairy.slice(0, 10) : fallbackList.slice(0, 8);
-    }
-    if (id === 'bestsellers') {
-      const bs = fallbackList.filter((p) => p.rating >= 4.5);
-      return bs.length > 0 ? bs.slice(0, 10) : fallbackList.slice(0, 8);
-    }
-    if (id === 'under_50') {
-      const u50 = fallbackList.filter((p) => p.sellingPrice <= 50);
-      return u50.length > 0 ? u50.slice(0, 10) : fallbackList.slice(0, 8);
-    }
-    return fallbackList.slice(0, 8);
-  }, [products, id]);
+    return Array.isArray(products) ? products : [];
+  }, [products]);
 
   const totalProducts = sectionProducts?.length || 0;
   const handleScrollStep = useCallback((dir: 'left' | 'right') => {
@@ -242,7 +216,7 @@ const ProductSectionComponent: React.FC<ProductSectionProps> = ({
           onPress={() => onOpenProduct(getProductPayload())}
           style={styles.imageContainer}
         >
-          <Image
+          <ProductImageWithLoading
             source={resolveProductImageSource(item.imageUrl, item.name, (item as any).slug)}
             style={styles.productImage}
             resizeMode="cover"
