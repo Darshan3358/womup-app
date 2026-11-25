@@ -108,8 +108,9 @@ const HeroBannerCarouselComponent: React.FC<HeroBannerCarouselProps> = ({ onBann
     }
   };
 
-  // Dynamic 2:1 aspect ratio matching the 1024x512 banner dimensions so the entire image fits edge-to-edge
-  const bannerAspectRatio = 2.0;
+  // Aspect ratio tuned to 2.35:1 (16:7) matching modern e-commerce banner standards (Blinkit/Zepto)
+  // and uploaded Cloudinary banner dimensions (1024x434 / 2.36 ratio)
+  const bannerAspectRatio = 2.35;
   const bannerHeight = Math.min(Math.round(bannerWidth / bannerAspectRatio), 360);
 
   return (
@@ -138,13 +139,13 @@ const HeroBannerCarouselComponent: React.FC<HeroBannerCarouselProps> = ({ onBann
               onPress={() => onBannerPress && onBannerPress(slide)}
               style={[
                 styles.bannerTouchable,
-                { width: bannerWidth, height: bannerHeight, backgroundColor: slide.bgColor || '#F9ECF8' },
+                { width: bannerWidth, height: bannerHeight, backgroundColor: slide.bgColor || '#F8FAFC' },
               ]}
             >
               <Image
                 source={slide.image}
                 style={styles.bannerImage}
-                resizeMode="cover"
+                resizeMode="contain"
               />
             </TouchableOpacity>
           ))}

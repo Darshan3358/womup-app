@@ -20,62 +20,62 @@ export const CATEGORIES_DATA: WomupCategoryItem[] = [
   {
     id: 'c1',
     name: 'Vegetables &\nFruits',
-    bgColor: '#ECF5F7',
-    localImage: require('../../../assets/cat_1_trans.png'),
+    bgColor: '#ECF6F8',
+    localImage: require('../../../assets/category images/vegetables and fruits.png'),
   },
   {
     id: 'c2',
     name: 'Chips &\nNamkeen',
-    bgColor: '#FCF6F0',
-    localImage: require('../../../assets/cat_2_trans.png'),
+    bgColor: '#FBF6F0',
+    localImage: require('../../../assets/category images/chips & namkeen.png'),
   },
   {
     id: 'c3',
-    name: 'Dairy, Bread &\nEggs',
-    bgColor: '#F3F4FC',
-    localImage: require('../../../assets/cat_3_trans.png'),
+    name: 'Dairy, Bread\n& ...',
+    bgColor: '#F4F4FC',
+    localImage: require('../../../assets/category images/dairy & bread .png'),
   },
   {
     id: 'c4',
     name: 'Oil, Ghee &\nMasala',
-    bgColor: '#FDF7EE',
-    localImage: require('../../../assets/cat_4_trans.png'),
+    bgColor: '#FEF7ED',
+    localImage: require('../../../assets/category images/Oil, Ghee & Masala.png'),
   },
   {
     id: 'c5',
     name: 'Bakery &\nBiscuits',
-    bgColor: '#F7F1FC',
-    localImage: require('../../../assets/cat_5_trans.png'),
+    bgColor: '#F7F1FB',
+    localImage: require('../../../assets/category images/Bakery & Biscuits.png'),
   },
   {
     id: 'c6',
     name: 'Drinks &\nJuices',
-    bgColor: '#FCF2F2',
-    localImage: require('../../../assets/cat_6_trans.png'),
+    bgColor: '#FBF0F4',
+    localImage: require('../../../assets/category images/Drinks & Juices.png'),
   },
   {
     id: 'c7',
     name: 'Household\nEssentials',
-    bgColor: '#EAF1FD',
-    localImage: require('../../../assets/cat_7_trans.png'),
+    bgColor: '#E8F2FB',
+    localImage: require('../../../assets/category images/Household Essentials.png'),
   },
   {
     id: 'c8',
     name: 'Personal\nCare',
-    bgColor: '#FAF2FB',
-    localImage: require('../../../assets/cat_8_trans.png'),
+    bgColor: '#F4EFFB',
+    localImage: require('../../../assets/category images/Personal Care.png'),
   },
   {
     id: 'c9',
     name: 'Baby\nCare',
-    bgColor: '#F5F0FC',
-    localImage: require('../../../assets/cat_9_trans.png'),
+    bgColor: '#F4F0FE',
+    localImage: require('../../../assets/category images/Baby Care.png'),
   },
   {
     id: 'c12',
     name: 'More',
-    bgColor: '#FBEFF8',
-    localImage: require('../../../assets/cat_12_trans.png'),
+    bgColor: '#FBF0F8',
+    localImage: require('../../../assets/category images/more.png'),
   },
 ];
 
@@ -152,7 +152,7 @@ const WomupCategoryGridComponent: React.FC<WomupCategoryGridProps> = ({
                 styles.card,
                 {
                   width: cardWidth,
-                  height: Math.round(cardWidth * 1.18),
+                  height: Math.round(cardWidth * 1.22),
                   backgroundColor: cat.bgColor,
                   paddingVertical: isSmall ? 6 : 8,
                   paddingHorizontal: 2,
@@ -162,24 +162,18 @@ const WomupCategoryGridComponent: React.FC<WomupCategoryGridProps> = ({
               ]}
               accessibilityLabel={cat.name.replace('\n', ' ')}
             >
-              {cat.id === 'c12' ? (
-                <View style={styles.moreIconWrapper}>
-                  <Ionicons name="grid" size={20} color="#E11D88" />
-                </View>
-              ) : (
-                <Image
-                  source={cat.localImage}
-                  style={[
-                    styles.categoryImage,
-                    {
-                      width: Math.round(cardWidth * 0.65),
-                      height: Math.round(cardWidth * 0.55),
-                      marginBottom: isSmall ? 3 : 5,
-                    },
-                  ]}
-                  resizeMode="contain"
-                />
-              )}
+              <Image
+                source={cat.localImage}
+                style={[
+                  styles.categoryImage,
+                  {
+                    width: cat.id === 'c12' ? Math.round(cardWidth * 0.38) : Math.round(cardWidth * 0.70),
+                    height: cat.id === 'c12' ? Math.round(cardWidth * 0.38) : Math.round(cardWidth * 0.58),
+                    marginBottom: isSmall ? 3 : 5,
+                  },
+                ]}
+                resizeMode="contain"
+              />
 
               <Text
                 style={[
@@ -188,7 +182,7 @@ const WomupCategoryGridComponent: React.FC<WomupCategoryGridProps> = ({
                 ]}
                 numberOfLines={2}
               >
-                {cat.id === 'c3' ? 'Dairy, Bread\n& ...' : cat.name}
+                {cat.name}
               </Text>
             </TouchableOpacity>
           ))}
