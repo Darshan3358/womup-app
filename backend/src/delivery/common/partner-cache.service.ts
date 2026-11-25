@@ -78,9 +78,17 @@ export class DeliveryPartnerCacheService {
 
         if (!partner && userObjId) {
           const user = await this.partnerModel.db.collection('users').findOne({ _id: userObjId });
-          const phone = user?.phone?.replace(/\s+/g, '').replace('+', '') || '9876543210';
+          const rawPhone = (user?.phone || '').replace(/\s+/g, '');
+          const cleanPhone10 = rawPhone.replace(/^(\+?91)/, '') || '9876543210';
+          const userEmail = (user?.email || '').trim().toLowerCase();
           partner = await this.partnerModel.findOne({
-            $or: [{ phoneNumber: phone }, { phoneNumber: `+91${phone}` }],
+            $or: [
+              ...(userEmail ? [{ email: userEmail }] : []),
+              { phoneNumber: cleanPhone10 },
+              { phoneNumber: `91${cleanPhone10}` },
+              { phoneNumber: `+91${cleanPhone10}` },
+              ...(rawPhone ? [{ phoneNumber: rawPhone }] : []),
+            ],
           });
           if (partner) {
             partner.userId = userObjId as any;
@@ -90,8 +98,8 @@ export class DeliveryPartnerCacheService {
               userId: userObjId,
               partnerCode: `RDR-${Math.floor(1000 + Math.random() * 9000)}`,
               fullName: user?.name || 'Delivery Partner',
-              phoneNumber: phone,
-              email: user?.email || `rider.${phone}@wormup.com`,
+              phoneNumber: cleanPhone10,
+              email: userEmail || `rider.${cleanPhone10}@wormup.com`,
               city: 'Ahmedabad (Satellite Hub)',
               hubName: 'Satellite Hub Dark Store',
               status: 'APPROVED',
