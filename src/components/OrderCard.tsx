@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { resolveProductImageSource } from '../utils/imageUrl';
+import { ProductService } from '../services/productService';
 
 export interface OrderCardItem {
   productId?: string;
@@ -119,7 +120,16 @@ export const OrderCard: React.FC<OrderCardProps> = ({
   // Helper to resolve product real image
   const resolveItemImage = (it: OrderCardItem): any => {
     if (it.image) return it.image;
-    const resolved = resolveProductImageSource(it.imageUrl, it.name);
+    let imgUrl = it.imageUrl;
+    if (!imgUrl && it.productId) {
+      const liveProd = ProductService.getAllProducts().find(
+        (p) => p.id === it.productId || (p as any)._id === it.productId
+      );
+      if (liveProd?.imageUrl) {
+        imgUrl = liveProd.imageUrl;
+      }
+    }
+    const resolved = resolveProductImageSource(imgUrl, it.name);
     if (resolved) return resolved;
     return require('../../assets/order_again_box.png');
   };
