@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
 import { DeliveryOrderService } from './delivery-order.service';
@@ -43,14 +43,34 @@ export class DeliveryOrderController {
 
   @Get('orders/available')
   @ApiOperation({ summary: 'Check and dispatch real available order for online partner' })
-  async getAvailableOrder(@CurrentUser() user: any) {
-    return this.orderService.getAvailableOrder(user.id);
+  async getAvailableOrder(
+    @CurrentUser() user: any,
+    @Query('lat') lat?: string,
+    @Query('lng') lng?: string,
+  ) {
+    const parsedLat = lat !== undefined ? Number(lat) : undefined;
+    const parsedLng = lng !== undefined ? Number(lng) : undefined;
+    return this.orderService.getAvailableOrder(
+      user.id,
+      Number.isFinite(parsedLat) ? parsedLat : undefined,
+      Number.isFinite(parsedLng) ? parsedLng : undefined,
+    );
   }
 
   @Get('orders/available-list')
   @ApiOperation({ summary: 'Get list of all fresh available orders for job board' })
-  async getAvailableOrdersList(@CurrentUser() user: any) {
-    return this.orderService.getAvailableOrdersList(user.id);
+  async getAvailableOrdersList(
+    @CurrentUser() user: any,
+    @Query('lat') lat?: string,
+    @Query('lng') lng?: string,
+  ) {
+    const parsedLat = lat !== undefined ? Number(lat) : undefined;
+    const parsedLng = lng !== undefined ? Number(lng) : undefined;
+    return this.orderService.getAvailableOrdersList(
+      user.id,
+      Number.isFinite(parsedLat) ? parsedLat : undefined,
+      Number.isFinite(parsedLng) ? parsedLng : undefined,
+    );
   }
 
   @Get('orders/history')

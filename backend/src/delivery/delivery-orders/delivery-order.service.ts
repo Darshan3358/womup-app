@@ -238,7 +238,7 @@ export class DeliveryOrderService implements OnModuleInit {
     return parseFloat((R * c).toFixed(2));
   }
 
-  async getAvailableOrdersList(userId: string): Promise<any[]> {
+  async getAvailableOrdersList(userId: string, liveLat?: number, liveLng?: number): Promise<any[]> {
     const partner = await this.getPartner(userId);
     if (!partner.isOnline || partner.status !== 'APPROVED') {
       return [];
@@ -290,9 +290,16 @@ export class DeliveryOrderService implements OnModuleInit {
     const results: any[] = [];
     const handledOrderIds = new Set<string>();
 
-    // 3. Resolve rider's coordinates and build allowedHubMap (Home Hub + nearby stores within 6 km)
-    const riderLat = partner.currentLocation?.coordinates?.[1] ?? 23.0245;
-    const riderLng = partner.currentLocation?.coordinates?.[0] ?? 72.5298;
+    // 3. Resolve rider's coordinates and build allowedHubMap (Home Hub + nearby stores within 6.5 km)
+    const hasLiveGps =
+      typeof liveLat === 'number' &&
+      typeof liveLng === 'number' &&
+      Number.isFinite(liveLat) &&
+      Number.isFinite(liveLng) &&
+      liveLat !== 0 &&
+      liveLng !== 0;
+    const riderLat = hasLiveGps ? liveLat : (partner.currentLocation?.coordinates?.[1] ?? 23.0245);
+    const riderLng = hasLiveGps ? liveLng : (partner.currentLocation?.coordinates?.[0] ?? 72.5298);
     const allowedHubMap = new Map<string, { store: StoreDocument; distanceKm: number; isOwnHub: boolean }>();
 
     // Add rider's assigned home hub
@@ -436,7 +443,7 @@ export class DeliveryOrderService implements OnModuleInit {
     return results;
   }
 
-  async getAvailableOrder(userId: string) {
+  async getAvailableOrder(userId: string, liveLat?: number, liveLng?: number) {
     const partner = await this.getPartner(userId);
 
     // 1. If partner already has an active assignment, return it
@@ -445,7 +452,7 @@ export class DeliveryOrderService implements OnModuleInit {
       return active;
     }
 
-    const list = await this.getAvailableOrdersList(userId);
+    const list = await this.getAvailableOrdersList(userId, liveLat, liveLng);
     return list.length > 0 ? list[0] : null;
   }
 
