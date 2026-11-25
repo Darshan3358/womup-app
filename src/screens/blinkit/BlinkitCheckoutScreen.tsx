@@ -625,27 +625,34 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     ? (selectedAddress?.areaLandmark || areaLandmark || (selectedAddress as any)?.area || selectedAddress?.street || '')
     : (areaLandmark || selectedAddress?.areaLandmark || currentAreaName || '');
 
-  // Active coordinates: always take explicit selectedAddress coordinates first
-  const activeLat = Number(selectedAddress?.latitude) || 0;
-  const activeLng = Number(selectedAddress?.longitude) || 0;
+  const matchedArea = matchAreaByName(
+    effectiveAreaText || currentAreaName || selectedAddress?.areaLandmark || ''
+  );
+
+  const feeParams = React.useMemo(
+    () =>
+      CartService.buildDeliveryFeeParams({
+        items: blinkitCartList,
+        selectedAddress,
+        matchedArea,
+        currentAreaName,
+        currentCityName,
+        currentStoreId,
+        explicitAreaText: !isSavedAddress ? (areaLandmark || undefined) : undefined,
+      }),
+    [blinkitCartList, selectedAddress, matchedArea, currentAreaName, currentCityName, currentStoreId, isSavedAddress, areaLandmark]
+  );
+
+  const activeLat = feeParams.deliveryAddress.latitude;
+  const activeLng = feeParams.deliveryAddress.longitude;
   const currentDistanceKm = 1.2;
 
   const cartItemCount = blinkitCartList.length;
-  const cityKey = selectedAddress?.city || currentCityName || 'Ahmedabad';
-  const areaKey = currentAreaName || effectiveAreaText || selectedAddress?.areaLandmark || '';
+  const cityKey = feeParams.cityName;
+  const areaKey = feeParams.areaName;
   const addressIdKey = selectedAddress?.id || selectedAddressType;
 
-  const cachedFeeData = CartService.getCachedDeliveryFee({
-    cityName: cityKey,
-    areaName: areaKey,
-    distanceKm: currentDistanceKm,
-    items: blinkitCartList.map((item: any) => ({
-      name: item.product.name,
-      price: item.product.sellingPrice,
-      mrp: item.product.mrp,
-      quantity: item.quantity,
-    })),
-  });
+  const cachedFeeData = CartService.getCachedDeliveryFee(feeParams);
 
   const [dynamicDeliveryFee, setDynamicDeliveryFee] = useState<number | null>(
     cachedFeeData ? cachedFeeData.deliveryFee : null
@@ -657,37 +664,34 @@ export const BlinkitCheckoutScreen: React.FC = () => {
 
   useEffect(() => {
     let isMounted = true;
-    const abortController = new AbortController();
     let timer: any = null;
 
     const fetchFee = async () => {
-      setIsCalculatingFee(true);
+      const cached = CartService.getCachedDeliveryFee(feeParams);
+      if (cached) {
+        if (isMounted) {
+          setDynamicDeliveryFee(cached.deliveryFee);
+          if (cached.breakdown) {
+            setFeeBreakdown({
+              ...cached.breakdown,
+              distanceKm: cached.distanceKm || (cached as any).routeDistanceKm || currentDistanceKm,
+              rateUsed: cached.rateUsed || 5,
+              areaName: cached.areaName || areaKey,
+            });
+          }
+          setIsCalculatingFee(false);
+        }
+        return;
+      }
+
+      if (dynamicDeliveryFee === null) {
+        setIsCalculatingFee(true);
+      }
       try {
-        const res = await CartService.calculateDynamicDeliveryFee(
-          {
-            items: blinkitCartList.map((item: any) => ({
-              id: item.product.id,
-              productId: item.product.id,
-              name: item.product.name,
-              price: item.product.sellingPrice,
-              sellingPrice: item.product.sellingPrice,
-              mrp: item.product.mrp,
-              quantity: item.quantity,
-              variantId: (item.product as any).selectedVariantId,
-            })),
-            cityName: cityKey,
-            areaName: areaKey,
-            storeId: currentStoreId || undefined,
-            deliveryAddress: {
-              latitude: activeLat,
-              longitude: activeLng,
-              area: areaKey,
-              city: cityKey,
-            },
-            forceRefresh: true,
-          },
-          abortController.signal
-        );
+        const res = await CartService.calculateDynamicDeliveryFee({
+          ...feeParams,
+          forceRefresh: false,
+        });
 
         if (isMounted && res) {
           setDynamicDeliveryFee(res.deliveryFee);
@@ -695,8 +699,8 @@ export const BlinkitCheckoutScreen: React.FC = () => {
             setFeeBreakdown({
               ...res.breakdown,
               distanceKm: res.distanceKm || (res as any).routeDistanceKm || currentDistanceKm,
-              rateUsed: res.rateUsed || 12,
-              areaName: areaKey,
+              rateUsed: res.rateUsed || 5,
+              areaName: res.areaName || areaKey,
             });
           }
           if (res.storeName) {
@@ -706,10 +710,9 @@ export const BlinkitCheckoutScreen: React.FC = () => {
               storeName: res.storeName,
             });
           }
-          // Do not call syncCartFromSummary inside fetchFee to avoid triggering infinite re-renders
         }
       } catch (err: any) {
-        if (err?.name !== 'AbortError') {
+        if (err?.name !== 'AbortError' && err?.name !== 'CanceledError') {
           console.warn('[BlinkitCheckout] Live calculate fee error:', err);
         }
       } finally {
@@ -721,7 +724,6 @@ export const BlinkitCheckoutScreen: React.FC = () => {
 
     return () => {
       isMounted = false;
-      abortController.abort();
       if (timer) clearTimeout(timer);
     };
   }, [cartItemCount, cityKey, areaKey, addressIdKey, selectedAddressType, activeLat, activeLng, currentStoreId]);

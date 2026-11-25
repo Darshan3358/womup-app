@@ -716,13 +716,14 @@ export class OrdersService {
     }
 
     const resolvedDynamic = dynamicQuote?.data;
-    if (typeof deliveryFee !== 'number' || deliveryFee === 0) {
+    if (resolvedDynamic?.deliveryFee !== undefined) {
+      // Authoritative backend OSRM + Admin rate calculation always takes precedence
+      deliveryFee = resolvedDynamic.deliveryFee;
+    } else if (typeof deliveryFee !== 'number' || deliveryFee === 0) {
       if (typeof dto.deliveryFee === 'number') {
         deliveryFee = dto.deliveryFee;
-      } else if (resolvedDynamic?.deliveryFee !== undefined) {
-        deliveryFee = resolvedDynamic.deliveryFee;
       } else {
-        deliveryFee = 35; // Global fallback minimum
+        deliveryFee = 20; // Global fallback minimum
       }
     }
 

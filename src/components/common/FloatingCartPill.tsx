@@ -41,66 +41,26 @@ export const FloatingCartPill: React.FC<FloatingCartPillProps> = ({
     const abortController = new AbortController();
 
     const timer = setTimeout(() => {
-      const isSavedAddress = selectedAddressSource === 'SAVED' && selectedAddress && selectedAddress.type !== 'Current';
       const matchedArea = matchAreaByName(
-        (isSavedAddress ? (selectedAddress?.areaLandmark || (selectedAddress as any)?.area || selectedAddress?.street || selectedAddress?.houseFlat) : null) ||
-        currentAreaName ||
-        selectedAddress?.areaLandmark
+        selectedAddress?.areaLandmark || (selectedAddress as any)?.area || currentAreaName || ''
       );
-      const activeLat = isSavedAddress
-        ? (matchedArea?.lat || Number(selectedAddress?.latitude) || 23.0125)
-        : (Number(selectedAddress?.latitude) || matchedArea?.lat || 23.0125);
-      const activeLng = isSavedAddress
-        ? (matchedArea?.lng || Number(selectedAddress?.longitude) || 72.5082)
-        : (Number(selectedAddress?.longitude) || matchedArea?.lng || 72.5082);
-      const areaKey = (isSavedAddress ? (selectedAddress?.areaLandmark || matchedArea?.name) : null) ||
-        matchedArea?.name || currentAreaName || selectedAddress?.areaLandmark || 'Prahlad Nagar';
-      const cityKey = (isSavedAddress ? selectedAddress?.city : null) || currentCityName || 'Ahmedabad';
-
-      const itemsPayload = blinkitCartList.map((item) => ({
-        id: item.product.id,
-        productId: item.product.id,
-        name: item.product.name,
-        price: item.product.sellingPrice,
-        sellingPrice: item.product.sellingPrice,
-        mrp: item.product.mrp,
-        quantity: item.quantity,
-        variantId: (item.product as any).selectedVariantId,
-      }));
-
-      // Only invoke backend if not already in memory cache
-      const cached = CartService.getCachedDeliveryFee({
-        cityName: cityKey,
-        areaName: areaKey,
-        storeId: currentStoreId || undefined,
-        distanceKm: 1.2,
-        deliveryAddress: {
-          latitude: activeLat,
-          longitude: activeLng,
-          area: areaKey,
-          city: cityKey,
-        },
-        items: itemsPayload,
+      const feeParams = CartService.buildDeliveryFeeParams({
+        items: blinkitCartList,
+        selectedAddress,
+        matchedArea,
+        currentAreaName,
+        currentCityName,
+        currentStoreId,
       });
 
+      // Only invoke backend if not already in memory cache
+      const cached = CartService.getCachedDeliveryFee(feeParams);
+
       if (!cached) {
-        CartService.calculateDynamicDeliveryFee(
-          {
-            items: itemsPayload,
-            cityName: cityKey,
-            areaName: areaKey,
-            storeId: currentStoreId || undefined,
-            distanceKm: 1.2,
-            deliveryAddress: {
-              latitude: activeLat,
-              longitude: activeLng,
-              area: areaKey,
-              city: cityKey,
-            },
-            forceRefresh: false,
-          },
-          abortController.signal
-        ).catch(() => {});
+        CartService.calculateDynamicDeliveryFee({
+          ...feeParams,
+          forceRefresh: false,
+        }).catch(() => {});
       }
     }, 500);
 

@@ -52,6 +52,68 @@ export const CartService = {
   clearCache() {
     clearFeeCache();
   },
+
+  /**
+   * Single source of truth for building delivery fee calculation parameters
+   * across FloatingCartPill, BlinkitCartScreen, and BlinkitCheckoutScreen.
+   * Ensures identical coordinates, area, city, storeId, and cache keys.
+   */
+  buildDeliveryFeeParams(opts: {
+    items: any[];
+    selectedAddress?: any;
+    matchedArea?: any;
+    currentAreaName?: string | null;
+    currentCityName?: string | null;
+    currentStoreId?: string | null;
+    explicitAreaText?: string | null;
+  }) {
+    const addr = opts.selectedAddress;
+    const addrLat = Number(addr?.latitude);
+    const addrLng = Number(addr?.longitude);
+    const hasValidAddrCoords = Number.isFinite(addrLat) && Number.isFinite(addrLng) && addrLat !== 0 && addrLng !== 0;
+
+    const areaLat = Number(opts.matchedArea?.lat);
+    const areaLng = Number(opts.matchedArea?.lng);
+    const hasValidAreaCoords = Number.isFinite(areaLat) && Number.isFinite(areaLng) && areaLat !== 0 && areaLng !== 0;
+
+    const activeLat = hasValidAddrCoords ? addrLat : (hasValidAreaCoords ? areaLat : 23.0125);
+    const activeLng = hasValidAddrCoords ? addrLng : (hasValidAreaCoords ? areaLng : 72.5082);
+
+    const areaKey = (
+      opts.explicitAreaText ||
+      addr?.areaLandmark ||
+      (addr as any)?.area ||
+      opts.matchedArea?.name ||
+      opts.currentAreaName ||
+      'Prahlad Nagar'
+    ).trim();
+
+    const cityKey = (addr?.city || opts.currentCityName || 'Ahmedabad').trim();
+
+    const feeItems = (opts.items || []).map((item: any) => ({
+      id: item.product?.id || item.id || item.productId,
+      productId: item.product?.id || item.productId || item.id,
+      name: item.product?.name || item.name,
+      price: item.product?.sellingPrice ?? item.sellingPrice ?? item.price ?? 0,
+      sellingPrice: item.product?.sellingPrice ?? item.sellingPrice ?? item.price ?? 0,
+      mrp: item.product?.mrp ?? item.mrp ?? 0,
+      quantity: item.quantity || 1,
+      variantId: item.product?.selectedVariantId || item.variantId,
+    }));
+
+    return {
+      items: feeItems,
+      cityName: cityKey,
+      areaName: areaKey,
+      storeId: opts.currentStoreId || undefined,
+      deliveryAddress: {
+        latitude: activeLat,
+        longitude: activeLng,
+        area: areaKey,
+        city: cityKey,
+      },
+    };
+  },
   calculateSummary(
     items: CartItem[],
     appliedCoins = 0,
@@ -207,30 +269,37 @@ export const CartService = {
       return inFlight;
     }
 
-    // 3. Create single shared promise — uses centralized api client (correct URL + auth header)
-    const promise = (async () => {
-      try {
-        const res = await api.post<any>('/cart/calculate', params, undefined, { signal });
-        if (res.success && res.data) {
-          _feeCache.set(cacheKey, { data: res.data, ts: Date.now() });
-          return res.data;
+    // 3. Create single shared promise — uses centralized api client (correct URL + auth header).
+    // Do NOT bind a single caller's AbortSignal to the shared HTTP request so unmounting Pill
+    // does not abort the request for Cart/Checkout.
+    let sharedPromise = _inFlightRequests.get(cacheKey);
+    if (!sharedPromise || params.forceRefresh) {
+      sharedPromise = (async () => {
+        try {
+          const res = await api.post<any>('/cart/calculate', params);
+          if (res.success && res.data) {
+            _feeCache.set(cacheKey, { data: res.data, ts: Date.now() });
+            return res.data;
+          }
+        } catch (err: any) {
+          if (err?.name === 'AbortError' || err?.name === 'CanceledError') {
+            throw err;
+          }
+          console.warn('[CartService] /api/v1/cart/calculate failed, using fallback:', err);
+        } finally {
+          _inFlightRequests.delete(cacheKey);
         }
-      } catch (err) {
-        console.warn('[CartService] /api/v1/cart/calculate failed, using fallback:', err);
-      } finally {
-        _inFlightRequests.delete(cacheKey);
-      }
 
-      // High fidelity fallback matching configured Admin rates:
-      const dist = params.distanceKm || 2.6;
-      const rate = 12;
-      const minPayout = 35;
-      const maxPayout = 160;
-      const baseFee = Number((dist * rate).toFixed(2));
-      const floorApplied = baseFee < minPayout;
-      const floorAdjustment = floorApplied ? Number((minPayout - baseFee).toFixed(2)) : 0;
-      const capApplied = baseFee > maxPayout;
-      const finalFee = Math.round(Math.min(Math.max(baseFee, minPayout), maxPayout));
+        // Offline fallback matching configured global Admin defaults (₹5/km, min ₹20, max ₹80):
+        const dist = params.distanceKm || 2.6;
+        const rate = 5;
+        const minPayout = 20;
+        const maxPayout = 80;
+        const baseFee = Number((dist * rate).toFixed(2));
+        const floorApplied = baseFee < minPayout;
+        const floorAdjustment = floorApplied ? Number((minPayout - baseFee).toFixed(2)) : 0;
+        const capApplied = baseFee > maxPayout;
+        const finalFee = Math.round(Math.min(Math.max(baseFee, minPayout), maxPayout));
 
       const formulaText = floorApplied
         ? `${dist} km × ₹${rate}/km = ₹${baseFee.toFixed(2)} · ₹${minPayout} minimum applied`
@@ -269,12 +338,12 @@ export const CartService = {
         },
       };
 
-      _feeCache.set(cacheKey, { data: fallbackData, ts: Date.now() });
       return fallbackData;
     })();
+    }
 
-    _inFlightRequests.set(cacheKey, promise);
-    return promise;
+    _inFlightRequests.set(cacheKey, sharedPromise);
+    return sharedPromise;
   },
 
   getCachedDeliveryFee(params?: {

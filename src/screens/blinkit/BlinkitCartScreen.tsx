@@ -45,42 +45,33 @@ export const BlinkitCartScreen: React.FC = () => {
     syncCartFromSummary,
   } = useApp();
 
-  const isSavedAddress = selectedAddressSource === 'SAVED' && selectedAddress && selectedAddress.type !== 'Current';
-
   const matchedArea = matchAreaByName(
-    (isSavedAddress ? (selectedAddress?.areaLandmark || (selectedAddress as any)?.area || selectedAddress?.street || selectedAddress?.houseFlat) : null) ||
-    currentAreaName ||
     selectedAddress?.areaLandmark ||
     (selectedAddress as any)?.area ||
+    currentAreaName ||
+    selectedAddress?.street ||
     deliveryLocation
   );
-  const activeLat = isSavedAddress
-    ? (matchedArea?.lat || Number(selectedAddress?.latitude) || 23.0125)
-    : (Number(selectedAddress?.latitude) || matchedArea?.lat || 23.0125);
-  const activeLng = isSavedAddress
-    ? (matchedArea?.lng || Number(selectedAddress?.longitude) || 72.5082)
-    : (Number(selectedAddress?.longitude) || matchedArea?.lng || 72.5082);
-  const areaKey = (isSavedAddress ? (selectedAddress?.areaLandmark || matchedArea?.name) : null) ||
-    matchedArea?.name || currentAreaName || selectedAddress?.areaLandmark || 'Prahlad Nagar';
-  const cityKey = (isSavedAddress ? selectedAddress?.city : null) || currentCityName || 'Ahmedabad';
-  const currentDistanceKm = 1.2;
 
   const [couponInput, setCouponInput] = useState('');
 
-  const feeCalculationItems = useMemo(
+  const feeParams = useMemo(
     () =>
-      blinkitCartList.map((item) => ({
-        id: item.product.id,
-        productId: item.product.id,
-        name: item.product.name,
-        price: item.product.sellingPrice,
-        sellingPrice: item.product.sellingPrice,
-        mrp: item.product.mrp,
-        quantity: item.quantity,
-        variantId: (item.product as any).selectedVariantId,
-      })),
-    [blinkitCartList]
+      CartService.buildDeliveryFeeParams({
+        items: blinkitCartList,
+        selectedAddress,
+        matchedArea,
+        currentAreaName,
+        currentCityName,
+        currentStoreId,
+      }),
+    [blinkitCartList, selectedAddress, matchedArea, currentAreaName, currentCityName, currentStoreId]
   );
+
+  const activeLat = feeParams.deliveryAddress.latitude;
+  const activeLng = feeParams.deliveryAddress.longitude;
+  const areaKey = feeParams.areaName;
+  const cityKey = feeParams.cityName;
 
   const cartFingerprint = useMemo(
     () =>
@@ -95,19 +86,7 @@ export const BlinkitCartScreen: React.FC = () => {
   latestFingerprintRef.current = cartFingerprint;
 
   // Check cached delivery fee synchronously to avoid any 1-frame price flicker
-  const initialCachedFee = CartService.getCachedDeliveryFee({
-    cityName: cityKey,
-    areaName: areaKey,
-    storeId: currentStoreId || undefined,
-    distanceKm: currentDistanceKm,
-    deliveryAddress: {
-      latitude: activeLat,
-      longitude: activeLng,
-      area: areaKey,
-      city: cityKey,
-    },
-    items: feeCalculationItems,
-  });
+  const initialCachedFee = CartService.getCachedDeliveryFee(feeParams);
 
   const [dynamicDeliveryFee, setDynamicDeliveryFee] = useState<number | null>(
     initialCachedFee ? initialCachedFee.deliveryFee : null
@@ -119,25 +98,12 @@ export const BlinkitCartScreen: React.FC = () => {
 
   useEffect(() => {
     let isMounted = true;
-    const abortController = new AbortController();
     let timer: any = null;
     const activeFingerprint = cartFingerprint;
 
     const fetchFee = async () => {
       // 1. Check synchronous compound cache first
-      const cached = CartService.getCachedDeliveryFee({
-        cityName: cityKey,
-        areaName: areaKey,
-        storeId: currentStoreId || undefined,
-        distanceKm: currentDistanceKm,
-        deliveryAddress: {
-          latitude: activeLat,
-          longitude: activeLng,
-          area: areaKey,
-          city: cityKey,
-        },
-        items: feeCalculationItems,
-      });
+      const cached = CartService.getCachedDeliveryFee(feeParams);
 
       if (cached) {
         if (isMounted && latestFingerprintRef.current === activeFingerprint) {
@@ -155,23 +121,10 @@ export const BlinkitCartScreen: React.FC = () => {
       }
 
       try {
-        const res = await CartService.calculateDynamicDeliveryFee(
-          {
-            items: feeCalculationItems,
-            cityName: cityKey,
-            areaName: areaKey,
-            storeId: currentStoreId || undefined,
-            distanceKm: currentDistanceKm,
-            deliveryAddress: {
-              latitude: activeLat,
-              longitude: activeLng,
-              area: areaKey,
-              city: cityKey,
-            },
-            forceRefresh: false,
-          },
-          abortController.signal
-        );
+        const res = await CartService.calculateDynamicDeliveryFee({
+          ...feeParams,
+          forceRefresh: false,
+        });
 
         // Discard response if component unmounted or cart contents changed during in-flight request
         if (isMounted && res && latestFingerprintRef.current === activeFingerprint) {
@@ -179,8 +132,8 @@ export const BlinkitCartScreen: React.FC = () => {
           if (res.breakdown) {
             setFeeBreakdown({
               ...res.breakdown,
-              distanceKm: res.distanceKm || currentDistanceKm,
-              rateUsed: res.rateUsed || 12,
+              distanceKm: res.distanceKm || (res.breakdown as any)?.distanceKm,
+              rateUsed: res.rateUsed || 5,
               areaName: res.areaName || areaKey,
             });
           }
@@ -201,10 +154,9 @@ export const BlinkitCartScreen: React.FC = () => {
 
     return () => {
       isMounted = false;
-      abortController.abort();
       if (timer) clearTimeout(timer);
     };
-  }, [cartFingerprint, areaKey, cityKey, activeLat, activeLng, currentStoreId, currentDistanceKm]);
+  }, [cartFingerprint, areaKey, cityKey, activeLat, activeLng, currentStoreId]);
 
   const deliveryFee = dynamicDeliveryFee ?? 0;
   const handlingFee = 5;
