@@ -13,7 +13,7 @@ import {
   AuthScreenState,
 } from '../types/rider.types';
 import { RiderApiService } from '../services/riderApi';
-import { LocationTrackerService, HubLocation, AHMEDABAD_HUBS } from '../services/locationService';
+import { LocationTrackerService, HubLocation, AHMEDABAD_HUBS, GpsPermissionStatus } from '../services/locationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import io from 'socket.io-client';
 
@@ -84,11 +84,23 @@ interface RiderContextType {
   currentTab: RiderTabKey;
   subScreen: RiderSubScreenKey;
   currentLocation: LocationCoordinates | null;
+  riderAddress: string | null;
+  gpsPermissionStatus: GpsPermissionStatus;
+  lastGpsUpdatedAt: number | null;
+  isSimulatedLocation: boolean;
+  assignedStore: {
+    storeId?: string;
+    storeName: string;
+    storeCode?: string;
+    address: string;
+    distanceKm: number | null;
+  } | null;
   detectedHubName: string | null;
   detectedAddress: string | null;
   locationError: string | null;
   availableHubs: HubLocation[];
-  detectLocation: () => Promise<void>;
+  detectLocation: (forceFresh?: boolean) => Promise<void>;
+  refreshActiveStores: () => Promise<void>;
   setSimulatedHub: (hub: HubLocation) => Promise<void>;
   clearSelectedHub: () => Promise<void>;
   settlementSummary: SettlementSummary | null;
@@ -167,10 +179,21 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setTabHistory((prev) => (prev[prev.length - 1] === tab ? prev : [...prev, tab]));
   };
   const [currentLocation, setCurrentLocation] = useState<LocationCoordinates | null>(null);
+  const [riderAddress, setRiderAddress] = useState<string | null>(null);
+  const [gpsPermissionStatus, setGpsPermissionStatus] = useState<GpsPermissionStatus>('checking');
+  const [lastGpsUpdatedAt, setLastGpsUpdatedAt] = useState<number | null>(null);
+  const [isSimulatedLocation, setIsSimulatedLocation] = useState<boolean>(false);
+  const [assignedStore, setAssignedStore] = useState<{
+    storeId?: string;
+    storeName: string;
+    storeCode?: string;
+    address: string;
+    distanceKm: number | null;
+  } | null>(null);
   const [detectedHubName, setDetectedHubName] = useState<string | null>(null);
   const [detectedAddress, setDetectedAddress] = useState<string | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
-  const availableHubs = AHMEDABAD_HUBS;
+  const [availableHubs, setAvailableHubs] = useState<HubLocation[]>(AHMEDABAD_HUBS);
   const [settlementSummary, setSettlementSummary] = useState<SettlementSummary | null>(null);
   const [bankAccount, setBankAccount] = useState<RiderBankAccount | null>(null);
   const [vehicle, setVehicle] = useState<RiderVehicle | null>(null);
@@ -290,10 +313,10 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   }, []);
 
-  const refreshAvailableJobs = useCallback(async () => {
+  const refreshAvailableJobs = useCallback(async (lat?: number, lng?: number) => {
     try {
       setJobsError(null);
-      const jobs = await RiderApiService.fetchAvailableOrdersList();
+      const jobs = await RiderApiService.fetchAvailableOrdersList(lat, lng);
       setAvailableJobs(jobs);
       if (jobs.length > 0) {
         setIncomingJobOffer(jobs[0]);
@@ -305,64 +328,136 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, []);
 
-  const detectLocation = useCallback(async () => {
+  const refreshActiveStores = useCallback(async () => {
     try {
-      const coords = await LocationTrackerService.detectRealGps();
-      if (!coords) {
+      const stores = await RiderApiService.fetchActiveDarkStores();
+      if (stores.length > 0) {
+        setAvailableHubs(stores);
+      }
+    } catch {
+      // Keep fallback hubs if offline
+    }
+  }, []);
+
+  const lastHubLookupRef = useRef<{ lat: number; lng: number; ts: number } | null>(null);
+
+  const syncLocationWithBackend = useCallback(async (
+    coords: LocationCoordinates,
+    opts?: { simulated?: boolean; forceHubLookup?: boolean }
+  ) => {
+    const now = Date.now();
+    setCurrentLocation(coords);
+    setLastGpsUpdatedAt(coords.timestamp || now);
+    setIsSimulatedLocation(Boolean(opts?.simulated));
+
+    // Resolve Rider's actual street/area address in parallel with backend /nearest-hub
+    const addrPromise = LocationTrackerService.getAddressForCoords(coords.latitude, coords.longitude)
+      .then((addr) => setRiderAddress(addr))
+      .catch(() => setRiderAddress(`GPS: ${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`));
+
+    const prev = lastHubLookupRef.current;
+    const movedEnough =
+      !prev ||
+      Math.abs(prev.lat - coords.latitude) > 0.0005 ||
+      Math.abs(prev.lng - coords.longitude) > 0.0005;
+    const staleHub = !prev || now - prev.ts > 20000;
+
+    if (opts?.forceHubLookup || movedEnough || staleHub) {
+      lastHubLookupRef.current = { lat: coords.latitude, lng: coords.longitude, ts: now };
+      const hubRes = await RiderApiService.getNearestHub(coords.latitude, coords.longitude);
+      if (hubRes && hubRes.success && hubRes.storeName) {
+        const distVal = typeof hubRes.distanceKm === 'number' ? hubRes.distanceKm : null;
+        const distStr = distVal != null ? `${distVal} km away` : '';
+        setAssignedStore({
+          storeId: hubRes.storeId,
+          storeName: hubRes.storeName,
+          storeCode: hubRes.storeCode,
+          address: hubRes.address || hubRes.areaName || 'Active Dark Store',
+          distanceKm: distVal,
+        });
+        setDetectedHubName(distStr ? `${hubRes.storeName} (${distStr})` : hubRes.storeName);
+        setDetectedAddress(hubRes.address || (distStr ? `${distStr} from your location` : 'Active Dark Store'));
+        setLocationError(null);
+      } else {
+        setAssignedStore(null);
         setDetectedHubName(null);
         setDetectedAddress(null);
-        setLocationError('GPS permission denied or location unavailable. Please enable device GPS.');
+        setLocationError(hubRes?.message || 'No active dark store found within operational coverage radius.');
+      }
+    }
+
+    await addrPromise;
+  }, []);
+
+  const detectLocation = useCallback(async (forceFresh = false) => {
+    try {
+      if (forceFresh) {
+        await AsyncStorage.removeItem('@womup_rider_selected_hub');
+      } else if (LocationTrackerService.isUsingSimulatedLocation()) {
+        const simCoords = LocationTrackerService.getCurrentCoordinates();
+        if (simCoords) {
+          await syncLocationWithBackend(simCoords, { simulated: true, forceHubLookup: true });
+          return;
+        }
+      }
+
+      const gpsResult = await LocationTrackerService.detectRealGpsWithStatus(forceFresh);
+      setGpsPermissionStatus(gpsResult.permissionStatus);
+
+      if (!gpsResult.coords) {
+        setLocationError(gpsResult.error || 'GPS permission denied or location unavailable. Please enable device GPS.');
+        if (forceFresh) {
+          setAssignedStore(null);
+          setDetectedHubName(null);
+          setDetectedAddress(null);
+        }
         return;
       }
 
-      setCurrentLocation(coords);
+      const prevCoords = lastHubLookupRef.current;
+      const movedForJobs =
+        forceFresh ||
+        !prevCoords ||
+        Math.abs(prevCoords.lat - gpsResult.coords.latitude) > 0.001 ||
+        Math.abs(prevCoords.lng - gpsResult.coords.longitude) > 0.001;
 
-      // Dynamic Nearest Hub Resolver from Backend
-      const res = await RiderApiService.getNearestHub(coords.latitude, coords.longitude);
-      if (res && res.success && res.storeName) {
-        const distStr = res.distanceKm != null ? `${res.distanceKm} km away` : '';
-        setDetectedHubName(distStr ? `${res.storeName} (${distStr})` : res.storeName);
-        setDetectedAddress(res.address || (distStr ? `${distStr} from your location` : 'Active Dark Store'));
-        setLocationError(null);
-      } else {
-        setDetectedHubName(null);
-        setDetectedAddress(null);
-        setLocationError(res?.message || 'No active dark store found within 10 km of your location.');
+      await syncLocationWithBackend(gpsResult.coords, {
+        simulated: false,
+        forceHubLookup: forceFresh,
+      });
+
+      if (movedForJobs && isOnline) {
+        refreshAvailableJobs(gpsResult.coords.latitude, gpsResult.coords.longitude).catch(() => {});
       }
     } catch (err: any) {
-      setDetectedHubName(null);
-      setDetectedAddress(null);
       setLocationError(err?.message || 'GPS location error. Please check your connection.');
     }
-  }, []);
+  }, [syncLocationWithBackend, refreshAvailableJobs, isOnline]);
 
   const setSimulatedHub = useCallback(async (hub: HubLocation) => {
     try {
       const coords = await LocationTrackerService.setSimulatedLocation(hub.latitude, hub.longitude);
-      setCurrentLocation(coords);
-      setDetectedHubName(`${hub.name} (0.1 km away)`);
-      setDetectedAddress(hub.address);
+      setGpsPermissionStatus('granted');
       await AsyncStorage.setItem('@womup_rider_selected_hub', JSON.stringify(hub));
-      // Refresh jobs once when the rider manually selects a hub
-      await refreshAvailableJobs();
+      await syncLocationWithBackend(coords, { simulated: true, forceHubLookup: true });
+      await refreshAvailableJobs(coords.latitude, coords.longitude);
     } catch {
       // non-fatal
     }
-  }, [refreshAvailableJobs]);
+  }, [syncLocationWithBackend, refreshAvailableJobs]);
 
   const clearSelectedHub = useCallback(async () => {
     try {
       LocationTrackerService.clearLocation();
       await AsyncStorage.removeItem('@womup_rider_selected_hub');
-      setCurrentLocation(null);
-      setDetectedHubName(null);
-      setDetectedAddress(null);
-      // Refresh jobs once when rider clears hub selection
-      await refreshAvailableJobs();
+      setIsSimulatedLocation(false);
+      await detectLocation(true);
+      const liveCoords = LocationTrackerService.getCurrentCoordinates();
+      await refreshAvailableJobs(liveCoords?.latitude, liveCoords?.longitude);
     } catch {
       // non-fatal
     }
-  }, [refreshAvailableJobs]);
+  }, [detectLocation, refreshAvailableJobs]);
 
   const isDashboardRefreshingRef = React.useRef(false);
   const lastDashboardRefreshTimeRef = React.useRef(0);
@@ -391,25 +486,24 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setActiveDelivery(null);
       }
 
-      // GPS resolution (cached/simulated fallback)
-      let coords = LocationTrackerService.getCurrentCoordinates();
-      if (!coords) {
-        const savedHubRaw = await AsyncStorage.getItem('@womup_rider_selected_hub');
-        let hub = AHMEDABAD_HUBS[0];
-        if (savedHubRaw) {
-          try { hub = JSON.parse(savedHubRaw); } catch {}
-        }
-        coords = await LocationTrackerService.setSimulatedLocation(hub.latitude, hub.longitude);
+      // GPS resolution: prefer saved manual test hub if explicitly chosen; otherwise always detect real GPS
+      const savedHubRaw = await AsyncStorage.getItem('@womup_rider_selected_hub');
+      if (savedHubRaw) {
+        try {
+          const hub = JSON.parse(savedHubRaw);
+          if (hub?.latitude && hub?.longitude) {
+            const simCoords = await LocationTrackerService.setSimulatedLocation(hub.latitude, hub.longitude);
+            setGpsPermissionStatus('granted');
+            await syncLocationWithBackend(simCoords, { simulated: true, forceHubLookup: true });
+          }
+        } catch {}
+      } else {
+        await detectLocation(false);
       }
 
-      if (coords) {
-        setCurrentLocation(coords);
-        const nearest = LocationTrackerService.getNearestHub(coords.latitude, coords.longitude);
-        setDetectedHubName(`${nearest.hub.name} (${nearest.distanceKm} km away)`);
-        LocationTrackerService.getAddressForCoords(coords.latitude, coords.longitude)
-          .then(setDetectedAddress)
-          .catch(() => {});
-      }
+      refreshActiveStores().catch(() => {});
+
+      const latestCoords = LocationTrackerService.getCurrentCoordinates();
 
       // ── Stage 2: Operational Data (Settlement + Jobs only if online) ──
       const settlementPromise = RiderApiService.getSettlementSummary()
@@ -417,7 +511,7 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         .catch(() => {});
 
       const jobsPromise = userProfile.isOnline
-        ? refreshAvailableJobs().catch(() => {})
+        ? refreshAvailableJobs(latestCoords?.latitude, latestCoords?.longitude).catch(() => {})
         : Promise.resolve();
 
       await Promise.all([settlementPromise, jobsPromise]);
@@ -703,11 +797,10 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (authStep === 'AUTHENTICATED' && isOnline) {
       LocationTrackerService.resumeTracking();
       LocationTrackerService.startTracking(async (coords) => {
-        setCurrentLocation(coords);
-        const nearest = LocationTrackerService.getNearestHub(coords.latitude, coords.longitude);
-        setDetectedHubName(`${nearest.hub.name} (${nearest.distanceKm} km away)`);
-        const addr = await LocationTrackerService.getAddressForCoords(coords.latitude, coords.longitude);
-        setDetectedAddress(addr);
+        setGpsPermissionStatus(LocationTrackerService.getPermissionStatus());
+        await syncLocationWithBackend(coords, {
+          simulated: LocationTrackerService.isUsingSimulatedLocation(),
+        });
       });
     } else {
       LocationTrackerService.stopTracking();
@@ -1125,11 +1218,17 @@ export const RiderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         currentTab,
         subScreen,
         currentLocation,
+        riderAddress,
+        gpsPermissionStatus,
+        lastGpsUpdatedAt,
+        isSimulatedLocation,
+        assignedStore,
         detectedHubName,
         detectedAddress,
         locationError,
         availableHubs,
         detectLocation,
+        refreshActiveStores,
         setSimulatedHub,
         clearSelectedHub,
         settlementSummary,

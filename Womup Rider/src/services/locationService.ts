@@ -97,6 +97,14 @@ export function calculateDistanceKm(lat1: number, lon1: number, lat2: number, lo
   return Math.round(R * c * 10) / 10;
 }
 
+export type GpsPermissionStatus = 'granted' | 'denied' | 'unavailable' | 'checking';
+
+export interface GpsDetectionResult {
+  coords: LocationCoordinates | null;
+  permissionStatus: GpsPermissionStatus;
+  error?: string;
+}
+
 export class LocationTrackerService {
   private static timer: ReturnType<typeof setInterval> | null = null;
   private static currentLatitude: number | null = null;
@@ -107,9 +115,18 @@ export class LocationTrackerService {
   private static isSimulated = false;
   private static hasSetLocation = false;
   private static isPaused = false;
+  private static lastPermissionStatus: GpsPermissionStatus = 'checking';
 
   static isLocationSet(): boolean {
     return this.hasSetLocation && this.currentLatitude !== null && this.currentLongitude !== null;
+  }
+
+  static isUsingSimulatedLocation(): boolean {
+    return this.isSimulated;
+  }
+
+  static getPermissionStatus(): GpsPermissionStatus {
+    return this.lastPermissionStatus;
   }
 
   static pauseTracking(): void {
@@ -155,7 +172,7 @@ export class LocationTrackerService {
     lat: number = LocationTrackerService.currentLatitude ?? 23.115,
     lng: number = LocationTrackerService.currentLongitude ?? 72.545
   ): Promise<string> {
-    const key = `${lat.toFixed(3)},${lng.toFixed(3)}`;
+    const key = `${lat.toFixed(4)},${lng.toFixed(4)}`;
     if (this.addressCache.has(key)) {
       return this.addressCache.get(key)!;
     }
@@ -202,63 +219,94 @@ export class LocationTrackerService {
         }
       }
     } catch {
-      // fallback
+      // fallback to formatted GPS coordinates rather than a hardcoded store address
     }
-    const nearest = this.getNearestHub(lat, lng);
-    this.addressCache.set(key, nearest.hub.address);
-    return nearest.hub.address;
+    return `GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
   }
 
-  static async detectRealGps(): Promise<LocationCoordinates | null> {
+  static async detectRealGps(forceFresh = false): Promise<LocationCoordinates | null> {
+    const result = await this.detectRealGpsWithStatus(forceFresh);
+    return result.coords;
+  }
+
+  static async detectRealGpsWithStatus(forceFresh = false): Promise<GpsDetectionResult> {
+    // Web browser geolocation first when available so maximumAge: 0 is honored
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      return new Promise((resolve) => {
+        navigator.geolocation.getCurrentPosition(
+          async (pos) => {
+            this.currentLatitude = pos.coords.latitude;
+            this.currentLongitude = pos.coords.longitude;
+            this.isSimulated = false;
+            this.hasSetLocation = true;
+            this.lastPermissionStatus = 'granted';
+            const coords: LocationCoordinates = {
+              latitude: this.currentLatitude,
+              longitude: this.currentLongitude,
+              accuracy: pos.coords.accuracy || 15,
+              heading: pos.coords.heading ?? 0,
+              speed: pos.coords.speed ?? 0,
+              timestamp: Date.now(),
+            };
+            RiderApiService.sendLocationTelemetry(coords).catch(() => {});
+            resolve({ coords, permissionStatus: 'granted' });
+          },
+          (geoErr) => {
+            const denied = geoErr?.code === 1;
+            const status: GpsPermissionStatus = denied ? 'denied' : 'unavailable';
+            this.lastPermissionStatus = status;
+            resolve({
+              coords: null,
+              permissionStatus: status,
+              error: denied
+                ? 'Location permission denied. Please allow browser location access.'
+                : geoErr?.message || 'Unable to fetch GPS signal.',
+            });
+          },
+          { timeout: 8000, enableHighAccuracy: true, maximumAge: forceFresh ? 0 : 5000 }
+        );
+      });
+    }
+
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status === 'granted') {
-        const pos = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-        this.currentLatitude = pos.coords.latitude;
-        this.currentLongitude = pos.coords.longitude;
-        this.isSimulated = false;
-        this.hasSetLocation = true;
-
-        const coords: LocationCoordinates = {
-          latitude: this.currentLatitude,
-          longitude: this.currentLongitude,
-          accuracy: pos.coords.accuracy ?? 10,
-          heading: pos.coords.heading ?? 0,
-          speed: pos.coords.speed ?? 0,
-          timestamp: Date.now(),
+      if (status !== 'granted') {
+        this.lastPermissionStatus = 'denied';
+        return {
+          coords: null,
+          permissionStatus: 'denied',
+          error: 'Location permission denied. Enable device location permission.',
         };
+      }
 
-        await RiderApiService.sendLocationTelemetry(coords);
-        return coords;
-      }
-    } catch (err) {
-      // Fallback to browser geolocation on web
-      if (typeof navigator !== 'undefined' && navigator.geolocation) {
-        return new Promise((resolve) => {
-          navigator.geolocation.getCurrentPosition(
-            async (pos) => {
-              this.currentLatitude = pos.coords.latitude;
-              this.currentLongitude = pos.coords.longitude;
-              this.isSimulated = false;
-              this.hasSetLocation = true;
-              const coords: LocationCoordinates = {
-                latitude: this.currentLatitude,
-                longitude: this.currentLongitude,
-                accuracy: pos.coords.accuracy || 15,
-                timestamp: Date.now(),
-              };
-              await RiderApiService.sendLocationTelemetry(coords);
-              resolve(coords);
-            },
-            () => resolve(null),
-            { timeout: 5000, enableHighAccuracy: false }
-          );
-        });
-      }
+      this.lastPermissionStatus = 'granted';
+      const pos = await Location.getCurrentPositionAsync({
+        accuracy: forceFresh ? Location.Accuracy.High : Location.Accuracy.Balanced,
+      });
+      this.currentLatitude = pos.coords.latitude;
+      this.currentLongitude = pos.coords.longitude;
+      this.isSimulated = false;
+      this.hasSetLocation = true;
+
+      const coords: LocationCoordinates = {
+        latitude: this.currentLatitude,
+        longitude: this.currentLongitude,
+        accuracy: pos.coords.accuracy ?? 10,
+        heading: pos.coords.heading ?? 0,
+        speed: pos.coords.speed ?? 0,
+        timestamp: Date.now(),
+      };
+
+      RiderApiService.sendLocationTelemetry(coords).catch(() => {});
+      return { coords, permissionStatus: 'granted' };
+    } catch (err: any) {
+      this.lastPermissionStatus = 'unavailable';
+      return {
+        coords: null,
+        permissionStatus: 'unavailable',
+        error: err?.message || 'GPS sensor unavailable.',
+      };
     }
-    return null;
   }
 
   static async setSimulatedLocation(lat: number, lng: number): Promise<LocationCoordinates> {
@@ -296,21 +344,13 @@ export class LocationTrackerService {
       // Pause network telemetry if app is in background or paused
       if (this.isPaused) return;
 
-      // If not simulated and location is set, try reading device GPS
-      if (!this.isSimulated && this.hasSetLocation) {
+      // If not in manual test simulation mode, read fresh device/browser GPS
+      if (!this.isSimulated) {
         try {
-          const pos = await Location.getLastKnownPositionAsync();
-          if (pos?.coords) {
-            this.currentLatitude = pos.coords.latitude;
-            this.currentLongitude = pos.coords.longitude;
-          }
+          await this.detectRealGpsWithStatus(false);
         } catch {
-          // ignore error, keep last known
+          // ignore transient GPS poll failure, keep last known
         }
-      } else if (this.isSimulated && this.currentLatitude !== null && this.currentLongitude !== null) {
-        // Small realistic micro-jitter if simulated
-        this.currentLatitude += (Math.random() - 0.5) * 0.0001;
-        this.currentLongitude += (Math.random() - 0.5) * 0.0001;
       }
 
       const coords = this.getCurrentCoordinates();

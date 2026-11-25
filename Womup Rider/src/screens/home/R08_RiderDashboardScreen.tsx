@@ -53,20 +53,30 @@ export const RiderDashboardScreen: React.FC = () => {
     detectedAddress,
     locationError,
     currentLocation,
+    riderAddress,
+    gpsPermissionStatus,
+    lastGpsUpdatedAt,
+    isSimulatedLocation,
+    assignedStore,
+    availableHubs,
     detectLocation,
+    refreshActiveStores,
+    setSimulatedHub,
+    clearSelectedHub,
     riderUnreadCount,
     refreshRiderUnreadCount,
   } = useRider();
 
   const [isDetecting, setIsDetecting] = useState(false);
   const [showPayAdminModal, setShowPayAdminModal] = useState(false);
+  const [showHubSwitcherModal, setShowHubSwitcherModal] = useState(false);
 
   const isRealDelivery = Boolean(
     activeDelivery &&
     activeDelivery.stepStatus !== 'OFFERED'
   );
 
-  // Stable ref ensures 5s interval is never reset on re-renders
+  // Stable ref ensures interval is never reset on re-renders
   const detectLocationRef = useRef(detectLocation);
   detectLocationRef.current = detectLocation;
 
@@ -75,15 +85,14 @@ export const RiderDashboardScreen: React.FC = () => {
       return;
     }
 
-    // Pehli baar turant detect karo
-    detectLocationRef.current();
+    // Detect immediately when going online
+    detectLocationRef.current(false);
 
-    // Phir har 5 second me detect karo
+    // Keep live GPS coordinates & nearest dark store synced every 15s
     const intervalId = setInterval(() => {
-      detectLocationRef.current();
-    }, 5000); // 5000 ms = 5 seconds
+      detectLocationRef.current(false);
+    }, 15000);
 
-    // Cleanup: Jab screen chhodein ya offline ho toh interval clear karein
     return () => clearInterval(intervalId);
   }, [isOnline, isRealDelivery]);
 
@@ -438,15 +447,46 @@ export const RiderDashboardScreen: React.FC = () => {
         </View>
       </LinearGradient>
 
-      {/* 7. LIVE GPS AND HUB INFORMATION CARD */}
-      <View style={[styles.liveGpsDarkCard, !detectedHubName && { borderColor: '#DC2626', borderWidth: 1.5 }]}>
-        {/* Top Header: LIVE GPS + Controls */}
+      {/* 7. LIVE GPS & ASSIGNED DARK STORE CARD */}
+      <View
+        style={[
+          styles.liveGpsDarkCard,
+          !currentLocation && gpsPermissionStatus !== 'checking' && { borderColor: '#DC2626', borderWidth: 1.5 },
+          isSimulatedLocation && { borderColor: '#F59E0B', borderWidth: 1.5 },
+        ]}
+      >
+        {/* Top Header: LIVE GPS + Permission Chip + Controls */}
         <View style={styles.gpsCardHeaderRow}>
           <View style={styles.liveGpsIndicatorRow}>
-            <View style={[styles.pulseDotGreen, !detectedHubName && { backgroundColor: '#DC2626' }]} />
-            <Text style={[styles.liveGpsHeaderTitle, !detectedHubName && { color: '#FCA5A5' }]}>
-              {detectedHubName ? 'LIVE GPS' : 'LOCATION ERROR'}
+            <View
+              style={[
+                styles.pulseDotGreen,
+                isSimulatedLocation && { backgroundColor: '#F59E0B' },
+                !currentLocation && gpsPermissionStatus !== 'checking' && { backgroundColor: '#DC2626' },
+              ]}
+            />
+            <Text
+              style={[
+                styles.liveGpsHeaderTitle,
+                isSimulatedLocation && { color: '#FDE68A' },
+                !currentLocation && gpsPermissionStatus !== 'checking' && { color: '#FCA5A5' },
+              ]}
+            >
+              {isSimulatedLocation ? 'TEST GPS MODE' : currentLocation ? 'LIVE GPS' : 'GPS SIGNAL OFF'}
             </Text>
+            <View style={styles.gpsPermBadge}>
+              <Text style={styles.gpsPermBadgeText}>
+                {isSimulatedLocation
+                  ? 'Simulated'
+                  : gpsPermissionStatus === 'granted'
+                  ? 'GPS Granted'
+                  : gpsPermissionStatus === 'denied'
+                  ? 'GPS Denied'
+                  : gpsPermissionStatus === 'unavailable'
+                  ? 'Unavailable'
+                  : 'Checking...'}
+              </Text>
+            </View>
           </View>
 
           <View style={styles.gpsControlButtonsRow}>
@@ -454,49 +494,113 @@ export const RiderDashboardScreen: React.FC = () => {
               style={styles.autoGpsPillBtn}
               onPress={async () => {
                 setIsDetecting(true);
-                await detectLocation();
+                await detectLocation(true);
                 setIsDetecting(false);
               }}
               disabled={isDetecting}
               activeOpacity={0.75}
             >
               <Ionicons
-                name={isDetecting ? 'sync-outline' : 'flash'}
-                size={11}
+                name={isDetecting ? 'sync' : 'refresh'}
+                size={12}
                 color="#06BF7B"
-                style={{ marginRight: 3 }}
+                style={{ marginRight: 4 }}
               />
               <Text style={styles.autoGpsPillText}>
-                {isDetecting ? '...' : 'Auto-GPS'}
+                {isDetecting ? 'Refreshing...' : isSimulatedLocation ? 'Use Live GPS' : 'Refresh GPS'}
               </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.hubsPillBtn}
+              onPress={() => {
+                refreshActiveStores();
+                setShowHubSwitcherModal(true);
+              }}
+              activeOpacity={0.75}
+            >
+              <Ionicons name="flask-outline" size={11} color="#E2E8F0" style={{ marginRight: 3 }} />
+              <Text style={styles.hubsPillText}>Test Hub</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Hub / Area Name */}
-        <View style={styles.gpsLocationInfoRow}>
-          <Ionicons
-            name={detectedHubName ? "location" : "alert-circle"}
-            size={18}
-            color={detectedHubName ? "#2676F4" : "#DC2626"}
-            style={{ marginTop: 2, marginRight: 6 }}
-          />
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.gpsHubNameText, !detectedHubName && { color: '#FCA5A5' }]} numberOfLines={1}>
-              {detectedHubName ? detectedHubName.split('(')[0].trim() : (isDetecting ? 'Detecting Nearest Hub...' : 'NO SERVICEABLE HUB')}
-            </Text>
-            <Text style={[styles.gpsHubAddressText, !detectedHubName && { color: '#F87171' }]} numberOfLines={2}>
-              {detectedHubName
-                ? detectedAddress
-                : (locationError || (isDetecting ? 'Fetching your real GPS location...' : 'Please turn on GPS and move to an active delivery area.'))}
-            </Text>
+        {/* SECTION A: Rider's Actual Device GPS Location */}
+        <View style={styles.gpsSectionBlock}>
+          <View style={styles.gpsSectionLabelRow}>
+            <Text style={styles.gpsSectionKicker}>CURRENT RIDER LOCATION</Text>
+            {currentLocation ? (
+              <Text style={styles.gpsCoordsTag}>
+                {currentLocation.latitude.toFixed(5)}, {currentLocation.longitude.toFixed(5)}
+              </Text>
+            ) : null}
           </View>
 
-          {/* Mini Stylized Map Indicator Graphic */}
-          <View style={styles.miniMapGraphicWrap}>
-            <View style={styles.miniMapRouteLine} />
-            <View style={styles.miniMapPinMarker}>
-              <Ionicons name="location" size={18} color={detectedHubName ? "#F51BA0" : "#DC2626"} />
+          <View style={styles.gpsLocationInfoRow}>
+            <Ionicons
+              name={currentLocation ? 'navigate-circle' : 'alert-circle'}
+              size={18}
+              color={currentLocation ? '#38BDF8' : '#DC2626'}
+              style={{ marginTop: 2, marginRight: 8 }}
+            />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.gpsHubNameText} numberOfLines={2}>
+                {currentLocation
+                  ? (riderAddress || (isDetecting ? 'Resolving street address...' : `Lat ${currentLocation.latitude.toFixed(4)}, Lng ${currentLocation.longitude.toFixed(4)}`))
+                  : (isDetecting ? 'Detecting device GPS...' : 'Device GPS coordinates unavailable')}
+              </Text>
+              <Text style={styles.gpsMetaTimestampText}>
+                {lastGpsUpdatedAt
+                  ? `Last updated: ${new Date(lastGpsUpdatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`
+                  : 'Waiting for first GPS fix'}
+                {isSimulatedLocation ? ' · Manual testing coordinates active' : ' · Auto-tracking device GPS'}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.gpsSectionDivider} />
+
+        {/* SECTION B: Nearest Operational Dark Store */}
+        <View style={styles.gpsSectionBlock}>
+          <View style={styles.gpsSectionLabelRow}>
+            <Text style={styles.gpsSectionKicker}>ASSIGNED DARK STORE (NEAREST)</Text>
+            {assignedStore?.distanceKm != null ? (
+              <View style={styles.gpsDistancePill}>
+                <Text style={styles.gpsDistancePillText}>{assignedStore.distanceKm} km away</Text>
+              </View>
+            ) : null}
+          </View>
+
+          <View style={styles.gpsLocationInfoRow}>
+            <Ionicons
+              name={assignedStore || detectedHubName ? 'storefront' : 'warning'}
+              size={17}
+              color={assignedStore || detectedHubName ? '#F472B6' : '#DC2626'}
+              style={{ marginTop: 2, marginRight: 8 }}
+            />
+            <View style={{ flex: 1 }}>
+              <Text
+                style={[
+                  styles.gpsHubNameText,
+                  !(assignedStore || detectedHubName) && { color: '#FCA5A5' },
+                ]}
+                numberOfLines={1}
+              >
+                {assignedStore?.storeName || (detectedHubName ? detectedHubName.split('(')[0].trim() : (isDetecting ? 'Finding nearest dark store...' : 'NO DARK STORE IN RANGE'))}
+              </Text>
+              <Text
+                style={[
+                  styles.gpsHubAddressText,
+                  !(assignedStore || detectedHubName) && { color: '#F87171' },
+                ]}
+                numberOfLines={2}
+              >
+                {assignedStore?.address ||
+                  (detectedHubName
+                    ? detectedAddress
+                    : (locationError || 'Move within 6 km of an active Dark Store to receive orders.'))}
+              </Text>
             </View>
           </View>
         </View>
@@ -711,7 +815,7 @@ export const RiderDashboardScreen: React.FC = () => {
               style={[styles.testDispatchBtn, { borderColor: '#DC2626' }]}
               onPress={async () => {
                 setIsDetecting(true);
-                await detectLocation();
+                await detectLocation(true);
                 setIsDetecting(false);
               }}
               activeOpacity={0.8}
@@ -799,6 +903,81 @@ export const RiderDashboardScreen: React.FC = () => {
           checkPendingSettlements();
         }}
       />
+
+      {/* Manual Dark Store Switcher Modal (Testing Only) */}
+      <Modal
+        visible={showHubSwitcherModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowHubSwitcherModal(false)}
+      >
+        <View style={styles.hubModalBackdrop}>
+          <View style={styles.hubModalCard}>
+            <View style={styles.hubModalHeader}>
+              <View>
+                <Text style={styles.hubModalTitle}>Select Test Dark Store</Text>
+                <Text style={styles.hubModalSub}>
+                  Testing Only · Simulates GPS near chosen store without disabling Auto-GPS in production
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowHubSwitcherModal(false)}
+                style={styles.hubModalCloseBtn}
+              >
+                <Ionicons name="close" size={20} color="#475569" />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={[
+                styles.hubOptionItem,
+                !isSimulatedLocation && styles.hubOptionItemActive,
+              ]}
+              onPress={async () => {
+                setShowHubSwitcherModal(false);
+                setIsDetecting(true);
+                await clearSelectedHub();
+                setIsDetecting(false);
+              }}
+            >
+              <Ionicons name="navigate" size={18} color="#06BF7B" style={{ marginRight: 10 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.hubOptionTitle}>Use Live Device Auto-GPS (Production)</Text>
+                <Text style={styles.hubOptionSub}>Automatically resolves nearest Dark Store from real GPS</Text>
+              </View>
+              {!isSimulatedLocation && <Ionicons name="checkmark-circle" size={18} color="#06BF7B" />}
+            </TouchableOpacity>
+
+            <ScrollView style={{ maxHeight: 280 }} showsVerticalScrollIndicator={false}>
+              {availableHubs.map((hub) => {
+                const isSelected =
+                  isSimulatedLocation && assignedStore?.storeId === hub.id;
+                return (
+                  <TouchableOpacity
+                    key={hub.id}
+                    style={[styles.hubOptionItem, isSelected && styles.hubOptionItemActive]}
+                    onPress={async () => {
+                      setShowHubSwitcherModal(false);
+                      setIsDetecting(true);
+                      await setSimulatedHub(hub);
+                      setIsDetecting(false);
+                    }}
+                  >
+                    <Ionicons name="storefront-outline" size={18} color="#6366F1" style={{ marginRight: 10 }} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.hubOptionTitle}>{hub.name}</Text>
+                      <Text style={styles.hubOptionSub} numberOfLines={2}>
+                        {hub.address} ({hub.latitude.toFixed(4)}, {hub.longitude.toFixed(4)})
+                      </Text>
+                    </View>
+                    {isSelected && <Ionicons name="checkmark-circle" size={18} color="#6366F1" />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -1166,14 +1345,27 @@ const styles = StyleSheet.create({
   },
   gpsCardHeaderRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    gap: 8,
+    marginBottom: 12,
   },
   liveGpsIndicatorRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+  },
+  gpsPermBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  gpsPermBadgeText: {
+    color: '#CBD5E1',
+    fontSize: 10,
+    fontWeight: '700',
   },
   pulseDotGreen: {
     width: 8,
@@ -1234,6 +1426,54 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.7)',
     fontSize: 11.5,
     lineHeight: 16,
+  },
+  gpsSectionBlock: {
+    paddingVertical: 2,
+  },
+  gpsSectionLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 5,
+  },
+  gpsSectionKicker: {
+    color: '#94A3B8',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.7,
+  },
+  gpsCoordsTag: {
+    color: '#7DD3FC',
+    fontSize: 10.5,
+    fontWeight: '700',
+    backgroundColor: 'rgba(56, 189, 248, 0.12)',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  gpsMetaTimestampText: {
+    color: '#94A3B8',
+    fontSize: 10.5,
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  gpsSectionDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    marginVertical: 10,
+  },
+  gpsDistancePill: {
+    backgroundColor: 'rgba(6, 191, 123, 0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(6, 191, 123, 0.4)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  gpsDistancePillText: {
+    color: '#34D399',
+    fontSize: 10,
+    fontWeight: '800',
   },
   miniMapGraphicWrap: {
     width: 44,
@@ -1765,12 +2005,12 @@ const styles = StyleSheet.create({
   },
 
   // Hub Switcher Modal
-  modalBackdrop: {
+  hubModalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
     justifyContent: 'flex-end',
   },
-  hubModalSheet: {
+  hubModalCard: {
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
@@ -1779,73 +2019,48 @@ const styles = StyleSheet.create({
   },
   hubModalHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     marginBottom: 14,
   },
   hubModalTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '900',
     color: '#10215A',
   },
   hubModalSub: {
     fontSize: 11.5,
     color: '#657493',
-    marginTop: 2,
+    marginTop: 3,
+    maxWidth: 280,
   },
-  closeModalBtn: {
+  hubModalCloseBtn: {
     padding: 4,
-  },
-  hubItemCard: {
-    backgroundColor: '#F8F9FD',
     borderRadius: 12,
-    padding: 12,
+    backgroundColor: '#F1F5F9',
+  },
+  hubOptionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    padding: 12,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#EAEFF8',
+    borderColor: '#E2E8F0',
+    marginBottom: 8,
+    backgroundColor: '#F8FAFC',
   },
-  hubItemName: {
-    fontSize: 13,
+  hubOptionItemActive: {
+    borderColor: '#6366F1',
+    backgroundColor: '#EEF2FF',
+  },
+  hubOptionTitle: {
+    fontSize: 13.5,
     fontWeight: '800',
     color: '#10215A',
   },
-  hubItemAddress: {
+  hubOptionSub: {
     fontSize: 11,
     color: '#657493',
     marginTop: 2,
-  },
-  hubItemCoords: {
-    fontSize: 10,
-    color: '#9AA5BC',
-    marginTop: 2,
-  },
-  hubSelectArrow: {
-    backgroundColor: '#F51BA0',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  hubSelectArrowText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  realGpsRestoreBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 10,
-    paddingVertical: 10,
-  },
-  realGpsRestoreText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#10215A',
   },
 });

@@ -47,6 +47,7 @@ export class RiderApiService {
   private static token: string | null = null;
   private static isLocationTelemetryInFlight = false;
   private static lastLocationTelemetrySent = 0;
+  private static lastKnownCoords: { latitude: number; longitude: number } | null = null;
 
   private static getApiBaseUrl(): string {
     const envUrl = process.env.EXPO_PUBLIC_API_URL;
@@ -970,14 +971,19 @@ export class RiderApiService {
     return false;
   }
 
-  static async fetchAvailableOrders(): Promise<DeliveryRequest | null> {
+  static async fetchAvailableOrders(lat?: number, lng?: number): Promise<DeliveryRequest | null> {
     if (!(await this.hasValidToken())) {
       return null;
     }
     const headers = await this.getAuthHeader();
     try {
+      const qLat = typeof lat === 'number' ? lat : this.lastKnownCoords?.latitude;
+      const qLng = typeof lng === 'number' ? lng : this.lastKnownCoords?.longitude;
+      const locQuery = typeof qLat === 'number' && typeof qLng === 'number' && qLat !== 0 && qLng !== 0
+        ? `?lat=${qLat}&lng=${qLng}`
+        : '';
       // 1. Try to get real unassigned order waiting for dispatch
-      const res = await this.resilientFetch(`${this.getApiBaseUrl()}/delivery/orders/available`, { headers }, 15000);
+      const res = await this.resilientFetch(`${this.getApiBaseUrl()}/delivery/orders/available${locQuery}`, { headers }, 15000);
       if (res.status === 401) {
         await this.clearAuth();
         return null;
@@ -1018,13 +1024,18 @@ export class RiderApiService {
     return null;
   }
 
-  static async fetchAvailableOrdersList(): Promise<DeliveryRequest[]> {
+  static async fetchAvailableOrdersList(lat?: number, lng?: number): Promise<DeliveryRequest[]> {
     if (!(await this.hasValidToken())) {
       return [];
     }
     const headers = await this.getAuthHeader();
     try {
-      const res = await this.resilientFetch(`${this.getApiBaseUrl()}/delivery/orders/available-list`, { headers }, 15000);
+      const qLat = typeof lat === 'number' ? lat : this.lastKnownCoords?.latitude;
+      const qLng = typeof lng === 'number' ? lng : this.lastKnownCoords?.longitude;
+      const locQuery = typeof qLat === 'number' && typeof qLng === 'number' && qLat !== 0 && qLng !== 0
+        ? `?lat=${qLat}&lng=${qLng}`
+        : '';
+      const res = await this.resilientFetch(`${this.getApiBaseUrl()}/delivery/orders/available-list${locQuery}`, { headers }, 15000);
       if (res.status === 401) {
         await this.clearAuth();
         return [];
@@ -1045,6 +1056,9 @@ export class RiderApiService {
 
   // --- LOCATION TELEMETRY ---
   static async sendLocationTelemetry(coords: LocationCoordinates): Promise<boolean> {
+    if (coords?.latitude && coords?.longitude) {
+      this.lastKnownCoords = { latitude: Number(coords.latitude), longitude: Number(coords.longitude) };
+    }
     if (this.isLocationTelemetryInFlight) {
       return false; // Prevent concurrent calls from saturating browser connection pool
     }
@@ -1090,6 +1104,48 @@ export class RiderApiService {
     }
   }
 
+  // --- ACTIVE DARK STORES LIST (DYNAMIC) ---
+  static async fetchActiveDarkStores(): Promise<Array<{
+    id: string;
+    name: string;
+    latitude: number;
+    longitude: number;
+    address: string;
+    serviceRadiusKm?: number;
+  }>> {
+    try {
+      const headers = await this.getAuthHeader();
+      const res = await this.resilientFetch(
+        `${this.getApiBaseUrl()}/stores`,
+        { method: 'GET', headers, cache: 'no-store' as any },
+        8000
+      );
+      if (res.ok) {
+        const json = await res.json();
+        const list = this.unwrapData<any[]>(json) || (Array.isArray(json) ? json : []);
+        if (Array.isArray(list)) {
+          return list
+            .filter((s: any) => s && s.isActive !== false)
+            .map((s: any) => {
+              const coords = s.location?.coordinates || s.coordinates;
+              const lat = Number(s.latitude ?? coords?.[1]);
+              const lng = Number(s.longitude ?? coords?.[0]);
+              return {
+                id: String(s._id || s.id),
+                name: s.name || 'Dark Store',
+                latitude: Number.isFinite(lat) ? lat : 0,
+                longitude: Number.isFinite(lng) ? lng : 0,
+                address: s.address || s.areaName || '',
+                serviceRadiusKm: Number(s.serviceRadiusKm) || 6,
+              };
+            })
+            .filter((s) => s.latitude !== 0 && s.longitude !== 0);
+        }
+      }
+    } catch {}
+    return [];
+  }
+
   // --- NEAREST HUB RESOLVER ---
   static async getNearestHub(latitude: number, longitude: number): Promise<{
     success: boolean;
@@ -1097,19 +1153,22 @@ export class RiderApiService {
     storeName?: string;
     storeCode?: string;
     address?: string;
+    areaName?: string;
     distanceKm?: number;
     message?: string;
   }> {
     const headers = await this.getAuthHeader();
     try {
       const res = await this.resilientFetch(
-        `${this.getApiBaseUrl()}/delivery/nearest-hub`,
+        `${this.getApiBaseUrl()}/delivery/nearest-hub?t=${Date.now()}`,
         {
           method: 'POST',
           headers: {
             ...headers,
             'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache',
           },
+          cache: 'no-store' as any,
           body: JSON.stringify({ latitude, longitude }),
         },
         8000
