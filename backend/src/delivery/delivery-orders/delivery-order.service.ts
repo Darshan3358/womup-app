@@ -433,10 +433,8 @@ export class DeliveryOrderService implements OnModuleInit {
       }
     }
 
-    // 6. Sort results: Own hub orders first, then nearest pickup stores first
+    // Strictly Location-Based Sorting: Nearest pickup store first!
     results.sort((a, b) => {
-      if (a.isFromOwnHub && !b.isFromOwnHub) return -1;
-      if (!a.isFromOwnHub && b.isFromOwnHub) return 1;
       return (a.distanceToStoreKm || 0) - (b.distanceToStoreKm || 0);
     });
 
@@ -493,21 +491,39 @@ export class DeliveryOrderService implements OnModuleInit {
 
     const assignment = await this.findAssignment(partner._id, assignmentOrOrderId);
 
+    const order = await this.orderModel.findById(assignment.orderId);
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    // Location-Based Dispatch Check: allow accepting orders from any dark store within 6.5 km of rider's location
+    if (order.storeId) {
+      const store = await this.storeModel.findById(order.storeId);
+      const riderLat = partner.currentLocation?.coordinates?.[1];
+      const riderLng = partner.currentLocation?.coordinates?.[0];
+
+      if (store?.location?.coordinates && store.location.coordinates.length === 2 && riderLat && riderLng) {
+        const distanceKm = this.calculateHaversineDistanceKm(
+          riderLat,
+          riderLng,
+          store.location.coordinates[1],
+          store.location.coordinates[0],
+        );
+        const maxRadius = Math.max(6.5, store.serviceRadiusKm || 6.5);
+        if (distanceKm > maxRadius) {
+          throw new BadRequestException(
+            `You are too far (${distanceKm} km) from this dark store to accept this order.`,
+          );
+        }
+      }
+    }
+
     assignment.status = RiderAssignmentStatus.GOING_TO_STORE;
     assignment.acceptedAt = new Date();
     await assignment.save();
 
     partner.currentOrderId = assignment.orderId;
     await partner.save();
-
-    const order = await this.orderModel.findById(assignment.orderId);
-    if (!order) {
-      throw new NotFoundException('Order not found');
-    }
-
-    if (partner.hubId && order.storeId && order.storeId.toString() !== partner.hubId.toString()) {
-      throw new BadRequestException('You are not authorized to accept orders from another dark store hub.');
-    }
 
     if (order) {
       order.deliveryPartnerId = partner._id;
