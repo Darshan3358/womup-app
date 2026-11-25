@@ -277,7 +277,8 @@ export class RiderApiService {
           vehicleNumber: riderData?.vehicleNumber || '',
           rating: riderData?.rating ?? 5.0,
           completedDeliveries: riderData?.totalDeliveries ?? 0,
-          status: riderData?.status === 'APPROVED' || riderData?.status === 'ACTIVE' ? 'ACTIVE' : 'PENDING',
+          status: riderData?.status || 'PENDING',
+          verificationStatus: riderData?.verificationStatus || (riderData?.status === 'APPROVED' ? 'VERIFIED' : 'PENDING'),
           isOnline: riderData?.isOnline ?? true,
         };
         await this.setStorage(STORAGE_KEYS.PROFILE, profile);
@@ -330,7 +331,8 @@ export class RiderApiService {
         vehicleNumber: riderData?.vehicleNumber || '',
         rating: riderData?.averageRating || riderData?.rating || 5.0,
         completedDeliveries: riderData?.totalDeliveries ?? 0,
-        status: 'ACTIVE',
+        status: riderData?.status || 'PENDING',
+        verificationStatus: riderData?.verificationStatus || (riderData?.status === 'APPROVED' ? 'VERIFIED' : 'PENDING'),
         isOnline: riderData?.isOnline ?? true,
       };
 
@@ -368,10 +370,11 @@ export class RiderApiService {
         hubName: riderData?.hubName || null,
         vehicleType: riderData?.vehicleType || 'BIKE',
         vehicleNumber: riderData?.vehicleNumber || '',
-        rating: 5.0,
-        completedDeliveries: 0,
-        status: 'ACTIVE',
-        isOnline: true,
+        rating: riderData?.averageRating || riderData?.rating || 5.0,
+        completedDeliveries: riderData?.totalDeliveries ?? 0,
+        status: riderData?.status || 'PENDING',
+        verificationStatus: riderData?.verificationStatus || (riderData?.status === 'APPROVED' ? 'VERIFIED' : 'PENDING'),
+        isOnline: riderData?.isOnline ?? true,
       };
 
       await this.setStorage(STORAGE_KEYS.PROFILE, profile);
@@ -578,10 +581,11 @@ export class RiderApiService {
         hubName: chosenArea || riderData?.hubName || 'Satellite Hub Dark Store',
         vehicleType: (riderData?.vehicleType || data.vehicleType) as any,
         vehicleNumber: riderData?.vehicleNumber || data.vehicleNumber,
-        rating: 5.0,
-        completedDeliveries: 0,
-        status: 'ACTIVE',
-        isOnline: true,
+        rating: riderData?.averageRating || riderData?.rating || 5.0,
+        completedDeliveries: riderData?.totalDeliveries ?? 0,
+        status: riderData?.status || 'PENDING',
+        verificationStatus: riderData?.verificationStatus || (riderData?.status === 'APPROVED' ? 'VERIFIED' : 'PENDING'),
+        isOnline: riderData?.isOnline ?? true,
       };
 
       await this.setStorage(STORAGE_KEYS.PROFILE, profile);
@@ -620,7 +624,7 @@ export class RiderApiService {
     const headers = await this.getAuthHeader();
 
     try {
-      const res = await this.resilientFetch(
+      let res = await this.resilientFetch(
         `${this.getApiBaseUrl()}/delivery/me`,
         { headers },
         12000
@@ -628,6 +632,21 @@ export class RiderApiService {
       if (res.status === 401) {
         await this.clearAuth();
         throw new Error('SESSION_EXPIRED');
+      }
+      // Fallback to /rider/auth/me if /delivery/me errors (e.g., partner userId resync pending)
+      if (!res.ok) {
+        const authMeRes = await this.resilientFetch(
+          `${this.getApiBaseUrl()}/rider/auth/me`,
+          { headers },
+          12000
+        );
+        if (authMeRes.status === 401) {
+          await this.clearAuth();
+          throw new Error('SESSION_EXPIRED');
+        }
+        if (authMeRes.ok) {
+          res = authMeRes;
+        }
       }
       if (!res.ok) {
         throw new Error(`PROFILE_FETCH_FAILED_${res.status}`);

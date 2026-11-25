@@ -544,6 +544,9 @@ export class DeliveryAuthService {
       });
     }
 
+    if (!partner.userId || partner.userId.toString() !== user._id.toString()) {
+      partner.userId = user._id as any;
+    }
     partner.lastLoginAt = new Date();
     await partner.save();
 

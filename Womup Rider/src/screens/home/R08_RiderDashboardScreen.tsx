@@ -125,7 +125,11 @@ export const RiderDashboardScreen: React.FC = () => {
   const netDueToAdmin = settlementSummary?.netBalance ?? settlementSummary?.riderOwesAdmin ?? 0;
   const cashLimit = settlementSummary?.cashLimit ?? 500;
   const isCashBlocked = Boolean(settlementSummary?.isOrderBlocked || netDueToAdmin >= cashLimit);
-  const isPendingApproval = Boolean(profile && profile.status !== 'APPROVED');
+  const isPendingApproval = Boolean(
+    profile &&
+      profile.status !== 'APPROVED' &&
+      !(profile.status === 'ACTIVE' && profile.verificationStatus === 'VERIFIED')
+  );
 
   const riderFirstName = profile?.name ? profile.name.split(' ')[0] : 'Test';
   const totalEarningsAmount = settlementSummary?.totalEarnings ?? settlementSummary?.netPayableToday ?? 0;
@@ -1437,7 +1441,7 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   gpsSectionKicker: {
-    color: '#94A3B8',
+    color: '#CBD5E1',
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.7,
@@ -1446,13 +1450,13 @@ const styles = StyleSheet.create({
     color: '#7DD3FC',
     fontSize: 10.5,
     fontWeight: '700',
-    backgroundColor: 'rgba(56, 189, 248, 0.12)',
+    backgroundColor: 'rgba(56, 189, 248, 0.14)',
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 8,
   },
   gpsMetaTimestampText: {
-    color: '#94A3B8',
+    color: '#CBD5E1',
     fontSize: 10.5,
     marginTop: 2,
     fontWeight: '600',
