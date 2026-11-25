@@ -50,9 +50,9 @@ export function mapRawItemToProduct(item: any): Product {
   const effectiveLabel = defaultVariant ? defaultVariant.label : (item.quantityLabel || '1 unit');
 
   const catObj = item.categoryId;
-  const catIdStr = catObj?._id ? catObj._id.toString() : (catObj ? catObj.toString() : 'cooking');
-  const catSlug = catObj?.slug || '';
-  const catName = catObj?.name || '';
+  const catIdStr = catObj?._id ? catObj._id.toString() : (catObj ? catObj.toString() : (item.category || 'cooking'));
+  const catName = (typeof catObj === 'object' && catObj?.name) ? catObj.name : (item.category || item.categoryName || '');
+  const catSlug = (typeof catObj === 'object' && catObj?.slug) ? catObj.slug : (item.categorySlug || catName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''));
 
   return {
     id: item._id || item.id,

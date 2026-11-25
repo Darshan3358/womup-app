@@ -175,14 +175,19 @@ export class ProductsService {
       const uniqueObjectIds = Array.from(new Set(directObjectIds.map((id) => id.toString()))).map(
         (id) => new Types.ObjectId(id),
       );
+      const stringIds = uniqueObjectIds.map((id) => id.toString());
 
-      if (uniqueObjectIds.length === 1) {
-        query.categoryId = uniqueObjectIds[0];
-      } else if (uniqueObjectIds.length > 1) {
-        query.categoryId = { $in: uniqueObjectIds };
-      } else {
-        query.categoryId = new Types.ObjectId();
+      const catOrConditions: any[] = [
+        { categoryId: { $in: [...uniqueObjectIds, ...stringIds] } },
+      ];
+      if (nonObjectIds.length > 0) {
+        catOrConditions.push(
+          { category: { $in: nonObjectIds.map((s) => new RegExp(`^${s}$`, 'i')) } },
+        );
       }
+
+      if (!query.$and) query.$and = [];
+      query.$and.push({ $or: catOrConditions });
     }
 
     if (filters.subCategoryId && Types.ObjectId.isValid(filters.subCategoryId)) {

@@ -116,14 +116,121 @@ export interface BestSellerCategoryGroup {
   categoryIds: string[];
 }
 
-// Grouped Best Seller cards mapped to real MongoDB categories
+// Grouped Best Seller and Category Grid items mapped to real MongoDB categories
 export const BEST_SELLER_GROUPS: BestSellerCategoryGroup[] = [
   {
-    id: 'bs_veg',
+    id: 'c1',
     title: 'Vegetables & Fruits',
     categoryIds: [
       '6aa2712acb3d55073acc2101', // Vegetables
       '6aa2712acb3d55073acc2102', // Fruits
+      'vegetables',
+      'fruits',
+      'vegetable',
+      'fruit',
+    ],
+  },
+  {
+    id: 'c2',
+    title: 'Chips & Namkeen',
+    categoryIds: [
+      '6aa2712bcb3d55073acc2106', // Snacks
+      'snacks',
+      'chips',
+      'namkeen',
+    ],
+  },
+  {
+    id: 'c3',
+    title: 'Dairy, Bread & ...',
+    categoryIds: [
+      '6b046011e457907227bc34cc', // Real Mongo DB Dairy, Bread & Eggs
+      '6aa2712acb3d55073acc2103', // Dairy
+      '6aa2712bcb3d55073acc2104', // Bakery
+      'dairy-bread-eggs',
+      'dairy',
+      'bread',
+      'bakery',
+      'milk',
+      'eggs',
+    ],
+  },
+  {
+    id: 'c4',
+    title: 'Oil, Ghee & Masala',
+    categoryIds: [
+      '6b046011e457907227bc34cb', // Real Mongo DB Atta, Rice & Dal (Sunflower Oil, Atta, Rice, Salt)
+      '6aa11866c6c3e5984e2ef5ea', // Cooking Essentials
+      'atta-rice-dal',
+      'cooking-essentials',
+      'oil',
+      'ghee',
+      'masala',
+      'atta',
+      'rice',
+      'cooking',
+    ],
+  },
+  {
+    id: 'c5',
+    title: 'Bakery & Biscuits',
+    categoryIds: [
+      '6b046011e457907227bc34cc', // Bread in Dairy, Bread & Eggs
+      '6aa2712bcb3d55073acc2104', // Bakery
+      '6aa2712bcb3d55073acc2106', // Snacks
+      'bakery',
+      'biscuits',
+      'bread',
+      'biscuit',
+      'dairy-bread-eggs',
+    ],
+  },
+  {
+    id: 'c6',
+    title: 'Drinks & Juices',
+    categoryIds: [
+      '6aa2712bcb3d55073acc2105', // Beverages
+      '6b046011e457907227bc34cc', // Butter milk / drinks
+      'beverages',
+      'drinks',
+      'juices',
+      'juice',
+    ],
+  },
+  {
+    id: 'c7',
+    title: 'Household Essentials',
+    categoryIds: [
+      'household-essentials',
+      'household',
+      'cleaning',
+    ],
+  },
+  {
+    id: 'c8',
+    title: 'Personal Care',
+    categoryIds: [
+      '6b046012e457907227bc34cd', // Real Mongo DB Beauty & Personal Care
+      'beauty-personal-care',
+      'personal-care',
+      'personal care',
+      'beauty',
+    ],
+  },
+  {
+    id: 'c9',
+    title: 'Baby Care',
+    categoryIds: [
+      'baby-care',
+      'baby',
+    ],
+  },
+  {
+    id: 'bs_veg',
+    title: 'Vegetables & Fruits',
+    categoryIds: [
+      '6aa2712acb3d55073acc2101',
+      '6aa2712acb3d55073acc2102',
       'vegetables',
       'fruits',
     ],
@@ -132,17 +239,22 @@ export const BEST_SELLER_GROUPS: BestSellerCategoryGroup[] = [
     id: 'bs_chips',
     title: 'Chips & Namkeen',
     categoryIds: [
-      '6aa2712bcb3d55073acc2106', // Snacks
+      '6aa2712bcb3d55073acc2106',
       'snacks',
+      'chips',
+      'namkeen',
     ],
   },
   {
     id: 'bs_dairy',
     title: 'Dairy, Bread & Eggs',
     categoryIds: [
-      '6aa2712acb3d55073acc2103', // Dairy
-      '6aa2712bcb3d55073acc2104', // Bakery
+      '6b046011e457907227bc34cc',
+      '6aa2712acb3d55073acc2103',
+      '6aa2712bcb3d55073acc2104',
+      'dairy-bread-eggs',
       'dairy',
+      'bread',
       'bakery',
     ],
   },
@@ -150,27 +262,36 @@ export const BEST_SELLER_GROUPS: BestSellerCategoryGroup[] = [
     id: 'bs_oil',
     title: 'Oil, Ghee & Masala',
     categoryIds: [
-      '6aa11866c6c3e5984e2ef5ea', // Cooking Essentials
+      '6b046011e457907227bc34cb',
+      '6aa11866c6c3e5984e2ef5ea',
+      'atta-rice-dal',
       'cooking-essentials',
-      'cooking',
+      'oil',
+      'ghee',
+      'masala',
     ],
   },
   {
     id: 'bs_bakery',
     title: 'Bakery & Biscuits',
     categoryIds: [
-      '6aa2712bcb3d55073acc2104', // Bakery
-      '6aa2712bcb3d55073acc2106', // Snacks
+      '6b046011e457907227bc34cc',
+      '6aa2712bcb3d55073acc2104',
+      '6aa2712bcb3d55073acc2106',
       'bakery',
       'snacks',
+      'bread',
     ],
   },
   {
     id: 'bs_drinks',
     title: 'Drinks & Juices',
     categoryIds: [
-      '6aa2712bcb3d55073acc2105', // Beverages
+      '6aa2712bcb3d55073acc2105',
+      '6b046011e457907227bc34cc',
       'beverages',
+      'drinks',
+      'juices',
     ],
   },
 ];
@@ -184,22 +305,85 @@ export const resolveCategoryGroup = (groupOrTileId: string, title?: string): str
 
   // Title-based matching for category tiles
   if (normTitle.includes('vegetable') || normTitle.includes('fruit')) {
-    return ['6aa2712acb3d55073acc2101', '6aa2712acb3d55073acc2102', 'vegetables', 'fruits'];
+    return [
+      '6aa2712acb3d55073acc2101',
+      '6aa2712acb3d55073acc2102',
+      'vegetables',
+      'fruits',
+      'vegetable',
+      'fruit',
+    ];
   }
-  if (normTitle.includes('dairy') || normTitle.includes('milk') || normTitle.includes('egg') || normTitle.includes('bread')) {
-    return ['6aa2712acb3d55073acc2103', '6aa2712bcb3d55073acc2104', 'dairy', 'bakery'];
+  if (
+    normTitle.includes('dairy') ||
+    normTitle.includes('milk') ||
+    normTitle.includes('egg') ||
+    normTitle.includes('bread') ||
+    normTitle.includes('paneer') ||
+    normTitle.includes('curd') ||
+    normTitle.includes('dahi')
+  ) {
+    return [
+      '6b046011e457907227bc34cc',
+      '6aa2712acb3d55073acc2103',
+      '6aa2712bcb3d55073acc2104',
+      'dairy-bread-eggs',
+      'dairy',
+      'bread',
+      'bakery',
+      'milk',
+      'eggs',
+    ];
   }
-  if (normTitle.includes('atta') || normTitle.includes('rice') || normTitle.includes('dal') || normTitle.includes('oil') || normTitle.includes('ghee') || normTitle.includes('masala')) {
-    return ['6aa11866c6c3e5984e2ef5ea', 'cooking-essentials'];
+  if (
+    normTitle.includes('oil') ||
+    normTitle.includes('ghee') ||
+    normTitle.includes('masala') ||
+    normTitle.includes('atta') ||
+    normTitle.includes('rice') ||
+    normTitle.includes('dal') ||
+    normTitle.includes('cooking')
+  ) {
+    return [
+      '6b046011e457907227bc34cb',
+      '6aa11866c6c3e5984e2ef5ea',
+      'atta-rice-dal',
+      'cooking-essentials',
+      'oil',
+      'ghee',
+      'masala',
+      'atta',
+      'rice',
+      'cooking',
+    ];
+  }
+  if (
+    normTitle.includes('personal') ||
+    normTitle.includes('beauty') ||
+    normTitle.includes('care')
+  ) {
+    return [
+      '6b046012e457907227bc34cd',
+      'beauty-personal-care',
+      'personal-care',
+      'personal care',
+      'beauty',
+    ];
   }
   if (normTitle.includes('chip') || normTitle.includes('snack') || normTitle.includes('namkeen') || normTitle.includes('crisp')) {
-    return ['6aa2712bcb3d55073acc2106', 'snacks'];
+    return ['6aa2712bcb3d55073acc2106', 'snacks', 'chips', 'namkeen'];
   }
   if (normTitle.includes('drink') || normTitle.includes('juice') || normTitle.includes('beverage')) {
-    return ['6aa2712bcb3d55073acc2105', 'beverages'];
+    return ['6aa2712bcb3d55073acc2105', '6b046011e457907227bc34cc', 'beverages', 'drinks', 'juices'];
   }
   if (normTitle.includes('bakery') || normTitle.includes('biscuit')) {
-    return ['6aa2712bcb3d55073acc2104', '6aa2712bcb3d55073acc2106', 'bakery', 'snacks'];
+    return ['6b046011e457907227bc34cc', '6aa2712bcb3d55073acc2104', '6aa2712bcb3d55073acc2106', 'bakery', 'snacks', 'bread', 'biscuits'];
+  }
+  if (normTitle.includes('household') || normTitle.includes('clean') || normTitle.includes('home')) {
+    return ['household-essentials', 'household', 'cleaning'];
+  }
+  if (normTitle.includes('baby')) {
+    return ['baby-care', 'baby'];
   }
 
   return [groupOrTileId];
