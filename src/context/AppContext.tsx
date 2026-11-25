@@ -1270,14 +1270,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setCatalogVersion((v) => v + 1);
     });
 
-    let inventoryDebounceTimer: any = null;
     socket.on('inventory_update', (payload: any) => {
       console.log('[AppContext] Real-time inventory update received:', payload);
-      // Debounce stock update so multiple consecutive item updates do NOT flood the network or purge cache
-      if (inventoryDebounceTimer) clearTimeout(inventoryDebounceTimer);
-      inventoryDebounceTimer = setTimeout(() => {
-        setCatalogVersion((v) => v + 1);
-      }, 2500);
+      ProductService.clearHomeCache();
+      setCatalogVersion((v) => v + 1);
     });
 
     // Real-time Wishlist synchronization

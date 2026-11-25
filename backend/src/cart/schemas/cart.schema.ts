@@ -46,6 +46,3 @@ export class Cart {
 }
 
 export const CartSchema = SchemaFactory.createForClass(Cart);
-
-CartSchema.index({ userId: 1, storeId: 1, areaId: 1 });
-CartSchema.index({ userId: 1, storeId: 1 });
