@@ -661,6 +661,36 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     let timer: any = null;
 
     const fetchFee = async () => {
+      // 1. Check synchronous compound cache first (60s TTL)
+      const cached = CartService.getCachedDeliveryFee({
+        cityName: cityKey,
+        areaName: areaKey,
+        storeId: currentStoreId || undefined,
+        distanceKm: currentDistanceKm,
+        deliveryAddress: {
+          latitude: activeLat,
+          longitude: activeLng,
+          area: areaKey,
+          city: cityKey,
+        },
+        items: blinkitCartList.map((item: any) => ({
+          productId: item.product.id,
+          quantity: item.quantity,
+          sellingPrice: item.product.sellingPrice,
+        })),
+      });
+
+      if (cached) {
+        if (isMounted) {
+          setDynamicDeliveryFee(cached.deliveryFee);
+          if (cached.breakdown) {
+            setFeeBreakdown(cached.breakdown);
+          }
+          setIsCalculatingFee(false);
+        }
+        return;
+      }
+
       setIsCalculatingFee(true);
       try {
         const res = await CartService.calculateDynamicDeliveryFee(
@@ -684,7 +714,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
               area: areaKey,
               city: cityKey,
             },
-            forceRefresh: true,
+            forceRefresh: false,
           },
           abortController.signal
         );
@@ -706,10 +736,9 @@ export const BlinkitCheckoutScreen: React.FC = () => {
               storeName: res.storeName,
             });
           }
-          // Do not call syncCartFromSummary inside fetchFee to avoid triggering infinite re-renders
         }
       } catch (err: any) {
-        if (err?.name !== 'AbortError') {
+        if (err?.name !== 'AbortError' && err?.name !== 'CanceledError') {
           console.warn('[BlinkitCheckout] Live calculate fee error:', err);
         }
       } finally {
@@ -717,7 +746,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
       }
     };
 
-    timer = setTimeout(fetchFee, 250);
+    timer = setTimeout(fetchFee, 400);
 
     return () => {
       isMounted = false;
@@ -760,6 +789,8 @@ export const BlinkitCheckoutScreen: React.FC = () => {
   const finalPayable = Math.max(0, remainingAfterCoins - walletDeduction);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
+  const isOrderSuccessfulRef = useRef(false);
 
   // Gracefully complete the 5s video and transition to Order Confirmed state
   const finishCelebrationVideo = useCallback(() => {
@@ -784,7 +815,9 @@ export const BlinkitCheckoutScreen: React.FC = () => {
       useNativeDriver: true,
     }).start(() => {
       setShowCelebrationVideo(false);
-      setOrderConfirmed(true);
+      if (isOrderSuccessfulRef.current || !isSubmittingRef.current) {
+        setOrderConfirmed(true);
+      }
     });
   }, [videoFadeAnim]);
 
@@ -923,38 +956,58 @@ export const BlinkitCheckoutScreen: React.FC = () => {
     // 1. Direct flow for Womup Wallet or Cash On Delivery
     if (paymentMethod === 'WOMUP_WALLET' || paymentMethod === 'COD' || !ENABLE_ONLINE_PAYMENTS) {
       setIsSubmitting(true);
-      try {
-        if (useCoins) {
-          setAppliedCoins(coinsDeduction);
-        }
-        await placeOrder('COD', {
-          tip: tipAmount,
-          deliveryFee: deliveryFee,
-          deliveryInstructions: deliveryInstruction,
-          walletDeduction: useWalletBalance ? walletDeduction : 0,
-          coinsDeduction: useCoins ? coinsDeduction : 0,
-        });
-        startCelebrationVideo();
-      } catch (error: any) {
-        console.error('Failed to place order:', error);
-        setUseCoins(false);
-        setAppliedCoins(0);
-        const errMsg = error?.message || '';
-        if (errMsg.toLowerCase().includes('price change')) {
-          Alert.alert(
-            'Prices Updated',
-            'Some prices have been updated to reflect the latest live store catalog. Please verify your cart total and tap Place Order to proceed.',
-            [{ text: 'OK' }]
-          );
-        } else {
-          Alert.alert(
-            'Order Placement Failed',
-            errMsg || 'Could not place order. Delivery is currently not available for your area.'
-          );
-        }
-      } finally {
-        setIsSubmitting(false);
+      isSubmittingRef.current = true;
+      isOrderSuccessfulRef.current = false;
+
+      if (useCoins) {
+        setAppliedCoins(coinsDeduction);
       }
+
+      // Optimistic instant celebration: show video immediately without freezing the UI!
+      startCelebrationVideo();
+
+      placeOrder('COD', {
+        tip: tipAmount,
+        deliveryFee: deliveryFee,
+        deliveryInstructions: deliveryInstruction,
+        walletDeduction: useWalletBalance ? walletDeduction : 0,
+        coinsDeduction: useCoins ? coinsDeduction : 0,
+      })
+        .then(() => {
+          isOrderSuccessfulRef.current = true;
+          isSubmittingRef.current = false;
+          setIsSubmitting(false);
+          // If video finished while placeOrder was in-flight, transition now
+          if (isVideoFinishedRef.current) {
+            setShowCelebrationVideo(false);
+            setOrderConfirmed(true);
+          }
+        })
+        .catch((error: any) => {
+          console.error('Failed to place order:', error);
+          isSubmittingRef.current = false;
+          setIsSubmitting(false);
+          if (videoTimerRef.current) {
+            clearInterval(videoTimerRef.current);
+            videoTimerRef.current = null;
+          }
+          setShowCelebrationVideo(false);
+          setUseCoins(false);
+          setAppliedCoins(0);
+          const errMsg = error?.message || '';
+          if (errMsg.toLowerCase().includes('price change')) {
+            Alert.alert(
+              'Prices Updated',
+              'Some prices have been updated to reflect the latest live store catalog. Please verify your cart total and tap Place Order to proceed.',
+              [{ text: 'OK' }]
+            );
+          } else {
+            Alert.alert(
+              'Order Placement Failed',
+              errMsg || 'Could not place order. Delivery is currently not available for your area.'
+            );
+          }
+        });
       return;
     }
 
