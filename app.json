@@ -43,14 +43,14 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.wormup.customerapp",
+      "bundleIdentifier": "com.womup.customerapp",
       "infoPlist": {
         "CFBundleDisplayName": "WOMART",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.wormup.customerapp",
+      "package": "com.womup.customerapp",
       "adaptiveIcon": {
         "backgroundColor": "#05062A",
         "foregroundImage": "./assets/android-icon-foreground.png",
