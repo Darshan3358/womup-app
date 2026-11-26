@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -24,7 +24,13 @@ const ProductImageWithLoading: React.FC<{
   style: any;
   resizeMode?: any;
 }> = ({ source, style, resizeMode = 'cover' }) => {
-  const [loaded, setLoaded] = useState(false);
+  const uriKey = typeof source === 'number' ? String(source) : (source?.uri || '');
+  const [loaded, setLoaded] = useState(typeof source === 'number');
+
+  useEffect(() => {
+    setLoaded(typeof source === 'number');
+  }, [uriKey]);
+
   return (
     <View style={[style, { overflow: 'hidden', backgroundColor: '#F8FAFC' }]}>
       {!loaded && (
@@ -33,6 +39,7 @@ const ProductImageWithLoading: React.FC<{
         </View>
       )}
       <Image
+        key={uriKey}
         source={source}
         style={[style, { width: '100%', height: '100%' }, !loaded ? { opacity: 0 } : { opacity: 1 }]}
         resizeMode={resizeMode}
@@ -155,6 +162,14 @@ const ProductSectionComponent: React.FC<ProductSectionProps> = ({
     let currentSellingPrice = activeVariant ? activeVariant.price : item.sellingPrice;
     let currentMrp = activeVariant ? activeVariant.mrp : item.mrp;
     let currentPackSize = activeVariant ? activeVariant.label : item.packSize;
+    const activeStock =
+      activeVariant && typeof activeVariant.stock === 'number'
+        ? Math.max(0, activeVariant.stock)
+        : typeof item.stock === 'number'
+        ? Math.max(0, item.stock)
+        : 100;
+    const isOutOfStock = activeStock === 0;
+    const isCriticalStock = activeStock > 0 && activeStock <= 5;
 
     const discountPercent =
       currentMrp > currentSellingPrice
@@ -169,6 +184,7 @@ const ProductSectionComponent: React.FC<ProductSectionProps> = ({
       sellingPrice: currentSellingPrice,
       mrp: currentMrp,
       packSize: currentPackSize,
+      stock: activeStock,
       selectedVariantId: activeVariant?.id,
     });
 
@@ -218,9 +234,16 @@ const ProductSectionComponent: React.FC<ProductSectionProps> = ({
         >
           <ProductImageWithLoading
             source={resolveProductImageSource(item.imageUrl, item.name, (item as any).slug)}
-            style={styles.productImage}
+            style={[styles.productImage, isOutOfStock && { opacity: 0.45 }]}
             resizeMode="cover"
           />
+          {isOutOfStock && (
+            <View style={styles.oosOverlay}>
+              <View style={styles.oosBadge}>
+                <Text style={[styles.oosBadgeText, isCompact && { fontSize: 7.5 }]}>OUT OF STOCK</Text>
+              </View>
+            </View>
+          )}
         </TouchableOpacity>
 
         {/* Product Name */}
@@ -276,6 +299,11 @@ const ProductSectionComponent: React.FC<ProductSectionProps> = ({
         )}
 
         {/* Price & Action Row */}
+        {isCriticalStock && (
+          <Text style={[styles.urgencyMiniText, isCompact && { fontSize: 8 }]} numberOfLines={1}>
+            Hurry! Only {activeStock} left
+          </Text>
+        )}
         <View style={[styles.actionRow, isCompact && { marginTop: 4 }]}>
           <View style={styles.priceColumn}>
             <Text style={[styles.sellingPrice, isCompact && { fontSize: 11.5 }]}>
@@ -301,8 +329,13 @@ const ProductSectionComponent: React.FC<ProductSectionProps> = ({
               </Text>
               <TouchableOpacity
                 activeOpacity={0.7}
-                onPress={() => updateBlinkitQty(getProductPayload(), 1, activeVariant?.id)}
-                style={styles.stepperBtn}
+                disabled={quantity >= activeStock}
+                onPress={() => {
+                  if (quantity < activeStock) {
+                    updateBlinkitQty(getProductPayload(), 1, activeVariant?.id);
+                  }
+                }}
+                style={[styles.stepperBtn, quantity >= activeStock && { opacity: 0.4 }]}
                 hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
               >
                 <Ionicons name="add" size={isCompact ? 10 : 13} color="#FFFFFF" />
@@ -311,11 +344,28 @@ const ProductSectionComponent: React.FC<ProductSectionProps> = ({
           ) : (
             <TouchableOpacity
               activeOpacity={0.8}
-              onPress={() => updateBlinkitQty(getProductPayload(), 1, activeVariant?.id)}
-              style={[styles.addButton, isCompact && { height: 25, paddingHorizontal: 8 }]}
+              disabled={isOutOfStock}
+              onPress={() => {
+                if (!isOutOfStock) {
+                  updateBlinkitQty(getProductPayload(), 1, activeVariant?.id);
+                }
+              }}
+              style={[
+                styles.addButton,
+                isCompact && { height: 25, paddingHorizontal: 8 },
+                isOutOfStock && styles.addButtonDisabled,
+              ]}
               accessibilityLabel={`Add ${item.name}`}
             >
-              <Text style={[styles.addButtonText, isCompact && { fontSize: 10 }]}>ADD</Text>
+              <Text
+                style={[
+                  styles.addButtonText,
+                  isCompact && { fontSize: 10 },
+                  isOutOfStock && styles.addButtonTextDisabled,
+                ]}
+              >
+                {isOutOfStock ? 'OOS' : 'ADD'}
+              </Text>
             </TouchableOpacity>
           )}
         </View>
@@ -750,10 +800,46 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  addButtonDisabled: {
+    backgroundColor: '#F1F5F9',
+    borderColor: '#CBD5E1',
+  },
   addButtonText: {
     color: '#16A34A',
     fontSize: 11,
     fontWeight: '800',
+  },
+  addButtonTextDisabled: {
+    color: '#94A3B8',
+    fontSize: 9.5,
+  },
+  oosOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+  },
+  oosBadge: {
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  oosBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 8.5,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  urgencyMiniText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#DC2626',
+    marginBottom: 2,
   },
   stepperContainer: {
     flexDirection: 'row',

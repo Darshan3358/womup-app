@@ -132,6 +132,7 @@ interface AdminStateContextType {
   addProductItem: (data: Partial<ProductItem>) => Promise<boolean>;
   updateProductItem: (id: string, data: Partial<ProductItem>) => Promise<boolean>;
   deleteProductItem: (id: string) => Promise<boolean>;
+  removeProductFromStore: (id: string, storeId: string) => Promise<boolean>;
   toggleProductStatus: (id: string) => Promise<boolean>;
 
   zonePrices: Record<string, Record<string, number>>;
@@ -1053,6 +1054,11 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const sPrice = Number(data.sellingPrice) || 0;
     const mPrice = Number(data.mrp) || sPrice || 0;
 
+    const scope: 'ALL' | 'SPECIFIC' = data.storeScope === 'SPECIFIC' ? 'SPECIFIC' : 'ALL';
+    const assignedIds = scope === 'SPECIFIC'
+      ? (data.assignedStoreIds || []).filter(Boolean)
+      : [];
+
     const newItem: ProductItem = {
       id: 'prod_' + Date.now(),
       name: data.name || 'New Item',
@@ -1067,6 +1073,9 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       sellingPrice: sPrice,
       mrp: mPrice,
       stockKg: Number(data.stockKg) || 100,
+      shelfLocation: data.shelfLocation || 'A1-R2',
+      storeScope: scope,
+      assignedStoreIds: assignedIds,
       isActive: data.isActive !== false,
       image: data.image || data.imageUrl || 'https://images.unsplash.com/photo-1546094096-0df4bcaaa337?w=400&q=80',
       variants: data.variants || [],
@@ -1090,7 +1099,11 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     setProducts((prev) => [newItem, ...prev]);
 
-    logAudit('Product Added', newItem.name, `Added under ${newItem.category} with ${(data.variants || []).length} variants`);
+    logAudit(
+      'Product Added',
+      newItem.name,
+      `Added under ${newItem.category} (${scope === 'SPECIFIC' ? 'Particular Store' : 'All Stores'}) with ${(data.variants || []).length} variants`
+    );
     const res = await ApiService.addProduct({
       ...newItem,
       variants: data.variants,
@@ -1099,13 +1112,27 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       imageUrl: data.imageUrl,
       images: data.images,
       cloudinaryPublicId: data.cloudinaryPublicId,
+      shelfLocation: data.shelfLocation,
+      storeScope: scope,
+      assignedStoreIds: assignedIds,
     });
+
+    if (!res || !(res as any).id) {
+      setProducts((prev) => prev.filter((p) => p.id !== newItem.id));
+      return false;
+    }
 
     if (res && res.id) {
       setProducts((prev) =>
         prev.map((p) =>
           p.id === newItem.id
-            ? { ...p, id: res.id, variants: res.variants || data.variants || [] }
+            ? {
+                ...p,
+                id: res.id,
+                variants: res.variants || data.variants || [],
+                storeScope: scope,
+                assignedStoreIds: assignedIds,
+              }
             : p
         )
       );
@@ -1177,6 +1204,42 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     logAudit('Product Deleted', prod?.name || id, 'Removed from catalog and area pricing');
     await ApiService.deleteProduct(id);
     return true;
+  };
+
+  const removeProductFromStore = async (id: string, storeId: string) => {
+    const prod = products.find((p) => p.id === id);
+    const activeIds = (darkStores || [])
+      .filter((s: any) => s && s.isActive !== false)
+      .map((s: any) => String(s.id || s._id || ''))
+      .filter(Boolean);
+
+    const res = await ApiService.removeProductFromStore(id, storeId);
+    const nextIds: string[] = Array.isArray(res?.assignedStoreIds)
+      ? res.assignedStoreIds
+      : (prod?.storeScope === 'SPECIFIC' && Array.isArray(prod.assignedStoreIds)
+          ? prod.assignedStoreIds
+          : activeIds
+        ).filter((sid) => String(sid) !== String(storeId));
+
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              storeScope: 'SPECIFIC',
+              assignedStoreIds: nextIds,
+            }
+          : p
+      )
+    );
+    setInventory((prev) =>
+      prev.filter((inv) => !(inv.productId === id && String(inv.darkStoreId) === String(storeId)))
+    );
+    logAudit('Store Product Removed', prod?.name || id, `Removed only from store ${storeId}`);
+    setTimeout(() => {
+      refreshFromDb();
+    }, 400);
+    return Boolean(res?.success);
   };
 
   const toggleProductStatus = async (id: string) => {
@@ -1878,6 +1941,7 @@ export const AdminStateProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         addProductItem,
         updateProductItem,
         deleteProductItem,
+        removeProductFromStore,
         toggleProductStatus,
         zonePrices,
         areaPricing,

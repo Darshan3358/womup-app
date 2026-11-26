@@ -343,20 +343,32 @@ export const BlinkitMoneyScreen: React.FC = () => {
           setIsEditingKyc(true);  // Form view for NOT_SUBMITTED or REJECTED
         }
 
-        // Keep local app user state synchronized with server status
-        setUser((prev: any) => ({
-          ...prev,
-          customerKycStatus: normalized === 'VERIFIED' ? 2 : normalized === 'PENDING' ? 1 : normalized === 'REJECTED' ? 3 : 0,
-          verificationStatus: normalized,
-          aadhaarVerified: normalized === 'VERIFIED',
-          fullNameAsPerAadhaar: d.fullNameAsPerAadhaar || prev.fullNameAsPerAadhaar,
-          aadharNumber: d.rawAadhaarNumber || d.aadharNumber || prev.aadharNumber,
-          bankName: d.bankDetails?.bankName || d.bankName || prev.bankName,
-          accountNumber: d.bankDetails?.rawAccountNumber || d.accountNumber || prev.accountNumber,
-          ifscCode: d.bankDetails?.ifscCode || d.ifscCode || prev.ifscCode,
-          accountHolderName: d.bankDetails?.accountHolderName || prev.accountHolderName,
-          upiId: d.bankDetails?.upiId || d.upiId || prev.upiId,
-        }));
+        // Keep local app user state synchronized with server status & uploaded KYC document URLs
+        const serverFront = d.aadhaarFrontUrl || d.aadharFront || '';
+        const serverBack = d.aadhaarBackUrl || d.aadharBack || '';
+        setUser((prev: any) => {
+          const next = {
+            ...prev,
+            customerKycStatus: normalized === 'VERIFIED' ? 2 : normalized === 'PENDING' ? 1 : normalized === 'REJECTED' ? 3 : 0,
+            verificationStatus: normalized,
+            aadhaarVerified: normalized === 'VERIFIED',
+            fullNameAsPerAadhaar: d.fullNameAsPerAadhaar || prev.fullNameAsPerAadhaar,
+            aadharNumber: d.rawAadhaarNumber || d.aadharNumber || prev.aadharNumber,
+            aadharFrontImage: serverFront || prev.aadharFrontImage,
+            aadharBackImage: serverBack || prev.aadharBackImage,
+            aadhaarFrontImage: serverFront || prev.aadhaarFrontImage,
+            aadhaarBackImage: serverBack || prev.aadhaarBackImage,
+            customer_image_aadhar_front: serverFront || prev.customer_image_aadhar_front,
+            customer_image_aadhar_back: serverBack || prev.customer_image_aadhar_back,
+            bankName: d.bankDetails?.bankName || d.bankName || prev.bankName,
+            accountNumber: d.bankDetails?.rawAccountNumber || d.accountNumber || prev.accountNumber,
+            ifscCode: d.bankDetails?.ifscCode || d.ifscCode || prev.ifscCode,
+            accountHolderName: d.bankDetails?.accountHolderName || prev.accountHolderName,
+            upiId: d.bankDetails?.upiId || d.upiId || prev.upiId,
+          };
+          StorageService.saveItem(StorageService.KEYS.USER, next);
+          return next;
+        });
       }
     } catch (_) {}
   };
@@ -441,7 +453,25 @@ export const BlinkitMoneyScreen: React.FC = () => {
           availableIncome: res.user?.availableIncome ?? user.availableIncome,
         };
         setUser(updated);
-        StorageService.saveItem(StorageService.KEYS.USER, updated);
+        await StorageService.saveItem(StorageService.KEYS.USER, updated);
+        AuthService.getProfile()
+          .then((fresh) => {
+            if (fresh) {
+              setUser((prev) => {
+                const merged = {
+                  ...prev,
+                  ...fresh,
+                  savedAddresses:
+                    prev.savedAddresses && prev.savedAddresses.length > 0
+                      ? prev.savedAddresses
+                      : fresh.savedAddresses,
+                };
+                StorageService.saveItem(StorageService.KEYS.USER, merged);
+                return merged;
+              });
+            }
+          })
+          .catch(() => {});
         setAadhaarSuccessMsg('KYC & Bank details submitted successfully for admin review!');
         setIsEditingKyc(false);
       } else {
@@ -1192,7 +1222,22 @@ export const BlinkitMoneyScreen: React.FC = () => {
                     required={false}
                     value={aadhaarFrontUrl}
                     folder="womup/kyc/customer"
-                    onUploadComplete={(url) => setAadhaarFrontUrl(url)}
+                    entityType="customer"
+                    entityId={user.id || (user as any)._id}
+                    resourceType="AADHAAR_FRONT"
+                    onUploadComplete={(url) => {
+                      setAadhaarFrontUrl(url);
+                      setUser((prev: any) => {
+                        const next = {
+                          ...prev,
+                          aadharFrontImage: url,
+                          aadhaarFrontImage: url,
+                          customer_image_aadhar_front: url,
+                        };
+                        StorageService.saveItem(StorageService.KEYS.USER, next);
+                        return next;
+                      });
+                    }}
                     helperText="Upload front side showing photo & name"
                   />
 
@@ -1201,7 +1246,22 @@ export const BlinkitMoneyScreen: React.FC = () => {
                     required={false}
                     value={aadhaarBackUrl}
                     folder="womup/kyc/customer"
-                    onUploadComplete={(url) => setAadhaarBackUrl(url)}
+                    entityType="customer"
+                    entityId={user.id || (user as any)._id}
+                    resourceType="AADHAAR_BACK"
+                    onUploadComplete={(url) => {
+                      setAadhaarBackUrl(url);
+                      setUser((prev: any) => {
+                        const next = {
+                          ...prev,
+                          aadharBackImage: url,
+                          aadhaarBackImage: url,
+                          customer_image_aadhar_back: url,
+                        };
+                        StorageService.saveItem(StorageService.KEYS.USER, next);
+                        return next;
+                      });
+                    }}
                     helperText="Upload back side showing permanent address"
                   />
                 </>
@@ -1231,7 +1291,7 @@ export const BlinkitMoneyScreen: React.FC = () => {
                   {/* Aadhaar Front Document Card */}
                   <View style={styles.viewDocCard}>
                     {aadhaarFrontUrl ? (
-                      <Image source={{ uri: resolveImageUrl(aadhaarFrontUrl) }} style={styles.viewDocThumb} resizeMode="cover" />
+                      <Image key={aadhaarFrontUrl} source={{ uri: resolveImageUrl(aadhaarFrontUrl) }} style={styles.viewDocThumb} resizeMode="cover" />
                     ) : (
                       <View style={styles.viewDocEmptyThumb}>
                         <Ionicons name="image-outline" size={22} color="#94A3B8" />
@@ -1258,7 +1318,7 @@ export const BlinkitMoneyScreen: React.FC = () => {
                   {/* Aadhaar Back Document Card */}
                   <View style={styles.viewDocCard}>
                     {aadhaarBackUrl ? (
-                      <Image source={{ uri: resolveImageUrl(aadhaarBackUrl) }} style={styles.viewDocThumb} resizeMode="cover" />
+                      <Image key={aadhaarBackUrl} source={{ uri: resolveImageUrl(aadhaarBackUrl) }} style={styles.viewDocThumb} resizeMode="cover" />
                     ) : (
                       <View style={styles.viewDocEmptyThumb}>
                         <Ionicons name="image-outline" size={22} color="#94A3B8" />

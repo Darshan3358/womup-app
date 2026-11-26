@@ -35,6 +35,7 @@ export const BlinkitProductDetailScreen: React.FC = () => {
     toggleWishlist,
     currentAreaId,
     currentAreaName,
+    currentStoreId,
   } = useApp();
 
   const product = selectedBlinkitProduct;
@@ -60,6 +61,18 @@ export const BlinkitProductDetailScreen: React.FC = () => {
   let displayMrp = activeVariant ? activeVariant.mrp : product?.mrp || 0;
 
   const displayPackSize = activeVariant ? activeVariant.label : product?.packSize || '1 unit';
+  const activeStock =
+    activeVariant && typeof activeVariant.stock === 'number'
+      ? Math.max(0, activeVariant.stock)
+      : typeof product?.stock === 'number'
+      ? Math.max(0, product.stock)
+      : 100;
+  const activeUrgency =
+    activeStock === 0
+      ? 'Out of Stock'
+      : activeStock < 10
+      ? `Only ${activeStock} left`
+      : product?.stockUrgency;
 
   const attributeList: { label: string; value: string }[] =
     product?.attributes && product.attributes.length > 0
@@ -91,14 +104,17 @@ export const BlinkitProductDetailScreen: React.FC = () => {
   React.useEffect(() => {
     (async () => {
       try {
-        const live = await ProductService.fetchProducts({ areaId: currentAreaId || undefined });
+        const live = await ProductService.fetchProducts({
+          areaId: currentAreaId || undefined,
+          storeId: currentStoreId || undefined,
+        });
         const mapped = live
           .filter((p) => p.id !== product?.id)
           .map(mapProductToBlinkit);
         setRelatedProducts(mapped.slice(0, 4));
       } catch (e) {}
     })();
-  }, [product?.id, currentAreaId]);
+  }, [product?.id, currentAreaId, currentStoreId]);
 
   if (!product) {
     return (
@@ -279,10 +295,10 @@ export const BlinkitProductDetailScreen: React.FC = () => {
           ) : (
             <View style={styles.variantStockRow}>
               <Text style={styles.variantLabel}>{displayPackSize}</Text>
-              {product.stockUrgency && (
+              {activeUrgency && (
                 <View style={styles.urgencyChip}>
-                  <AppIcon name="clock" size={12} color={COLORS.warning} />
-                  <Text style={styles.urgencyText}>{product.stockUrgency}</Text>
+                  <AppIcon name="clock" size={12} color={activeStock === 0 ? '#DC2626' : COLORS.warning} />
+                  <Text style={[styles.urgencyText, activeStock === 0 && { color: '#DC2626' }]}>{activeUrgency}</Text>
                 </View>
               )}
             </View>
@@ -416,7 +432,11 @@ export const BlinkitProductDetailScreen: React.FC = () => {
         </View>
 
         {/* Right CTA / Stepper */}
-        {quantity === 0 ? (
+        {activeStock === 0 ? (
+          <View style={[styles.stickyAddToCartBtn, { backgroundColor: '#E2E8F0' }]}>
+            <Text style={[styles.stickyAddToCartBtnText, { color: '#64748B' }]}>Out of Stock</Text>
+          </View>
+        ) : quantity === 0 ? (
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={() =>
@@ -426,6 +446,7 @@ export const BlinkitProductDetailScreen: React.FC = () => {
                   sellingPrice: displayPrice,
                   mrp: displayMrp,
                   packSize: displayPackSize,
+                  stock: activeStock,
                   selectedVariantId: activeVariant?.id,
                 },
                 1,
@@ -448,6 +469,7 @@ export const BlinkitProductDetailScreen: React.FC = () => {
                     sellingPrice: displayPrice,
                     mrp: displayMrp,
                     packSize: displayPackSize,
+                    stock: activeStock,
                     selectedVariantId: activeVariant?.id,
                   },
                   -1,
@@ -462,6 +484,7 @@ export const BlinkitProductDetailScreen: React.FC = () => {
             <Text style={styles.stickyStepperQty}>{quantity}</Text>
             <TouchableOpacity
               activeOpacity={0.7}
+              disabled={quantity >= activeStock}
               onPress={() =>
                 updateBlinkitQty(
                   {
@@ -469,13 +492,14 @@ export const BlinkitProductDetailScreen: React.FC = () => {
                     sellingPrice: displayPrice,
                     mrp: displayMrp,
                     packSize: displayPackSize,
+                    stock: activeStock,
                     selectedVariantId: activeVariant?.id,
                   },
                   1,
                   activeVariant?.id
                 )
               }
-              style={styles.stickyStepperBtn}
+              style={[styles.stickyStepperBtn, quantity >= activeStock && { opacity: 0.4 }]}
               accessibilityLabel="Increase"
             >
               <AppIcon name="plus" size={16} color={COLORS.primary} />

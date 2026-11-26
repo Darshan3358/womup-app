@@ -27,6 +27,8 @@ export const S15_ProductListingScreen: React.FC = () => {
     selectedCategoryIds,
     selectedCategoryName,
     currentAreaId,
+    currentStoreId,
+    catalogVersion,
     filters,
     goBack,
   } = useApp();
@@ -38,21 +40,18 @@ export const S15_ProductListingScreen: React.FC = () => {
     let isCancelled = false;
     (async () => {
       setLoading(true);
+      setProducts([]);
       try {
         const hasCategoryIds = selectedCategoryIds && selectedCategoryIds.length > 0;
         const live = await ProductService.fetchProducts({
           categoryIds: hasCategoryIds ? selectedCategoryIds : undefined,
           categoryId: !hasCategoryIds && selectedCategoryId && selectedCategoryId !== 'All' ? selectedCategoryId : undefined,
           areaId: currentAreaId || undefined,
+          storeId: currentStoreId || undefined,
         });
 
         if (!isCancelled) {
-          // Merge live items with the app full catalog to guarantee complete coverage
-          const catalog = ProductService.getAllProducts();
-          const map = new Map<string, Product>();
-          (catalog || []).forEach((p) => map.set(p.id, p));
-          (live || []).forEach((p) => map.set(p.id, p));
-          setProducts(Array.from(map.values()));
+          setProducts(live || []);
         }
       } catch (e) {
         if (!isCancelled) {
@@ -68,7 +67,7 @@ export const S15_ProductListingScreen: React.FC = () => {
     return () => {
       isCancelled = true;
     };
-  }, [selectedCategoryId, selectedCategoryIds, currentAreaId]);
+  }, [selectedCategoryId, selectedCategoryIds, currentAreaId, currentStoreId, catalogVersion]);
 
   // Smart category filtering matching IDs, slugs, category names, and title keywords
   const categoryScopedProducts = useMemo(() => {

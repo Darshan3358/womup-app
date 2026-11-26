@@ -150,10 +150,20 @@ export const BlinkitHomeScreen: React.FC = () => {
   const [dbProducts, setDbProducts] = useState<Product[]>(() => ProductService.getAllProducts());
   const [backendSections, setBackendSections] = useState<Record<string, BlinkitProduct[]>>({});
   const requestEpochRef = useRef(0);
+  const lastScopeKeyRef = useRef(`${currentStoreId || ''}_${currentAreaId || ''}`);
 
   const loadHomeData = useCallback(async () => {
     const epoch = ++requestEpochRef.current;
-    if (!ProductService.hasCachedProducts()) {
+    const scopeKey = `${currentStoreId || ''}_${currentAreaId || ''}`;
+    const isScopeChanged = scopeKey !== lastScopeKeyRef.current;
+
+    if (isScopeChanged) {
+      lastScopeKeyRef.current = scopeKey;
+      ProductService.clearHomeCache(true);
+      setBackendSections({});
+      setDbProducts([]);
+      setIsLoading(true);
+    } else if (!ProductService.hasCachedProducts()) {
       setIsLoading(true);
     }
     setIsError(false);
@@ -163,6 +173,8 @@ export const BlinkitHomeScreen: React.FC = () => {
         areaId: currentAreaId || undefined,
         storeId: currentStoreId || undefined,
       }).catch(() => null);
+
+      if (epoch !== requestEpochRef.current) return;
 
       if (homeData && homeData.sections && homeData.sections.length > 0) {
         // Populate section map from the unified home response
@@ -183,17 +195,20 @@ export const BlinkitHomeScreen: React.FC = () => {
             }
           }
         }
-        if (allProds.length > 0) {
-          setDbProducts(allProds);
-        }
+        setDbProducts(allProds);
       } else {
         // Fallback: If unified homeData returned empty sections, fetch catalog directly
-        const fallbackProds = await ProductService.fetchProducts({ limit: 120 }).catch(() => []);
-        if (fallbackProds.length > 0) {
-          setDbProducts(fallbackProds);
-        }
+        const fallbackProds = await ProductService.fetchProducts({
+          areaId: currentAreaId || undefined,
+          storeId: currentStoreId || undefined,
+          limit: 120,
+        }).catch(() => []);
+        if (epoch !== requestEpochRef.current) return;
+        setBackendSections({});
+        setDbProducts(fallbackProds);
       }
     } catch (e: any) {
+      if (epoch !== requestEpochRef.current) return;
       console.warn('Error loading home data:', e);
       setIsError(true);
     } finally {
@@ -402,7 +417,7 @@ export const BlinkitHomeScreen: React.FC = () => {
           <ProductSection
             id="fast_delivery"
             title="Fresh Grocery & Essentials"
-            subtitle="In stock at your nearest dark store"
+            subtitle="Fresh picks ready for fast doorstep delivery"
             products={item.products}
             onOpenProduct={handleOpenProductDetail}
             onViewAll={() => setActiveScreen('C15_ProductListing')}
@@ -715,7 +730,14 @@ export const BlinkitHomeScreen: React.FC = () => {
                 <Ionicons name="cloud-offline-outline" size={36} color="#EF4444" style={{ marginBottom: 6 }} />
                 <Text style={styles.errorTitle}>Unable to load products</Text>
                 <Text style={styles.errorSubtitle}>Please check your internet connection and try again</Text>
-                <TouchableOpacity style={styles.retryBtn} onPress={loadHomeData} activeOpacity={0.8}>
+                <TouchableOpacity
+                  style={styles.retryBtn}
+                  onPress={() => {
+                    ProductService.clearHomeCache(true);
+                    loadHomeData();
+                  }}
+                  activeOpacity={0.8}
+                >
                   <Text style={styles.retryBtnText}>Retry</Text>
                 </TouchableOpacity>
               </View>
@@ -726,7 +748,10 @@ export const BlinkitHomeScreen: React.FC = () => {
         refreshControl={
           <RefreshControl
             refreshing={isLoading && dbProducts.length > 0}
-            onRefresh={loadHomeData}
+            onRefresh={() => {
+              ProductService.clearHomeCache(true);
+              loadHomeData();
+            }}
             colors={[COLORS.primary]}
             tintColor={COLORS.primary}
           />

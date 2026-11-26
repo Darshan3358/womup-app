@@ -93,8 +93,18 @@ export const S16_ProductDetailsScreen: React.FC = () => {
               <Text style={styles.ratingText}>{product.rating} ({product.reviewCount})</Text>
             </View>
             <View style={styles.stockBadge}>
-              <Ionicons name="checkmark-circle" size={14} color={COLORS.success} />
-              <Text style={styles.stockText}>In Stock</Text>
+              <Ionicons
+                name={product.stock === 0 ? 'close-circle' : 'checkmark-circle'}
+                size={14}
+                color={product.stock === 0 ? '#DC2626' : COLORS.success}
+              />
+              <Text style={[styles.stockText, product.stock === 0 && { color: '#DC2626' }]}>
+                {product.stock === 0
+                  ? 'Out of Stock'
+                  : typeof product.stock === 'number' && product.stock < 10
+                  ? `Only ${product.stock} left`
+                  : 'In Stock'}
+              </Text>
             </View>
           </View>
 
@@ -117,7 +127,7 @@ export const S16_ProductDetailsScreen: React.FC = () => {
             <Ionicons name="flash-outline" size={20} color={COLORS.hotPink} />
             <View style={styles.etaTextContainer}>
               <Text style={styles.etaTitle}>Delivery in {product.deliveryMinutes} mins</Text>
-              <Text style={styles.etaSubtitle}>Shipment from nearest Womup dark store</Text>
+              <Text style={styles.etaSubtitle}>Fast doorstep delivery across your area</Text>
             </View>
           </View>
 
@@ -149,7 +159,8 @@ export const S16_ProductDetailsScreen: React.FC = () => {
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={handleAddToCart}
-          style={styles.cartButton}
+          disabled={product.stock === 0}
+          style={[styles.cartButton, product.stock === 0 && { opacity: 0.45 }]}
         >
           <Ionicons
             name={added ? 'checkmark' : 'cart-outline'}
@@ -157,13 +168,15 @@ export const S16_ProductDetailsScreen: React.FC = () => {
             color={COLORS.navy}
           />
           <Text style={styles.cartButtonText}>
-            {added ? 'Added!' : 'Add to Cart'}
+            {product.stock === 0 ? 'Out of Stock' : added ? 'Added!' : 'Add to Cart'}
           </Text>
         </TouchableOpacity>
 
         <GradientButton
-          title="Buy Now"
-          onPress={handleBuyNow}
+          title={product.stock === 0 ? 'Unavailable' : 'Buy Now'}
+          onPress={() => {
+            if (product.stock !== 0) handleBuyNow();
+          }}
           style={styles.buyButton}
         />
       </View>

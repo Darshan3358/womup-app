@@ -439,6 +439,10 @@ export const ApiService = {
               const matchedCat = dynamicCategories.find((c) => c.id === cId);
               const resolvedCat = matchedCat ? matchedCat.name : (p.category || 'General');
 
+              const rawAssignedIds = Array.isArray(p.assignedStoreIds)
+                ? p.assignedStoreIds.map((id: any) => (id?.toString ? id.toString() : String(id)))
+                : [];
+
               return {
                 id: prodId,
                 name: p.name,
@@ -449,7 +453,10 @@ export const ApiService = {
                 basePrice: Number(p.basePrice) || Number(p.sellingPrice) || 40,
                 sellingPrice: Number(p.sellingPrice) || 45,
                 mrp: Number(p.mrp) || Number(p.sellingPrice) || 50,
-                stockKg: Number(p.stockKg) || 100,
+                stockKg: p.stock !== undefined ? Number(p.stock) : (p.stockKg !== undefined ? Number(p.stockKg) : 100),
+                shelfLocation: p.shelfLocation || 'A1-R2',
+                storeScope: p.storeScope === 'SPECIFIC' ? 'SPECIFIC' : 'ALL',
+                assignedStoreIds: rawAssignedIds,
                 isActive: p.isActive !== false,
                 image: p.imageUrl || p.image || '',
                 imageUrl: p.imageUrl || p.image || '',
@@ -616,8 +623,8 @@ export const ApiService = {
           );
           const matchedStore = dynamicStores.find((s) => s.id === sId || s.name === inv.storeName);
 
-          const avail = Number(inv.availableQty ?? inv.availableKg ?? 0);
-          const reserved = Number(inv.reservedQty ?? inv.reservedKg ?? 0);
+          const avail = Math.max(0, Number(inv.availableQty ?? inv.availableKg ?? 0));
+          const reserved = Math.max(0, Number(inv.reservedQty ?? inv.reservedKg ?? 0));
           const threshold = Number(inv.lowStockThreshold ?? 15);
 
           const isExpired =
@@ -645,6 +652,7 @@ export const ApiService = {
             expiryDate: inv.expiryDate ? new Date(inv.expiryDate).toISOString() : undefined,
             status,
             shelfLocation: inv.shelfLocation || (matchedProd as any)?.shelfLocation || undefined,
+            isHiddenInStore: Boolean(inv.isHiddenInStore),
           };
         });
 
@@ -1278,13 +1286,23 @@ export const ApiService = {
     productId?: string,
     deltaQty: number = 0,
     reason: string = 'Stock update',
-    inventoryId?: string
+    inventoryId?: string,
+    variantId?: string,
+    isHiddenInStore?: boolean
   ): Promise<boolean> {
     try {
       const res = await fetch(`${API_BASE_URL}/api/admin/stores/inventory/adjust`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storeId, productId, deltaQty, reason, inventoryId }),
+        body: JSON.stringify({
+          storeId,
+          productId,
+          variantId,
+          deltaQty,
+          reason,
+          inventoryId,
+          ...(isHiddenInStore !== undefined ? { isHiddenInStore } : {}),
+        }),
       });
       return res.ok;
     } catch {
@@ -1388,7 +1406,7 @@ export const ApiService = {
     }
   },
 
-  // 13. DELETE PRODUCT FROM LIVE MONGODB
+  // 13. DELETE PRODUCT GLOBALLY FROM LIVE MONGODB
   async deleteProduct(id: string): Promise<boolean> {
     try {
       const res = await fetch(`${API_BASE_URL}/api/admin/catalog/products/${id}`, {
@@ -1398,6 +1416,24 @@ export const ApiService = {
     } catch (err) {
       console.error('[API] Error deleting product:', err);
       return false;
+    }
+  },
+
+  // 13b. SAFE STORE-LEVEL REMOVAL: REMOVE PRODUCT ONLY FROM ONE DARK STORE
+  async removeProductFromStore(
+    productId: string,
+    storeId: string
+  ): Promise<{ success: boolean; assignedStoreIds?: string[]; error?: string }> {
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/api/admin/catalog/products/${productId}/store/${storeId}`,
+        { method: 'DELETE' }
+      );
+      const json = await res.json().catch(() => ({}));
+      return res.ok ? { success: true, ...json } : { success: false, ...json };
+    } catch (err: any) {
+      console.error('[API] Error removing product from store:', err);
+      return { success: false, error: err?.message || 'Network error' };
     }
   },
 

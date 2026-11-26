@@ -188,8 +188,8 @@ const DynamicLiveMapComponent: React.FC<DynamicLiveMapProps> = ({
   const storeLng = storeCoords!.longitude;
   const custLat = customerCoords!.latitude;
   const custLng = customerCoords!.longitude;
-  const effectiveStoreName = storeName || 'Wom Up Store Hub';
-  const safeStoreName = String(effectiveStoreName || 'Wom Up Store Hub').replace(/["\\\n\r]/g, ' ');
+  const effectiveStoreName = 'Dispatch Hub';
+  const safeStoreName = 'Dispatch Hub';
   const safePartnerName = String(partnerName || 'Delivery Partner').replace(/["\\\n\r]/g, ' ');
 
   // Compute status pill text
@@ -608,7 +608,7 @@ const DynamicLiveMapComponent: React.FC<DynamicLiveMapProps> = ({
           <View style={styles.storePin}>
             <Ionicons name="storefront" size={18} color="#FFFFFF" />
           </View>
-          <Text style={styles.storeLabel} numberOfLines={1}>{storeName}</Text>
+          <Text style={styles.storeLabel} numberOfLines={1}>{effectiveStoreName}</Text>
         </View>
 
         {/* Customer Pin */}

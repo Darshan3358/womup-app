@@ -47,7 +47,8 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 }
 
 import { ErrorBoundary } from './src/components/common/ErrorBoundary';
-import * as Updates from 'expo-updates';
+import { OtaProvider } from './src/context/OtaContext';
+import { OtaUpdateBanner } from './src/components/common/OtaUpdateBanner';
 
 export default function App() {
   React.useEffect(() => {
@@ -55,21 +56,6 @@ export default function App() {
       try {
         window.history.replaceState(null, '', '/');
       } catch (e) {}
-    } else {
-      // On native iOS / Android, check for OTA updates and apply automatically
-      (async () => {
-        try {
-          if (!__DEV__) {
-            const update = await Updates.checkForUpdateAsync();
-            if (update.isAvailable) {
-              await Updates.fetchUpdateAsync();
-              await Updates.reloadAsync();
-            }
-          }
-        } catch (e) {
-          // Ignore offline / dev mode errors
-        }
-      })();
     }
   }, []);
 
@@ -79,10 +65,13 @@ export default function App() {
         <AuthProvider>
           <AppProvider>
             <ToastProvider>
-              <NotificationProvider>
-                <RootNavigator />
-                <StatusBar style="dark" />
-              </NotificationProvider>
+              <OtaProvider>
+                <NotificationProvider>
+                  <RootNavigator />
+                  <OtaUpdateBanner />
+                  <StatusBar style="dark" />
+                </NotificationProvider>
+              </OtaProvider>
             </ToastProvider>
           </AppProvider>
         </AuthProvider>

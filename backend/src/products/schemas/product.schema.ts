@@ -81,6 +81,12 @@ export class Product {
   @Prop({ default: '', trim: true, index: true })
   barcode: string;
 
+  @Prop({ default: 'ALL', enum: ['ALL', 'SPECIFIC'], index: true })
+  storeScope?: 'ALL' | 'SPECIFIC';
+
+  @Prop({ type: [Types.ObjectId], ref: 'Store', default: [], index: true })
+  assignedStoreIds?: Types.ObjectId[];
+
   @Prop({ default: true })
   isActive: boolean;
 }
@@ -106,6 +112,9 @@ export class ProductVariant {
 
   @Prop({ default: 0 })
   discountPercent: number;
+
+  @Prop({ default: 50 })
+  stock: number;
 
   @Prop({ default: true })
   isDefault: boolean;

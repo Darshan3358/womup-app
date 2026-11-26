@@ -5,6 +5,8 @@ import { useAuth } from '../context/AuthContext';
 import { api, API_BASE_URL } from '../services/api';
 import io, { Socket } from 'socket.io-client';
 import { normalizeKycStatus } from '../services/kycService';
+import { AuthService } from '../services/authService';
+import { StorageService } from '../services/storageService';
 
 export type BannerVariant = 'WARNING' | 'INFO' | 'SUCCESS' | 'ERROR';
 
@@ -27,7 +29,7 @@ export interface KYCBannerData {
 const DISMISS_KEY = '@womup_kyc_banner_dismissed';
 
 export const useKYCBanner = () => {
-  const { user } = useApp();
+  const { user, setUser } = useApp();
   const { isAuthenticated } = useAuth();
   const [bannerData, setBannerData] = useState<KYCBannerData | null>(null);
   const [isVisible, setIsVisible] = useState<boolean>(true);
@@ -159,25 +161,52 @@ export const useKYCBanner = () => {
     fetchBanner();
   }, [fetchBanner]);
 
-  // Real-time WebSocket listener for immediate banner status change
+  // Real-time WebSocket listener for immediate banner + user profile sync
   useEffect(() => {
     if (!isAuthenticated) return;
 
+    const currentUserId = user?.id || (user as any)?._id;
+    const baseUrl = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
     let socket: Socket | null = null;
+
+    const handleKycChanged = () => {
+      fetchBanner();
+      AuthService.getProfile()
+        .then((profile) => {
+          if (profile) {
+            setUser((prev) => {
+              const merged = {
+                ...prev,
+                ...profile,
+                savedAddresses:
+                  prev.savedAddresses && prev.savedAddresses.length > 0
+                    ? prev.savedAddresses
+                    : profile.savedAddresses,
+              };
+              StorageService.saveItem(StorageService.KEYS.USER, merged);
+              return merged;
+            });
+          }
+        })
+        .catch(() => {});
+    };
+
     try {
-      socket = io('https://womup-app-uquz.onrender.com', { transports: ['websocket'] });
-      socket.on('customer_kyc_approved', () => {
-        fetchBanner();
+      socket = io(`${baseUrl}/tracking`, { transports: ['websocket', 'polling'] });
+      socket.on('connect', () => {
+        if (currentUserId) {
+          socket?.emit('join_user', { userId: currentUserId });
+        }
       });
-      socket.on('kyc_rejected', () => {
-        fetchBanner();
-      });
+      socket.on('customer_kyc_approved', handleKycChanged);
+      socket.on('kyc_approved', handleKycChanged);
+      socket.on('kyc_rejected', handleKycChanged);
     } catch (_) {}
 
     return () => {
       if (socket) socket.disconnect();
     };
-  }, [isAuthenticated, fetchBanner]);
+  }, [isAuthenticated, user?.id, (user as any)?._id, fetchBanner, setUser]);
 
   const dismissBanner = async () => {
     setIsVisible(false);

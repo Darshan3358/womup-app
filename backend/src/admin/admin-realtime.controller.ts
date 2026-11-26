@@ -286,7 +286,14 @@ export class AdminRealtimeController {
         };
       });
 
-      const products = await db.collection('products').find({}).toArray();
+      const rawProducts = await db.collection('products').find({}).toArray();
+      const products = rawProducts.map((p: any) => ({
+        ...p,
+        storeScope: p.storeScope === 'SPECIFIC' ? 'SPECIFIC' : 'ALL',
+        assignedStoreIds: Array.isArray(p.assignedStoreIds)
+          ? p.assignedStoreIds.map((id: any) => id?.toString?.() || String(id))
+          : [],
+      }));
       const categories = await db.collection('categories').find({}).toArray();
       const rawAreas = await db.collection('areas').find({ isActive: { $ne: false } }).toArray();
       const rawStores = await db.collection('stores').find({
@@ -359,7 +366,13 @@ export class AdminRealtimeController {
         };
       });
 
-      const inventory = await db.collection('inventory').find({}).toArray();
+      const rawInventory = await db.collection('inventory').find({}).toArray();
+      const inventory = rawInventory.map((inv: any) => ({
+        ...inv,
+        availableQty: Math.max(0, Number(inv.availableQty ?? inv.stock ?? 0)),
+        stock: Math.max(0, Number(inv.stock ?? inv.availableQty ?? 0)),
+        isHiddenInStore: Boolean(inv.isHiddenInStore),
+      }));
       const coinTransactions = await db.collection('coin_transactions').find({}).sort({ createdAt: -1 }).limit(500).toArray();
       const coupons = await db.collection('coupons').find({}).toArray();
       const orderHistory = await db.collection('order_status_history').find({}).sort({ timestamp: -1, createdAt: -1 }).limit(500).toArray();
@@ -888,6 +901,131 @@ export class AdminRealtimeController {
     return { success: true, message: 'Price updated and broadcasted to all apps' };
   }
 
+  private parseAssignedStoreIds(rawIds: any, singleId?: any): { objIds: Types.ObjectId[]; strIds: string[] } {
+    const rawList: string[] = [];
+    if (Array.isArray(rawIds)) {
+      for (const item of rawIds) {
+        if (item) rawList.push(item.toString ? item.toString() : String(item));
+      }
+    }
+    if (singleId) {
+      rawList.push(singleId.toString ? singleId.toString() : String(singleId));
+    }
+    const strIds = Array.from(new Set(rawList.map((s) => s.trim()).filter(Boolean)));
+    const objIds = strIds.filter((s) => Types.ObjectId.isValid(s)).map((s) => new Types.ObjectId(s));
+    return { objIds, strIds };
+  }
+
+  private async ensureUniqueProductSlug(db: any, baseName: string, excludeId?: any): Promise<string> {
+    const slugBase = (baseName || 'product')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '') || 'product';
+    let slug = slugBase;
+    let counter = 1;
+    while (true) {
+      const existing = await db.collection('products').findOne({
+        slug,
+        ...(excludeId ? { _id: { $ne: excludeId } } : {}),
+      });
+      if (!existing) return slug;
+      slug = `${slugBase}-${counter++}`;
+    }
+  }
+
+  private async ensureUniqueVariantSku(db: any, desiredSku: string, suffixSeed: string): Promise<string> {
+    const base = (desiredSku || `SKU-${suffixSeed}`).trim();
+    const existing = await db.collection('product_variants').findOne({ sku: base });
+    if (!existing) return base;
+    return `${base}-${Date.now().toString().slice(-5)}-${Math.floor(10 + Math.random() * 90)}`;
+  }
+
+  private async syncProductInventoryForScope(
+    db: any,
+    params: {
+      productId: any;
+      productName: string;
+      category: string;
+      variants: Array<{ _id: any; sku?: string; weightOrVolume?: string; stock?: number }>;
+      defaultStock: number;
+      shelfLocation: string;
+      storeScope: 'ALL' | 'SPECIFIC';
+      assignedStoreObjIds: Types.ObjectId[];
+      assignedStoreStrIds: string[];
+      pruneOtherStores?: boolean;
+    },
+  ) {
+    const now = new Date();
+    const prodIdStr = params.productId.toString();
+    const prodCandidates: any[] = [params.productId, prodIdStr];
+
+    let targetStores: any[] = [];
+    if (params.storeScope === 'SPECIFIC') {
+      const targetCandidates: any[] = [...params.assignedStoreObjIds, ...params.assignedStoreStrIds];
+      if (targetCandidates.length > 0) {
+        targetStores = await db.collection('stores').find({
+          _id: { $in: targetCandidates },
+          deletedAt: { $exists: false },
+        }).toArray();
+      }
+      if (params.pruneOtherStores) {
+        await db.collection('inventory').deleteMany({
+          productId: { $in: prodCandidates },
+          storeId: { $nin: targetCandidates },
+        });
+      }
+    } else {
+      targetStores = await db.collection('stores').find({
+        isActive: { $ne: false },
+        deletedAt: { $exists: false },
+      }).toArray();
+    }
+
+    if (targetStores.length === 0) return;
+
+    const variantEntries = params.variants.length > 0 ? params.variants : [null];
+    for (const store of targetStores) {
+      const storeIdObj = store._id;
+      const storeIdStr = store._id.toString();
+      for (const v of variantEntries) {
+        const varIdObj = v?._id;
+        const varIdStr = v?._id?.toString?.();
+        const invStock = Math.max(0, Number(v?.stock ?? params.defaultStock ?? 50));
+
+        const query: any = {
+          storeId: { $in: [storeIdObj, storeIdStr] },
+          productId: { $in: prodCandidates },
+        };
+        if (varIdObj) {
+          query.variantId = { $in: [varIdObj, varIdStr] };
+        }
+
+        const existing = await db.collection('inventory').findOne(query);
+        if (!existing) {
+          await db.collection('inventory').insertOne({
+            storeId: storeIdObj,
+            storeName: store.name || 'Dark Store',
+            warehouseId: storeIdObj,
+            productId: params.productId,
+            productName: params.productName,
+            category: params.category || 'General',
+            ...(varIdObj ? { variantId: varIdObj } : {}),
+            sku: v?.sku || `SKU-${prodIdStr.slice(-6)}`,
+            packSize: v?.weightOrVolume || '1 unit',
+            availableQty: invStock,
+            stock: invStock,
+            reservedQty: 0,
+            soldQty: 0,
+            lowStockThreshold: 10,
+            shelfLocation: params.shelfLocation || 'A1-R2',
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+      }
+    }
+  }
+
   /**
    * Create Product in Master Catalog
    */
@@ -899,54 +1037,150 @@ export class AdminRealtimeController {
       description,
       category,
       categoryId,
+      brand,
       sellingPrice,
       mrp,
       costPrice,
       stock,
+      stockKg,
       image,
       imageUrl,
+      images,
+      thumbnailUrl,
       unit,
       unitWeight,
       barcode,
       sku,
+      shelfLocation,
+      variants,
+      storeScope,
+      assignedStoreId,
+      assignedStoreIds,
     } = body;
 
+    const normalizedScope: 'ALL' | 'SPECIFIC' = storeScope === 'SPECIFIC' ? 'SPECIFIC' : 'ALL';
+    const { objIds: storeObjIds, strIds: storeStrIds } = this.parseAssignedStoreIds(
+      assignedStoreIds,
+      assignedStoreId,
+    );
+
+    if (normalizedScope === 'SPECIFIC' && storeStrIds.length === 0) {
+      return {
+        success: false,
+        error: 'Please select a specific dark store when Particular Store is chosen',
+      };
+    }
+
+    const inputVariants = Array.isArray(variants) ? variants : [];
+    const primaryInputVar = inputVariants.find((v: any) => v.isDefault) || inputVariants[0];
+    const resolvedPrice = Number(sellingPrice ?? primaryInputVar?.sellingPrice ?? 0);
+    const resolvedMrp = Number(mrp ?? primaryInputVar?.mrp ?? resolvedPrice);
+    const resolvedStock = Number(stock ?? stockKg ?? primaryInputVar?.stock ?? 50);
+    const cleanShelf = (shelfLocation || 'A1-R2').toString().trim().toUpperCase();
+    const resolvedImg =
+      (imageUrl || image || '').toString().trim() ||
+      'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&q=80';
+
+    const resolvedCatId =
+      categoryId && Types.ObjectId.isValid(String(categoryId))
+        ? new Types.ObjectId(String(categoryId))
+        : categoryId || 'Groceries';
+
+    const uniqueSlug = await this.ensureUniqueProductSlug(db, name || 'New Product');
+    const now = new Date();
+
     const newProd: any = {
-      name: name || 'New Product',
-      description: description || '',
+      name: (name || 'New Product').toString().trim(),
+      slug: uniqueSlug,
+      brand: (brand || 'Womup Fresh').toString().trim(),
+      description: (description || '').toString().trim(),
       category: category || 'Groceries',
-      categoryId: categoryId || 'Groceries',
-      sellingPrice: Number(sellingPrice || 0),
-      mrp: Number(mrp || sellingPrice || 0),
+      categoryId: resolvedCatId,
+      quantityLabel: primaryInputVar?.weightOrVolume || unitWeight || '1 unit',
+      sellingPrice: resolvedPrice,
+      mrp: resolvedMrp,
+      discountPercent: resolvedMrp > resolvedPrice && resolvedMrp > 0
+        ? Math.round(((resolvedMrp - resolvedPrice) / resolvedMrp) * 100)
+        : 0,
       costPrice: Number(costPrice || 0),
-      stock: Number(stock || 0),
-      imageUrl: imageUrl || image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&q=80',
-      image: imageUrl || image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&q=80',
-      images: [imageUrl || image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&q=80'],
-      thumbnailUrl: imageUrl || image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&q=80',
-      unit: unit || 'kg',
-      unitWeight: unitWeight || '1 kg',
+      stock: resolvedStock,
+      shelfLocation: cleanShelf,
+      imageUrl: resolvedImg,
+      image: resolvedImg,
+      images: Array.isArray(images) && images.length > 0 ? images : [resolvedImg],
+      thumbnailUrl: (thumbnailUrl || resolvedImg).toString().trim(),
+      unit: unit || 'unit',
+      unitWeight: primaryInputVar?.weightOrVolume || unitWeight || '1 unit',
       barcode: barcode || 'BAR_' + Date.now(),
-      sku: sku || 'SKU_' + Date.now(),
+      sku: sku || primaryInputVar?.sku || 'SKU_' + Date.now(),
+      storeScope: normalizedScope,
+      assignedStoreIds: normalizedScope === 'SPECIFIC' ? storeObjIds : [],
       isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: now,
+      updatedAt: now,
     };
 
     const res = await db.collection('products').insertOne(newProd);
     const prodId = res.insertedId;
 
-    // Create default 1 unit variant
-    await db.collection('product_variants').insertOne({
+    const insertedVariants: any[] = [];
+    if (inputVariants.length > 0) {
+      for (let i = 0; i < inputVariants.length; i++) {
+        const v = inputVariants[i];
+        const vPrice = Number(v.sellingPrice ?? resolvedPrice);
+        const vMrp = Number(v.mrp ?? vPrice);
+        const vStock = Number(v.stock ?? resolvedStock);
+        const uniqueSku = await this.ensureUniqueVariantSku(
+          db,
+          v.sku || `${uniqueSlug}-${(v.weightOrVolume || 'unit').replace(/[^a-z0-9]+/gi, '').toLowerCase()}`,
+          `${prodId.toString().slice(-5)}-${i}`,
+        );
+        const variantDoc = {
+          productId: prodId,
+          sku: uniqueSku,
+          weightOrVolume: (v.weightOrVolume || v.packSize || '1 unit').toString().trim(),
+          mrp: vMrp,
+          sellingPrice: vPrice,
+          discountPercent: vMrp > vPrice && vMrp > 0 ? Math.round(((vMrp - vPrice) / vMrp) * 100) : 0,
+          stock: vStock,
+          isDefault: v.isDefault !== undefined ? Boolean(v.isDefault) : i === 0,
+          isActive: v.isActive !== false,
+          createdAt: now,
+          updatedAt: now,
+        };
+        const vRes = await db.collection('product_variants').insertOne(variantDoc);
+        insertedVariants.push({ ...variantDoc, _id: vRes.insertedId, id: vRes.insertedId.toString() });
+      }
+    } else {
+      const uniqueSku = await this.ensureUniqueVariantSku(db, newProd.sku, prodId.toString().slice(-6));
+      const variantDoc = {
+        productId: prodId,
+        sku: uniqueSku,
+        weightOrVolume: newProd.unitWeight || '1 unit',
+        sellingPrice: resolvedPrice,
+        mrp: resolvedMrp,
+        discountPercent: newProd.discountPercent,
+        stock: resolvedStock,
+        isDefault: true,
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      };
+      const vRes = await db.collection('product_variants').insertOne(variantDoc);
+      insertedVariants.push({ ...variantDoc, _id: vRes.insertedId, id: vRes.insertedId.toString() });
+    }
+
+    await this.syncProductInventoryForScope(db, {
       productId: prodId,
-      name: 'Standard Unit',
-      weight: unitWeight || '1 kg',
-      sellingPrice: Number(sellingPrice || 0),
-      mrp: Number(mrp || sellingPrice || 0),
-      stock: Number(stock || 0),
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      productName: newProd.name,
+      category: newProd.category,
+      variants: insertedVariants,
+      defaultStock: resolvedStock,
+      shelfLocation: cleanShelf,
+      storeScope: normalizedScope,
+      assignedStoreObjIds: storeObjIds,
+      assignedStoreStrIds: storeStrIds,
+      pruneOtherStores: false,
     });
 
     clearHomeCache();
@@ -955,16 +1189,27 @@ export class AdminRealtimeController {
       this.trackingGateway?.server?.emit('catalog:updated', {
         type: 'PRODUCT_CREATED',
         productId: prodId.toString(),
-        product: { ...newProd, _id: prodId.toString() },
+        storeScope: normalizedScope,
+        assignedStoreIds: storeStrIds,
+        product: { ...newProd, _id: prodId.toString(), variants: insertedVariants },
         timestamp: new Date().toISOString(),
       });
       this.trackingGateway?.server?.emit('inventory_update', {
         productId: prodId.toString(),
-        newAvailableStock: Number(stock || 0),
+        newAvailableStock: resolvedStock,
       });
     } catch (_) {}
 
-    return { success: true, data: { ...newProd, _id: prodId.toString(), id: prodId.toString() } };
+    return {
+      success: true,
+      data: {
+        ...newProd,
+        _id: prodId.toString(),
+        id: prodId.toString(),
+        assignedStoreIds: storeStrIds,
+        variants: insertedVariants,
+      },
+    };
   }
 
   /**
@@ -981,31 +1226,152 @@ export class AdminRealtimeController {
 
     const updateSet: any = { updatedAt: new Date() };
     if (body.name !== undefined) updateSet.name = body.name;
+    if (body.brand !== undefined) updateSet.brand = body.brand;
     if (body.description !== undefined) updateSet.description = body.description;
     if (body.category !== undefined) updateSet.category = body.category;
-    if (body.categoryId !== undefined) updateSet.categoryId = body.categoryId;
+    if (body.categoryId !== undefined) {
+      updateSet.categoryId = Types.ObjectId.isValid(String(body.categoryId))
+        ? new Types.ObjectId(String(body.categoryId))
+        : body.categoryId;
+    }
     if (body.sellingPrice !== undefined) updateSet.sellingPrice = Number(body.sellingPrice);
     if (body.mrp !== undefined) updateSet.mrp = Number(body.mrp);
     if (body.costPrice !== undefined) updateSet.costPrice = Number(body.costPrice);
-    if (body.stock !== undefined) updateSet.stock = Number(body.stock);
+    const preserveGlobalStock = Boolean(body.preserveGlobalStock);
+    if (!preserveGlobalStock && (body.stock !== undefined || body.stockKg !== undefined)) {
+      updateSet.stock = Number(body.stock ?? body.stockKg);
+    }
+    if (body.shelfLocation !== undefined) {
+      updateSet.shelfLocation = String(body.shelfLocation).trim().toUpperCase();
+    }
     if (body.imageUrl !== undefined || body.image !== undefined) {
       const img = (body.imageUrl || body.image || '').trim();
       updateSet.imageUrl = img;
       updateSet.image = img;
-      updateSet.images = [img];
+      updateSet.images = img ? [img] : [];
       updateSet.thumbnailUrl = img;
     }
     if (body.unit !== undefined) updateSet.unit = body.unit;
     if (body.unitWeight !== undefined) updateSet.unitWeight = body.unitWeight;
     if (body.isActive !== undefined) updateSet.isActive = Boolean(body.isActive);
 
+    const hasScopeUpdate = body.storeScope !== undefined || body.assignedStoreIds !== undefined || body.assignedStoreId !== undefined;
+    let effectiveScope: 'ALL' | 'SPECIFIC' = prod.storeScope === 'SPECIFIC' ? 'SPECIFIC' : 'ALL';
+    let storeObjIds: Types.ObjectId[] = Array.isArray(prod.assignedStoreIds)
+      ? prod.assignedStoreIds.map((sid: any) => Types.ObjectId.isValid(String(sid)) ? new Types.ObjectId(String(sid)) : sid)
+      : [];
+    let storeStrIds: string[] = storeObjIds.map((sid) => sid.toString());
+
+    if (hasScopeUpdate) {
+      effectiveScope = body.storeScope === 'SPECIFIC' ? 'SPECIFIC' : 'ALL';
+      if (effectiveScope === 'SPECIFIC') {
+        const parsed = this.parseAssignedStoreIds(body.assignedStoreIds, body.assignedStoreId);
+        if (parsed.strIds.length === 0) {
+          return { success: false, error: 'Please select a specific dark store' };
+        }
+        storeObjIds = parsed.objIds;
+        storeStrIds = parsed.strIds;
+        updateSet.storeScope = 'SPECIFIC';
+        updateSet.assignedStoreIds = storeObjIds;
+      } else {
+        storeObjIds = [];
+        storeStrIds = [];
+        updateSet.storeScope = 'ALL';
+        updateSet.assignedStoreIds = [];
+      }
+    }
+
     await db.collection('products').updateOne({ _id: prod._id }, { $set: updateSet });
 
-    if (body.sellingPrice !== undefined) {
+    const updatedVariantsForInv: any[] = [];
+    if (Array.isArray(body.variants) && body.variants.length > 0) {
+      const incomingIds: Types.ObjectId[] = [];
+      for (let i = 0; i < body.variants.length; i++) {
+        const v = body.variants[i];
+        const vPrice = Number(v.sellingPrice ?? updateSet.sellingPrice ?? prod.sellingPrice ?? 0);
+        const vMrp = Number(v.mrp ?? vPrice);
+        const vStock = Number(v.stock ?? updateSet.stock ?? prod.stock ?? 50);
+        const rawVarId = v.id || v._id;
+
+        if (rawVarId && Types.ObjectId.isValid(String(rawVarId))) {
+          const vObjId = new Types.ObjectId(String(rawVarId));
+          incomingIds.push(vObjId);
+          await db.collection('product_variants').updateOne(
+            { _id: vObjId, productId: prod._id },
+            {
+              $set: {
+                ...(v.sku ? { sku: String(v.sku).trim() } : {}),
+                weightOrVolume: String(v.weightOrVolume || v.packSize || '1 unit').trim(),
+                sellingPrice: vPrice,
+                mrp: vMrp,
+                discountPercent: vMrp > vPrice && vMrp > 0 ? Math.round(((vMrp - vPrice) / vMrp) * 100) : 0,
+                ...(preserveGlobalStock ? {} : { stock: vStock }),
+                isDefault: v.isDefault !== undefined ? Boolean(v.isDefault) : i === 0,
+                isActive: v.isActive !== false,
+                updatedAt: new Date(),
+              },
+            },
+          );
+          updatedVariantsForInv.push({
+            _id: vObjId,
+            sku: v.sku,
+            weightOrVolume: v.weightOrVolume || v.packSize || '1 unit',
+            stock: vStock,
+          });
+        } else {
+          const uniqueSku = await this.ensureUniqueVariantSku(
+            db,
+            v.sku || `${prod.slug || prod._id.toString().slice(-6)}-${(v.weightOrVolume || 'unit').replace(/[^a-z0-9]+/gi, '').toLowerCase()}`,
+            `${prod._id.toString().slice(-5)}-${i}`,
+          );
+          const newVarDoc = {
+            productId: prod._id,
+            sku: uniqueSku,
+            weightOrVolume: String(v.weightOrVolume || v.packSize || '1 unit').trim(),
+            mrp: vMrp,
+            sellingPrice: vPrice,
+            discountPercent: vMrp > vPrice && vMrp > 0 ? Math.round(((vMrp - vPrice) / vMrp) * 100) : 0,
+            stock: vStock,
+            isDefault: v.isDefault !== undefined ? Boolean(v.isDefault) : i === 0,
+            isActive: v.isActive !== false,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+          const vInsert = await db.collection('product_variants').insertOne(newVarDoc);
+          incomingIds.push(vInsert.insertedId);
+          updatedVariantsForInv.push({ ...newVarDoc, _id: vInsert.insertedId });
+        }
+      }
+      if (incomingIds.length > 0) {
+        await db.collection('product_variants').updateMany(
+          { productId: prod._id, _id: { $nin: incomingIds } },
+          { $set: { isActive: false, updatedAt: new Date() } },
+        );
+      }
+    } else if (body.sellingPrice !== undefined) {
       await db.collection('product_variants').updateMany(
         { productId: prod._id },
         { $set: { sellingPrice: Number(body.sellingPrice), updatedAt: new Date() } },
       );
+    }
+
+    if (hasScopeUpdate) {
+      const variantsForInv =
+        updatedVariantsForInv.length > 0
+          ? updatedVariantsForInv
+          : await db.collection('product_variants').find({ productId: prod._id, isActive: { $ne: false } }).toArray();
+      await this.syncProductInventoryForScope(db, {
+        productId: prod._id,
+        productName: updateSet.name || prod.name,
+        category: updateSet.category || prod.category || 'General',
+        variants: variantsForInv,
+        defaultStock: Number(updateSet.stock ?? prod.stock ?? 50),
+        shelfLocation: updateSet.shelfLocation || prod.shelfLocation || 'A1-R2',
+        storeScope: effectiveScope,
+        assignedStoreObjIds: storeObjIds,
+        assignedStoreStrIds: storeStrIds,
+        pruneOtherStores: effectiveScope === 'SPECIFIC',
+      });
     }
 
     clearHomeCache();
@@ -1076,6 +1442,98 @@ export class AdminRealtimeController {
     } catch (_) {}
 
     return { success: true, message: 'Product deleted successfully' };
+  }
+
+  private async executeRemoveProductFromStore(id: string, storeId: string) {
+    const db = this.db;
+    const storeIdStr = (storeId || '').toString().trim();
+    if (!storeIdStr) {
+      return { success: false, error: 'storeId is required' };
+    }
+    const pObjId: any = Types.ObjectId.isValid(id) ? new Types.ObjectId(id) : id;
+    const prod = await db.collection('products').findOne({ $or: [{ _id: pObjId }, { _id: id }] } as any);
+    if (!prod) {
+      return { success: false, error: 'Product not found' };
+    }
+
+    const storeObjId: any = Types.ObjectId.isValid(storeIdStr) ? new Types.ObjectId(storeIdStr) : storeIdStr;
+    const storeCandidates: any[] = [storeObjId, storeIdStr];
+    const prodCandidates: any[] = [prod._id, prod._id.toString()];
+
+    let remainingIds: string[] = [];
+    if (prod.storeScope !== 'SPECIFIC') {
+      const allActiveStores = await db.collection('stores').find({
+        isActive: { $ne: false },
+        deletedAt: { $exists: false },
+      }).toArray();
+      remainingIds = allActiveStores
+        .map((s: any) => s._id?.toString?.() || String(s._id))
+        .filter((sid: string) => sid && sid !== storeIdStr);
+    } else {
+      const currentIds = Array.isArray(prod.assignedStoreIds)
+        ? prod.assignedStoreIds.map((sid: any) => sid?.toString?.() || String(sid)).filter(Boolean)
+        : [];
+      remainingIds = currentIds.filter((sid: string) => sid !== storeIdStr);
+    }
+
+    const { objIds: remainingObjIds, strIds: remainingStrIds } = this.parseAssignedStoreIds(remainingIds);
+    await db.collection('products').updateOne(
+      { _id: prod._id },
+      {
+        $set: {
+          storeScope: 'SPECIFIC',
+          assignedStoreIds: remainingObjIds,
+          updatedAt: new Date(),
+        },
+      },
+    );
+
+    await db.collection('inventory').deleteMany({
+      productId: { $in: prodCandidates },
+      storeId: { $in: storeCandidates },
+    } as any);
+
+    clearHomeCache();
+
+    try {
+      const nowIso = new Date().toISOString();
+      this.trackingGateway?.server?.emit('catalog:updated', {
+        type: 'PRODUCT_REMOVED_FROM_STORE',
+        productId: prod._id.toString(),
+        storeId: storeIdStr,
+        storeScope: 'SPECIFIC',
+        assignedStoreIds: remainingStrIds,
+        timestamp: nowIso,
+      });
+      this.trackingGateway?.server?.emit('inventory_update', {
+        productId: prod._id.toString(),
+        storeId: storeIdStr,
+        newAvailableStock: 0,
+        timestamp: nowIso,
+      });
+    } catch (_) {}
+
+    return {
+      success: true,
+      message: 'Product removed from this store only',
+      productId: prod._id.toString(),
+      storeId: storeIdStr,
+      storeScope: 'SPECIFIC',
+      assignedStoreIds: remainingStrIds,
+    };
+  }
+
+  /**
+   * Safe Store-Level Remove: Removes product visibility & inventory strictly from one dark store
+   */
+  @Delete(['api/admin/catalog/products/:id/store/:storeId', 'api/catalog/products/:id/store/:storeId'])
+  async removeCatalogProductFromStoreDelete(@Param('id') id: string, @Param('storeId') storeId: string) {
+    return this.executeRemoveProductFromStore(id, storeId);
+  }
+
+  @Post(['api/admin/catalog/products/:id/remove-store', 'api/catalog/products/:id/remove-store'])
+  async removeCatalogProductFromStorePost(@Param('id') id: string, @Body('storeId') storeId: string) {
+    return this.executeRemoveProductFromStore(id, storeId);
   }
 
   /**
@@ -1346,54 +1804,72 @@ export class AdminRealtimeController {
   @Post(['api/admin/stores/inventory/adjust', 'api/stores/inventory/adjust'])
   async adjustStoreInventoryStock(@Body() body: any) {
     const db = this.db;
-    const { storeId, productId, deltaQty, reason, inventoryId } = body;
+    const { storeId, productId, variantId, deltaQty, reason, inventoryId, isHiddenInStore } = body;
     const delta = Number(deltaQty || 0);
 
     const pObjId = productId && Types.ObjectId.isValid(productId) ? new Types.ObjectId(productId) : productId;
     const sObjId = storeId && Types.ObjectId.isValid(storeId) ? new Types.ObjectId(storeId) : storeId;
+    const vObjId = variantId && Types.ObjectId.isValid(variantId) ? new Types.ObjectId(variantId) : variantId;
 
     const filter: any = {};
     if (inventoryId && Types.ObjectId.isValid(inventoryId)) {
       filter._id = new Types.ObjectId(inventoryId);
     } else if (pObjId && sObjId) {
-      filter.$or = [
-        { productId: pObjId, storeId: sObjId },
-        { productId: productId.toString(), storeId: storeId.toString() },
-        { productId: pObjId, storeId: storeId.toString() },
-        { productId: productId.toString(), storeId: sObjId },
-      ];
+      const storeIn = sObjId !== storeId ? [sObjId, storeId.toString()] : [sObjId];
+      const prodIn = pObjId !== productId ? [pObjId, productId.toString()] : [pObjId];
+      filter.storeId = { $in: storeIn };
+      filter.productId = { $in: prodIn };
+      if (vObjId) {
+        const varIn = vObjId !== variantId ? [vObjId, variantId.toString()] : [vObjId];
+        filter.variantId = { $in: varIn };
+      }
     } else if (pObjId) {
       filter.$or = [{ productId: pObjId }, { productId: productId.toString() }];
     }
 
     const invItem = await db.collection('inventory').findOne(filter);
-    const currentStock = invItem ? Number(invItem.stock || invItem.availableQty || 0) : 0;
+    const prodDoc = pObjId ? await db.collection('products').findOne({ $or: [{ _id: pObjId }, { _id: productId }] }) : null;
+    const currentStock = invItem
+      ? Math.max(0, Number(invItem.availableQty ?? invItem.stock ?? 0))
+      : Math.max(0, Number(prodDoc?.stock ?? 50));
     const newStock = Math.max(0, currentStock + delta);
 
     if (invItem) {
+      const setPayload: any = {
+        stock: newStock,
+        availableQty: newStock,
+        updatedAt: new Date(),
+      };
+      if (isHiddenInStore !== undefined) {
+        setPayload.isHiddenInStore = Boolean(isHiddenInStore);
+      }
       await db.collection('inventory').updateOne(
         { _id: invItem._id },
-        {
-          $set: {
-            stock: newStock,
-            availableQty: newStock,
-            updatedAt: new Date(),
-          },
-        },
+        { $set: setPayload },
       );
     } else if (pObjId) {
+      const storeDoc = sObjId ? await db.collection('stores').findOne({ _id: sObjId }) : null;
       await db.collection('inventory').insertOne({
         productId: pObjId,
+        productName: prodDoc?.name || 'Product',
         storeId: sObjId || null,
+        storeName: storeDoc?.name || 'Dark Store',
+        warehouseId: sObjId || null,
+        ...(vObjId ? { variantId: vObjId } : {}),
         stock: newStock,
         availableQty: newStock,
         reservedQty: 0,
+        soldQty: 0,
+        lowStockThreshold: 10,
+        shelfLocation: prodDoc?.shelfLocation || 'A1-R2',
+        isHiddenInStore: Boolean(isHiddenInStore),
         createdAt: new Date(),
         updatedAt: new Date(),
       });
     }
 
-    if (pObjId) {
+    // Only update master product.stock when no specific store was targeted (store-wise adjustments stay isolated per dark store)
+    if (!storeId && pObjId) {
       try {
         await db.collection('products').updateOne(
           { $or: [{ _id: pObjId }, { _id: productId }] },
@@ -1407,6 +1883,7 @@ export class AdminRealtimeController {
     try {
       const payload = {
         productId: productId?.toString(),
+        variantId: variantId?.toString(),
         storeId: storeId?.toString(),
         newAvailableStock: newStock,
         newReservedStock: invItem?.reservedQty || 0,
@@ -2222,24 +2699,187 @@ export class AdminRealtimeController {
   @Post(['api/admin/stores', 'admin/stores', 'api/v1/admin/stores'])
   async createStore(@Body() body: any) {
     const db = this.db;
-    const newStore = {
-      name: body.name,
-      code: body.code || 'STR_' + Date.now(),
-      city: body.city || 'Ahmedabad',
-      cityId: body.cityId || null,
-      areaId: body.areaId || null,
+    const storeName = (body.name || 'Wom Up Dark Store').toString().trim();
+    const rawCode = (body.code || `STR_${Date.now()}`).toString().trim().toUpperCase().replace(/\s+/g, '_');
+    const cleanLoginId = (
+      body.loginId ||
+      rawCode.toLowerCase().replace(/[^a-z0-9._-]+/g, '.')
+    ).toString().trim().toLowerCase();
+    const plainPassword = (
+      body.password ||
+      body.loginPassword ||
+      cleanLoginId
+    ).toString().trim();
+    const passwordHash = await bcrypt.hash(plainPassword, 10);
+
+    const lat = Number(body.latitude || 23.0225);
+    const lng = Number(body.longitude || 72.5714);
+    const areaIdRaw = body.areaId || null;
+    const areaObjId = areaIdRaw && Types.ObjectId.isValid(String(areaIdRaw))
+      ? new Types.ObjectId(String(areaIdRaw))
+      : areaIdRaw;
+    const cityIdRaw = body.cityId || null;
+    const cityObjId = cityIdRaw && Types.ObjectId.isValid(String(cityIdRaw))
+      ? new Types.ObjectId(String(cityIdRaw))
+      : cityIdRaw;
+
+    const existingDup = await db.collection('stores').findOne({
+      $or: [{ code: rawCode }, ...(cleanLoginId ? [{ loginId: cleanLoginId }] : [])],
+    });
+    if (existingDup) {
+      return {
+        success: false,
+        error: `A dark store with code "${rawCode}" or loginId "${cleanLoginId}" already exists.`,
+      };
+    }
+
+    const now = new Date();
+    const newStore: any = {
+      name: storeName,
+      code: rawCode,
+      loginId: cleanLoginId,
+      loginPassword: plainPassword,
+      loginPasswordHash: passwordHash,
+      passwordUpdatedAt: now,
+      city: body.city || body.cityName || 'Ahmedabad',
+      cityName: body.cityName || body.city || 'Ahmedabad',
+      cityId: cityObjId || null,
+      areaId: areaObjId || null,
+      areaName: body.areaName || '',
       address: body.address || '',
-      latitude: Number(body.latitude || 23.0225),
-      longitude: Number(body.longitude || 72.5714),
+      pincode: (body.pincode || '380001').toString().trim(),
+      latitude: lat,
+      longitude: lng,
+      location: { type: 'Point', coordinates: [lng, lat] },
+      serviceRadiusKm: Number(body.serviceRadiusKm || 5),
+      estimatedDeliveryMinutes: Number(body.estimatedDeliveryMinutes || 9),
+      openingTime: body.openingTime || '07:00',
+      closingTime: body.closingTime || '23:00',
+      status: 'ACTIVE',
       isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      isOnShift: true,
+      isOnline: true,
+      staffOnShift: 1,
+      staffTotal: 2,
+      createdAt: now,
+      updatedAt: now,
     };
+
     const res = await db.collection('stores').insertOne(newStore);
+    const storeIdObj = res.insertedId;
+    const storeIdStr = storeIdObj.toString();
+
+    // Link back to operating area document if areaId/areaName matched
+    if (areaObjId || body.areaName) {
+      const areaFilter: any = areaObjId
+        ? { $or: [{ _id: areaObjId }, { _id: String(areaIdRaw) }] }
+        : { name: new RegExp(`^${String(body.areaName).trim()}$`, 'i') };
+      await db.collection('areas').updateOne(areaFilter, {
+        $set: {
+          hubStoreId: storeIdObj,
+          darkStore: storeName,
+          updatedAt: now,
+        },
+        $addToSet: { assignedStores: storeIdStr },
+        $inc: { currentStoreCount: 1 },
+      });
+    }
+
+    // Seed independent inventory rows for all Global ('ALL') products & variants
     try {
-      this.trackingGateway?.server?.emit('stores:updated', { ...newStore, id: res.insertedId.toString() });
+      const globalProducts = await db.collection('products').find({
+        isActive: { $ne: false },
+        storeScope: { $ne: 'SPECIFIC' },
+      }).toArray();
+      const prodIds = globalProducts.map((p: any) => p._id);
+      const variants = prodIds.length > 0
+        ? await db.collection('product_variants').find({
+            productId: { $in: [...prodIds, ...prodIds.map((id: any) => id.toString())] },
+            isActive: { $ne: false },
+          }).toArray()
+        : [];
+
+      const varsByProd = new Map<string, any[]>();
+      for (const v of variants) {
+        const pKey = v.productId?.toString();
+        if (!pKey) continue;
+        if (!varsByProd.has(pKey)) varsByProd.set(pKey, []);
+        varsByProd.get(pKey)!.push(v);
+      }
+
+      const invBulk: any[] = [];
+      for (const p of globalProducts) {
+        const pKey = p._id.toString();
+        const pVars = varsByProd.get(pKey) || [];
+        const baseStock = Math.max(0, Number(p.stock ?? 50));
+        if (pVars.length > 0) {
+          for (const v of pVars) {
+            const vStock = Math.max(0, Number(v.stock ?? baseStock));
+            invBulk.push({
+              storeId: storeIdObj,
+              storeName,
+              warehouseId: storeIdObj,
+              productId: p._id,
+              productName: p.name,
+              category: p.category || 'General',
+              variantId: v._id,
+              sku: v.sku || `SKU-${pKey.slice(-6)}`,
+              packSize: v.weightOrVolume || '1 unit',
+              availableQty: vStock,
+              stock: vStock,
+              reservedQty: 0,
+              soldQty: 0,
+              lowStockThreshold: 10,
+              shelfLocation: p.shelfLocation || 'A1-R2',
+              isHiddenInStore: false,
+              createdAt: now,
+              updatedAt: now,
+            });
+          }
+        } else {
+          invBulk.push({
+            storeId: storeIdObj,
+            storeName,
+            warehouseId: storeIdObj,
+            productId: p._id,
+            productName: p.name,
+            category: p.category || 'General',
+            sku: p.sku || `SKU-${pKey.slice(-6)}`,
+            packSize: p.quantityLabel || '1 unit',
+            availableQty: baseStock,
+            stock: baseStock,
+            reservedQty: 0,
+            soldQty: 0,
+            lowStockThreshold: 10,
+            shelfLocation: p.shelfLocation || 'A1-R2',
+            isHiddenInStore: false,
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+      }
+      if (invBulk.length > 0) {
+        await db.collection('inventory').insertMany(invBulk, { ordered: false }).catch(() => {});
+      }
     } catch (_) {}
-    return { success: true, data: { ...newStore, id: res.insertedId.toString() } };
+
+    clearHomeCache();
+
+    try {
+      this.trackingGateway?.server?.emit('stores:updated', { ...newStore, id: storeIdStr });
+      this.trackingGateway?.server?.emit('areas:updated', { areaId: areaIdRaw, storeId: storeIdStr });
+      this.trackingGateway?.server?.emit('catalog:updated', { type: 'STORE_CREATED', storeId: storeIdStr });
+    } catch (_) {}
+
+    return {
+      success: true,
+      data: {
+        ...newStore,
+        _id: storeIdStr,
+        id: storeIdStr,
+        plainPassword,
+      },
+    };
   }
 
   @Post(['api/admin/stores/:id/reset-password', 'admin/stores/:id/reset-password', 'api/v1/admin/stores/:id/reset-password'])

@@ -28,6 +28,7 @@ const CATEGORY_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 const _homeSectionCache = new Map<string, { data: any; ts: number }>();
 const HOME_SECTION_TTL_MS = 30 * 1000; // 30 seconds per store+area combo
+let _activeStoreScopeKey = '';
 
 export function mapRawItemToProduct(item: any): Product {
   const variants: ProductVariantPriced[] = Array.isArray(item.variants)
@@ -37,7 +38,7 @@ export function mapRawItemToProduct(item: any): Product {
         price: Number(v.price ?? v.sellingPrice ?? item.sellingPrice ?? 0),
         mrp: Number(v.mrp ?? item.mrp ?? 0),
         discountPercent: Number(v.discountPercent ?? item.discountPercent ?? 0),
-        stock: Number(v.stock ?? 100),
+        stock: Number(v.stock !== undefined && v.stock !== null ? v.stock : 100),
         isAvailable: v.isAvailable !== false,
         isDefault: !!v.isDefault,
       }))
@@ -70,7 +71,11 @@ export function mapRawItemToProduct(item: any): Product {
     shoppingCoins: item.shoppingCoins || 10,
     rating: Number(Number(item.rating || 4.8).toFixed(1)),
     reviewCount: item.reviewCount || 0,
-    stock: defaultVariant ? defaultVariant.stock : (item.stock || 100),
+    stock: defaultVariant
+      ? defaultVariant.stock
+      : item.stock !== undefined && item.stock !== null
+      ? Number(item.stock)
+      : 100,
     isPopular: item.isPopular || false,
     isDeal: item.isDeal || false,
     deliveryMinutes: item.deliveryMinutes || 9,
@@ -99,6 +104,14 @@ export const ProductService = {
       products: Product[];
     }[];
   } | null> {
+    const scopeKey = `${params.storeId || ''}_${params.areaId || ''}`;
+    if (scopeKey !== _activeStoreScopeKey) {
+      _activeStoreScopeKey = scopeKey;
+      _homeSectionCache.clear();
+      cachedProducts = [];
+      StorageService.removeItem(CACHE_KEYS.CACHED_PRODUCTS).catch(() => {});
+    }
+
     const queryParts: string[] = [];
     if (params.storeId) queryParts.push(`storeId=${encodeURIComponent(params.storeId)}`);
     if (params.areaId) queryParts.push(`areaId=${encodeURIComponent(params.areaId)}`);
@@ -114,12 +127,12 @@ export const ProductService = {
     try {
       let res = await api.request<any>(`/home/sections${qs}`, { method: 'GET', signal });
 
-      // If scoped query returned empty sections or failed, fallback to global /home/sections
-      if ((!res.success || !res.data?.sections || res.data.sections.length === 0) && qs) {
+      // Only fallback to unscoped /home/sections when no store/area filter was requested
+      if ((!res.success || !res.data?.sections || res.data.sections.length === 0) && !params.storeId && !params.areaId && qs) {
         res = await api.request<any>('/home/sections', { method: 'GET' });
       }
 
-      if (res.success && res.data?.sections && res.data.sections.length > 0) {
+      if (res.success && res.data?.sections) {
         const result = {
           hero: res.data.hero || [],
           categories: res.data.categories || [],
@@ -130,7 +143,7 @@ export const ProductService = {
         };
         _homeSectionCache.set(cacheKey, { data: result, ts: Date.now() });
 
-        // Update cachedProducts flat array
+        // Update cachedProducts flat array for the active store scope
         const allProds: Product[] = [];
         const seen = new Set<string>();
         for (const sec of result.sections) {
@@ -141,9 +154,11 @@ export const ProductService = {
             }
           }
         }
+        cachedProducts = allProds;
         if (allProds.length > 0) {
-          cachedProducts = allProds;
           StorageService.saveItem(CACHE_KEYS.CACHED_PRODUCTS, allProds).catch(() => {});
+        } else if (params.storeId) {
+          StorageService.removeItem(CACHE_KEYS.CACHED_PRODUCTS).catch(() => {});
         }
 
         return result;
@@ -198,7 +213,7 @@ export const ProductService = {
         {
           id: 'fast_delivery',
           title: 'Fresh Grocery & Essentials',
-          subtitle: 'In stock at your nearest dark store',
+          subtitle: 'Freshly stocked for fast doorstep delivery',
           icon: '⚡',
           products: fallbackItems.slice(0, 10),
         },
@@ -277,8 +292,12 @@ export const ProductService = {
     return null;
   },
 
-  clearHomeCache() {
+  clearHomeCache(clearCatalog: boolean = false) {
     _homeSectionCache.clear();
+    if (clearCatalog) {
+      cachedProducts = [];
+      StorageService.removeItem(CACHE_KEYS.CACHED_PRODUCTS).catch(() => {});
+    }
   },
 
   async fetchProducts(params: {
@@ -294,6 +313,14 @@ export const ProductService = {
     page?: number;
     limit?: number;
   } = {}): Promise<Product[]> {
+    const scopeKey = `${params.storeId || ''}_${params.areaId || ''}`;
+    if (scopeKey !== _activeStoreScopeKey) {
+      _activeStoreScopeKey = scopeKey;
+      _homeSectionCache.clear();
+      cachedProducts = [];
+      StorageService.removeItem(CACHE_KEYS.CACHED_PRODUCTS).catch(() => {});
+    }
+
     const queryParts: string[] = [];
     if (params.areaId) queryParts.push(`areaId=${encodeURIComponent(params.areaId)}`);
     if (params.storeId) queryParts.push(`storeId=${encodeURIComponent(params.storeId)}`);
@@ -315,11 +342,15 @@ export const ProductService = {
     if (res.success && res.data?.items) {
       const mapped: Product[] = res.data.items.map(mapRawItemToProduct);
 
-      // If fetching general catalog, update cachedProducts only when non-empty so we never wipe the catalog
+      // Update cachedProducts when fetching general catalog (including empty scoped store catalogs)
       if (!params.categoryId && (!params.categoryIds || params.categoryIds.length === 0) && !params.search) {
-        if (mapped.length > 0) {
+        if (mapped.length > 0 || params.storeId) {
           cachedProducts = mapped;
-          StorageService.saveItem(CACHE_KEYS.CACHED_PRODUCTS, mapped).catch(() => {});
+          if (mapped.length > 0) {
+            StorageService.saveItem(CACHE_KEYS.CACHED_PRODUCTS, mapped).catch(() => {});
+          } else {
+            StorageService.removeItem(CACHE_KEYS.CACHED_PRODUCTS).catch(() => {});
+          }
         }
       }
       return mapped;
@@ -433,6 +464,9 @@ export const ProductService = {
         storeId,
         limit: 100,
       });
+      if (storeId) {
+        return server;
+      }
       const map = new Map<string, Product>();
       local.forEach((p) => map.set(p.id, p));
       server.forEach((p) => map.set(p.id, p));

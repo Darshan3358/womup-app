@@ -183,19 +183,24 @@ export const InventoryScreen: React.FC = () => {
     }
   }, [availableAreas, selectedAreaId, setSelectedZone]);
 
-  // Default to first store in area when area changes
+  // Default to first store in area when area changes and keep AdminStateContext.selectedDarkStore in sync
   useEffect(() => {
     if (areaStores.length > 0) {
-      const exists = areaStores.some((s: any) => String(s.id || s._id) === String(selectedStoreId));
-      if (!exists) {
+      const matched = areaStores.find((s: any) => String(s.id || s._id) === String(selectedStoreId));
+      if (!matched) {
         const firstStoreId = String(areaStores[0].id || (areaStores[0] as any)._id);
         setSelectedStoreId(firstStoreId);
         if (setSelectedDarkStore) setSelectedDarkStore(areaStores[0].name);
+      } else if (setSelectedDarkStore && selectedDarkStore !== matched.name) {
+        setSelectedDarkStore(matched.name);
       }
     } else {
       setSelectedStoreId('');
+      if (setSelectedDarkStore && selectedDarkStore !== '') {
+        setSelectedDarkStore('');
+      }
     }
-  }, [areaStores, selectedStoreId, setSelectedDarkStore]);
+  }, [areaStores, selectedStoreId, selectedDarkStore, setSelectedDarkStore]);
 
   const resolvedStore =
     darkStores.find((s: any) => {
@@ -214,11 +219,11 @@ export const InventoryScreen: React.FC = () => {
   const selectedStore =
     areaStores.find((s: any) => String(s.id || s._id) === String(selectedStoreId)) ||
     areaStores[0] ||
-    resolvedStore;
+    (currentArea ? null : resolvedStore);
 
-  const currentStoreName = selectedStore?.name || resolvedStore?.name || selectedDarkStore || 'Dark Store';
+  const currentStoreName = selectedStore?.name || (currentArea ? `No Dark Store Assigned (${currentArea.name})` : resolvedStore?.name || selectedDarkStore || 'Dark Store');
 
-  // Store-specific inventory lookup map for the currently selected store
+  // Store-specific inventory lookup map for the currently selected store (variant-level + product-level)
   const storeInventoryMap = useMemo(() => {
     const map = new Map<string, any>();
     const activeStoreId = selectedStoreId || (selectedStore ? String(selectedStore.id || (selectedStore as any)._id) : '');
@@ -227,7 +232,13 @@ export const InventoryScreen: React.FC = () => {
       const sId = String(inv.darkStoreId || (inv as any).storeId || '');
       if (sId === activeStoreId) {
         const pId = String(inv.productId || '');
-        if (pId) map.set(pId, inv);
+        const vId = String(inv.variantId || '');
+        if (pId && vId) {
+          map.set(`${pId}_${vId}`, inv);
+          if (!map.has(pId)) map.set(pId, inv);
+        } else if (pId) {
+          map.set(pId, inv);
+        }
       }
     });
     return map;
@@ -262,13 +273,13 @@ export const InventoryScreen: React.FC = () => {
     const vId = String(variant.id || (variant as any)._id || '');
     const pId = prodId || variant.productId || variantToProductMap.get(vId) || '';
 
-    // Store-specific stock check
+    // Store-specific stock check (variant-level first, then product-level fallback)
     let storeStock: number | undefined = undefined;
-    if (pId && storeInventoryMap.has(pId)) {
-      const invDoc = storeInventoryMap.get(pId);
-      if (invDoc && invDoc.availableKg !== undefined) {
-        storeStock = invDoc.availableKg;
-      }
+    const varInvDoc = pId && vId ? storeInventoryMap.get(`${pId}_${vId}`) : undefined;
+    const prodInvDoc = pId ? storeInventoryMap.get(pId) : undefined;
+    const invDoc = varInvDoc || prodInvDoc;
+    if (invDoc && invDoc.availableKg !== undefined) {
+      storeStock = invDoc.availableKg;
     }
 
     if (selectedAreaId !== 'ALL' && currentArea) {
@@ -291,35 +302,48 @@ export const InventoryScreen: React.FC = () => {
     };
   };
 
+  const activeStoreIdStr = selectedStoreId || (selectedStore ? String(selectedStore.id || (selectedStore as any)._id) : '');
+
+  // Products scoped to the currently selected dark store (All Stores + products assigned to this store)
+  const storeScopedProducts = useMemo(() => {
+    return (products || []).filter((p) => {
+      if (p.storeScope !== 'SPECIFIC') return true;
+      if (!activeStoreIdStr) return true;
+      return Array.isArray(p.assignedStoreIds) && p.assignedStoreIds.includes(activeStoreIdStr);
+    });
+  }, [products, activeStoreIdStr]);
+
   // Stock calculations
-  const totalStockUnits = products.reduce((sum, p) => {
-    if (selectedAreaId !== 'ALL' && currentArea && p.variants && p.variants.length > 0) {
+  const totalStockUnits = storeScopedProducts.reduce((sum, p) => {
+    if (p.variants && p.variants.length > 0) {
       const areaVarStock = p.variants.reduce((vSum: number, v: any) => {
-        const vd = getEffectiveVariantData(v);
+        const vd = getEffectiveVariantData(v, p.id);
         return vSum + (vd.stock || 0);
       }, 0);
-      if (areaVarStock > 0) return sum + areaVarStock;
+      return sum + areaVarStock;
     }
-    return sum + (Number(p.stockKg) || 50);
+    const invDoc = storeInventoryMap.get(p.id);
+    const sStock = invDoc?.availableKg !== undefined ? invDoc.availableKg : (Number(p.stockKg) || 50);
+    return sum + sStock;
   }, 0);
 
   const availableStockUnits = Math.round(totalStockUnits * 0.88);
   const reservedStockUnits = totalStockUnits - availableStockUnits;
 
-  const lowStockCount = products.filter((p) => {
+  const lowStockCount = storeScopedProducts.filter((p) => {
     const defaultVar = p.variants?.find((v) => v.isDefault) || p.variants?.[0];
-    const stockVal = defaultVar ? getEffectiveVariantData(defaultVar).stock : (p.stockKg || 50);
+    const stockVal = defaultVar ? getEffectiveVariantData(defaultVar, p.id).stock : (storeInventoryMap.get(p.id)?.availableKg ?? p.stockKg ?? 50);
     return stockVal > 0 && stockVal < 15;
   }).length;
 
-  const outOfStockCount = products.filter((p) => {
+  const outOfStockCount = storeScopedProducts.filter((p) => {
     const defaultVar = p.variants?.find((v) => v.isDefault) || p.variants?.[0];
-    const stockVal = defaultVar ? getEffectiveVariantData(defaultVar).stock : (p.stockKg || 50);
+    const stockVal = defaultVar ? getEffectiveVariantData(defaultVar, p.id).stock : (storeInventoryMap.get(p.id)?.availableKg ?? p.stockKg ?? 50);
     return stockVal <= 0;
   }).length;
 
   // Filtered Products
-  const filteredProducts = products.filter((p) => {
+  const filteredProducts = storeScopedProducts.filter((p) => {
     const q = search.toLowerCase();
     const matchSearch =
       (p.name && p.name.toLowerCase().includes(q)) ||
@@ -333,7 +357,7 @@ export const InventoryScreen: React.FC = () => {
 
     let matchTab = true;
     const defaultVar = p.variants?.find((v) => v.isDefault) || p.variants?.[0];
-    const stockVal = defaultVar ? getEffectiveVariantData(defaultVar).stock : (p.stockKg !== undefined ? p.stockKg : 50);
+    const stockVal = defaultVar ? getEffectiveVariantData(defaultVar, p.id).stock : (storeInventoryMap.get(p.id)?.availableKg ?? p.stockKg ?? 50);
 
     if (activeTab === 'Low Stock') {
       matchTab = stockVal > 0 && stockVal < 15;
@@ -395,8 +419,8 @@ export const InventoryScreen: React.FC = () => {
       const defaultVar = prod.variants?.find((v) => v.isDefault) || prod.variants?.[0];
       const targetStoreId =
         selectedStoreId || (selectedStore ? String(selectedStore.id || (selectedStore as any)._id) : '') || resolvedStore?.id;
-      const invRecord = storeInventoryMap.get(prod.id);
-      const oldStock = defaultVar ? getEffectiveVariantData(defaultVar, prod.id).stock : (prod.stockKg || 50);
+      const invRecord = (defaultVar ? storeInventoryMap.get(`${prod.id}_${defaultVar.id}`) : undefined) || storeInventoryMap.get(prod.id);
+      const oldStock = defaultVar ? getEffectiveVariantData(defaultVar, prod.id).stock : (invRecord?.availableKg ?? prod.stockKg ?? 50);
       const delta = newStock - oldStock;
 
       if (targetStoreId) {
@@ -405,27 +429,14 @@ export const InventoryScreen: React.FC = () => {
           prod.id,
           delta,
           'Manual stock update',
-          invRecord?.id
+          invRecord?.id,
+          defaultVar?.id
         );
-      }
-
-      if (defaultVar) {
-        if (selectedAreaId !== 'ALL' && currentArea) {
-          const curData = getEffectiveVariantData(defaultVar, prod.id);
-          await updateVariantAreaPrice(
-            prod.id,
-            defaultVar.id,
-            currentArea.id || (currentArea as any)._id,
-            curData.price,
-            curData.mrp,
-            newStock
-          );
-        } else {
-          const updatedVariants = (prod.variants || []).map((v) =>
-            v.id === defaultVar.id ? { ...v, stock: newStock } : v
-          );
-          await updateProductItem(prod.id, { variants: updatedVariants });
-        }
+      } else if (defaultVar) {
+        const updatedVariants = (prod.variants || []).map((v) =>
+          v.id === defaultVar.id ? { ...v, stock: newStock } : v
+        );
+        await updateProductItem(prod.id, { variants: updatedVariants });
       } else {
         await updateProductItem(prod.id, { stockKg: newStock });
       }
@@ -489,12 +500,12 @@ export const InventoryScreen: React.FC = () => {
     setAuditSubmitting(true);
     try {
       const defaultVar = auditProduct.variants?.find((v) => v.isDefault) || auditProduct.variants?.[0];
-      const recordedStock = defaultVar ? getEffectiveVariantData(defaultVar, auditProduct.id).stock : (auditProduct.stockKg || 50);
+      const recordedStock = defaultVar ? getEffectiveVariantData(defaultVar, auditProduct.id).stock : (storeInventoryMap.get(auditProduct.id)?.availableKg ?? auditProduct.stockKg ?? 50);
       const discrepancy = parsedStock - recordedStock;
 
       const targetStoreId =
         selectedStoreId || (selectedStore ? String(selectedStore.id || (selectedStore as any)._id) : '') || resolvedStore?.id;
-      const invRecord = storeInventoryMap.get(auditProduct.id);
+      const invRecord = (defaultVar ? storeInventoryMap.get(`${auditProduct.id}_${defaultVar.id}`) : undefined) || storeInventoryMap.get(auditProduct.id);
 
       if (targetStoreId) {
         await ApiService.adjustStock(
@@ -502,19 +513,8 @@ export const InventoryScreen: React.FC = () => {
           auditProduct.id,
           discrepancy,
           `${auditReason}${auditNotes ? ` - ${auditNotes}` : ''}`,
-          invRecord?.id
-        );
-      }
-
-      if (selectedAreaId !== 'ALL' && currentArea && defaultVar) {
-        const curData = getEffectiveVariantData(defaultVar, auditProduct.id);
-        await updateVariantAreaPrice(
-          auditProduct.id,
-          defaultVar.id,
-          currentArea.id || (currentArea as any)._id,
-          curData.price,
-          curData.mrp,
-          parsedStock
+          invRecord?.id,
+          defaultVar?.id
         );
       } else {
         await updateProductItem(auditProduct.id, { stockKg: parsedStock });
@@ -564,25 +564,15 @@ export const InventoryScreen: React.FC = () => {
     try {
       const targetStoreId =
         selectedStoreId || (selectedStore ? String(selectedStore.id || (selectedStore as any)._id) : '') || resolvedStore?.id;
-      const invRecord = storeInventoryMap.get(prod.id);
+      const invRecord = storeInventoryMap.get(`${prod.id}_${variantId}`) || storeInventoryMap.get(prod.id);
       if (targetStoreId) {
         await ApiService.adjustStock(
           targetStoreId,
           prod.id,
           delta,
           'Quick adjustment',
-          invRecord?.id
-        );
-      }
-
-      if (selectedAreaId !== 'ALL' && currentArea) {
-        await updateVariantAreaPrice(
-          prod.id,
-          curVar.id,
-          currentArea.id || (currentArea as any)._id,
-          curData.price,
-          curData.mrp,
-          newStock
+          invRecord?.id,
+          variantId
         );
       } else {
         const updatedVariants = (prod.variants || []).map((v) =>
@@ -605,24 +595,24 @@ export const InventoryScreen: React.FC = () => {
       await handleQuickAdjustVariantStock(prod, defaultVar.id, delta);
       return;
     }
-    const currentStock = prod.stockKg !== undefined ? prod.stockKg : 50;
+    const invFallback = storeInventoryMap.get(prod.id);
+    const currentStock = invFallback?.availableKg !== undefined ? invFallback.availableKg : (prod.stockKg !== undefined ? prod.stockKg : 50);
     const newStock = Math.max(0, currentStock + delta);
 
     try {
       const targetStoreId =
         selectedStoreId || (selectedStore ? String(selectedStore.id || (selectedStore as any)._id) : '') || resolvedStore?.id;
-      const invRecord = storeInventoryMap.get(prod.id);
       if (targetStoreId) {
         await ApiService.adjustStock(
           targetStoreId,
           prod.id,
           delta,
           'Quick adjustment',
-          invRecord?.id
+          invFallback?.id
         );
+      } else {
+        await updateProductItem(prod.id, { stockKg: newStock });
       }
-
-      await updateProductItem(prod.id, { stockKg: newStock });
 
       if (refreshFromDb) {
         await refreshFromDb();
@@ -665,7 +655,15 @@ export const InventoryScreen: React.FC = () => {
 
         <TouchableOpacity
           style={styles.headerAddBtn}
-          onPress={() => setActiveModal && setActiveModal('AddProduct')}
+          onPress={() => {
+            if (setSelectedDarkStore) {
+              setSelectedDarkStore(selectedStore ? selectedStore.name : '');
+            }
+            if (setSelectedZone) {
+              setSelectedZone(currentArea ? currentArea.name : '');
+            }
+            if (setActiveModal) setActiveModal('AddProduct');
+          }}
           activeOpacity={0.85}
         >
           <Plus size={16} color="#FFFFFF" strokeWidth={2.5} />
@@ -757,10 +755,28 @@ export const InventoryScreen: React.FC = () => {
 
           <View style={styles.storeHubTag}>
             <Text style={styles.storeHubTagText}>
-              Hub: STORE-{(currentArea?.name || 'CHANDLODIYA_TRAGAD').toUpperCase().replace(/[^A-Z0-9]/g, '_')}
+              {selectedStore
+                ? `Hub: STORE-${(currentArea?.name || 'HUB').toUpperCase().replace(/[^A-Z0-9]/g, '_')}`
+                : 'No Store Linked'}
             </Text>
           </View>
         </View>
+        {currentArea && !selectedStore && (
+          <View
+            style={{
+              marginTop: 10,
+              padding: 10,
+              borderRadius: 8,
+              backgroundColor: '#FFFBEB',
+              borderWidth: 1,
+              borderColor: '#FDE68A',
+            }}
+          >
+            <Text style={{ fontSize: 11, fontWeight: '700', color: '#B45309' }}>
+              No Dark Store created for "{currentArea.name}" yet. Add a store in Stores Management first so stock edits apply specifically to that store.
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* 4. THREE KPI CARDS ROW */}
@@ -822,7 +838,7 @@ export const InventoryScreen: React.FC = () => {
           </Text>
           <View style={[styles.filterCountBadge, activeTab === 'All Items' && styles.filterCountBadgeActive]}>
             <Text style={[styles.filterCountText, activeTab === 'All Items' && styles.filterCountTextActive]}>
-              {products.length || 18}
+              {storeScopedProducts.length || 0}
             </Text>
           </View>
         </TouchableOpacity>
@@ -903,14 +919,26 @@ export const InventoryScreen: React.FC = () => {
               stock: p.stockKg !== undefined ? p.stockKg : 50,
             };
 
-            const displayStock = effData.stock !== undefined ? effData.stock : (p.stockKg !== undefined ? p.stockKg : 50);
+            const invDoc = (currentVar ? storeInventoryMap.get(`${p.id}_${currentVar.id}`) : undefined) || storeInventoryMap.get(p.id);
+            const displayStock = effData.stock !== undefined ? effData.stock : (invDoc?.availableKg !== undefined ? invDoc.availableKg : (p.stockKg !== undefined ? p.stockKg : 50));
             const displayPrice = effData.price || p.sellingPrice || 7;
             const displayMrp = effData.mrp || p.mrp || (displayPrice + 8);
             const skuText = (p as any).sku || `SKU-${(p.id || '2ef56c').slice(-6)}`;
-            const shelfLocation = shelfLocations[p.id] || shelfLocations.default || 'A1-R2';
+            const shelfLocation = shelfLocations[p.id] || invDoc?.shelfLocation || (p as any).shelfLocation || shelfLocations.default || 'A1-R2';
             const catName = p.category || (categories.find((c) => c.id === p.categoryId)?.name) || 'Vegetables';
             const isVegetable = catName.toLowerCase().includes('veg');
             const thumbUrl = getProductThumbnail(p.name, p.image || p.imageUrl);
+
+            const isSpecificStore = p.storeScope === 'SPECIFIC';
+            const assignedStoreLabel = (() => {
+              if (isSpecificStore && Array.isArray(p.assignedStoreIds) && p.assignedStoreIds.length > 0) {
+                const matchedNames = p.assignedStoreIds
+                  .map((sid) => darkStores.find((s: any) => String(s.id || s._id) === String(sid))?.name)
+                  .filter(Boolean);
+                return matchedNames.length > 0 ? matchedNames.join(', ') : 'Specific Store';
+              }
+              return 'All Stores';
+            })();
 
             const isLow = displayStock > 0 && displayStock < 15;
             const isOut = displayStock <= 0;
@@ -950,6 +978,19 @@ export const InventoryScreen: React.FC = () => {
 
                       <View style={styles.shelfPillWrap}>
                         <Text style={styles.shelfPillText}>📍 {shelfLocation}</Text>
+                      </View>
+
+                      <View style={[styles.assignedStorePill, isSpecificStore ? styles.assignedStorePillSpecific : styles.assignedStorePillAll]}>
+                        <Store size={10} color={isSpecificStore ? '#BE185D' : '#047857'} />
+                        <Text
+                          style={[
+                            styles.assignedStorePillText,
+                            isSpecificStore ? { color: '#BE185D' } : { color: '#047857' },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          Assigned Store: {assignedStoreLabel}
+                        </Text>
                       </View>
                     </View>
                   </View>
@@ -1014,8 +1055,8 @@ export const InventoryScreen: React.FC = () => {
                     onPress={() => {
                       const storeAwareProduct = {
                         ...p,
-                        selectedStoreId: selectedStoreId || (selectedStore ? String(selectedStore.id || (selectedStore as any)._id) : ''),
-                        selectedStoreName: selectedStore?.name || currentArea?.assignedStore?.name || selectedDarkStore,
+                        selectedStoreId: selectedStore ? String(selectedStore.id || (selectedStore as any)._id) : '',
+                        selectedStoreName: selectedStore?.name || '',
                         selectedAreaId: selectedAreaId !== 'ALL' && currentArea ? String(currentArea.id || (currentArea as any)._id) : '',
                         selectedAreaName: currentArea?.name || '',
                         variants: (p.variants || []).map((v) => {
@@ -2956,6 +2997,7 @@ const styles = StyleSheet.create({
   inventoryCardBadgesRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 6,
     marginTop: 6,
   },
@@ -3000,6 +3042,28 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     color: '#475569',
+  },
+  assignedStorePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+    borderWidth: 1,
+    maxWidth: 210,
+  },
+  assignedStorePillAll: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+  assignedStorePillSpecific: {
+    backgroundColor: '#FDF2F8',
+    borderColor: '#FBCFE8',
+  },
+  assignedStorePillText: {
+    fontSize: 10,
+    fontWeight: '700',
   },
   inventoryCardPriceCol: {
     alignItems: 'flex-end',

@@ -39,6 +39,7 @@ import {
 import { CreateOrderDto } from './dto/order.dto';
 import { TrackingGateway } from '../tracking/tracking.gateway';
 import { NotificationService } from '../notifications/notification.service';
+import { clearHomeCache } from '../home/home-cache';
 
 @Injectable()
 export class OrdersService {
@@ -580,6 +581,17 @@ export class OrdersService {
         });
       }
 
+      if (productDoc && (productDoc as any).storeScope === 'SPECIFIC') {
+        const assignedIds = Array.isArray((productDoc as any).assignedStoreIds)
+          ? (productDoc as any).assignedStoreIds.map((id: any) => id?.toString()).filter(Boolean)
+          : [];
+        if (!assignedIds.includes(store._id.toString())) {
+          throw new BadRequestException(
+            `"${item.name}" is currently unavailable in your delivery area. Please remove it to continue.`,
+          );
+        }
+      }
+
       // Check stock
       if (variantDoc && typeof variantDoc.stock === 'number') authoritativeStock = variantDoc.stock;
       else if (productDoc && typeof productDoc.stock === 'number') authoritativeStock = productDoc.stock;
@@ -636,18 +648,32 @@ export class OrdersService {
         }
       }
 
+      // Serving dark store's independent inventory always takes precedence over fallback catalog stock
+      const effectiveVarId = variantDoc?._id || vIdObj || vIdStr || undefined;
+      const { matchedInv: storeInvDoc } = prodIdStr
+        ? await this.findStoreInventoryRecord(store._id, prodIdStr, effectiveVarId)
+        : { matchedInv: null };
+      if (storeInvDoc && (storeInvDoc as any).isHiddenInStore === true) {
+        throw new BadRequestException(
+          `"${item.name}" is currently unavailable in your delivery area. Please remove it to continue.`,
+        );
+      }
+      if (storeInvDoc && typeof storeInvDoc.availableQty === 'number') {
+        authoritativeStock = Math.max(0, storeInvDoc.availableQty);
+      }
+
       // Check stock in serving dark store
       if (authoritativeStock !== null && authoritativeStock < 0) {
         authoritativeStock = 100; // Auto-heal corrupt negative stock from cancelled/stale test data
       }
       if (authoritativeStock !== null && authoritativeStock === 0) {
         throw new BadRequestException(
-          `"${item.name}" is currently out of stock at ${store.name || 'serving store'}. Please remove it to continue.`,
+          `"${item.name}" is currently out of stock in your delivery area. Please remove it to continue.`,
         );
       }
       if (authoritativeStock !== null && authoritativeStock > 0 && authoritativeStock < item.quantity) {
         throw new BadRequestException(
-          `Insufficient stock for "${item.name}" at ${store.name || 'serving store'}. Available: ${authoritativeStock}, Requested: ${item.quantity}`,
+          `Insufficient stock for "${item.name}". Available: ${authoritativeStock}, Requested: ${item.quantity}`,
         );
       }
 
@@ -933,7 +959,7 @@ export class OrdersService {
     // 9. Multi-Store FCFS Bidding: Rider dispatch is deferred until a dark store accepts the order.
     this.logger.log(`[Order Broadcast] Broadcasted Order #${orderNumber} to ${broadcastStoreIds.length} candidate stores in ${matchedArea?.name || 'area'} for FCFS acceptance.`);
 
-    // 9b. Real-Time Stock Management & Atomic Deduction
+    // 9b. Real-Time Store-Isolated Stock Management & Atomic Deduction
     if (order.items && order.items.length > 0) {
       for (const item of order.items) {
         try {
@@ -941,116 +967,161 @@ export class OrdersService {
             ? new Types.ObjectId(item.productId.toString())
             : item.productId;
 
-          // 1. Atomically deduct stock from master products collection
-          await this.connection.collection('products').updateOne(
-            { _id: prodObjId as any },
-            { $inc: { stock: -item.quantity }, $set: { updatedAt: new Date() } }
-          );
-
-          // 2. Atomically deduct stock from ONLY the specific ordered product_variant
           const vList = await this.connection.collection('product_variants').find({
             $or: [
               { productId: prodObjId as any },
               { productId: item.productId.toString() },
             ],
           }).toArray();
+          const matchedV = this.matchOrderItemVariant(vList, item);
+          const targetVarIdStr = (item.variantId || matchedV?._id)?.toString();
+          const targetVarObjId =
+            targetVarIdStr && Types.ObjectId.isValid(targetVarIdStr)
+              ? new Types.ObjectId(targetVarIdStr)
+              : undefined;
 
-          if (vList.length > 0) {
-            let matchedV = null;
-            if (item.variantId) {
-              matchedV = vList.find((v) => v._id.toString() === item.variantId.toString());
-            }
-            if (!matchedV && item.quantityLabel) {
-              matchedV = vList.find((v) =>
-                v.weightOrVolume &&
-                v.weightOrVolume.trim().toLowerCase() === item.quantityLabel.trim().toLowerCase()
-              );
-            }
-            if (!matchedV && item.name) {
-              matchedV = vList.find((v) =>
-                v.weightOrVolume && item.name.toLowerCase().includes(v.weightOrVolume.toLowerCase())
-              );
-            }
-            if (!matchedV) {
-              matchedV = vList.find((v) => v.isDefault) || vList[0];
-            }
+          if (store?._id) {
+            // Store-isolated deduction: NEVER mutate global products/variants/area_pricing when store is known
+            const storeIdStr = store._id.toString();
+            const storeIdObj = Types.ObjectId.isValid(storeIdStr)
+              ? new Types.ObjectId(storeIdStr)
+              : store._id;
 
-            if (matchedV) {
-              await this.connection.collection('product_variants').updateOne(
-                { _id: matchedV._id },
-                { $inc: { stock: -item.quantity }, $set: { updatedAt: new Date() } }
-              );
+            let { matchedInv, hasVariantSpecificRows } = await this.findStoreInventoryRecord(
+              storeIdObj,
+              item.productId,
+              targetVarIdStr,
+            );
 
-              // 2b. Atomically deduct stock from area_pricing for this dark store's area / delivery zone
-              let targetAreaId = store?.areaId || (matchedArea as any)?._id || (order.deliveryAddress as any)?.areaId;
-              if (!targetAreaId && store?._id) {
-                const storeObjId = Types.ObjectId.isValid(store._id.toString()) ? new Types.ObjectId(store._id.toString()) : store._id;
-                const sDoc = await this.connection.collection('stores').findOne({
-                  $or: [
-                    { _id: storeObjId as any },
-                    { _id: store._id.toString() as any },
-                  ],
-                });
-                targetAreaId = sDoc?.areaId;
-              }
-              if (targetAreaId) {
-                const aObjId = Types.ObjectId.isValid(targetAreaId.toString())
-                  ? new Types.ObjectId(targetAreaId.toString())
-                  : targetAreaId;
+            if (!matchedInv) {
+              const prodDoc = await this.connection.collection('products').findOne({
+                _id: prodObjId as any,
+              });
+              const baselineQty =
+                matchedV && typeof matchedV.stock === 'number'
+                  ? Math.max(0, matchedV.stock)
+                  : prodDoc && typeof prodDoc.stock === 'number'
+                  ? Math.max(0, prodDoc.stock)
+                  : 50;
 
-                await this.connection.collection('area_pricing').updateOne(
+              const seedVarObjId =
+                targetVarObjId || (hasVariantSpecificRows ? matchedV?._id : undefined);
+              const seedFilter: any = {
+                storeId: storeIdObj,
+                productId: prodObjId,
+                ...(seedVarObjId ? { variantId: seedVarObjId } : {}),
+              };
+              try {
+                await this.connection.collection('inventory').updateOne(
+                  seedFilter,
                   {
-                    $and: [
-                      { $or: [{ variantId: matchedV._id }, { variantId: matchedV._id.toString() }] },
-                      { $or: [{ areaId: aObjId }, { areaId: targetAreaId.toString() }] },
-                    ],
-                  },
-                  {
-                    $inc: { stock: -item.quantity },
+                    $setOnInsert: {
+                      storeId: storeIdObj,
+                      storeName: store.name || 'Dark Store',
+                      warehouseId: storeIdObj,
+                      productId: prodObjId,
+                      productName: prodDoc?.name || item.name,
+                      ...(seedVarObjId ? { variantId: seedVarObjId } : {}),
+                      sku:
+                        matchedV?.sku ||
+                        prodDoc?.sku ||
+                        `SKU-${prodObjId.toString().slice(-6)}`,
+                      packSize:
+                        matchedV?.weightOrVolume ||
+                        matchedV?.packSize ||
+                        item.quantityLabel ||
+                        prodDoc?.quantityLabel ||
+                        '1 unit',
+                      availableQty: baselineQty,
+                      reservedQty: 0,
+                      soldQty: 0,
+                      lowStockThreshold: 5,
+                      shelfLocation: prodDoc?.shelfLocation || 'A1-R2',
+                      createdAt: new Date(),
+                    },
                     $set: { updatedAt: new Date() },
-                  }
+                  },
+                  { upsert: true },
+                );
+              } catch {
+                // Concurrent seed already inserted this store/product/variant row
+              }
+
+              const reloaded = await this.findStoreInventoryRecord(
+                storeIdObj,
+                item.productId,
+                targetVarIdStr,
+              );
+              matchedInv = reloaded.matchedInv;
+            }
+
+            let updatedInv: any = null;
+            if (matchedInv) {
+              updatedInv = await this.connection.collection('inventory').findOneAndUpdate(
+                { _id: matchedInv._id, availableQty: { $gte: item.quantity } },
+                {
+                  $inc: {
+                    availableQty: -item.quantity,
+                    reservedQty: item.quantity,
+                    soldQty: item.quantity,
+                  },
+                  $set: { updatedAt: new Date() },
+                },
+                { returnDocument: 'after' },
+              );
+              if (!updatedInv) {
+                updatedInv = await this.connection.collection('inventory').findOneAndUpdate(
+                  { _id: matchedInv._id },
+                  {
+                    $set: { availableQty: 0, updatedAt: new Date() },
+                    $inc: { reservedQty: item.quantity, soldQty: item.quantity },
+                  },
+                  { returnDocument: 'after' },
                 );
               }
             }
-          }
 
-          // 3. Atomically update store-specific inventory
-          let updatedInv: any = null;
-          if (store) {
-            updatedInv = await this.connection.collection('inventory').findOneAndUpdate(
-              {
-                storeId: new Types.ObjectId(store._id.toString()),
-                productId: prodObjId,
-              },
-              {
-                $inc: {
-                  availableQty: -item.quantity,
-                  reservedQty: item.quantity,
-                  soldQty: item.quantity,
-                },
-              },
-              { upsert: true, returnDocument: 'after' }
+            const nextAvail = Math.max(0, Number(updatedInv?.availableQty ?? 0));
+            this.trackingGateway.broadcastInventoryUpdate({
+              storeId: storeIdStr,
+              productId: item.productId.toString(),
+              variantId: targetVarIdStr || undefined,
+              productName: item.name,
+              availableQty: nextAvail,
+              reservedQty: Math.max(0, Number(updatedInv?.reservedQty ?? item.quantity)),
+              newAvailableStock: nextAvail,
+            });
+          } else {
+            // Legacy fallback when no serving store was resolved
+            await this.connection.collection('products').updateOne(
+              { _id: prodObjId as any },
+              { $inc: { stock: -item.quantity }, $set: { updatedAt: new Date() } },
             );
+            if (matchedV) {
+              await this.connection.collection('product_variants').updateOne(
+                { _id: matchedV._id },
+                { $inc: { stock: -item.quantity }, $set: { updatedAt: new Date() } },
+              );
+            }
+            const freshProd = await this.connection.collection('products').findOne({
+              _id: prodObjId as any,
+            });
+            const fallbackAvail = Math.max(0, Number(freshProd?.stock ?? 0));
+            this.trackingGateway.broadcastInventoryUpdate({
+              storeId: '',
+              productId: item.productId.toString(),
+              variantId: targetVarIdStr || undefined,
+              productName: item.name,
+              availableQty: fallbackAvail,
+              reservedQty: 0,
+              newAvailableStock: fallbackAvail,
+            });
           }
-
-          // Fetch fresh master product to get updated stock
-          const freshProd = await this.connection.collection('products').findOne({
-            _id: prodObjId as any,
-          });
-
-          // 4. Broadcast real-time stock update to Admin and Store App
-          this.trackingGateway.broadcastInventoryUpdate({
-            storeId: store?._id?.toString() || '',
-            productId: item.productId.toString(),
-            productName: item.name,
-            availableQty: freshProd?.stock ?? (updatedInv?.availableQty ?? 0),
-            reservedQty: updatedInv?.reservedQty ?? item.quantity,
-            newAvailableStock: freshProd?.stock ?? (updatedInv?.availableQty ?? 0),
-          });
         } catch (invErr: any) {
           this.logger.warn(`Failed to update real-time stock for product ${item.productId}: ${invErr.message}`);
         }
       }
+      clearHomeCache();
     }
 
     // 10. Clear customer cart
@@ -1566,6 +1637,53 @@ export class OrdersService {
   /**
    * Atomically restores physical stock in products, product_variants, and store inventory
    */
+  private matchOrderItemVariant(vList: any[], item: any): any | null {
+    if (!vList || vList.length === 0) return null;
+    let matchedV: any = null;
+    if (item.variantId) {
+      matchedV = vList.find((v) => v._id.toString() === item.variantId.toString()) || null;
+    }
+    if (!matchedV && item.quantityLabel) {
+      const targetLabel = item.quantityLabel.trim().toLowerCase();
+      matchedV =
+        vList.find(
+          (v) => v.weightOrVolume && v.weightOrVolume.trim().toLowerCase() === targetLabel,
+        ) || null;
+    }
+    if (!matchedV && item.name) {
+      const lowerName = item.name.toLowerCase();
+      matchedV =
+        vList.find((v) => v.weightOrVolume && lowerName.includes(v.weightOrVolume.toLowerCase())) ||
+        null;
+    }
+    return matchedV || vList.find((v) => v.isDefault) || vList[0];
+  }
+
+  private async findStoreInventoryRecord(storeId: any, productId: any, variantId?: any) {
+    const storeIdStr = storeId?.toString();
+    const prodIdStr = productId?.toString();
+    if (!storeIdStr || !prodIdStr) {
+      return { matchedInv: null as any, hasVariantSpecificRows: false };
+    }
+
+    const storeIdObj = Types.ObjectId.isValid(storeIdStr) ? new Types.ObjectId(storeIdStr) : storeId;
+    const prodIdObj = Types.ObjectId.isValid(prodIdStr) ? new Types.ObjectId(prodIdStr) : productId;
+    const docs = await this.connection.collection('inventory').find({
+      storeId: { $in: [storeIdObj, storeIdStr] as any[] },
+      productId: { $in: [prodIdObj, prodIdStr] as any[] },
+    }).toArray();
+
+    const targetVarStr = variantId ? variantId.toString() : null;
+    const hasVariantSpecificRows = docs.some((inv) => Boolean(inv.variantId));
+    let matchedInv = targetVarStr
+      ? docs.find((inv) => inv.variantId?.toString() === targetVarStr) || null
+      : null;
+    if (!matchedInv) {
+      matchedInv = docs.find((inv) => !inv.variantId) || null;
+    }
+    return { matchedInv, hasVariantSpecificRows };
+  }
+
   private async restockOrderItems(order: any) {
     if (!order.items || order.items.length === 0) return;
     for (const item of order.items) {
@@ -1574,116 +1692,83 @@ export class OrdersService {
           ? new Types.ObjectId(item.productId.toString())
           : item.productId;
 
-        // 1. Restock master products collection
-        await this.connection.collection('products').updateOne(
-          { _id: prodObjId as any },
-          { $inc: { stock: item.quantity }, $set: { updatedAt: new Date() } }
-        );
-
-        // 2. Restock ONLY the specific ordered product_variant
         const vList = await this.connection.collection('product_variants').find({
           $or: [
             { productId: prodObjId as any },
             { productId: item.productId.toString() },
           ],
         }).toArray();
+        const matchedV = this.matchOrderItemVariant(vList, item);
+        const targetVarIdStr = (item.variantId || matchedV?._id)?.toString();
 
-        if (vList.length > 0) {
-          let matchedV = null;
-          if (item.variantId) {
-            matchedV = vList.find((v) => v._id.toString() === item.variantId.toString());
-          }
-          if (!matchedV && item.quantityLabel) {
-            matchedV = vList.find((v) =>
-              v.weightOrVolume &&
-              v.weightOrVolume.trim().toLowerCase() === item.quantityLabel.trim().toLowerCase()
+        if (order.storeId) {
+          // Store-isolated restock: ONLY restore this order's serving dark store inventory
+          const { matchedInv } = await this.findStoreInventoryRecord(
+            order.storeId,
+            item.productId,
+            targetVarIdStr,
+          );
+
+          let updatedInv: any = null;
+          if (matchedInv) {
+            const nextAvail = Math.max(0, Number(matchedInv.availableQty ?? 0)) + item.quantity;
+            const nextReserved = Math.max(0, Number(matchedInv.reservedQty ?? 0) - item.quantity);
+            const nextSold = Math.max(0, Number(matchedInv.soldQty ?? 0) - item.quantity);
+            updatedInv = await this.connection.collection('inventory').findOneAndUpdate(
+              { _id: matchedInv._id },
+              {
+                $set: {
+                  availableQty: nextAvail,
+                  reservedQty: nextReserved,
+                  soldQty: nextSold,
+                  updatedAt: new Date(),
+                },
+              },
+              { returnDocument: 'after' },
             );
           }
-          if (!matchedV && item.name) {
-            matchedV = vList.find((v) =>
-              v.weightOrVolume && item.name.toLowerCase().includes(v.weightOrVolume.toLowerCase())
-            );
-          }
-          if (!matchedV) {
-            matchedV = vList.find((v) => v.isDefault) || vList[0];
-          }
 
+          const nextAvail = Math.max(0, Number(updatedInv?.availableQty ?? 0));
+          this.trackingGateway.broadcastInventoryUpdate({
+            storeId: order.storeId.toString(),
+            productId: item.productId.toString(),
+            variantId: targetVarIdStr || undefined,
+            productName: item.name,
+            availableQty: nextAvail,
+            reservedQty: Math.max(0, Number(updatedInv?.reservedQty ?? 0)),
+            newAvailableStock: nextAvail,
+          });
+        } else {
+          // Legacy fallback when order has no storeId
+          await this.connection.collection('products').updateOne(
+            { _id: prodObjId as any },
+            { $inc: { stock: item.quantity }, $set: { updatedAt: new Date() } },
+          );
           if (matchedV) {
             await this.connection.collection('product_variants').updateOne(
               { _id: matchedV._id },
-              { $inc: { stock: item.quantity }, $set: { updatedAt: new Date() } }
+              { $inc: { stock: item.quantity }, $set: { updatedAt: new Date() } },
             );
-
-            // 2b. Restock area_pricing
-            let targetAreaId = (order.deliveryAddress as any)?.areaId;
-            if (!targetAreaId && order.storeId) {
-              const sDoc = await this.connection.collection('stores').findOne({
-                $or: [
-                  { _id: Types.ObjectId.isValid(order.storeId.toString()) ? new Types.ObjectId(order.storeId.toString()) : order.storeId },
-                  { _id: order.storeId.toString() },
-                ],
-              });
-              targetAreaId = sDoc?.areaId;
-            }
-            if (targetAreaId) {
-              const aObjId = Types.ObjectId.isValid(targetAreaId.toString())
-                ? new Types.ObjectId(targetAreaId.toString())
-                : targetAreaId;
-              await this.connection.collection('area_pricing').updateOne(
-                {
-                  $and: [
-                    { $or: [{ variantId: matchedV._id }, { variantId: matchedV._id.toString() }] },
-                    { $or: [{ areaId: aObjId }, { areaId: targetAreaId.toString() }] },
-                  ],
-                },
-                {
-                  $inc: { stock: item.quantity },
-                  $set: { updatedAt: new Date() },
-                }
-              );
-            }
           }
+          const freshProd = await this.connection.collection('products').findOne({
+            _id: prodObjId as any,
+          });
+          const fallbackAvail = Math.max(0, Number(freshProd?.stock ?? 0));
+          this.trackingGateway.broadcastInventoryUpdate({
+            storeId: '',
+            productId: item.productId.toString(),
+            variantId: targetVarIdStr || undefined,
+            productName: item.name,
+            availableQty: fallbackAvail,
+            reservedQty: 0,
+            newAvailableStock: fallbackAvail,
+          });
         }
-
-        // 3. Restock dark store inventory
-        let updatedInv: any = null;
-        if (order.storeId) {
-          const sId = Types.ObjectId.isValid(order.storeId.toString())
-            ? new Types.ObjectId(order.storeId.toString())
-            : order.storeId;
-          updatedInv = await this.connection.collection('inventory').findOneAndUpdate(
-            {
-              storeId: sId,
-              productId: prodObjId,
-            },
-            {
-              $inc: {
-                availableQty: item.quantity,
-                reservedQty: -item.quantity,
-                soldQty: -item.quantity,
-              },
-            },
-            { returnDocument: 'after' }
-          );
-        }
-
-        const freshProd = await this.connection.collection('products').findOne({
-          _id: prodObjId as any,
-        });
-
-        // 4. Broadcast real-time stock update
-        this.trackingGateway.broadcastInventoryUpdate({
-          storeId: order.storeId?.toString() || '',
-          productId: item.productId.toString(),
-          productName: item.name,
-          availableQty: freshProd?.stock ?? (updatedInv?.availableQty ?? 0),
-          reservedQty: Math.max(0, updatedInv?.reservedQty ?? 0),
-          newAvailableStock: freshProd?.stock ?? (updatedInv?.availableQty ?? 0),
-        });
       } catch (invErr: any) {
         this.logger.warn(`Failed to restore inventory on cancel for product ${item.productId}: ${invErr.message}`);
       }
     }
+    clearHomeCache();
   }
 
   async cancelOrder(orderId: string, userId: string, reason?: string) {

@@ -26,6 +26,10 @@ import {
   AlertCircle,
   ChevronDown,
   Link2,
+  Store,
+  Layers,
+  Eye,
+  EyeOff,
 } from 'lucide-react-native';
 import { COLORS } from '../../theme';
 import { useAdminState } from '../../context/AdminStateContext';
@@ -43,6 +47,7 @@ interface FormVariant {
   stock: string;
   isDefault: boolean;
   isActive: boolean;
+  isHiddenInStore?: boolean;
 }
 
 export const EditProductModal: React.FC = () => {
@@ -53,6 +58,7 @@ export const EditProductModal: React.FC = () => {
     setSelectedProduct,
     updateProductItem,
     deleteProductItem,
+    removeProductFromStore,
     categories,
     updateVariantAreaPrice,
     areaPricingRecords,
@@ -69,6 +75,18 @@ export const EditProductModal: React.FC = () => {
   const [brand, setBrand] = useState('Womup Fresh');
   const [shelfLocation, setShelfLocation] = useState('A1-R2');
   const [description, setDescription] = useState('');
+
+  // Store Assignment ("All Stores" vs "Particular Store(s)")
+  const [storeScope, setStoreScope] = useState<'ALL' | 'SPECIFIC'>('ALL');
+  const [assignedStoreIds, setAssignedStoreIds] = useState<string[]>([]);
+  const toggleAssignedStoreId = (storeId: string) => {
+    setAssignedStoreIds((prev) =>
+      prev.includes(storeId) ? prev.filter((id) => id !== storeId) : [...prev, storeId]
+    );
+    setErrorMsg(null);
+  };
+
+  const activeDarkStores = (darkStores || []).filter((s: any) => s && s.isActive !== false);
 
   // Media
   const [imageUrl, setImageUrl] = useState('');
@@ -98,6 +116,13 @@ export const EditProductModal: React.FC = () => {
       setShelfLocation((selectedProduct as any).shelfLocation || 'A1-R2');
       setDescription(selectedProduct.description || '');
 
+      const prodScope = (selectedProduct as any).storeScope === 'SPECIFIC' ? 'SPECIFIC' : 'ALL';
+      const prodAssignedIds: string[] = Array.isArray((selectedProduct as any).assignedStoreIds)
+        ? (selectedProduct as any).assignedStoreIds.map((id: any) => String(id)).filter(Boolean)
+        : [];
+      setStoreScope(prodScope);
+      setAssignedStoreIds(prodAssignedIds);
+
       const img = selectedProduct.imageUrl || selectedProduct.image || '';
       setImageUrl(img);
       setImagePreview(img);
@@ -106,20 +131,30 @@ export const EditProductModal: React.FC = () => {
       setImageMode(isCloudinary ? 'upload' : 'link');
       setErrorMsg(null);
 
-      // Resolve store & inventory if available
-      const targetStore = darkStores.find(
-        (s) =>
-          (selectedProduct as any).selectedStoreId === String(s.id || (s as any)._id) ||
-          (selectedProduct as any).selectedStoreName === s.name ||
-          s.name === selectedDarkStore ||
-          String(s.id || (s as any)._id) === selectedDarkStore
-      );
-      const invRecord = inventory.find(
-        (i) =>
-          i.productId === selectedProduct.id &&
-          targetStore &&
-          (i.darkStoreId === String(targetStore.id || (targetStore as any)._id) || i.darkStoreName === targetStore.name)
-      );
+      // Resolve store & inventory if available (respect empty store assignment on No-Store areas)
+      const hasExplicitStoreKey =
+        'selectedStoreId' in selectedProduct || 'selectedStoreName' in selectedProduct;
+      const explicitStoreId = (selectedProduct as any).selectedStoreId
+        ? String((selectedProduct as any).selectedStoreId)
+        : '';
+      const explicitStoreName =
+        (selectedProduct as any).selectedStoreName ||
+        (!hasExplicitStoreKey ? selectedDarkStore : '') ||
+        '';
+      const targetStore = explicitStoreId
+        ? darkStores.find((s) => String(s.id || (s as any)._id) === explicitStoreId)
+        : explicitStoreName && !explicitStoreName.includes('No Dark Store')
+        ? darkStores.find((s) => s.name === explicitStoreName || String(s.id || (s as any)._id) === explicitStoreName)
+        : undefined;
+      const targetStoreIdStr = targetStore ? String(targetStore.id || (targetStore as any)._id) : '';
+      const storeInvList = targetStoreIdStr
+        ? inventory.filter(
+            (i) =>
+              i.productId === selectedProduct.id &&
+              (String(i.darkStoreId) === targetStoreIdStr || i.darkStoreName === targetStore?.name)
+          )
+        : [];
+      const prodInvRecord = storeInvList.find((i) => !i.variantId) || storeInvList[0];
 
       // Resolve area pricing if available
       const targetAreaId = (selectedProduct as any).selectedAreaId;
@@ -130,6 +165,7 @@ export const EditProductModal: React.FC = () => {
         setVariants(
           prodVariants.map((v, idx) => {
             const vId = String(v.id || (v as any)._id || '');
+            const varInvRecord = storeInvList.find((i) => i.variantId && String(i.variantId) === vId) || prodInvRecord;
             const areaRecord =
               targetAreaId && targetAreaId !== 'ALL'
                 ? areaPricingRecords.find(
@@ -154,10 +190,10 @@ export const EditProductModal: React.FC = () => {
                 : effectivePrice;
 
             const effectiveStock =
-              v.stock !== undefined
-                ? v.stock
-                : invRecord?.availableKg !== undefined
-                ? invRecord.availableKg
+              varInvRecord && varInvRecord.availableKg !== undefined
+                ? Math.max(0, varInvRecord.availableKg)
+                : v.stock !== undefined
+                ? Math.max(0, v.stock)
                 : 50;
 
             return {
@@ -169,11 +205,12 @@ export const EditProductModal: React.FC = () => {
               stock: String(effectiveStock),
               isDefault: v.isDefault !== undefined ? !!v.isDefault : idx === 0,
               isActive: v.isActive !== false,
+              isHiddenInStore: Boolean(varInvRecord?.isHiddenInStore),
             };
           })
         );
       } else {
-        const storeStock = invRecord?.availableKg !== undefined ? invRecord.availableKg : (selectedProduct.stockKg || 50);
+        const storeStock = prodInvRecord?.availableKg !== undefined ? Math.max(0, prodInvRecord.availableKg) : Math.max(0, selectedProduct.stockKg ?? 50);
         setVariants([
           {
             id: `v_${Date.now()}`,
@@ -184,6 +221,7 @@ export const EditProductModal: React.FC = () => {
             stock: String(storeStock),
             isDefault: true,
             isActive: true,
+            isHiddenInStore: Boolean(prodInvRecord?.isHiddenInStore),
           },
         ]);
       }
@@ -356,11 +394,42 @@ export const EditProductModal: React.FC = () => {
     );
   };
 
+  const hasExplicitStoreKey =
+    'selectedStoreId' in selectedProduct || 'selectedStoreName' in selectedProduct;
+  const explicitContextStoreId = (selectedProduct as any).selectedStoreId
+    ? String((selectedProduct as any).selectedStoreId)
+    : '';
+  const explicitContextStoreName =
+    (selectedProduct as any).selectedStoreName ||
+    (!hasExplicitStoreKey ? selectedDarkStore : '') ||
+    '';
+  const contextDarkStore = explicitContextStoreId
+    ? darkStores.find((s) => String(s.id || (s as any)._id) === explicitContextStoreId)
+    : (explicitContextStoreName && !explicitContextStoreName.includes('No Dark Store')
+        ? darkStores.find((s) => s.name === explicitContextStoreName || String(s.id || (s as any)._id) === explicitContextStoreName)
+        : undefined);
+  const contextStoreIdStr = contextDarkStore ? String(contextDarkStore.id || (contextDarkStore as any)._id) : '';
+  const contextStoreNameStr = contextDarkStore?.name || explicitContextStoreName || '';
+  const displayedDarkStores = contextStoreIdStr
+    ? [...activeDarkStores].sort((a: any, b: any) => {
+        const aId = String(a.id || a._id || '');
+        const bId = String(b.id || b._id || '');
+        if (aId === contextStoreIdStr) return -1;
+        if (bId === contextStoreIdStr) return 1;
+        return 0;
+      })
+    : activeDarkStores;
+
   const handleSave = async () => {
     setErrorMsg(null);
 
     if (!name.trim()) {
       setErrorMsg('Product name cannot be empty.');
+      return;
+    }
+
+    if (storeScope === 'SPECIFIC' && assignedStoreIds.length === 0) {
+      setErrorMsg('Please select at least one Dark Store for Particular Store(s) assignment.');
       return;
     }
 
@@ -394,26 +463,36 @@ export const EditProductModal: React.FC = () => {
 
     setSaving(true);
     try {
-      const formattedVariants: ProductVariantItem[] = variants.map((v) => ({
-        id: v.id.startsWith('new_') ? '' : v.id,
-        productId: selectedProduct.id,
-        sku:
-          v.sku.trim() ||
-          `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${v.weightOrVolume
-            .replace(/[^a-z0-9]+/gi, '')
-            .toLowerCase()}`,
-        weightOrVolume: v.weightOrVolume.trim(),
-        mrp: parseFloat(v.mrp),
-        sellingPrice: parseFloat(v.sellingPrice),
-        stock: parseInt(v.stock, 10) || 50,
-        isDefault: v.isDefault,
-        isActive: v.isActive,
-      }));
+      const formattedVariants: ProductVariantItem[] = variants.map((v) => {
+        const parsedStock = parseInt(v.stock, 10);
+        return {
+          id: v.id.startsWith('new_') ? '' : v.id,
+          productId: selectedProduct.id,
+          sku:
+            v.sku.trim() ||
+            `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${v.weightOrVolume
+              .replace(/[^a-z0-9]+/gi, '')
+              .toLowerCase()}`,
+          weightOrVolume: v.weightOrVolume.trim(),
+          mrp: parseFloat(v.mrp),
+          sellingPrice: parseFloat(v.sellingPrice),
+          stock: Number.isNaN(parsedStock) ? 50 : Math.max(0, parsedStock),
+          isDefault: v.isDefault,
+          isActive: v.isActive,
+          isHiddenInStore: Boolean(v.isHiddenInStore),
+        };
+      });
 
       const defaultVar = formattedVariants.find((v) => v.isDefault) || formattedVariants[0];
       const chosenCat = categories.find((c) => c.id === selectedCategoryId) || categories[0];
 
       const finalImage = (imageUrl || '').trim(); // NEVER save base64 imagePreview to database
+
+      const targetStore =
+        contextDarkStore ||
+        (storeScope === 'SPECIFIC' && assignedStoreIds[0]
+          ? darkStores.find((s) => String(s.id || (s as any)._id) === String(assignedStoreIds[0]))
+          : undefined);
 
       const success = await updateProductItem(selectedProduct.id, {
         name: name.trim(),
@@ -428,41 +507,57 @@ export const EditProductModal: React.FC = () => {
         sellingPrice: defaultVar.sellingPrice,
         mrp: defaultVar.mrp,
         basePrice: defaultVar.sellingPrice,
-        stockKg: defaultVar.stock || 50,
+        stockKg: defaultVar.stock !== undefined ? defaultVar.stock : 50,
         isActive: selectedProduct.isActive !== false,
         variants: formattedVariants,
         shelfLocation: shelfLocation.trim(),
+        storeScope,
+        assignedStoreIds: storeScope === 'SPECIFIC' ? assignedStoreIds : [],
+        preserveGlobalStock: Boolean(targetStore),
       } as any);
 
       if (success) {
-        // 1. Sync store-specific inventory if store context exists
-        const targetStore = darkStores.find(
-          (s) =>
-            (selectedProduct as any).selectedStoreId === String(s.id || (s as any)._id) ||
-            (selectedProduct as any).selectedStoreName === s.name ||
-            s.name === selectedDarkStore ||
-            String(s.id || (s as any)._id) === selectedDarkStore
-        );
+        // 1. Sync EVERY variant's store-specific inventory & visibility when store context exists
         if (targetStore) {
           const storeId = String(targetStore.id || (targetStore as any)._id);
-          const invRecord = inventory.find(
-            (i) => i.productId === selectedProduct.id && (i.darkStoreId === storeId || i.darkStoreName === targetStore.name)
+          const storeInvList = inventory.filter(
+            (i) =>
+              i.productId === selectedProduct.id &&
+              (String(i.darkStoreId) === storeId || i.darkStoreName === targetStore.name)
           );
-          const newStock = defaultVar.stock !== undefined ? defaultVar.stock : 50;
-          const oldStock = invRecord ? invRecord.availableKg : (selectedProduct.stockKg || 50);
-          const delta = newStock - oldStock;
-          if (delta !== 0) {
-            await ApiService.adjustStock(
-              storeId,
-              selectedProduct.id,
-              delta,
-              'Product edit modal stock sync',
-              invRecord?.id
-            );
+          const prodInvFallback = storeInvList.find((i) => !i.variantId) || storeInvList[0];
+
+          for (let idx = 0; idx < formattedVariants.length; idx++) {
+            const v = formattedVariants[idx];
+            if (!v.id) continue;
+            const varInvRecord =
+              storeInvList.find((i) => i.variantId && String(i.variantId) === String(v.id)) ||
+              prodInvFallback;
+            const newStock = v.stock !== undefined ? Math.max(0, v.stock) : 50;
+            const oldStock =
+              varInvRecord && varInvRecord.availableKg !== undefined
+                ? Math.max(0, varInvRecord.availableKg)
+                : Math.max(0, selectedProduct.stockKg ?? 50);
+            const delta = newStock - oldStock;
+            const wantHidden = Boolean(v.isHiddenInStore);
+            const wasHidden = Boolean(varInvRecord?.isHiddenInStore);
+
+            if (delta !== 0 || wantHidden !== wasHidden || !varInvRecord) {
+              await ApiService.adjustStock(
+                storeId,
+                selectedProduct.id,
+                delta,
+                'Product edit modal variant sync',
+                varInvRecord && varInvRecord.variantId ? varInvRecord.id : undefined,
+                v.id,
+                wantHidden
+              );
+            }
           }
+
           if (shelfLocation.trim()) {
             await ApiService.updateShelfLocation({
-              inventoryId: invRecord?.id,
+              inventoryId: prodInvFallback?.id,
               productId: selectedProduct.id,
               storeId,
               shelfLocation: shelfLocation.trim(),
@@ -470,7 +565,7 @@ export const EditProductModal: React.FC = () => {
           }
         }
 
-        // 2. Sync Area Pricing if area context exists
+        // 2. Sync Area Pricing price only if area context exists
         const targetAreaId = (selectedProduct as any).selectedAreaId;
         if (targetAreaId && targetAreaId !== 'ALL' && updateVariantAreaPrice) {
           for (const v of formattedVariants) {
@@ -480,8 +575,7 @@ export const EditProductModal: React.FC = () => {
                 v.id,
                 targetAreaId,
                 v.sellingPrice,
-                v.mrp,
-                v.stock
+                v.mrp
               );
             }
           }
@@ -501,10 +595,42 @@ export const EditProductModal: React.FC = () => {
     }
   };
 
+  const handleRemoveFromStore = () => {
+    if (!contextStoreIdStr) return;
+    const prodId = selectedProduct.id || (selectedProduct as any)._id;
+    const label = contextStoreNameStr || 'this store';
+    const msg = `Remove "${selectedProduct.name}" from ${label} only?\n\nOther dark stores and the Master Catalog will NOT be affected.`;
+
+    const runRemove = async () => {
+      setDeleting(true);
+      handleClose();
+      try {
+        await removeProductFromStore(prodId, contextStoreIdStr);
+      } finally {
+        setDeleting(false);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(msg)) {
+        runRemove();
+      }
+      return;
+    }
+
+    Alert.alert('Remove From Store', msg, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove from Store', style: 'destructive', onPress: runRemove },
+    ]);
+  };
+
   const handleDelete = () => {
     const prodId = selectedProduct.id || (selectedProduct as any)._id;
+    const globalWarning = contextStoreIdStr
+      ? `PERMANENTLY DELETE "${selectedProduct.name}" from ALL stores and the Master Catalog? This affects every dark store and cannot be undone.`
+      : `Are you sure you want to delete "${selectedProduct.name}"? This cannot be undone.`;
     if (Platform.OS === 'web') {
-      if (window.confirm(`Are you sure you want to delete "${selectedProduct.name}"? This cannot be undone.`)) {
+      if (window.confirm(globalWarning)) {
         setDeleting(true);
         handleClose();
         deleteProductItem(prodId).finally(() => {
@@ -516,12 +642,12 @@ export const EditProductModal: React.FC = () => {
     }
 
     Alert.alert(
-      'Confirm Deletion',
-      `Are you sure you want to delete "${selectedProduct.name}"? This cannot be undone.`,
+      'Confirm Global Deletion',
+      globalWarning,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
+          text: 'Delete Globally',
           style: 'destructive',
           onPress: async () => {
             setDeleting(true);
@@ -686,6 +812,144 @@ export const EditProductModal: React.FC = () => {
             </View>
 
             {/* ========================================================================= */}
+            {/* SECTION 1B: STORE AVAILABILITY (ALL STORES VS PARTICULAR STORE(S))        */}
+            {/* ========================================================================= */}
+            <View style={styles.sectionWrap}>
+              <Text style={styles.sectionHeading}>
+                <Store size={13} color="#4F46E5" /> STORE AVAILABILITY & INVENTORY TARGET
+              </Text>
+
+              <View style={styles.storeScopeRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.storeScopeCard,
+                    storeScope === 'ALL' && styles.storeScopeCardActive,
+                  ]}
+                  onPress={() => {
+                    setStoreScope('ALL');
+                    setErrorMsg(null);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.storeScopeTop}>
+                    <View style={[styles.radioCircle, storeScope === 'ALL' && styles.radioCircleActive]}>
+                      {storeScope === 'ALL' && <View style={styles.radioDot} />}
+                    </View>
+                    <Layers size={14} color={storeScope === 'ALL' ? '#FF3B98' : '#64748B'} />
+                    <Text style={[styles.storeScopeTitle, storeScope === 'ALL' && { color: '#071B52' }]}>
+                      All Stores (Global Catalog)
+                    </Text>
+                  </View>
+                  <Text style={styles.storeScopeDesc}>
+                    Available in all active dark stores ({activeDarkStores.length} stores)
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.storeScopeCard,
+                    storeScope === 'SPECIFIC' && styles.storeScopeCardActive,
+                  ]}
+                  onPress={() => {
+                    setStoreScope('SPECIFIC');
+                    if (assignedStoreIds.length === 0 && contextStoreIdStr) {
+                      setAssignedStoreIds([contextStoreIdStr]);
+                    }
+                    setErrorMsg(null);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.storeScopeTop}>
+                    <View style={[styles.radioCircle, storeScope === 'SPECIFIC' && styles.radioCircleActive]}>
+                      {storeScope === 'SPECIFIC' && <View style={styles.radioDot} />}
+                    </View>
+                    <Store size={14} color={storeScope === 'SPECIFIC' ? '#FF3B98' : '#64748B'} />
+                    <Text style={[styles.storeScopeTitle, storeScope === 'SPECIFIC' && { color: '#071B52' }]}>
+                      Particular Store(s)
+                    </Text>
+                  </View>
+                  <Text style={styles.storeScopeDesc}>
+                    Visible & stocked ONLY in the checked dark store(s)
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {storeScope === 'SPECIFIC' && (
+                <View style={{ marginTop: 10 }}>
+                  <Text style={styles.formLabel}>
+                    Select Dark Store(s) — {assignedStoreIds.length} selected <Text style={{ color: '#DC2626' }}>*</Text>
+                  </Text>
+                  <View style={styles.storeDropdownList}>
+                    {displayedDarkStores.length === 0 ? (
+                      <Text style={{ padding: 10, fontSize: 12, color: '#94A3B8' }}>
+                        No active dark stores found.
+                      </Text>
+                    ) : (
+                      displayedDarkStores.map((s: any) => {
+                        const sId = String(s.id || s._id || '');
+                        const isChosen = assignedStoreIds.includes(sId);
+                        const isCurrentContext = Boolean(contextStoreIdStr && sId === contextStoreIdStr);
+                        return (
+                          <TouchableOpacity
+                            key={sId}
+                            style={[
+                              styles.storeDropdownItem,
+                              isChosen && { backgroundColor: '#FDF2F8' },
+                            ]}
+                            onPress={() => toggleAssignedStoreId(sId)}
+                            activeOpacity={0.75}
+                          >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8 }}>
+                              <View
+                                style={{
+                                  width: 16,
+                                  height: 16,
+                                  borderRadius: 4,
+                                  borderWidth: 1.5,
+                                  borderColor: isChosen ? '#FF3B98' : '#94A3B8',
+                                  backgroundColor: isChosen ? '#FF3B98' : '#FFFFFF',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                }}
+                              >
+                                {isChosen && <Check size={11} color="#FFFFFF" strokeWidth={3} />}
+                              </View>
+                              <Text
+                                style={[
+                                  styles.storeDropdownItemText,
+                                  isChosen && { color: '#BE185D', fontWeight: '800' },
+                                ]}
+                                numberOfLines={1}
+                              >
+                                {s.name} ({s.areaName || s.city || 'Hub'})
+                              </Text>
+                              {isCurrentContext && (
+                                <View
+                                  style={{
+                                    backgroundColor: '#EEF2FF',
+                                    borderColor: '#C7D2FE',
+                                    borderWidth: 1,
+                                    paddingHorizontal: 6,
+                                    paddingVertical: 2,
+                                    borderRadius: 4,
+                                  }}
+                                >
+                                  <Text style={{ fontSize: 9, fontWeight: '800', color: '#4F46E5' }}>
+                                    CURRENT
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })
+                    )}
+                  </View>
+                </View>
+              )}
+            </View>
+
+            {/* ========================================================================= */}
             {/* SECTION 2: MEDIA & PRODUCT PHOTO                                         */}
             {/* ========================================================================= */}
             <View style={styles.sectionWrap}>
@@ -825,7 +1089,7 @@ export const EditProductModal: React.FC = () => {
               {/* Matrix Table */}
               <View style={styles.matrixTableCard}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={true}>
-                  <View style={{ minWidth: 700 }}>
+                  <View style={{ minWidth: 740 }}>
                     {/* Header */}
                     <View style={styles.matrixTableHeader}>
                       <Text style={[styles.matrixHeaderCell, { width: 60, textAlign: 'center' }]}>Default</Text>
@@ -835,7 +1099,9 @@ export const EditProductModal: React.FC = () => {
                       <Text style={[styles.matrixHeaderCell, { width: 100 }]}>MRP (₹) *</Text>
                       <Text style={[styles.matrixHeaderCell, { width: 85, textAlign: 'center' }]}>Discount</Text>
                       <Text style={[styles.matrixHeaderCell, { width: 90 }]}>Stock</Text>
-                      <Text style={[styles.matrixHeaderCell, { width: 65, textAlign: 'center' }]}>Action</Text>
+                      <Text style={[styles.matrixHeaderCell, { width: 95, textAlign: 'center' }]}>
+                        {contextStoreIdStr ? 'Hide / Del' : 'Action'}
+                      </Text>
                     </View>
 
                     {/* Rows */}
@@ -851,6 +1117,7 @@ export const EditProductModal: React.FC = () => {
                           style={[
                             styles.matrixTableRow,
                             v.isDefault && { backgroundColor: '#FFFDF5' },
+                            v.isHiddenInStore && { opacity: 0.55, backgroundColor: '#F8FAFC' },
                           ]}
                         >
                           {/* Radio Button for Default */}
@@ -955,8 +1222,27 @@ export const EditProductModal: React.FC = () => {
                             />
                           </View>
 
-                          {/* Action Delete */}
-                          <View style={[styles.matrixCell, { width: 65, alignItems: 'center' }]}>
+                          {/* Action: Store Variant Hide/Show + Global Delete */}
+                          <View style={[styles.matrixCell, { width: 95, flexDirection: 'row', justifyContent: 'center', gap: 6 }]}>
+                            {contextStoreIdStr ? (
+                              <TouchableOpacity
+                                onPress={() =>
+                                  handleUpdateVariant(v.id, 'isHiddenInStore', !v.isHiddenInStore)
+                                }
+                                style={{
+                                  padding: 4,
+                                  borderRadius: 6,
+                                  backgroundColor: v.isHiddenInStore ? '#FEF3C7' : '#F1F5F9',
+                                }}
+                                accessibilityLabel={v.isHiddenInStore ? 'Show in this store' : 'Hide in this store'}
+                              >
+                                {v.isHiddenInStore ? (
+                                  <EyeOff size={14} color="#D97706" />
+                                ) : (
+                                  <Eye size={14} color="#475569" />
+                                )}
+                              </TouchableOpacity>
+                            ) : null}
                             <TouchableOpacity
                               onPress={() => handleRemoveVariant(v.id)}
                               disabled={variants.length <= 1}
@@ -979,17 +1265,43 @@ export const EditProductModal: React.FC = () => {
 
           {/* Modal Footer */}
           <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={styles.deleteProdBtn}
-              onPress={handleDelete}
-              disabled={deleting || saving}
-              activeOpacity={0.8}
-            >
-              <Trash2 size={14} color="#DC2626" />
-              <Text style={styles.deleteProdBtnText}>
-                {deleting ? 'Deleting...' : 'Delete Product'}
-              </Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              {contextStoreIdStr ? (
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 5,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: '#FDBA74',
+                    backgroundColor: '#FFF7ED',
+                  }}
+                  onPress={handleRemoveFromStore}
+                  disabled={deleting || saving}
+                  activeOpacity={0.8}
+                >
+                  <Store size={14} color="#C2410C" />
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#C2410C' }}>
+                    {deleting ? 'Updating...' : 'Remove from This Store'}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+
+              <TouchableOpacity
+                style={styles.deleteProdBtn}
+                onPress={handleDelete}
+                disabled={deleting || saving}
+                activeOpacity={0.8}
+              >
+                <Trash2 size={14} color="#DC2626" />
+                <Text style={styles.deleteProdBtnText}>
+                  {deleting ? 'Deleting...' : contextStoreIdStr ? 'Delete Globally' : 'Delete Product'}
+                </Text>
+              </TouchableOpacity>
+            </View>
 
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <TouchableOpacity
@@ -1181,6 +1493,66 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#071B52',
     flex: 1,
+  },
+  storeScopeRow: {
+    flexDirection: 'row',
+    gap: 10,
+    flexWrap: 'wrap',
+  },
+  storeScopeCard: {
+    flex: 1,
+    minWidth: 200,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    padding: 10,
+    backgroundColor: '#F8FAFC',
+  },
+  storeScopeCardActive: {
+    borderColor: '#FF3B98',
+    backgroundColor: '#FFF1F7',
+  },
+  storeScopeTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginBottom: 4,
+  },
+  storeScopeTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#334155',
+    flex: 1,
+  },
+  storeScopeDesc: {
+    fontSize: 11,
+    color: '#64748B',
+    paddingLeft: 25,
+  },
+  storeDropdownList: {
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    maxHeight: 170,
+    overflow: 'hidden',
+  },
+  storeDropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  storeDropdownItemText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#071B52',
+    flex: 1,
+    marginRight: 8,
   },
   mediaRow: {
     flexDirection: 'row',

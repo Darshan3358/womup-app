@@ -26,6 +26,8 @@ import { AddressService } from '../../services/addressService';
 import { AuthService } from '../../services/authService';
 import { SettingsService } from '../../services/settingsService';
 import { KycBankVerificationModal } from '../../components/common/KycBankVerificationModal';
+import { useOta } from '../../context/OtaContext';
+import { useToast } from '../../context/ToastContext';
 import * as Clipboard from 'expo-clipboard';
 
 export const BlinkitProfileScreen: React.FC = () => {
@@ -47,6 +49,8 @@ export const BlinkitProfileScreen: React.FC = () => {
     updateBlinkitQty,
     goBack,
   } = useApp();
+  const ota = useOta();
+  const { showSuccess, showWarning, showInfo } = useToast();
 
   // Sync live profile and settings data directly from MongoDB Atlas when Profile screen opens
   useEffect(() => {
@@ -861,6 +865,59 @@ export const BlinkitProfileScreen: React.FC = () => {
               onPress: () => setNotificationsModalVisible(true),
             },
             {
+              icon: 'zap',
+              label: 'Check for App Updates',
+              subtitle: ota.isUpdatePending
+                ? 'Update downloaded — tap to restart'
+                : `Channel: ${ota.channel} • RT ${ota.runtimeVersion}`,
+              badge: ota.isDownloading
+                ? ota.downloadProgress !== undefined
+                  ? `${Math.round(ota.downloadProgress * 100)}%`
+                  : 'Downloading...'
+                : ota.isChecking
+                ? 'Checking...'
+                : ota.isUpdatePending
+                ? 'Restart Now'
+                : ota.updateId
+                ? `OTA ${ota.updateId.slice(0, 6)}`
+                : 'Latest',
+              onPress: async () => {
+                if (ota.isUpdatePending) {
+                  Alert.alert(
+                    'Update Ready',
+                    'A new WOMART update is ready to apply. Restart the app now?',
+                    [
+                      { text: 'Later', style: 'cancel' },
+                      { text: 'Restart Now', onPress: () => ota.applyUpdate() },
+                    ]
+                  );
+                  return;
+                }
+                const status = await ota.checkAndDownloadUpdate({ manual: true });
+                if (status === 'updated') {
+                  Alert.alert(
+                    'Update Downloaded',
+                    'Latest WOMART update is downloaded. Restart now to apply it?',
+                    [
+                      { text: 'Later', style: 'cancel' },
+                      { text: 'Restart Now', onPress: () => ota.applyUpdate() },
+                    ]
+                  );
+                } else if (status === 'up-to-date') {
+                  showSuccess('You are already running the latest WOMART update.', 'Up to Date');
+                } else if (status === 'unsupported') {
+                  showInfo(
+                    Platform.OS === 'web'
+                      ? 'Web runs the latest release automatically on refresh.'
+                      : `OTA checks run on standalone builds (${ota.channel}, RT ${ota.runtimeVersion}).`,
+                    'App Version'
+                  );
+                } else {
+                  showWarning('Unable to reach update server right now. Please try again later.');
+                }
+              },
+            },
+            {
               icon: 'log-out',
               label: 'Log out',
               isDestructive: true,
@@ -875,7 +932,10 @@ export const BlinkitProfileScreen: React.FC = () => {
               <Text style={styles.footerWordmark}>WOMART by Womup</Text>
             </View>
             <Text style={styles.footerTagline}>Empowerment • Shopping • Revolutions</Text>
-            <Text style={styles.footerVersion}>v1.0.0 (Production Build)</Text>
+            <Text style={styles.footerVersion}>
+              v1.0.0 ({ota.channel} • RT {ota.runtimeVersion}
+              {ota.updateId ? ` • OTA ${ota.updateId.slice(0, 8)}` : ota.isEmbeddedLaunch ? ' • Embedded' : ''})
+            </Text>
           </View>
         </View>
       </ScrollView>

@@ -1287,7 +1287,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
                   <View style={styles.detectedBadge}>
                     <CheckCircle2 size={12} color="#16A34A" />
                     <Text style={styles.detectedBadgeText}>
-                      ✓ {areaDetectionStatus.areaName} detected (Serving from {areaDetectionStatus.storeName})
+                      ✓ {areaDetectionStatus.areaName} detected (Delivery in {deliveryEtaMinutes || 9} mins)
                     </Text>
                   </View>
                 ) : areaDetectionStatus && areaDetectionStatus.isServiceable === false ? (
@@ -1737,15 +1737,15 @@ export const BlinkitCheckoutScreen: React.FC = () => {
             )}
           </View>
 
-          {/* Serving Dark Store Info Banner matching website */}
+          {/* Instant Delivery Area Info Banner */}
           <View style={styles.servingStoreBanner}>
             <MapPin size={16} color="#16A34A" />
             <View style={{ flex: 1 }}>
               <Text style={styles.servingStoreBannerTitle}>
-                Dispatching from: {currentStoreName || 'Wom Up Dark Store'}
+                Delivering to {areaLandmark || currentAreaName || 'your location'}
               </Text>
               <Text style={styles.servingStoreBannerSub}>
-                ⚡ {deliveryEtaMinutes || 9} min delivery to {areaLandmark || currentAreaName || 'your area'}
+                ⚡ Guaranteed {deliveryEtaMinutes || 9} min doorstep delivery
               </Text>
             </View>
           </View>
@@ -1914,7 +1914,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
               Order Confirmed & Preparing 📦
             </Text>
             <Text style={styles.successDesc}>
-              Your items are being packed at the nearest Womup dark store.
+              Your items are being freshly packed for {deliveryEtaMinutes || 9}-minute delivery.
             </Text>
 
             <TouchableOpacity
@@ -2187,7 +2187,7 @@ export const BlinkitCheckoutScreen: React.FC = () => {
                 <View style={styles.confirmStoreRow}>
                   <CheckCircle2 size={13} color="#16A34A" />
                   <Text style={styles.confirmStoreText}>
-                    Serving from <Text style={{ fontWeight: '700', color: '#166534' }}>{areaDetectionStatus.storeName || currentStoreName || 'Dark Store'}</Text>
+                    Delivering to <Text style={{ fontWeight: '700', color: '#166534' }}>{areaLandmark || areaDetectionStatus.areaName || currentAreaName || 'your area'}</Text> ({deliveryEtaMinutes || 9} mins)
                   </Text>
                 </View>
               ) : areaDetectionStatus && areaDetectionStatus.isServiceable === false ? (

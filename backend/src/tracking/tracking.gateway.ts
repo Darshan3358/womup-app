@@ -739,16 +739,18 @@ export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
   }
 
-  // Broadcast real-time stock update to Admin Dashboard
+  // Broadcast real-time stock update to Admin Dashboard & Customer App
   broadcastInventoryUpdate(payload: {
     storeId: string;
     productId: string;
+    variantId?: string;
     productName?: string;
     availableQty?: number;
     reservedQty?: number;
     newAvailableStock?: number;
     newReservedStock?: number;
     soldQty?: number;
+    shelfLocation?: string;
   }) {
     if (this.server) {
       const data = {

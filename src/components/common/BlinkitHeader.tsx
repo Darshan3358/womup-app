@@ -191,16 +191,17 @@ const BlinkitHeaderComponent: React.FC<BlinkitHeaderProps> = ({
     return hasValidLocation ? 'CHECKING SERVICEABILITY…' : 'LOCATION UNAVAILABLE';
   })();
 
-  // Store Hub Status Line - Only show when a real resolved store exists
+  // Delivery Area & ETA Status Line (Keep internal dark store name hidden from Customer UI)
   const storeStatusText = (() => {
     if (locationError || (!isAvailable && !hasValidLocation)) {
       return null;
     }
     if (isAvailable) {
-      if (currentStoreName) {
-        return currentStoreName.replace(/^🟢\s*/, '').trim();
+      const eta = deliveryEtaMinutes || 9;
+      if (currentAreaName) {
+        return `Delivering to ${currentAreaName} (${eta} mins)`;
       }
-      return deliveryEtaMinutes ? `Delivery in ${deliveryEtaMinutes} mins` : 'Delivering in 9 mins';
+      return `Delivering in ${eta} mins`;
     }
     if (isUnavailable && hasValidLocation) {
       return 'Outside delivery area';

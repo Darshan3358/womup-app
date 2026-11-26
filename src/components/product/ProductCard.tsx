@@ -42,6 +42,20 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const currentSellingPrice = activeVariant ? activeVariant.price : product.sellingPrice;
   const currentMrp = activeVariant ? activeVariant.mrp : product.mrp;
   const currentLabel = activeVariant ? activeVariant.label : product.quantityLabel;
+  const activeStock =
+    activeVariant && typeof activeVariant.stock === 'number'
+      ? Math.max(0, activeVariant.stock)
+      : typeof product.stock === 'number'
+      ? Math.max(0, product.stock)
+      : 100;
+  const isOutOfStock = activeStock === 0;
+  const isCriticalStock = activeStock > 0 && activeStock <= 5;
+  const activeUrgency =
+    activeStock > 0 && activeStock <= 5
+      ? `Hurry! Only ${activeStock} left`
+      : activeStock > 5 && activeStock < 10
+      ? `Only ${activeStock} left`
+      : undefined;
   const currentDiscount = currentMrp > currentSellingPrice
     ? Math.round(((currentMrp - currentSellingPrice) / currentMrp) * 100)
     : product.discountPercent;
@@ -49,11 +63,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const quantity = getBlinkitQty ? getBlinkitQty(product.id, activeVariant?.id) : 0;
 
   const handleAddToCart = () => {
+    if (activeStock <= 0) return;
     const enrichedProduct: Product = {
       ...product,
       sellingPrice: currentSellingPrice,
       mrp: currentMrp,
       quantityLabel: currentLabel,
+      stock: activeStock,
       selectedVariantId: activeVariant?.id,
     };
     addToCart(enrichedProduct, activeVariant?.id);
@@ -121,7 +137,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               )}
               <Image
                 source={resolveProductImageSource(product.imageUrl || product.image, product.name, (product as any).slug)}
-                style={[styles.horizontalImage, !imgLoaded && { opacity: 0 }]}
+                style={[
+                  styles.horizontalImage,
+                  isOutOfStock && { opacity: 0.45 },
+                  !imgLoaded && { opacity: 0 },
+                ]}
                 resizeMode="cover"
                 onLoad={() => setImgLoaded(true)}
               />
@@ -136,6 +156,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               <Text style={styles.discountText}>{currentDiscount}% OFF</Text>
             </View>
           )}
+          {isOutOfStock && (
+            <View style={styles.oosOverlay}>
+              <View style={styles.oosOverlayBadge}>
+                <Text style={styles.oosOverlayText}>OUT OF STOCK</Text>
+              </View>
+            </View>
+          )}
         </View>
 
         {/* Details */}
@@ -147,41 +174,59 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
           {/* Variant Selector Pills */}
           {variants.length > 1 ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.variantScrollContent}
-              style={styles.variantScrollView}
-            >
-              {variants.map((v) => {
-                const isSelected = v.id === activeVariant?.id;
-                return (
-                  <TouchableOpacity
-                    key={v.id}
-                    activeOpacity={0.7}
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      setSelectedVariantId(v.id);
-                    }}
-                    style={[
-                      styles.variantPill,
-                      isSelected && styles.variantPillActive,
-                    ]}
-                  >
-                    <Text
+            <View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.variantScrollContent}
+                style={styles.variantScrollView}
+              >
+                {variants.map((v) => {
+                  const isSelected = v.id === activeVariant?.id;
+                  return (
+                    <TouchableOpacity
+                      key={v.id}
+                      activeOpacity={0.7}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        setSelectedVariantId(v.id);
+                      }}
                       style={[
-                        styles.variantPillText,
-                        isSelected && styles.variantPillTextActive,
+                        styles.variantPill,
+                        isSelected && styles.variantPillActive,
                       ]}
                     >
-                      {v.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+                      <Text
+                        style={[
+                          styles.variantPillText,
+                          isSelected && styles.variantPillTextActive,
+                        ]}
+                      >
+                        {v.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+              {activeUrgency && (
+                <View style={[styles.urgencyPill, isCriticalStock && styles.urgencyPillCritical, { marginBottom: 2 }]}>
+                  <Text style={[styles.urgencyText, isCriticalStock && styles.urgencyTextCritical]}>
+                    {activeUrgency}
+                  </Text>
+                </View>
+              )}
+            </View>
           ) : (
-            <Text style={styles.quantityLabel}>{currentLabel}</Text>
+            <View style={styles.packAndUrgencyRow}>
+              <Text style={styles.quantityLabel}>{currentLabel}</Text>
+              {activeUrgency && (
+                <View style={[styles.urgencyPill, isCriticalStock && styles.urgencyPillCritical]}>
+                  <Text style={[styles.urgencyText, isCriticalStock && styles.urgencyTextCritical]}>
+                    {activeUrgency}
+                  </Text>
+                </View>
+              )}
+            </View>
           )}
 
           <View style={styles.priceRow}>
@@ -196,7 +241,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
         {/* Add CTA */}
         <View style={styles.actionContainer}>
-          {quantity === 0 ? (
+          {activeStock === 0 ? (
+            <View style={[styles.addButton, { backgroundColor: '#F1F5F9', borderColor: '#CBD5E1' }]}>
+              <Text style={[styles.addButtonText, { color: '#64748B', fontSize: 10 }]}>Out</Text>
+            </View>
+          ) : quantity === 0 ? (
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={(e) => {
@@ -244,7 +293,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             )}
             <Image
               source={resolveProductImageSource(product.imageUrl || product.image, product.name, (product as any).slug)}
-              style={[styles.gridProductImage, !imgLoaded && { opacity: 0 }]}
+              style={[
+                styles.gridProductImage,
+                isOutOfStock && { opacity: 0.45 },
+                !imgLoaded && { opacity: 0 },
+              ]}
               resizeMode="cover"
               onLoad={() => setImgLoaded(true)}
             />
@@ -252,6 +305,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         ) : (
           <View style={styles.iconCircleLarge}>
             <Ionicons name="fast-food-outline" size={32} color={COLORS.purple} />
+          </View>
+        )}
+        {isOutOfStock && (
+          <View style={styles.oosOverlay}>
+            <View style={styles.oosOverlayBadge}>
+              <Text style={styles.oosOverlayText}>OUT OF STOCK</Text>
+            </View>
           </View>
         )}
       </View>
@@ -265,41 +325,59 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
         {/* Variant Selector Pills */}
         {variants.length > 1 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.variantScrollContent}
-            style={styles.variantScrollView}
-          >
-            {variants.map((v) => {
-              const isSelected = v.id === activeVariant?.id;
-              return (
-                <TouchableOpacity
-                  key={v.id}
-                  activeOpacity={0.7}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    setSelectedVariantId(v.id);
-                  }}
-                  style={[
-                    styles.variantPill,
-                    isSelected && styles.variantPillActive,
-                  ]}
-                >
-                  <Text
+          <View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.variantScrollContent}
+              style={styles.variantScrollView}
+            >
+              {variants.map((v) => {
+                const isSelected = v.id === activeVariant?.id;
+                return (
+                  <TouchableOpacity
+                    key={v.id}
+                    activeOpacity={0.7}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      setSelectedVariantId(v.id);
+                    }}
                     style={[
-                      styles.variantPillText,
-                      isSelected && styles.variantPillTextActive,
+                      styles.variantPill,
+                      isSelected && styles.variantPillActive,
                     ]}
                   >
-                    {v.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+                    <Text
+                      style={[
+                        styles.variantPillText,
+                        isSelected && styles.variantPillTextActive,
+                      ]}
+                    >
+                      {v.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            {activeUrgency && (
+              <View style={[styles.urgencyPill, isCriticalStock && styles.urgencyPillCritical, { marginBottom: 2 }]}>
+                <Text style={[styles.urgencyText, isCriticalStock && styles.urgencyTextCritical]}>
+                  {activeUrgency}
+                </Text>
+              </View>
+            )}
+          </View>
         ) : (
-          <Text style={styles.quantityLabel}>{currentLabel}</Text>
+          <View style={styles.packAndUrgencyRow}>
+            <Text style={styles.quantityLabel}>{currentLabel}</Text>
+            {activeUrgency && (
+              <View style={[styles.urgencyPill, isCriticalStock && styles.urgencyPillCritical]}>
+                <Text style={[styles.urgencyText, isCriticalStock && styles.urgencyTextCritical]}>
+                  {activeUrgency}
+                </Text>
+              </View>
+            )}
+          </View>
         )}
 
         <View style={styles.priceRow}>
@@ -315,7 +393,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
         {/* Add or Stepper */}
         <View style={styles.gridActionRow}>
-          {quantity === 0 ? (
+          {activeStock === 0 ? (
+            <View style={[styles.gridAddButton, { backgroundColor: '#F1F5F9', borderColor: '#CBD5E1' }]}>
+              <Text style={[styles.gridAddButtonText, { color: '#64748B', fontSize: 11 }]}>Out of Stock</Text>
+            </View>
+          ) : quantity === 0 ? (
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={(e) => {
@@ -542,5 +624,55 @@ const styles = StyleSheet.create({
   variantPillTextActive: {
     color: '#EC4A9D',
     fontWeight: '700',
+  },
+  packAndUrgencyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginVertical: 2,
+  },
+  urgencyPill: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+  },
+  urgencyPillCritical: {
+    backgroundColor: '#FEE2E2',
+    borderWidth: 0.5,
+    borderColor: '#FCA5A5',
+  },
+  urgencyText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#B45309',
+  },
+  urgencyTextCritical: {
+    color: '#DC2626',
+  },
+  oosOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 3,
+  },
+  oosOverlayBadge: {
+    backgroundColor: 'rgba(15, 23, 42, 0.78)',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  oosOverlayText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.4,
   },
 });

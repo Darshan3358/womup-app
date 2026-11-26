@@ -36,6 +36,23 @@ export class ProductsService {
     @InjectModel(Inventory.name) private inventoryModel: Model<InventoryDocument>,
   ) {}
 
+  private buildStoreVisibilityCondition(storeId?: string): any {
+    if (!storeId) {
+      return { storeScope: { $ne: 'SPECIFIC' } };
+    }
+    const storeIdStr = storeId.toString();
+    const storeCandidates: any[] = [storeIdStr];
+    if (Types.ObjectId.isValid(storeIdStr)) {
+      storeCandidates.push(new Types.ObjectId(storeIdStr));
+    }
+    return {
+      $or: [
+        { storeScope: { $ne: 'SPECIFIC' } },
+        { storeScope: 'SPECIFIC', assignedStoreIds: { $in: storeCandidates } },
+      ],
+    };
+  }
+
   private async enrichWithVariants(products: ProductDocument[], areaId?: string, storeId?: string): Promise<any[]> {
     if (products.length === 0) return [];
     const productIds = products.map((p) => (p as any)._id);
@@ -70,25 +87,65 @@ export class ProductsService {
       }
     }
 
-    let inventoryByProduct = new Map<string, number>();
-    if (storeId && Types.ObjectId.isValid(storeId)) {
+    const inventoryByProduct = new Map<string, number>();
+    const inventoryByProdVar = new Map<string, number>();
+    const hiddenProdVarSet = new Set<string>();
+    if (storeId) {
+      const storeIdStr = storeId.toString();
+      const storeCandidates: any[] = [storeIdStr];
+      if (Types.ObjectId.isValid(storeIdStr)) {
+        storeCandidates.push(new Types.ObjectId(storeIdStr));
+      }
+      const productCandidates: any[] = [
+        ...productIds,
+        ...productIds.map((id) => id.toString()),
+      ];
       const invRecords = await this.inventoryModel
         .find({
-          storeId: new Types.ObjectId(storeId),
-          productId: { $in: productIds },
+          storeId: { $in: storeCandidates },
+          productId: { $in: productCandidates },
         })
         .exec();
       for (const inv of invRecords) {
-        inventoryByProduct.set(inv.productId.toString(), inv.availableQty);
+        const pKey = inv.productId?.toString();
+        const vKey = inv.variantId?.toString();
+        const qty = Math.max(0, Number(inv.availableQty ?? 0));
+        if (pKey && vKey) {
+          inventoryByProdVar.set(`${pKey}_${vKey}`, qty);
+          if ((inv as any).isHiddenInStore === true) {
+            hiddenProdVarSet.add(`${pKey}_${vKey}`);
+          }
+        } else if (pKey && !inventoryByProduct.has(pKey)) {
+          inventoryByProduct.set(pKey, qty);
+        }
       }
     }
 
     return products.map((product) => {
       const prodId = (product as any)._id.toString();
-      const variants = (variantsByProduct.get(prodId) || []).map((v) => {
+      const storeProdStock = inventoryByProduct.get(prodId);
+
+      const rawProductVariants = variantsByProduct.get(prodId) || [];
+      const visibleProductVariants = storeId
+        ? rawProductVariants.filter((v) => !hiddenProdVarSet.has(`${prodId}_${(v as any)._id.toString()}`))
+        : rawProductVariants;
+
+      const variants = visibleProductVariants.map((v) => {
         const vidStr = (v as any)._id.toString();
         const pricing = pricingByVariant.get(vidStr);
-        const effectiveStock = pricing?.stock !== undefined ? pricing.stock : ((v as any).stock !== undefined ? (v as any).stock : ((product as any).stock ?? 50));
+        const storeVarStock = inventoryByProdVar.get(`${prodId}_${vidStr}`);
+        const effectiveStock =
+          storeVarStock !== undefined
+            ? storeVarStock
+            : storeProdStock !== undefined
+            ? storeProdStock
+            : pricing?.stock !== undefined
+            ? Math.max(0, Number(pricing.stock))
+            : (v as any).stock !== undefined
+            ? Math.max(0, Number((v as any).stock))
+            : typeof (product as any).stock === 'number'
+            ? Math.max(0, (product as any).stock)
+            : 50;
         return {
           id: vidStr,
           label: v.weightOrVolume,
@@ -104,13 +161,32 @@ export class ProductsService {
       const defaultVariant = variants.find((v) => v.isDefault) || variants[0];
       const effectivePrice = defaultVariant?.price ?? product.sellingPrice;
       const effectiveMrp = defaultVariant?.mrp ?? product.mrp;
-      const storeStock = inventoryByProduct.get(prodId);
-      const effectiveStock = storeStock !== undefined
-        ? Math.max(0, storeStock)
-        : (typeof (product as any).stock === 'number' && (product as any).stock > 0 ? (product as any).stock : 100);
+      const defaultVarInvStock = defaultVariant
+        ? inventoryByProdVar.get(`${prodId}_${defaultVariant.id}`)
+        : undefined;
+      const allVariantsHidden = rawProductVariants.length > 0 && visibleProductVariants.length === 0;
+      const effectiveStock = allVariantsHidden
+        ? 0
+        : defaultVarInvStock !== undefined
+        ? defaultVarInvStock
+        : storeProdStock !== undefined
+        ? storeProdStock
+        : defaultVariant
+        ? defaultVariant.stock
+        : typeof (product as any).stock === 'number'
+        ? Math.max(0, (product as any).stock)
+        : 100;
+
+      const rawObj = (product as any).toObject();
+      // Never leak storeScope/assignedStoreIds array of internal stores cleanly unless needed, keep payload customer-safe
+      const assignedIds = Array.isArray(rawObj.assignedStoreIds)
+        ? rawObj.assignedStoreIds.map((id: any) => id?.toString?.() || String(id))
+        : [];
 
       return {
-        ...(product as any).toObject(),
+        ...rawObj,
+        storeScope: rawObj.storeScope || 'ALL',
+        assignedStoreIds: assignedIds,
         variants,
         stock: effectiveStock,
         isOutOfStock: effectiveStock <= 0,
@@ -122,6 +198,8 @@ export class ProductsService {
 
   async findAll(filters: ProductQueryFilter) {
     const query: any = { isActive: { $ne: false } };
+    const storeVisibilityCondition = this.buildStoreVisibilityCondition(filters.storeId);
+    query.$and = [storeVisibilityCondition];
 
     // Support single categoryId, comma-separated categoryIds, or array of categoryIds (ObjectIds or slugs/names)
     const rawCategoryList: string[] = [];
@@ -248,19 +326,31 @@ export class ProductsService {
     if (!Types.ObjectId.isValid(id)) throw new NotFoundException('Invalid Product ID');
     const product = await this.productModel.findById(id).populate('categoryId', 'name slug').exec();
     if (!product) throw new NotFoundException('Product not found');
+    if (product.storeScope === 'SPECIFIC') {
+      const allowedIds = (product.assignedStoreIds || []).map((sid: any) => sid.toString());
+      if (!storeId || !allowedIds.includes(storeId.toString())) {
+        throw new NotFoundException('Product is not available in this store');
+      }
+    }
     const [enriched] = await this.enrichWithVariants([product], areaId, storeId);
     return enriched;
   }
 
   async findPopular(limit = 10, areaId?: string, storeId?: string) {
+    const storeVisibility = this.buildStoreVisibilityCondition(storeId);
     const products = await this.productModel
-      .find({ isActive: true, isPopular: true }).limit(limit).exec();
+      .find({ isActive: { $ne: false }, isPopular: true, ...storeVisibility })
+      .limit(limit)
+      .exec();
     return this.enrichWithVariants(products, areaId, storeId);
   }
 
   async findDeals(limit = 10, areaId?: string, storeId?: string) {
+    const storeVisibility = this.buildStoreVisibilityCondition(storeId);
     const products = await this.productModel
-      .find({ isActive: true, isDeal: true }).limit(limit).exec();
+      .find({ isActive: { $ne: false }, isDeal: true, ...storeVisibility })
+      .limit(limit)
+      .exec();
     return this.enrichWithVariants(products, areaId, storeId);
   }
 }

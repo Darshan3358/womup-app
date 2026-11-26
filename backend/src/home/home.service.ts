@@ -150,7 +150,7 @@ export class HomeService {
       {
         id: 'fast_delivery',
         title: 'Fresh Grocery & Essentials',
-        subtitle: 'In stock at your nearest dark store',
+        subtitle: 'Freshly stocked for quick doorstep delivery',
         icon: '⚡',
         viewAllFilter: 'fast',
         viewAllLink: '/products?filter=fast',

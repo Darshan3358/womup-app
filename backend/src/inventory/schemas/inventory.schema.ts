@@ -29,6 +29,9 @@ export class Inventory {
 
   @Prop({ default: '', trim: true })
   shelfLocation?: string;
+
+  @Prop({ default: false })
+  isHiddenInStore?: boolean;
 }
 
 export const InventorySchema = SchemaFactory.createForClass(Inventory);

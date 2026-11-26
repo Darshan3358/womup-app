@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,9 @@ interface FileUploadFieldProps {
   required?: boolean;
   value?: string;
   folder?: string;
+  entityType?: 'customer' | 'user' | 'rider' | 'vendor' | 'store';
+  entityId?: string;
+  resourceType?: string;
   onUploadComplete: (url: string) => void;
   helperText?: string;
 }
@@ -26,6 +29,9 @@ export const FileUploadField: React.FC<FileUploadFieldProps> = ({
   required = false,
   value,
   folder = 'womup/kyc',
+  entityType,
+  entityId,
+  resourceType,
   onUploadComplete,
   helperText,
 }) => {
@@ -39,9 +45,18 @@ export const FileUploadField: React.FC<FileUploadFieldProps> = ({
     pickFromGallery,
     uploadFile,
     reset,
-  } = useFileUpload({ folder });
+  } = useFileUpload({ folder, entityType, entityId, resourceType });
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(value || null);
+
+  useEffect(() => {
+    if (!isUploading) {
+      setPreviewUrl(value || null);
+      if (uploadedUrl && value !== uploadedUrl) {
+        reset();
+      }
+    }
+  }, [value, isUploading, uploadedUrl, reset]);
 
   const handlePickAndUpload = async (source: 'camera' | 'gallery') => {
     const uri = source === 'camera' ? await pickFromCamera() : await pickFromGallery();
@@ -62,6 +77,7 @@ export const FileUploadField: React.FC<FileUploadFieldProps> = ({
   };
 
   const activeImage = uploadedUrl || previewUrl || value;
+  const resolvedActiveUri = activeImage ? resolveImageUrl(activeImage) : '';
 
   return (
     <View style={styles.container}>
@@ -88,7 +104,7 @@ export const FileUploadField: React.FC<FileUploadFieldProps> = ({
       ) : activeImage ? (
         /* SUCCESS / PREVIEW STATE */
         <View style={styles.previewBox}>
-          <Image source={{ uri: resolveImageUrl(activeImage) }} style={styles.thumbnail} resizeMode="cover" />
+          <Image key={resolvedActiveUri} source={{ uri: resolvedActiveUri }} style={styles.thumbnail} resizeMode="cover" />
           <View style={styles.previewActions}>
             <TouchableOpacity
               style={styles.actionBtn}

@@ -643,9 +643,9 @@ export const S11_AddAddressScreen: React.FC = () => {
               <Ionicons name="checkmark-circle" size={16} color="#059669" />
               <View style={{ flex: 1 }}>
                 <Text style={styles.serviceAvailableText}>✓ Delivery available in your area</Text>
-                {activeStoreName ? (
-                  <Text style={styles.serviceAvailableStoreText}>Assigned Dark Store: {activeStoreName}</Text>
-                ) : null}
+                <Text style={styles.serviceAvailableStoreText}>
+                  {detectedStoreInfo.areaName ? `${detectedStoreInfo.areaName} · ` : ''}Fast 9-minute delivery
+                </Text>
               </View>
             </View>
           ) : isDeliveryUnavailable ? (

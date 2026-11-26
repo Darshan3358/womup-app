@@ -50,6 +50,9 @@ export const BlinkitOrderAgainScreen: React.FC = () => {
     selectedAddress,
     isInWishlist,
     toggleWishlist,
+    currentAreaId,
+    currentStoreId,
+    catalogVersion,
   } = useApp();
 
   const [popularProducts, setPopularProducts] = useState<BlinkitProduct[]>([]);
@@ -57,20 +60,28 @@ export const BlinkitOrderAgainScreen: React.FC = () => {
   const [printOrders, setPrintOrders] = useState<PrintOrderItem[]>([]);
 
   useEffect(() => {
+    let isMounted = true;
+    setPopularProducts([]);
     (async () => {
       try {
-        const live = await ProductService.fetchProducts();
-        if (live && live.length > 0) {
+        const live = await ProductService.fetchProducts({
+          areaId: currentAreaId || undefined,
+          storeId: currentStoreId || undefined,
+        });
+        if (isMounted && live) {
           setPopularProducts(live.map(mapProductToBlinkit));
         }
       } catch (e) {}
 
       try {
         const prints = await PrintingService.fetchMyPrintOrders();
-        if (prints) setPrintOrders(prints);
+        if (isMounted && prints) setPrintOrders(prints);
       } catch (e) {}
     })();
-  }, []);
+    return () => {
+      isMounted = false;
+    };
+  }, [currentAreaId, currentStoreId, catalogVersion]);
 
   const displayOrders = orders && orders.length > 0 ? orders : DEFAULT_PAST_ORDERS;
   const hasPrintOrders = printOrders && printOrders.length > 0;

@@ -821,7 +821,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
               <View style={{ height: 260, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8FAFC', borderRadius: 16, marginHorizontal: 16, marginTop: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
                 <ActivityIndicator size="small" color={COLORS.purple} />
                 <Text style={{ marginTop: 8, fontSize: 13, fontWeight: '700', color: '#64748B' }}>
-                  Locating Accepting Store...
+                  Preparing delivery route...
                 </Text>
               </View>
             );
@@ -830,12 +830,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
           return (
             <DynamicLiveMap
               storeCoords={storeCoords}
-              storeName={
-                (activeOrder as any)?.store?.name ||
-                (activeOrder as any)?.storeId?.name ||
-                (activeOrder as any)?.storeName ||
-                'Dark Store'
-              }
+              storeName="Dispatch Hub"
               customerCoords={customerCoords}
               customerAddress={customerAddressText}
               riderCoords={riderCoords}
@@ -937,7 +932,7 @@ export const S24_OrderTrackingScreen: React.FC = () => {
               </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
                 <Text style={styles.assigningTitle}>Assigning delivery partner...</Text>
-                <Text style={styles.assigningSub}>Locating nearest available rider at dark store</Text>
+                <Text style={styles.assigningSub}>Finding nearest available rider for your order</Text>
               </View>
             </View>
           )

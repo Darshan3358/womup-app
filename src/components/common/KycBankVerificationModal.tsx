@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import { GradientButton } from './GradientButton';
 import { FileUploadField } from './FileUploadField';
 import { useApp } from '../../context/AppContext';
 import { AuthService } from '../../services/authService';
+import { KycService, normalizeKycStatus } from '../../services/kycService';
 import { StorageService } from '../../services/storageService';
 import { resolveImageUrl } from '../../utils/imageUrl';
 
@@ -58,45 +59,113 @@ export const KycBankVerificationModal: React.FC<KycBankVerificationModalProps> =
   const [accountHolderName, setAccountHolderName] = useState('');
   const [upiId, setUpiId] = useState('');
 
-  // Sync state from user object on open or user update
+  const wasVisibleRef = useRef(false);
+
+  // Sync state from user object on open (once per open) and hydrate latest KYC docs/status from backend
   useEffect(() => {
-    if (visible) {
-      const existingAadhaar = user.aadhaarNumber || (user as any).aadharNumber || '';
-      const formattedAadhaar = existingAadhaar
-        ? existingAadhaar.replace(/\D/g, '').slice(0, 12).match(/.{1,4}/g)?.join(' ') || existingAadhaar
-        : '';
-
-      setFullName(user.fullNameAsPerAadhaar || user.fullName || '');
-      setAadhaarNumber(formattedAadhaar);
-      setFrontImageUrl(
-        user.customer_image_aadhar_front ||
-        (user as any).aadharFrontImage ||
-        (user as any).frontImage ||
-        ''
-      );
-      setBackImageUrl(
-        user.customer_image_aadhar_back ||
-        (user as any).aadharBackImage ||
-        (user as any).backImage ||
-        ''
-      );
-      setBankName(user.bankName || '');
-      setAccountNumber(user.accountNumber || (user as any).bankAccountNo || '');
-      setIfscCode(user.ifscCode || '');
-      setAccountHolderName(user.accountHolderName || user.fullNameAsPerAadhaar || user.fullName || '');
-      setUpiId(user.upiId || '');
-
-      const hasData = Boolean(
-        existingAadhaar ||
-        user.bankName ||
-        user.accountNumber ||
-        (user as any).bankAccountNo
-      );
-      setIsEditing(!hasData);
-      setErrorMsg('');
-      setSuccessMsg('');
+    if (!visible) {
+      wasVisibleRef.current = false;
+      return;
     }
-  }, [visible, user]);
+    if (wasVisibleRef.current) return;
+    wasVisibleRef.current = true;
+
+    const existingAadhaar = user.aadhaarNumber || (user as any).aadharNumber || '';
+    const formattedAadhaar = existingAadhaar
+      ? existingAadhaar.replace(/\D/g, '').slice(0, 12).match(/.{1,4}/g)?.join(' ') || existingAadhaar
+      : '';
+
+    const localFront =
+      user.customer_image_aadhar_front ||
+      (user as any).aadharFrontImage ||
+      (user as any).aadhaarFrontImage ||
+      (user as any).frontImage ||
+      '';
+    const localBack =
+      user.customer_image_aadhar_back ||
+      (user as any).aadharBackImage ||
+      (user as any).aadhaarBackImage ||
+      (user as any).backImage ||
+      '';
+
+    setFullName(user.fullNameAsPerAadhaar || user.fullName || '');
+    setAadhaarNumber(formattedAadhaar);
+    setFrontImageUrl(localFront);
+    setBackImageUrl(localBack);
+    setBankName(user.bankName || '');
+    setAccountNumber(user.accountNumber || (user as any).bankAccountNo || '');
+    setIfscCode(user.ifscCode || '');
+    setAccountHolderName(user.accountHolderName || user.fullNameAsPerAadhaar || user.fullName || '');
+    setUpiId(user.upiId || '');
+
+    const hasData = Boolean(
+      existingAadhaar ||
+      localFront ||
+      localBack ||
+      user.bankName ||
+      user.accountNumber ||
+      (user as any).bankAccountNo
+    );
+    setIsEditing(!hasData);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    let active = true;
+    KycService.getKycStatus()
+      .then((res) => {
+        if (!active || !res?.success || !res.data) return;
+        const d = res.data;
+        const serverFront = d.aadhaarFrontUrl || d.aadharFront || '';
+        const serverBack = d.aadhaarBackUrl || d.aadharBack || '';
+        const norm = normalizeKycStatus(d.kycStatus ?? (d as any).customerKycStatus, d);
+
+        if (d.fullNameAsPerAadhaar) setFullName(d.fullNameAsPerAadhaar);
+        if (d.rawAadhaarNumber) {
+          setAadhaarNumber(
+            d.rawAadhaarNumber.replace(/\D/g, '').slice(0, 12).match(/.{1,4}/g)?.join(' ') ||
+              d.rawAadhaarNumber
+          );
+        }
+        if (serverFront) setFrontImageUrl(serverFront);
+        if (serverBack) setBackImageUrl(serverBack);
+        if (d.bankDetails?.bankName || d.bankName) setBankName(d.bankDetails?.bankName || d.bankName || '');
+        if (d.bankDetails?.rawAccountNumber || d.accountNumber) {
+          setAccountNumber(d.bankDetails?.rawAccountNumber || d.accountNumber || '');
+        }
+        if (d.bankDetails?.ifscCode || d.ifscCode) setIfscCode(d.bankDetails?.ifscCode || d.ifscCode || '');
+        if (d.bankDetails?.accountHolderName) setAccountHolderName(d.bankDetails.accountHolderName);
+        if (d.bankDetails?.upiId || d.upiId) setUpiId(d.bankDetails?.upiId || d.upiId || '');
+
+        if (norm === 'VERIFIED' || norm === 'PENDING') {
+          setIsEditing(false);
+        } else if (!hasData && !serverFront && !serverBack) {
+          setIsEditing(true);
+        }
+
+        setUser((prev: any) => {
+          const merged = {
+            ...prev,
+            customerKycStatus:
+              norm === 'VERIFIED' ? 2 : norm === 'PENDING' ? 1 : norm === 'REJECTED' ? 3 : 0,
+            verificationStatus: norm,
+            aadhaarVerified: norm === 'VERIFIED',
+            customer_image_aadhar_front: serverFront || prev.customer_image_aadhar_front,
+            customer_image_aadhar_back: serverBack || prev.customer_image_aadhar_back,
+            aadharFrontImage: serverFront || prev.aadharFrontImage,
+            aadharBackImage: serverBack || prev.aadharBackImage,
+            aadhaarFrontImage: serverFront || prev.aadhaarFrontImage,
+            aadhaarBackImage: serverBack || prev.aadhaarBackImage,
+          };
+          StorageService.saveItem(StorageService.KEYS.USER, merged);
+          return merged;
+        });
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+    };
+  }, [visible, user, setUser]);
 
   const handleSubmit = async () => {
     setErrorMsg('');
@@ -155,6 +224,8 @@ export const KycBankVerificationModal: React.FC<KycBankVerificationModalProps> =
           customer_image_aadhar_back: backImageUrl,
           aadharFrontImage: frontImageUrl,
           aadharBackImage: backImageUrl,
+          aadhaarFrontImage: frontImageUrl,
+          aadhaarBackImage: backImageUrl,
           bankName: bankName.trim(),
           accountNumber: accountNumber.trim(),
           bankAccountNo: accountNumber.trim(),
@@ -164,7 +235,25 @@ export const KycBankVerificationModal: React.FC<KycBankVerificationModalProps> =
         };
 
         setUser(updatedUser);
-        StorageService.saveItem(StorageService.KEYS.USER, updatedUser);
+        await StorageService.saveItem(StorageService.KEYS.USER, updatedUser);
+        AuthService.getProfile()
+          .then((fresh) => {
+            if (fresh) {
+              setUser((prev) => {
+                const merged = {
+                  ...prev,
+                  ...fresh,
+                  savedAddresses:
+                    prev.savedAddresses && prev.savedAddresses.length > 0
+                      ? prev.savedAddresses
+                      : fresh.savedAddresses,
+                };
+                StorageService.saveItem(StorageService.KEYS.USER, merged);
+                return merged;
+              });
+            }
+          })
+          .catch(() => {});
         setSuccessMsg('KYC & Bank details submitted successfully for admin review!');
         setIsEditing(false);
       } else {
@@ -328,7 +417,22 @@ export const KycBankVerificationModal: React.FC<KycBankVerificationModalProps> =
                   required={false}
                   value={frontImageUrl}
                   folder="womup/kyc/customer"
-                  onUploadComplete={(url) => setFrontImageUrl(url)}
+                  entityType="customer"
+                  entityId={user.id || (user as any)._id}
+                  resourceType="AADHAAR_FRONT"
+                  onUploadComplete={(url) => {
+                    setFrontImageUrl(url);
+                    setUser((prev: any) => {
+                      const next = {
+                        ...prev,
+                        customer_image_aadhar_front: url,
+                        aadharFrontImage: url,
+                        aadhaarFrontImage: url,
+                      };
+                      StorageService.saveItem(StorageService.KEYS.USER, next);
+                      return next;
+                    });
+                  }}
                   helperText="Upload front side showing photo & 12-digit number"
                 />
 
@@ -337,7 +441,22 @@ export const KycBankVerificationModal: React.FC<KycBankVerificationModalProps> =
                   required={false}
                   value={backImageUrl}
                   folder="womup/kyc/customer"
-                  onUploadComplete={(url) => setBackImageUrl(url)}
+                  entityType="customer"
+                  entityId={user.id || (user as any)._id}
+                  resourceType="AADHAAR_BACK"
+                  onUploadComplete={(url) => {
+                    setBackImageUrl(url);
+                    setUser((prev: any) => {
+                      const next = {
+                        ...prev,
+                        customer_image_aadhar_back: url,
+                        aadharBackImage: url,
+                        aadhaarBackImage: url,
+                      };
+                      StorageService.saveItem(StorageService.KEYS.USER, next);
+                      return next;
+                    });
+                  }}
                   helperText="Upload back side showing permanent address"
                 />
               </>
@@ -368,6 +487,7 @@ export const KycBankVerificationModal: React.FC<KycBankVerificationModalProps> =
                 <View style={styles.viewDocCard}>
                   {frontImageUrl ? (
                     <Image
+                      key={frontImageUrl}
                       source={{ uri: resolveImageUrl(frontImageUrl) }}
                       style={styles.viewDocThumb}
                       resizeMode="cover"
@@ -399,6 +519,7 @@ export const KycBankVerificationModal: React.FC<KycBankVerificationModalProps> =
                 <View style={styles.viewDocCard}>
                   {backImageUrl ? (
                     <Image
+                      key={backImageUrl}
                       source={{ uri: resolveImageUrl(backImageUrl) }}
                       style={styles.viewDocThumb}
                       resizeMode="cover"

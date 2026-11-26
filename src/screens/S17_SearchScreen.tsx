@@ -41,6 +41,9 @@ export const S17_SearchScreen: React.FC = () => {
     goBack,
     isVoiceSearchActive,
     setIsVoiceSearchActive,
+    currentAreaId,
+    currentStoreId,
+    catalogVersion,
   } = useApp();
 
   const [query, setQuery] = useState(searchQuery || '');
@@ -58,12 +61,18 @@ export const S17_SearchScreen: React.FC = () => {
     }
   }, [isVoiceSearchActive]);
 
-  // Always load the complete product catalogue (up to 250 products) on mount
+  // Always load the complete store-scoped product catalogue (up to 250 products) on mount or store/area change
   useEffect(() => {
     let isMounted = true;
-    ProductService.fetchProducts({ limit: 250 })
+    setProducts([]);
+    setServerResults([]);
+    ProductService.fetchProducts({
+      areaId: currentAreaId || undefined,
+      storeId: currentStoreId || undefined,
+      limit: 250,
+    })
       .then((loaded) => {
-        if (isMounted && loaded && loaded.length > 0) {
+        if (isMounted && loaded) {
           setProducts(loaded);
         }
       })
@@ -72,7 +81,7 @@ export const S17_SearchScreen: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [currentAreaId, currentStoreId, catalogVersion]);
 
   // 1. Instant local search match (0ms latency, handles multi-word queries)
   const localResults = useMemo(() => {
@@ -105,6 +114,8 @@ export const S17_SearchScreen: React.FC = () => {
       try {
         const liveHits = await ProductService.fetchProducts({
           search: trimmed,
+          areaId: currentAreaId || undefined,
+          storeId: currentStoreId || undefined,
           limit: 100,
         });
         if (isMounted) {
@@ -121,7 +132,7 @@ export const S17_SearchScreen: React.FC = () => {
       isMounted = false;
       clearTimeout(timer);
     };
-  }, [query]);
+  }, [query, currentAreaId, currentStoreId, catalogVersion]);
 
   // 3. Combined deduplicated results: local instant + server live
   const results = useMemo(() => {

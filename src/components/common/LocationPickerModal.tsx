@@ -344,8 +344,8 @@ export const LocationPickerModal: React.FC = () => {
                                 ]}
                               >
                                 {isFarOrFallback
-                                  ? `Serving Hub: ${servingStore || 'Assigned Dark Store'}${distanceDisplay ? ` (${distanceDisplay} away)` : ''}${etaMinutes ? ` · ETA ${etaMinutes} mins` : ''}`
-                                  : `Serving Hub: ${servingStore || 'Assigned Dark Store'}${etaMinutes ? ` · Delivery in ${etaMinutes} mins` : ''}`}
+                                  ? `Delivering to ${gpsResolvedArea?.areaName || 'your area'}${distanceDisplay ? ` (${distanceDisplay})` : ''}${etaMinutes ? ` · ETA ${etaMinutes} mins` : ''}`
+                                  : `Delivering to ${gpsResolvedArea?.areaName || 'your area'}${etaMinutes ? ` · Delivery in ${etaMinutes} mins` : ''}`}
                               </Text>
                             </View>
                           ) : null}

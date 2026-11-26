@@ -38,8 +38,13 @@ export const mapProductToBlinkit = (p: Product): BlinkitProduct => ({
   deliveryMinutes: p.deliveryMinutes || 9,
   rating: p.rating || 4.8,
   reviewCount: p.reviewCount || 120,
-  stockUrgency: typeof p.stock === 'number' && p.stock > 0 && p.stock < 10 ? `Only ${p.stock} left` : undefined,
-  stock: typeof p.stock === 'number' && p.stock > 0 ? p.stock : 100,
+  stockUrgency:
+    typeof p.stock === 'number' && p.stock > 0 && p.stock <= 5
+      ? `Hurry! Only ${p.stock} left`
+      : typeof p.stock === 'number' && p.stock > 5 && p.stock < 10
+      ? `Only ${p.stock} left`
+      : undefined,
+  stock: typeof p.stock === 'number' ? Math.max(0, p.stock) : 100,
   imageUrl: p.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&q=80',
   galleryImages: [p.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&q=80'],
   specifications: p.specifications || {},
@@ -62,7 +67,7 @@ export const mapBlinkitToProduct = (bp: BlinkitProduct): Product => ({
   shoppingCoins: 10,
   rating: bp.rating || 4.8,
   reviewCount: bp.reviewCount || 100,
-  stock: bp.stock || 100,
+  stock: typeof bp.stock === 'number' ? Math.max(0, bp.stock) : 100,
   deliveryMinutes: bp.deliveryMinutes || 9,
   description: bp.description || `${bp.name} - Fresh everyday essential`,
   imageUrl: bp.imageUrl || (bp.galleryImages && bp.galleryImages[0]) || '',
@@ -409,6 +414,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (targetLat !== undefined && targetLng !== undefined) {
           LocationService.resolveArea(targetLat, targetLng, false).then((res) => {
             if (res && (res.serviceable || (res.areaId && res.storeId))) {
+              ProductService.clearHomeCache(true);
               setCurrentAreaId(res.areaId);
               setCurrentAreaName(res.areaName);
               setCurrentCityName(res.city || 'Ahmedabad');
@@ -418,6 +424,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               if (res.deliveryMinutes) {
                 setDeliveryEtaMinutes(res.deliveryMinutes);
               }
+              setCatalogVersion((v) => v + 1);
             }
           }).catch(() => {});
         }
@@ -433,14 +440,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let targetLat = typeof address.latitude === 'number' && !isNaN(address.latitude) ? address.latitude : undefined;
     let targetLng = typeof address.longitude === 'number' && !isNaN(address.longitude) ? address.longitude : undefined;
 
-    // Check if the address specifies a known area (e.g. "Prahlad Nagar" or "Thaltej")
+    // Check if the address specifies a known area; only set IDs optimistically if they are real MongoDB ObjectIds
     const matchedArea = matchAreaByName(address.areaLandmark || address.street || address.houseFlat || address.city);
     if (matchedArea) {
-      // Instantly mark serviceable with default store metadata so UI immediately shows serviceable
-      setCurrentAreaId(matchedArea.id || 'thaltej_area');
+      if (isValidMongoId(matchedArea.id)) {
+        setCurrentAreaId(matchedArea.id!);
+      }
       setCurrentAreaName(matchedArea.name);
       setCurrentCityName(matchedArea.city || 'Ahmedabad');
-      setCurrentStoreId(matchedArea.storeId || 'store_thaltej');
+      if (isValidMongoId(matchedArea.storeId)) {
+        setCurrentStoreId(matchedArea.storeId!);
+      } else {
+        setCurrentStoreId(null);
+      }
       setCurrentStoreName(matchedArea.storeName || `Wom Up ${matchedArea.name} Dark Store`);
       setIsServiceable(true);
       setDeliveryEtaMinutes(9);
@@ -449,8 +461,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         targetLat = matchedArea.lat;
         targetLng = matchedArea.lng;
       } else {
-        // If stored coordinates are geographically divergent from the selected area (e.g., GPS coords from Tragad while address is Prahlad Nagar),
-        // re-anchor coordinates to the chosen area center so the correct local dark store is resolved.
         const dLat = (targetLat - matchedArea.lat) * 111;
         const dLng = (targetLng - matchedArea.lng) * 111 * Math.cos((matchedArea.lat * Math.PI) / 180);
         const distKm = Math.sqrt(dLat * dLat + dLng * dLng);
@@ -463,10 +473,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const queryStr = `${address.houseFlat || ''} ${address.street || ''} ${address.areaLandmark || ''} ${address.city || ''}`;
       const matched = matchAreaByName(queryStr);
       if (matched) {
-        setCurrentAreaId(matched.id || 'thaltej_area');
+        if (isValidMongoId(matched.id)) {
+          setCurrentAreaId(matched.id!);
+        }
         setCurrentAreaName(matched.name);
         setCurrentCityName(matched.city || 'Ahmedabad');
-        setCurrentStoreId(matched.storeId || 'store_thaltej');
+        setCurrentStoreId(isValidMongoId(matched.storeId) ? matched.storeId! : null);
         setCurrentStoreName(matched.storeName || `Wom Up ${matched.name} Dark Store`);
         setIsServiceable(true);
         setDeliveryEtaMinutes(9);
@@ -476,6 +488,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     CartService.clearCache();
+    ProductService.clearHomeCache(true);
 
     const normalized: Address = {
       ...address,
@@ -511,6 +524,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
 
         if (area) {
+          ProductService.clearHomeCache(true);
           setCurrentAreaId(area.areaId);
           setCurrentAreaName(area.areaName);
           setCurrentCityName(area.city || user.preferredCityName || 'Ahmedabad');
@@ -519,6 +533,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const isSrv = area.serviceable === true || Boolean(area.areaId && area.storeId);
           setIsServiceable(isSrv);
           setDeliveryEtaMinutes(area.deliveryMinutes || 9);
+          setCatalogVersion((v) => v + 1);
 
           // Refresh products catalog for this new area and store
           try {
@@ -577,6 +592,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     LocationService.clearCache();
+    ProductService.clearHomeCache(true);
 
     try {
       const area = await LocationService.resolveArea(loc.latitude, loc.longitude, true);
@@ -586,6 +602,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       if (area) {
+        ProductService.clearHomeCache(true);
         setCurrentAreaId(area.areaId || null);
         setCurrentAreaName(area.areaName || null);
         setCurrentCityName(area.city || null);
@@ -594,6 +611,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const isSrv = area.serviceable === true;
         setIsServiceable(isSrv);
         setDeliveryEtaMinutes(isSrv ? (area.deliveryMinutes || null) : null);
+        setCatalogVersion((v) => v + 1);
 
         try {
           const liveProducts = await ProductService.fetchProducts({
@@ -675,8 +693,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
+    ProductService.clearHomeCache(true);
     setCurrentAreaId(areaId);
     setCurrentAreaName(areaName);
+    setCatalogVersion((v) => v + 1);
 
     if (syncSocketRef.current?.connected) {
       syncSocketRef.current.emit('location_changed', {
@@ -701,8 +721,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
+    ProductService.clearHomeCache(true);
     setCurrentStoreId(storeId);
     setCurrentStoreName(storeName);
+    setCatalogVersion((v) => v + 1);
 
     if (syncSocketRef.current?.connected) {
       syncSocketRef.current.emit('location_changed', {
@@ -1260,21 +1282,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Real-time Catalog & Price synchronization from Admin
     socket.on('catalog:updated', (payload: any) => {
       console.log('[AppContext] Real-time catalog update received from Admin:', payload);
-      ProductService.clearHomeCache();
+      ProductService.clearHomeCache(true);
       setCatalogVersion((v) => v + 1);
     });
 
     socket.on('catalog:price-updated', (payload: any) => {
       console.log('[AppContext] Real-time price update received from Admin:', payload);
-      ProductService.clearHomeCache();
+      ProductService.clearHomeCache(true);
       setCatalogVersion((v) => v + 1);
     });
 
     socket.on('inventory_update', (payload: any) => {
       console.log('[AppContext] Real-time inventory update received:', payload);
-      ProductService.clearHomeCache();
+      ProductService.clearHomeCache(true);
       setCatalogVersion((v) => v + 1);
     });
+
+    // Real-time KYC & Profile synchronization (no app restart required)
+    const syncFreshUserProfile = () => {
+      AuthService.getProfile()
+        .then((profile) => {
+          if (profile && (profile.email || profile.phoneNumber || profile.fullName)) {
+            setUser((prev) => {
+              const merged = {
+                ...prev,
+                ...profile,
+                savedAddresses:
+                  prev.savedAddresses && prev.savedAddresses.length > 0
+                    ? prev.savedAddresses
+                    : profile.savedAddresses,
+              };
+              StorageService.saveItem(StorageService.KEYS.USER, merged);
+              return merged;
+            });
+          }
+        })
+        .catch(() => {});
+    };
+
+    socket.on('customer_kyc_approved', syncFreshUserProfile);
+    socket.on('kyc_approved', syncFreshUserProfile);
+    socket.on('kyc_rejected', syncFreshUserProfile);
+    socket.on('profile_updated', syncFreshUserProfile);
+    socket.on('user_updated', syncFreshUserProfile);
 
     // Real-time Wishlist synchronization
     socket.on('wishlist_updated', (payload: any) => {
@@ -2015,8 +2065,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       storeId: currentStoreId || undefined,
     }).then((liveProducts) => {
       if (isMounted && liveProducts && liveProducts.length > 0) {
-        setSelectedProduct(liveProducts[0]);
-        setSelectedBlinkitProduct(mapProductToBlinkit(liveProducts[0]));
+        setSelectedProduct((prev) => {
+          if (!prev) return liveProducts[0];
+          const matched = liveProducts.find(
+            (p) => p.id === prev.id || (p as any)._id === prev.id
+          );
+          return matched || prev;
+        });
+        setSelectedBlinkitProduct((prev) => {
+          if (!prev) return mapProductToBlinkit(liveProducts[0]);
+          const matched = liveProducts.find(
+            (p) => p.id === prev.id || (p as any)._id === prev.id
+          );
+          return matched ? mapProductToBlinkit(matched) : prev;
+        });
 
         // Dynamically sync existing blinkitCart item prices without triggering server cart fetch
         setBlinkitCart((prev) => {
@@ -2050,7 +2112,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               }
             }
 
-            if (item.product.sellingPrice !== targetPrice || item.product.mrp !== targetMrp) {
+            if (
+              item.product.sellingPrice !== targetPrice ||
+              item.product.mrp !== targetMrp ||
+              item.product.stock !== targetStock
+            ) {
               hasChanged = true;
               updated[cartKey] = {
                 ...item,
@@ -2545,7 +2611,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const currentQty = existingEntry ? existingEntry.quantity : 0;
     let finalQty: number;
     if (delta > 0) {
-      const maxStock = typeof product.stock === 'number' && product.stock > 0 ? product.stock : 999;
+      const matchedVariant =
+        resolvedVariantId && Array.isArray(product.variants)
+          ? product.variants.find((v: any) => v.id === resolvedVariantId)
+          : undefined;
+      const rawVarStock =
+        matchedVariant && typeof matchedVariant.stock === 'number'
+          ? matchedVariant.stock
+          : undefined;
+      const maxStock =
+        rawVarStock !== undefined
+          ? Math.max(0, rawVarStock)
+          : typeof product.stock === 'number'
+          ? Math.max(0, product.stock)
+          : 999;
+      if (maxStock <= 0) return;
       finalQty = Math.min(currentQty + delta, maxStock);
     } else {
       finalQty = Math.max(0, currentQty + delta);

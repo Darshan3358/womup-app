@@ -190,6 +190,7 @@ export interface ProductVariantItem {
   stock?: number;
   isDefault?: boolean;
   isActive?: boolean;
+  isHiddenInStore?: boolean;
   basePrice?: number;
 }
 
@@ -224,6 +225,8 @@ export interface ProductItem {
   variants?: ProductVariantItem[];
   priceHistory?: PriceHistoryEntry[];
   shelfLocation?: string;
+  storeScope?: 'ALL' | 'SPECIFIC';
+  assignedStoreIds?: string[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -379,6 +382,7 @@ export interface InventoryItem {
   expiryDate?: string;
   status: 'Healthy' | 'Low Stock' | 'Expired';
   shelfLocation?: string;
+  isHiddenInStore?: boolean;
 }
 
 export interface DarkStoreItem {

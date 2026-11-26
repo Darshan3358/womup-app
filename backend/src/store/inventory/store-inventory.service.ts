@@ -22,6 +22,7 @@ import {
   StoreStaffDocument,
 } from '../schemas/store-staff.schema';
 import { TrackingGateway } from '../../tracking/tracking.gateway';
+import { clearHomeCache } from '../../home/home-cache';
 import {
   StockAdjustmentDto,
   RestockDto,
@@ -95,16 +96,31 @@ export class StoreInventoryService {
       }
     }
 
-    const query: any = {};
+    const storeIdStr = storeId ? storeId.toString() : '';
+    const storeIdObjForFilter = storeIdStr && Types.ObjectId.isValid(storeIdStr) ? new Types.ObjectId(storeIdStr) : storeIdStr;
+    const andConditions: any[] = [
+      { isActive: { $ne: false } },
+      storeIdStr
+        ? {
+            $or: [
+              { storeScope: { $ne: 'SPECIFIC' } },
+              { storeScope: 'SPECIFIC', assignedStoreIds: { $in: [storeIdObjForFilter, storeIdStr] } },
+            ],
+          }
+        : { storeScope: { $ne: 'SPECIFIC' } },
+    ];
     if (search && search.trim()) {
       const term = search.trim();
-      query.$or = [
-        { name: { $regex: term, $options: 'i' } },
-        { brand: { $regex: term, $options: 'i' } },
-        { category: { $regex: term, $options: 'i' } },
-        { sku: { $regex: term, $options: 'i' } },
-      ];
+      andConditions.push({
+        $or: [
+          { name: { $regex: term, $options: 'i' } },
+          { brand: { $regex: term, $options: 'i' } },
+          { category: { $regex: term, $options: 'i' } },
+          { sku: { $regex: term, $options: 'i' } },
+        ],
+      });
     }
+    const query: any = { $and: andConditions };
 
     const products = await this.productModel
       .find(query)
@@ -320,10 +336,13 @@ export class StoreInventoryService {
       afterQty,
     });
 
-    // Real-time broadcast stock change strictly to this store
+    clearHomeCache();
+
+    // Real-time broadcast stock change for this store
     this.trackingGateway.broadcastInventoryUpdate({
       storeId: storeId ? storeId.toString() : '',
       productId: product._id.toString(),
+      variantId: targetVariantId ? targetVariantId.toString() : undefined,
       productName: product.name,
       availableQty: afterQty,
       reservedQty: inv.reservedQty || 0,
@@ -390,6 +409,8 @@ export class StoreInventoryService {
       beforeQty,
       afterQty,
     });
+
+    clearHomeCache();
 
     this.trackingGateway.broadcastInventoryUpdate({
       storeId: storeId ? storeId.toString() : '',
@@ -517,10 +538,20 @@ export class StoreInventoryService {
       }
     }
 
-    // Broadcast inventory update to store
+    clearHomeCache();
+
+    // Broadcast inventory update to store & customer apps
     if (storeId) {
       this.trackingGateway.server?.to(`store_${storeId.toString()}`).emit('inventory_update', {
         productId: product._id.toString(),
+        shelfLocation: cleanShelf,
+      });
+      this.trackingGateway.broadcastInventoryUpdate({
+        storeId: storeId.toString(),
+        productId: product._id.toString(),
+        productName: product.name,
+        availableQty: Math.max(0, Number((inv as any).availableQty ?? 0)),
+        reservedQty: Math.max(0, Number((inv as any).reservedQty ?? 0)),
         shelfLocation: cleanShelf,
       });
     }
@@ -577,6 +608,12 @@ export class StoreInventoryService {
       dto.imageUrl?.trim() ||
       'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400';
 
+    const storeIdObjForProd = storeId
+      ? Types.ObjectId.isValid(storeId.toString())
+        ? new Types.ObjectId(storeId.toString())
+        : storeId
+      : undefined;
+
     const product = await this.productModel.create({
       name: cleanName,
       slug,
@@ -591,6 +628,8 @@ export class StoreInventoryService {
       stock: initialQty,
       shelfLocation: cleanShelf,
       description: dto.description?.trim() || `Fresh ${cleanName}`,
+      storeScope: storeIdObjForProd ? 'SPECIFIC' : 'ALL',
+      assignedStoreIds: storeIdObjForProd ? [storeIdObjForProd] : [],
       isActive: true,
     });
 
@@ -631,11 +670,21 @@ export class StoreInventoryService {
 
     this.logger.log(`[Store Add Product] Store ${storeId} added product "${product.name}" with stock ${initialQty}`);
 
+    clearHomeCache();
+
     // Broadcast inventory update
     if (storeId) {
       this.trackingGateway.server?.to(`store_${storeId.toString()}`).emit('inventory_update', {
         productId: product._id.toString(),
         name: product.name,
+      });
+      this.trackingGateway.broadcastInventoryUpdate({
+        storeId: storeId.toString(),
+        productId: product._id.toString(),
+        productName: product.name,
+        availableQty: Math.max(0, Number(inv.availableQty ?? initialQty)),
+        reservedQty: 0,
+        newAvailableStock: Math.max(0, Number(inv.availableQty ?? initialQty)),
       });
     }
 

@@ -634,7 +634,7 @@ export const MyTeamScreen: React.FC = () => {
                         {/* Store / Destination & Date */}
                         <View style={styles.orderStoreRow}>
                           <Text style={styles.orderStoreName} numberOfLines={1}>
-                            {ord.storeName}
+                            {isHome ? 'Doorstep Delivery' : ord.storeName}
                           </Text>
                           <Text style={styles.orderDetailDate}>
                             {new Date(ord.date).toLocaleDateString('en-IN', {

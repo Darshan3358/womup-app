@@ -48,6 +48,8 @@ export const AreaPricingScreen: React.FC = () => {
     selectedZone,
     setSelectedZone,
     darkStores,
+    selectedDarkStore,
+    setSelectedDarkStore,
     categories,
     products,
     areaPricing,
@@ -124,17 +126,28 @@ export const AreaPricingScreen: React.FC = () => {
     });
   }, [currentArea, darkStores]);
 
-  // Default to first store in area when area changes
+  // Default to first store in area when area changes and keep AdminStateContext.selectedDarkStore in sync
   useEffect(() => {
     if (areaStores.length > 0) {
-      const exists = areaStores.some((s: any) => String(s.id || s._id) === String(selectedStoreId));
-      if (!exists) {
+      const matched = areaStores.find((s: any) => String(s.id || s._id) === String(selectedStoreId));
+      if (!matched) {
         setSelectedStoreId(String(areaStores[0].id || (areaStores[0] as any)._id));
+        if (setSelectedDarkStore) setSelectedDarkStore(areaStores[0].name);
+      } else if (setSelectedDarkStore && selectedDarkStore !== matched.name) {
+        setSelectedDarkStore(matched.name);
       }
     } else {
       setSelectedStoreId('');
+      if (setSelectedDarkStore && selectedDarkStore !== '') {
+        setSelectedDarkStore('');
+      }
     }
-  }, [areaStores, selectedStoreId]);
+  }, [areaStores, selectedStoreId, selectedDarkStore, setSelectedDarkStore]);
+
+  const activeAreaStore =
+    areaStores.find((s: any) => String(s.id || s._id) === String(selectedStoreId)) ||
+    areaStores[0] ||
+    null;
 
   const resolvedStore = darkStores.find((s: any) => {
     if (currentArea) {
@@ -221,6 +234,8 @@ export const AreaPricingScreen: React.FC = () => {
   const handleEditProduct = (product: ProductItem) => {
     const areaAwareProduct = {
       ...product,
+      selectedStoreId: activeAreaStore ? String(activeAreaStore.id || (activeAreaStore as any)._id || '') : '',
+      selectedStoreName: activeAreaStore?.name || '',
       selectedAreaId: currentAreaId || (currentArea ? String(currentArea.id || (currentArea as any)._id) : ''),
       selectedAreaName: currentAreaName || currentArea?.name || '',
       variants: (product.variants || []).map((v) => {
@@ -416,7 +431,15 @@ export const AreaPricingScreen: React.FC = () => {
 
         <TouchableOpacity
           style={styles.addCatalogItemBtn}
-          onPress={() => setActiveModal('AddProduct')}
+          onPress={() => {
+            if (setSelectedDarkStore) {
+              setSelectedDarkStore(activeAreaStore ? activeAreaStore.name : '');
+            }
+            if (setSelectedZone) {
+              setSelectedZone(currentAreaName || '');
+            }
+            setActiveModal('AddProduct');
+          }}
           activeOpacity={0.85}
         >
           <Plus size={15} color="#FFFFFF" strokeWidth={2.5} style={{ marginRight: 4 }} />

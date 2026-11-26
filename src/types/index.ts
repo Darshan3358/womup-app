@@ -202,8 +202,11 @@ export interface UserProfile {
   customer_aadhar_no?: string;
   customer_image_aadhar_front?: string;
   customer_image_aadhar_back?: string;
+  aadhaarFrontImage?: string;
+  aadhaarBackImage?: string;
   aadharFrontImage?: string;
   aadharBackImage?: string;
+  avatar?: string;
   passbookImage?: string;
   bankProofImage?: string;
   cancelledChequeImage?: string;

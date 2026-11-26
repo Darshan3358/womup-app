@@ -445,13 +445,8 @@ export const CityAreaDropdownModal: React.FC<CityAreaDropdownModalProps> = ({
                       </View>
 
                       <View style={styles.areaMetaRow}>
-                        <Ionicons name="storefront" size={12} color="#64748B" />
-                        <Text style={styles.darkStoreText} numberOfLines={1}>
-                          {area.darkStoreName || 'Womup Hub'}
-                        </Text>
-                        <Text style={styles.metaDot}>•</Text>
                         <Ionicons name="flash" size={12} color="#D97706" />
-                        <Text style={styles.etaText}>{area.deliveryMinutes} mins</Text>
+                        <Text style={styles.etaText}>Instant Delivery · {area.deliveryMinutes} mins</Text>
                       </View>
                     </View>
 

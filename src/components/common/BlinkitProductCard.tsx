@@ -65,10 +65,25 @@ const BlinkitProductCardComponent: React.FC<BlinkitProductCardProps> = ({
   const currentSellingPrice = activeVariant ? activeVariant.price : product.sellingPrice;
   const currentMrp = activeVariant ? activeVariant.mrp : product.mrp;
   const currentPackSize = activeVariant ? activeVariant.label : product.packSize;
+  const activeStock =
+    activeVariant && typeof activeVariant.stock === 'number'
+      ? Math.max(0, activeVariant.stock)
+      : typeof product.stock === 'number'
+      ? Math.max(0, product.stock)
+      : 100;
+  const isOutOfStock = activeStock === 0;
+  const isCriticalStock = activeStock > 0 && activeStock <= 5;
+  const activeUrgency =
+    activeStock > 0 && activeStock <= 5
+      ? `Hurry! Only ${activeStock} left`
+      : activeStock > 5 && activeStock < 10
+      ? `Only ${activeStock} left`
+      : product.stockUrgency;
 
   const quantity = getBlinkitQty(product.id, activeVariant?.id);
 
   const handleAdd = () => {
+    if (activeStock <= 0) return;
     if (!isServiceable) {
       Alert.alert(
         'Delivery Unavailable',
@@ -81,18 +96,20 @@ const BlinkitProductCardComponent: React.FC<BlinkitProductCardProps> = ({
       sellingPrice: currentSellingPrice,
       mrp: currentMrp,
       packSize: currentPackSize,
+      stock: activeStock,
       selectedVariantId: activeVariant?.id,
     };
     updateBlinkitQty(enrichedProd, 1, activeVariant?.id);
   };
 
   const handleIncrement = () => {
-    if (product.stock && quantity >= product.stock) return;
+    if (quantity >= activeStock) return;
     const enrichedProd: BlinkitProduct = {
       ...product,
       sellingPrice: currentSellingPrice,
       mrp: currentMrp,
       packSize: currentPackSize,
+      stock: activeStock,
       selectedVariantId: activeVariant?.id,
     };
     updateBlinkitQty(enrichedProd, 1, activeVariant?.id);
@@ -144,13 +161,24 @@ const BlinkitProductCardComponent: React.FC<BlinkitProductCardProps> = ({
           )}
           <Image
             source={resolveProductImageSource(product.imageUrl, product.name, (product as any).slug)}
-            style={[styles.wishlistProductImage, !imgLoaded && { opacity: 0 }]}
+            style={[
+              styles.wishlistProductImage,
+              isOutOfStock && { opacity: 0.45 },
+              !imgLoaded && { opacity: 0 },
+            ]}
             resizeMode="cover"
             onLoad={() => setImgLoaded(true)}
           />
           {product.discountBadge && (
             <View style={styles.wishlistDiscountBadge}>
               <Text style={styles.wishlistDiscountBadgeText}>{product.discountBadge}</Text>
+            </View>
+          )}
+          {isOutOfStock && (
+            <View style={styles.oosOverlay}>
+              <View style={styles.oosOverlayBadge}>
+                <Text style={styles.oosOverlayText}>OUT OF STOCK</Text>
+              </View>
             </View>
           )}
         </View>
@@ -194,9 +222,11 @@ const BlinkitProductCardComponent: React.FC<BlinkitProductCardProps> = ({
           {/* Pack size + Urgency info */}
           <View style={styles.wishlistPackRow}>
             <Text style={styles.wishlistPackText}>{product.packSize || '1 unit'}</Text>
-            {product.stockUrgency ? (
-              <View style={styles.wishlistUrgencyPill}>
-                <Text style={styles.wishlistUrgencyText}>{product.stockUrgency}</Text>
+            {activeUrgency ? (
+              <View style={[styles.wishlistUrgencyPill, isCriticalStock && styles.urgencyPillCritical]}>
+                <Text style={[styles.wishlistUrgencyText, isCriticalStock && styles.urgencyTextCritical]}>
+                  {activeUrgency}
+                </Text>
               </View>
             ) : null}
           </View>
@@ -222,10 +252,10 @@ const BlinkitProductCardComponent: React.FC<BlinkitProductCardProps> = ({
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={handleAdd}
-                disabled={isLoading || product.stock === 0 || !isServiceable}
+                disabled={isLoading || activeStock === 0 || !isServiceable}
                 style={[
                   styles.wishlistAddBtn,
-                  (product.stock === 0 || !isServiceable) && styles.disabledButton,
+                  (activeStock === 0 || !isServiceable) && styles.disabledButton,
                 ]}
                 accessibilityLabel={`Add ${product.name} to cart`}
               >
@@ -235,10 +265,10 @@ const BlinkitProductCardComponent: React.FC<BlinkitProductCardProps> = ({
                   <Text
                     style={[
                       styles.wishlistAddBtnText,
-                      (product.stock === 0 || !isServiceable) && styles.disabledButtonText,
+                      (activeStock === 0 || !isServiceable) && styles.disabledButtonText,
                     ]}
                   >
-                    {product.stock === 0 ? 'Out of Stock' : !isServiceable ? 'Not Serviceable' : 'ADD'}
+                    {activeStock === 0 ? 'Out of Stock' : !isServiceable ? 'Not Serviceable' : 'ADD'}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -256,10 +286,10 @@ const BlinkitProductCardComponent: React.FC<BlinkitProductCardProps> = ({
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={handleIncrement}
-                  disabled={Boolean(product.stock && quantity >= product.stock)}
+                  disabled={quantity >= activeStock}
                   style={[
                     styles.stepperButton,
-                    product.stock && quantity >= product.stock ? { opacity: 0.4 } : undefined,
+                    quantity >= activeStock ? { opacity: 0.4 } : undefined,
                   ]}
                   accessibilityLabel="Increase quantity"
                 >
@@ -297,7 +327,11 @@ const BlinkitProductCardComponent: React.FC<BlinkitProductCardProps> = ({
         )}
         <Image
           source={resolveProductImageSource(product.imageUrl, product.name, (product as any).slug)}
-          style={[styles.productImage, !imgLoaded && { opacity: 0 }]}
+          style={[
+            styles.productImage,
+            isOutOfStock && { opacity: 0.45 },
+            !imgLoaded && { opacity: 0 },
+          ]}
           resizeMode="cover"
           onLoad={() => setImgLoaded(true)}
         />
@@ -323,6 +357,14 @@ const BlinkitProductCardComponent: React.FC<BlinkitProductCardProps> = ({
         {product.discountBadge && (
           <View style={styles.discountBadge}>
             <Text style={styles.discountBadgeText}>{product.discountBadge}</Text>
+          </View>
+        )}
+
+        {isOutOfStock && (
+          <View style={styles.oosOverlay}>
+            <View style={styles.oosOverlayBadge}>
+              <Text style={styles.oosOverlayText}>OUT OF STOCK</Text>
+            </View>
           </View>
         )}
 
@@ -357,32 +399,43 @@ const BlinkitProductCardComponent: React.FC<BlinkitProductCardProps> = ({
 
         {/* Pack Size & Variant Selector */}
         {variants.length > 1 ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.cardVariantScroll}>
-            {variants.map((v) => {
-              const isSel = v.id === (activeVariant?.id || v.id);
-              return (
-                <TouchableOpacity
-                  key={v.id}
-                  activeOpacity={0.7}
-                  onPress={(e: any) => {
-                    e?.stopPropagation?.();
-                    setSelectedVariantId(v.id);
-                  }}
-                  style={[styles.cardVariantChip, isSel && styles.cardVariantChipActive]}
-                >
-                  <Text style={[styles.cardVariantChipText, isSel && styles.cardVariantChipTextActive]}>
-                    {v.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+          <View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.cardVariantScroll}>
+              {variants.map((v) => {
+                const isSel = v.id === (activeVariant?.id || v.id);
+                return (
+                  <TouchableOpacity
+                    key={v.id}
+                    activeOpacity={0.7}
+                    onPress={(e: any) => {
+                      e?.stopPropagation?.();
+                      setSelectedVariantId(v.id);
+                    }}
+                    style={[styles.cardVariantChip, isSel && styles.cardVariantChipActive]}
+                  >
+                    <Text style={[styles.cardVariantChipText, isSel && styles.cardVariantChipTextActive]}>
+                      {v.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            {activeUrgency && (
+              <View style={[styles.urgencyPill, isCriticalStock && styles.urgencyPillCritical, { marginTop: 2 }]}>
+                <Text style={[styles.urgencyText, isCriticalStock && styles.urgencyTextCritical]}>
+                  {activeUrgency}
+                </Text>
+              </View>
+            )}
+          </View>
         ) : (
           <View style={styles.packAndStockRow}>
             <Text style={styles.packSizeText}>{currentPackSize}</Text>
-            {product.stockUrgency && (
-              <View style={styles.urgencyPill}>
-                <Text style={styles.urgencyText}>{product.stockUrgency}</Text>
+            {activeUrgency && (
+              <View style={[styles.urgencyPill, isCriticalStock && styles.urgencyPillCritical]}>
+                <Text style={[styles.urgencyText, isCriticalStock && styles.urgencyTextCritical]}>
+                  {activeUrgency}
+                </Text>
               </View>
             )}
           </View>
@@ -409,10 +462,10 @@ const BlinkitProductCardComponent: React.FC<BlinkitProductCardProps> = ({
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={handleAdd}
-              disabled={isLoading || product.stock === 0 || !isServiceable}
+              disabled={isLoading || activeStock === 0 || !isServiceable}
               style={[
                 styles.addButton,
-                (product.stock === 0 || !isServiceable) && styles.disabledButton,
+                (activeStock === 0 || !isServiceable) && styles.disabledButton,
               ]}
               accessibilityLabel={`Add ${product.name} to cart`}
             >
@@ -422,10 +475,10 @@ const BlinkitProductCardComponent: React.FC<BlinkitProductCardProps> = ({
                 <Text
                   style={[
                     styles.addButtonText,
-                    (product.stock === 0 || !isServiceable) && styles.disabledButtonText,
+                    (activeStock === 0 || !isServiceable) && styles.disabledButtonText,
                   ]}
                 >
-                  {product.stock === 0 ? 'Out of Stock' : !isServiceable ? 'Not Serviceable' : 'ADD'}
+                  {activeStock === 0 ? 'Out of Stock' : !isServiceable ? 'Not Serviceable' : 'ADD'}
                 </Text>
               )}
             </TouchableOpacity>
@@ -443,10 +496,10 @@ const BlinkitProductCardComponent: React.FC<BlinkitProductCardProps> = ({
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={handleIncrement}
-                disabled={Boolean(product.stock && quantity >= product.stock)}
+                disabled={quantity >= activeStock}
                 style={[
                   styles.stepperButton,
-                  product.stock && quantity >= product.stock ? { opacity: 0.4 } : undefined,
+                  quantity >= activeStock ? { opacity: 0.4 } : undefined,
                 ]}
                 accessibilityLabel="Increase quantity"
               >
@@ -629,13 +682,45 @@ const styles = StyleSheet.create({
   urgencyPill: {
     backgroundColor: '#FEF3C7',
     paddingHorizontal: 6,
-    paddingVertical: 1,
+    paddingVertical: 2,
     borderRadius: 4,
+    alignSelf: 'flex-start',
+  },
+  urgencyPillCritical: {
+    backgroundColor: '#FEE2E2',
+    borderWidth: 0.5,
+    borderColor: '#FCA5A5',
   },
   urgencyText: {
     fontSize: 9,
     fontWeight: '700',
     color: '#B45309',
+  },
+  urgencyTextCritical: {
+    color: '#DC2626',
+  },
+  oosOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 3,
+  },
+  oosOverlayBadge: {
+    backgroundColor: 'rgba(15, 23, 42, 0.78)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  oosOverlayText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.4,
   },
   priceAndActionRow: {
     flexDirection: 'row',

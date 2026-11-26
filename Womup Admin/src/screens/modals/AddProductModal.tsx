@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -25,6 +25,8 @@ import {
   AlertCircle,
   ChevronDown,
   Link2,
+  Store,
+  Layers,
 } from 'lucide-react-native';
 import { useAdminState } from '../../context/AdminStateContext';
 import { ProductVariantItem } from '../../types/admin';
@@ -44,7 +46,49 @@ interface FormVariant {
 }
 
 export const AddProductModal: React.FC = () => {
-  const { activeModal, setActiveModal, categories, addProductItem } = useAdminState();
+  const {
+    activeModal,
+    setActiveModal,
+    categories,
+    darkStores,
+    selectedDarkStore,
+    selectedZone,
+    activeTab,
+    subView,
+    addProductItem,
+  } = useAdminState();
+
+  const activeDarkStores = (darkStores || []).filter((s: any) => s && s.isActive !== false);
+
+  const cleanedSelectedStore = (selectedDarkStore || '').trim();
+  const isGenericOrEmptyStore =
+    !cleanedSelectedStore ||
+    cleanedSelectedStore.toLowerCase().includes('all dark store') ||
+    cleanedSelectedStore.toLowerCase().includes('no dark store');
+  const isStoreScopedView =
+    subView === 'SingleZonePricing' ||
+    (subView === 'none' && (activeTab === 'Inventory' || activeTab === 'Prices'));
+
+  const contextDarkStore =
+    isStoreScopedView && !isGenericOrEmptyStore
+      ? activeDarkStores.find(
+          (s: any) =>
+            (s.name || '').toLowerCase() === cleanedSelectedStore.toLowerCase() ||
+            String(s.id || s._id || '') === cleanedSelectedStore
+        )
+      : undefined;
+  const contextStoreId = contextDarkStore
+    ? String(contextDarkStore.id || (contextDarkStore as any)._id || '')
+    : '';
+  const displayedDarkStores = contextStoreId
+    ? [...activeDarkStores].sort((a: any, b: any) => {
+        const aId = String(a.id || a._id || '');
+        const bId = String(b.id || b._id || '');
+        if (aId === contextStoreId) return -1;
+        if (bId === contextStoreId) return 1;
+        return 0;
+      })
+    : activeDarkStores;
 
   // Basic Info
   const [name, setName] = useState('');
@@ -52,6 +96,21 @@ export const AddProductModal: React.FC = () => {
   const [brand, setBrand] = useState('Womup Fresh');
   const [shelfLocation, setShelfLocation] = useState('A1-R2');
   const [description, setDescription] = useState('');
+
+  // Store Assignment Scope ("All Stores" vs "Particular Store(s)")
+  const [storeScope, setStoreScope] = useState<'ALL' | 'SPECIFIC'>('ALL');
+  const [selectedStoreIds, setSelectedStoreIds] = useState<string[]>(() =>
+    contextStoreId ? [contextStoreId] : []
+  );
+  const userEditedStoresRef = useRef(false);
+
+  const toggleSelectedStoreId = (storeId: string) => {
+    userEditedStoresRef.current = true;
+    setSelectedStoreIds((prev) =>
+      prev.includes(storeId) ? prev.filter((id) => id !== storeId) : [...prev, storeId]
+    );
+    setErrorMsg(null);
+  };
 
   // Image Upload / URL
   const [imageUrl, setImageUrl] = useState('');
@@ -96,6 +155,26 @@ export const AddProductModal: React.FC = () => {
 
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeModal === 'AddProduct') {
+      userEditedStoresRef.current = false;
+      setStoreScope('ALL');
+      setErrorMsg(null);
+    }
+  }, [activeModal]);
+
+  useEffect(() => {
+    if (activeModal === 'AddProduct' && !selectedCategoryId && categories[0]?.id) {
+      setSelectedCategoryId(categories[0].id);
+    }
+  }, [activeModal, categories, selectedCategoryId]);
+
+  useEffect(() => {
+    if (activeModal === 'AddProduct' && !userEditedStoresRef.current) {
+      setSelectedStoreIds(contextStoreId ? [contextStoreId] : []);
+    }
+  }, [activeModal, contextStoreId]);
 
   if (activeModal !== 'AddProduct') return null;
 
@@ -268,6 +347,11 @@ export const AddProductModal: React.FC = () => {
       return;
     }
 
+    if (storeScope === 'SPECIFIC' && selectedStoreIds.length === 0) {
+      setErrorMsg('Please select at least one Dark Store for Particular Store(s) assignment.');
+      return;
+    }
+
     if (variants.length === 0) {
       setErrorMsg('Please configure at least one pack variant.');
       return;
@@ -298,21 +382,24 @@ export const AddProductModal: React.FC = () => {
     setSaving(true);
     try {
       const chosenCat = categories.find((c) => c.id === selectedCategoryId) || categories[0];
-      const formattedVariants: ProductVariantItem[] = variants.map((v) => ({
-        id: v.id.startsWith('v_') ? '' : v.id,
-        productId: '',
-        sku:
-          v.sku.trim() ||
-          `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${v.weightOrVolume
-            .replace(/[^a-z0-9]+/gi, '')
-            .toLowerCase()}`,
-        weightOrVolume: v.weightOrVolume.trim(),
-        mrp: parseFloat(v.mrp),
-        sellingPrice: parseFloat(v.sellingPrice),
-        stock: parseInt(v.stock, 10) || 50,
-        isDefault: v.isDefault,
-        isActive: v.isActive,
-      }));
+      const formattedVariants: ProductVariantItem[] = variants.map((v) => {
+        const parsedStock = parseInt(v.stock, 10);
+        return {
+          id: v.id.startsWith('v_') ? '' : v.id,
+          productId: '',
+          sku:
+            v.sku.trim() ||
+            `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${v.weightOrVolume
+              .replace(/[^a-z0-9]+/gi, '')
+              .toLowerCase()}`,
+          weightOrVolume: v.weightOrVolume.trim(),
+          mrp: parseFloat(v.mrp),
+          sellingPrice: parseFloat(v.sellingPrice),
+          stock: Number.isNaN(parsedStock) ? 50 : Math.max(0, parsedStock),
+          isDefault: v.isDefault,
+          isActive: v.isActive,
+        };
+      });
 
       const defaultVar = formattedVariants.find((v) => v.isDefault) || formattedVariants[0];
       const finalImage = (imageUrl || '').trim() || 'https://images.unsplash.com/photo-1546094096-0df4bcaaa337?w=400&q=80';
@@ -330,13 +417,23 @@ export const AddProductModal: React.FC = () => {
         sellingPrice: defaultVar.sellingPrice,
         mrp: defaultVar.mrp,
         basePrice: defaultVar.sellingPrice,
-        stockKg: defaultVar.stock || 50,
+        stockKg: defaultVar.stock !== undefined ? defaultVar.stock : 50,
         isActive: true,
         variants: formattedVariants,
         shelfLocation: shelfLocation.trim() || 'A1-R2',
+        storeScope,
+        assignedStoreIds: storeScope === 'SPECIFIC' ? selectedStoreIds : [],
       } as any);
 
       if (success) {
+        userEditedStoresRef.current = false;
+        setName('');
+        setDescription('');
+        setImageUrl('');
+        setImagePreview('');
+        setImageSource(null);
+        setStoreScope('ALL');
+        setSelectedStoreIds(contextStoreId ? [contextStoreId] : []);
         handleClose();
       } else {
         setErrorMsg('Failed to add product. Please check your network and try again.');
@@ -354,9 +451,18 @@ export const AddProductModal: React.FC = () => {
         <View style={styles.modalCard}>
           {/* Header */}
           <View style={styles.modalHeader}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <PlusCircle size={18} color="#4F46E5" />
-              <Text style={styles.modalTitle}>Add New Product Item</Text>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <PlusCircle size={18} color="#4F46E5" />
+                <Text style={styles.modalTitle}>Add New Product Item</Text>
+              </View>
+              {contextDarkStore && (
+                <Text style={{ fontSize: 11, color: '#6366F1', fontWeight: '700', marginTop: 3 }}>
+                  🏬 {contextDarkStore.name}
+                  {Boolean(contextDarkStore.areaName || selectedZone) &&
+                    ` • 📍 ${contextDarkStore.areaName || selectedZone}`}
+                </Text>
+              )}
             </View>
             <TouchableOpacity onPress={handleClose} style={styles.closeBtn} activeOpacity={0.7}>
               <X size={18} color="#94A3B8" />
@@ -484,6 +590,142 @@ export const AddProductModal: React.FC = () => {
                   onChangeText={setDescription}
                 />
               </View>
+            </View>
+
+            {/* SECTION 1B: STORE AVAILABILITY (ALL STORES VS PARTICULAR STORE(S)) */}
+            <View style={styles.sectionWrap}>
+              <Text style={styles.sectionHeading}>
+                <Store size={13} color="#4F46E5" /> STORE AVAILABILITY & INVENTORY TARGET
+              </Text>
+
+              <View style={styles.storeScopeRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.storeScopeCard,
+                    storeScope === 'ALL' && styles.storeScopeCardActive,
+                  ]}
+                  onPress={() => {
+                    setStoreScope('ALL');
+                    setErrorMsg(null);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.storeScopeTop}>
+                    <View style={[styles.radioCircle, storeScope === 'ALL' && styles.radioCircleActive]}>
+                      {storeScope === 'ALL' && <View style={styles.radioDot} />}
+                    </View>
+                    <Layers size={14} color={storeScope === 'ALL' ? '#FF3B98' : '#64748B'} />
+                    <Text style={[styles.storeScopeTitle, storeScope === 'ALL' && { color: '#071B52' }]}>
+                      All Stores (Global Catalog)
+                    </Text>
+                  </View>
+                  <Text style={styles.storeScopeDesc}>
+                    Creates stock in every active dark store ({activeDarkStores.length} stores)
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.storeScopeCard,
+                    storeScope === 'SPECIFIC' && styles.storeScopeCardActive,
+                  ]}
+                  onPress={() => {
+                    setStoreScope('SPECIFIC');
+                    if (selectedStoreIds.length === 0 && contextStoreId) {
+                      setSelectedStoreIds([contextStoreId]);
+                    }
+                    setErrorMsg(null);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.storeScopeTop}>
+                    <View style={[styles.radioCircle, storeScope === 'SPECIFIC' && styles.radioCircleActive]}>
+                      {storeScope === 'SPECIFIC' && <View style={styles.radioDot} />}
+                    </View>
+                    <Store size={14} color={storeScope === 'SPECIFIC' ? '#FF3B98' : '#64748B'} />
+                    <Text style={[styles.storeScopeTitle, storeScope === 'SPECIFIC' && { color: '#071B52' }]}>
+                      Particular Store(s)
+                    </Text>
+                  </View>
+                  <Text style={styles.storeScopeDesc}>
+                    Visible & stocked ONLY in checked dark store(s)
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {storeScope === 'SPECIFIC' && (
+                <View style={{ marginTop: 10 }}>
+                  <Text style={styles.formLabel}>
+                    Select Dark Store(s) — {selectedStoreIds.length} selected <Text style={{ color: '#DC2626' }}>*</Text>
+                  </Text>
+                  <View style={styles.storeDropdownList}>
+                    {displayedDarkStores.length === 0 ? (
+                      <Text style={{ padding: 10, fontSize: 12, color: '#94A3B8' }}>
+                        No active dark stores found.
+                      </Text>
+                    ) : (
+                      displayedDarkStores.map((s: any) => {
+                        const sId = String(s.id || s._id || '');
+                        const isChosen = selectedStoreIds.includes(sId);
+                        const isCurrentContext = Boolean(contextStoreId && sId === contextStoreId);
+                        return (
+                          <TouchableOpacity
+                            key={sId}
+                            style={[
+                              styles.storeDropdownItem,
+                              isChosen && { backgroundColor: '#FDF2F8' },
+                            ]}
+                            onPress={() => toggleSelectedStoreId(sId)}
+                            activeOpacity={0.75}
+                          >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 8 }}>
+                              <View
+                                style={{
+                                  width: 16,
+                                  height: 16,
+                                  borderRadius: 4,
+                                  borderWidth: 1.5,
+                                  borderColor: isChosen ? '#FF3B98' : '#94A3B8',
+                                  backgroundColor: isChosen ? '#FF3B98' : '#FFFFFF',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                }}
+                              >
+                                {isChosen && <Check size={11} color="#FFFFFF" strokeWidth={3} />}
+                              </View>
+                              <Text
+                                style={[
+                                  styles.storeDropdownItemText,
+                                  isChosen && { color: '#BE185D', fontWeight: '800' },
+                                ]}
+                                numberOfLines={1}
+                              >
+                                {s.name} ({s.areaName || s.city || 'Hub'})
+                              </Text>
+                              {isCurrentContext && (
+                                <View
+                                  style={{
+                                    backgroundColor: '#EEF2FF',
+                                    borderColor: '#C7D2FE',
+                                    borderWidth: 1,
+                                    paddingHorizontal: 6,
+                                    paddingVertical: 2,
+                                    borderRadius: 4,
+                                  }}
+                                >
+                                  <Text style={{ fontSize: 9, fontWeight: '800', color: '#4F46E5' }}>
+                                    CURRENT
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })
+                    )}
+                  </View>
+                </View>
+              )}
             </View>
 
             {/* SECTION 2: MEDIA & PRODUCT PHOTO */}
@@ -957,6 +1199,66 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#071B52',
     flex: 1,
+  },
+  storeScopeRow: {
+    flexDirection: 'row',
+    gap: 10,
+    flexWrap: 'wrap',
+  },
+  storeScopeCard: {
+    flex: 1,
+    minWidth: 200,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    padding: 10,
+    backgroundColor: '#F8FAFC',
+  },
+  storeScopeCardActive: {
+    borderColor: '#FF3B98',
+    backgroundColor: '#FFF1F7',
+  },
+  storeScopeTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginBottom: 4,
+  },
+  storeScopeTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#334155',
+    flex: 1,
+  },
+  storeScopeDesc: {
+    fontSize: 11,
+    color: '#64748B',
+    paddingLeft: 25,
+  },
+  storeDropdownList: {
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    maxHeight: 170,
+    overflow: 'hidden',
+  },
+  storeDropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  storeDropdownItemText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#071B52',
+    flex: 1,
+    marginRight: 8,
   },
   mediaRow: {
     flexDirection: 'row',
