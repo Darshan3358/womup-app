@@ -1,4 +1,4 @@
-package com.wormup.customerapp
+package com.womup.customerapp
 
 import android.os.Build
 import android.os.Bundle

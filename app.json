@@ -39,6 +39,14 @@
         {
           "cameraPermission": "Allow WOMART to access your camera to scan vendor counter QR codes."
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enablePngCrunchInReleaseBuilds": false
+          }
+        }
       ]
     ],
     "ios": {

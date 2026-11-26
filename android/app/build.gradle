@@ -87,9 +87,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.wormup.customerapp'
+    namespace 'com.womup.customerapp'
     defaultConfig {
-        applicationId 'com.wormup.customerapp'
+        applicationId 'com.womup.customerapp'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 3
