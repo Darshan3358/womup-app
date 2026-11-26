@@ -184,4 +184,13 @@ export class UsersController {
   async getMyPincodeRequests(@CurrentUser() user: any) {
     return this.usersService.getMyPincodeChangeRequests(user.id);
   }
+
+  @Delete('account')
+  @ApiOperation({ summary: 'Permanently delete and anonymize currently authenticated customer account' })
+  async deleteMyAccount(
+    @CurrentUser() user: any,
+    @Body() body?: { reason?: string },
+  ) {
+    return this.usersService.deleteAccount(user.id, body?.reason);
+  }
 }

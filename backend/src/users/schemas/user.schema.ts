@@ -180,6 +180,15 @@ export class User {
   @Prop({ default: true })
   isActive: boolean;
 
+  @Prop({ default: false })
+  isDeleted?: boolean;
+
+  @Prop()
+  deletedAt?: Date;
+
+  @Prop({ default: '' })
+  deletionReason?: string;
+
   // ── tbl_customer Full SQL Schema Alignment ──
   @Prop({ default: '' })
   customerCodeNumber?: string;

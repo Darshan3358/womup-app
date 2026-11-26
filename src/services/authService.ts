@@ -529,6 +529,13 @@ export const AuthService = {
     await StorageService.removeItem(StorageService.KEYS.REFRESH_TOKEN);
     await StorageService.removeItem(StorageService.KEYS.USER);
   },
+
+  async deleteAccount(reason?: string): Promise<{ success: boolean; message?: string }> {
+    return api.request<any>('/users/account', {
+      method: 'DELETE',
+      body: JSON.stringify({ reason: reason || 'User requested deletion from mobile app' }),
+    });
+  },
 };
 
 export const generateRandomIndianMobile = (): string => {

@@ -10,7 +10,9 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Linking,
 } from 'react-native';
+import { LEGAL_URLS } from '../services/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../theme/colors';
@@ -545,8 +547,13 @@ export const S06_MobileNumberScreen: React.FC = () => {
         <View style={styles.footer}>
           <Text style={styles.termsText}>
             By continuing, you agree to our{' '}
-            <Text style={styles.linkText}>Terms & Conditions</Text> &{' '}
-            <Text style={styles.linkText}>Privacy Policy</Text>
+            <Text style={styles.linkText} onPress={() => Linking.openURL(LEGAL_URLS.terms)}>
+              Terms & Conditions
+            </Text>{' '}
+            &{' '}
+            <Text style={styles.linkText} onPress={() => Linking.openURL(LEGAL_URLS.privacyPolicy)}>
+              Privacy Policy
+            </Text>
           </Text>
         </View>
       </ScrollView>

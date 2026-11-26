@@ -28,6 +28,17 @@
     "production": {
       "channel": "production",
       "android": {
+        "buildType": "app-bundle",
+        "autoIncrement": true
+      },
+      "ios": {
+        "simulator": false
+      }
+    },
+    "production-apk": {
+      "channel": "production",
+      "distribution": "internal",
+      "android": {
         "buildType": "apk"
       },
       "ios": {
@@ -37,6 +48,10 @@
   },
   
   "submit": {
-    "production": {}
+    "production": {
+      "android": {
+        "track": "internal"
+      }
+    }
   }
 }

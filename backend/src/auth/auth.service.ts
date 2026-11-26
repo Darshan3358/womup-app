@@ -30,6 +30,7 @@ import { Store, StoreDocument } from '../stores/schemas/store.schema';
 import { Vendor, VendorDocument } from '../local-shops/schemas/vendor.schema';
 import { assertCrossRoleIdentityUniqueness } from '../common/services/cross-role-validator';
 import { TrackingGateway } from '../tracking/tracking.gateway';
+import { performCustomerAccountDeletion } from '../users/account-deletion.helper';
 
 @Injectable()
 export class AuthService {
@@ -1659,6 +1660,102 @@ export class AuthService {
       otp,
       ...result,
     };
+  }
+
+  async deleteAccountByOtp(dto: {
+    identifier?: string;
+    email?: string;
+    phoneNumber?: string;
+    phone?: string;
+    otp: string;
+    verificationId?: string;
+    reason?: string;
+  }) {
+    const rawId = (dto.identifier || dto.email || dto.phoneNumber || dto.phone || '').trim();
+    const isEmail = rawId.includes('@');
+    if (!rawId) {
+      throw new BadRequestException('Please enter your registered email or 10-digit mobile number.');
+    }
+
+    let record: OtpVerificationDocument | null = null;
+    let user: UserDocument | null = null;
+
+    if (isEmail) {
+      const cleanEmail = rawId.toLowerCase();
+      if (dto.verificationId) {
+        record = await this.otpModel.findOne({ verificationId: dto.verificationId });
+      } else {
+        record = await this.otpModel
+          .findOne({
+            $or: [{ email: cleanEmail }, { phoneNumber: cleanEmail }, { phone: cleanEmail }],
+            status: 'PENDING',
+          })
+          .sort({ createdAt: -1 });
+      }
+      user = await this.userModel.findOne({
+        email: cleanEmail,
+        isActive: true,
+        isDeleted: { $ne: true },
+      });
+    } else {
+      const { fullNumber, tenDigit } = this.smsService.normalizePhoneNumber(rawId);
+      if (dto.verificationId) {
+        record = await this.otpModel.findOne({ verificationId: dto.verificationId });
+      } else {
+        record = await this.otpModel
+          .findOne({
+            $or: [{ phoneNumber: fullNumber }, { phone: tenDigit }],
+            status: 'PENDING',
+          })
+          .sort({ createdAt: -1 });
+      }
+      user = await this.userModel.findOne({
+        $or: [{ phone: tenDigit }, { phone: fullNumber }, { phoneNumber: fullNumber }],
+        isActive: true,
+        isDeleted: { $ne: true },
+      });
+    }
+
+    if (!record || record.status !== 'PENDING' || record.isVerified) {
+      throw new BadRequestException('Invalid or expired verification code session. Please request a new code.');
+    }
+    if (record.expiresAt < new Date()) {
+      record.status = 'EXPIRED';
+      await record.save();
+      throw new BadRequestException('Verification code expired. Please request a new code.');
+    }
+
+    const attempts = record.attemptCount || record.attempts || 0;
+    if (attempts >= 5) {
+      record.status = 'FAILED';
+      await record.save();
+      throw new BadRequestException('Maximum verification attempts exceeded. Please request a new code.');
+    }
+
+    const otpValid =
+      this.smsService.verifyOtpHash(dto.otp, record.otpHash || '') ||
+      this.emailService.verifyOtpHash(dto.otp, record.otpHash || '');
+    if (!otpValid) {
+      record.attemptCount = attempts + 1;
+      record.attempts = attempts + 1;
+      await record.save();
+      throw new BadRequestException('Incorrect verification code.');
+    }
+
+    record.isVerified = true;
+    record.verifiedAt = new Date();
+    record.status = 'VERIFIED';
+    await record.save();
+
+    if (!user) {
+      throw new NotFoundException('No active WOMART customer account found for those details.');
+    }
+
+    return performCustomerAccountDeletion(
+      this.userModel,
+      user._id.toString(),
+      dto.reason || 'Web self-service OTP deletion',
+    );
   }
 }
 

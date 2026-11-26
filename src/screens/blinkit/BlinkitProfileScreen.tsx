@@ -11,6 +11,8 @@ import {
   TextInput,
   Share,
   Platform,
+  Linking,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,7 +23,7 @@ import { AppIcon, IconName } from '../../components/common/AppIcon';
 import { useApp } from '../../context/AppContext';
 import { Address, BlinkitProduct, UserProfile } from '../../types';
 import { StorageService } from '../../services/storageService';
-import { api } from '../../services/api';
+import { api, LEGAL_URLS } from '../../services/api';
 import { AddressService } from '../../services/addressService';
 import { AuthService } from '../../services/authService';
 import { SettingsService } from '../../services/settingsService';
@@ -127,6 +129,9 @@ export const BlinkitProfileScreen: React.FC = () => {
   // --- Modal Visibility States ---
   const [isAppearanceModalVisible, setAppearanceModalVisible] = useState(false);
   const [isLogoutModalVisible, setLogoutModalVisible] = useState(false);
+  const [isDeleteAccountModalVisible, setDeleteAccountModalVisible] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [isBirthdayModalVisible, setBirthdayModalVisible] = useState(false);
   const [isAddressBookModalVisible, setAddressBookModalVisible] = useState(false);
   const [isRecipesModalVisible, setRecipesModalVisible] = useState(false);
@@ -371,6 +376,29 @@ export const BlinkitProfileScreen: React.FC = () => {
       Alert.alert('Archive Requested 📦', res.message);
     } catch (e: any) {
       Alert.alert('Error', e.message || 'Failed to request archive');
+    }
+  };
+
+  const handleConfirmDeleteAccount = async () => {
+    if (deleteConfirmText.trim().toUpperCase() !== 'DELETE') {
+      Alert.alert('Confirmation Required', 'Please type DELETE to permanently remove your account.');
+      return;
+    }
+    setIsDeletingAccount(true);
+    try {
+      const res = await AuthService.deleteAccount('Deleted from customer app profile');
+      if (!res?.success) {
+        Alert.alert('Deletion Failed', res?.message || 'Unable to delete account right now. Please try again.');
+        return;
+      }
+      setDeleteAccountModalVisible(false);
+      setDeleteConfirmText('');
+      await logout();
+      showSuccess('Your account and personal data have been permanently deleted.', 'Account Deleted');
+    } catch (e: any) {
+      Alert.alert('Deletion Failed', e?.message || 'Unable to delete account right now. Please try again.');
+    } finally {
+      setIsDeletingAccount(false);
     }
   };
 
@@ -860,6 +888,16 @@ export const BlinkitProfileScreen: React.FC = () => {
               onPress: () => setPrivacyModalVisible(true),
             },
             {
+              icon: 'shield',
+              label: 'Privacy Policy',
+              onPress: () => Linking.openURL(LEGAL_URLS.privacyPolicy),
+            },
+            {
+              icon: 'file-text',
+              label: 'Terms & Conditions',
+              onPress: () => Linking.openURL(LEGAL_URLS.terms),
+            },
+            {
               icon: 'bell',
               label: 'Notification preferences',
               onPress: () => setNotificationsModalVisible(true),
@@ -915,6 +953,15 @@ export const BlinkitProfileScreen: React.FC = () => {
                 } else {
                   showWarning('Unable to reach update server right now. Please try again later.');
                 }
+              },
+            },
+            {
+              icon: 'trash',
+              label: 'Delete account',
+              isDestructive: true,
+              onPress: () => {
+                setDeleteConfirmText('');
+                setDeleteAccountModalVisible(true);
               },
             },
             {
@@ -1708,6 +1755,19 @@ export const BlinkitProfileScreen: React.FC = () => {
               <Ionicons name="download-outline" size={18} color={COLORS.textPrimary} style={{ marginRight: 6 }} />
               <Text style={styles.outlineActionBtnText}>Download Personal Data Archive</Text>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => {
+                setPrivacyModalVisible(false);
+                setDeleteConfirmText('');
+                setDeleteAccountModalVisible(true);
+              }}
+              style={[styles.outlineActionBtn, { marginTop: 10, borderColor: '#FECACA', backgroundColor: '#FEF2F2' }]}
+            >
+              <Ionicons name="person-remove-outline" size={18} color={COLORS.error} style={{ marginRight: 6 }} />
+              <Text style={[styles.outlineActionBtnText, { color: COLORS.error }]}>Delete My Account</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -1905,6 +1965,63 @@ export const BlinkitProfileScreen: React.FC = () => {
             </View>
           </View>
         </TouchableOpacity>
+      </Modal>
+
+      {/* ─────────────────────────────────────────────────────────────
+          20. PERMANENT ACCOUNT DELETION MODAL
+      ───────────────────────────────────────────────────────────── */}
+      <Modal visible={isDeleteAccountModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { paddingVertical: 24, paddingHorizontal: 20 }]}>
+            <View style={{ alignItems: 'center' }}>
+              <View style={styles.logoutIconWrapper}>
+                <AppIcon name="trash" size={26} color={COLORS.error} />
+              </View>
+              <Text style={[TYPOGRAPHY.headingMd, { color: COLORS.textPrimary, marginBottom: 8, textAlign: 'center' }]}>
+                Delete WOMART Account?
+              </Text>
+              <Text style={[TYPOGRAPHY.bodySm, { color: COLORS.textMuted, textAlign: 'center', marginBottom: 14, lineHeight: 20 }]}>
+                This permanently removes your profile, saved addresses, KYC documents, cart, wishlist, and active sessions. Type DELETE below to confirm.
+              </Text>
+            </View>
+
+            <TextInput
+              style={[styles.sheetInput, { marginBottom: 18, textAlign: 'center', fontWeight: '700' }]}
+              placeholder="Type DELETE"
+              placeholderTextColor={COLORS.textMuted}
+              autoCapitalize="characters"
+              value={deleteConfirmText}
+              onChangeText={setDeleteConfirmText}
+              editable={!isDeletingAccount}
+            />
+
+            <View style={{ flexDirection: 'row', gap: 12, width: '100%' }}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                disabled={isDeletingAccount}
+                onPress={() => {
+                  setDeleteAccountModalVisible(false);
+                  setDeleteConfirmText('');
+                }}
+                style={styles.logoutCancelBtn}
+              >
+                <Text style={styles.logoutCancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                disabled={isDeletingAccount}
+                onPress={handleConfirmDeleteAccount}
+                style={[styles.logoutConfirmBtn, isDeletingAccount && { opacity: 0.7 }]}
+              >
+                {isDeletingAccount ? (
+                  <ActivityIndicator size="small" color={COLORS.white} />
+                ) : (
+                  <Text style={styles.logoutConfirmBtnText}>Delete Forever</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
     </View>
   );

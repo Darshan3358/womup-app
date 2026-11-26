@@ -7,7 +7,9 @@ import {
   TouchableOpacity,
   Image,
   Alert,
+  Linking,
 } from 'react-native';
+import { LEGAL_URLS } from '../../services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp } from '../../context/AppContext';
@@ -152,15 +154,15 @@ export const MyProfileScreen: React.FC<MyProfileScreenProps> = ({
             },
             {
               icon: 'document-text-outline',
-              label: 'Shopping Coin Terms & Rules',
-              sub: '1 Coin = ₹1 cash value rules & expiry',
-              onPress: () => Alert.alert('Coin Rules', '• 1 Coin = ₹1.00\n• Coins never expire for active users\n• Redeemable on local shops and grocery orders.'),
+              label: 'Terms & Conditions',
+              sub: 'Usage, orders & Shopping Coin rules',
+              onPress: () => Linking.openURL(LEGAL_URLS.terms),
             },
             {
               icon: 'shield-checkmark-outline',
               label: 'Privacy Policy',
-              sub: 'Safe & secure digital transactions',
-              onPress: () => Alert.alert('Privacy Policy', 'WOMUP is PCI-DSS compliant and RBI licensed.'),
+              sub: 'How we protect and handle your data',
+              onPress: () => Linking.openURL(LEGAL_URLS.privacyPolicy),
             },
           ].map((item, idx) => (
             <TouchableOpacity

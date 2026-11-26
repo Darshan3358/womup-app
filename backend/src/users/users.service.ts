@@ -16,6 +16,7 @@ import { Vendor, VendorDocument } from '../local-shops/schemas/vendor.schema';
 import { assertCrossRoleIdentityUniqueness } from '../common/services/cross-role-validator';
 import { TrackingGateway } from '../tracking/tracking.gateway';
 import { NotificationService } from '../notifications/notification.service';
+import { performCustomerAccountDeletion } from './account-deletion.helper';
 
 export function sanitizePublicDocUrl(url?: string): string {
   if (!url || typeof url !== 'string') return '';
@@ -2572,6 +2573,10 @@ export class UsersService {
       message: `Ticket #${ticket.ticketNumber} updated to ${ticket.status}`,
       ticket,
     };
+  }
+
+  async deleteAccount(userId: string, reason?: string) {
+    return performCustomerAccountDeletion(this.userModel, userId, reason);
   }
 }
 

@@ -28,6 +28,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AdminModule } from './admin/admin.module';
 import { CronModule } from './cron/cron.module';
+import { LegalModule } from './legal/legal.module';
 
 @Module({
   imports: [
@@ -73,6 +74,7 @@ import { CronModule } from './cron/cron.module';
     NotificationsModule,
     AdminModule,
     CronModule,
+    LegalModule,
   ],
   controllers: [AppController],
 })

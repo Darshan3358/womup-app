@@ -4,6 +4,14 @@ import { StorageService } from './storageService';
 export const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_URL || 'https://womup-app-uquz.onrender.com/api/v1';
 
+export const PUBLIC_WEB_BASE_URL = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
+
+export const LEGAL_URLS = {
+  privacyPolicy: `${PUBLIC_WEB_BASE_URL}/privacy-policy`,
+  terms: `${PUBLIC_WEB_BASE_URL}/terms`,
+  deleteAccount: `${PUBLIC_WEB_BASE_URL}/delete-account`,
+};
+
 class ApiClient {
   private token: string | null = null;
   private isRefreshing = false;

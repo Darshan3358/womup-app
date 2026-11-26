@@ -16,6 +16,9 @@ import { SPACING, RADIUS } from '../theme/spacing';
 import { Header } from '../components/common/Header';
 import { useApp } from '../context/AppContext';
 import { normalizeKycStatus } from '../services/kycService';
+import { LEGAL_URLS } from '../services/api';
+import { AuthService } from '../services/authService';
+import { Linking } from 'react-native';
 
 export const S26_AccountScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
@@ -147,6 +150,40 @@ export const S26_AccountScreen: React.FC = () => {
       icon: 'settings-outline',
       color: COLORS.textMuted,
       action: () => Alert.alert('Settings', 'App version: v1.0.0 (Production)'),
+    },
+    {
+      title: 'Privacy Policy & Terms',
+      subtitle: 'Data protection, legal terms & deletion info',
+      icon: 'document-text-outline',
+      color: '#475569',
+      action: () => Linking.openURL(LEGAL_URLS.privacyPolicy),
+    },
+    {
+      title: 'Delete Account',
+      subtitle: 'Permanently delete your WOMART account & data',
+      icon: 'trash-outline',
+      color: COLORS.error,
+      action: () => {
+        Alert.alert(
+          'Delete WOMART Account?',
+          'This permanently deletes your profile, saved addresses, KYC data, cart and sessions.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Delete Forever',
+              style: 'destructive',
+              onPress: async () => {
+                const res = await AuthService.deleteAccount('Deleted from account screen');
+                if (res?.success) {
+                  await logout();
+                } else {
+                  Alert.alert('Error', res?.message || 'Unable to delete account right now.');
+                }
+              },
+            },
+          ]
+        );
+      },
     },
   ];
 

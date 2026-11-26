@@ -178,4 +178,22 @@ export class AuthController {
   async testEmail(@Query('to') to?: string) {
     return this.authService.testSendEmail(to || 'ayushithanki77@gmail.com');
   }
+
+  @Post('delete-account')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify OTP and permanently delete customer account from web deletion portal' })
+  async deleteAccountByOtp(
+    @Body()
+    body: {
+      identifier?: string;
+      email?: string;
+      phoneNumber?: string;
+      phone?: string;
+      otp: string;
+      verificationId?: string;
+      reason?: string;
+    },
+  ) {
+    return this.authService.deleteAccountByOtp(body);
+  }
 }
