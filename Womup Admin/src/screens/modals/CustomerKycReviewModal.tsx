@@ -224,7 +224,6 @@ export const CustomerKycReviewModal: React.FC<CustomerKycReviewModalProps> = ({
                 <View style={styles.grid}>
                   <InfoItem label="First Name" value={customer?.customer_first_name || customer?.name?.split(' ')[0]} />
                   <InfoItem label="Surname" value={customer?.customer_surname || customer?.name?.split(' ').slice(1).join(' ')} />
-                  <InfoItem label="Father / Husband Name" value={customer?.customer_father_husband_name || '—'} />
                   <InfoItem label="Gender" value={customer?.customer_gender || customer?.gender || '—'} />
                   <InfoItem label="Birthdate" value={customer?.customer_birthdate || customer?.birthdate || '—'} />
                   <InfoItem label="Mobile Number" value={customer?.phone || customer?.customer_mobile} />

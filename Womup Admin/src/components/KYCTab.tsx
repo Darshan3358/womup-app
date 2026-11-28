@@ -367,13 +367,6 @@ export const KYCTab: React.FC<KYCTabProps> = ({ customer, onStatusChange }) => {
           </View>
 
           <View style={styles.infoField}>
-            <Text style={styles.fieldLabel}>Father / Husband Name</Text>
-            <Text style={styles.fieldValue}>
-              {kycData?.personalInfo?.fatherHusbandName || customer.fatherHusbandName || (customer as any).fatherName || (customer as any).customer_father_husband_name || 'N/A'}
-            </Text>
-          </View>
-
-          <View style={styles.infoField}>
             <Text style={styles.fieldLabel}>Gender</Text>
             <Text style={styles.fieldValue}>
               {kycData?.personalInfo?.gender || customer.gender || (customer as any).customer_gender || 'Not Specified'}

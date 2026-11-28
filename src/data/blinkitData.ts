@@ -462,38 +462,38 @@ export const BESTSELLER_CATEGORY_CARDS_ROW2: BlinkitCategoryCard[] = [
   },
 ];
 
-// 4-Column Main Category Grid (Grocery) with Authentic Transparent 3D Assets
+// 4-Column Main Category Grid (Grocery) with Authentic Transparent 3D Assets matching Shop by Category
 export const MAIN_CATEGORY_GRID: BlinkitIconTile[] = [
-  { id: 'cat_veg', title: 'Vegetables & Fruits', imageUrl: '', localImage: require('../../assets/cat_1_trans.png'), bgColor: '#ECF5F7' },
-  { id: 'cat_atta', title: 'Atta, Rice & Dal', imageUrl: '', localImage: require('../../assets/cat_4_trans.png'), bgColor: '#FDF7EE' },
-  { id: 'cat_oil', title: 'Oil, Ghee & Masala', imageUrl: '', localImage: require('../../assets/cat_4_trans.png'), bgColor: '#FCF6F0' },
-  { id: 'cat_dairy', title: 'Dairy, Bread & Eggs', imageUrl: '', localImage: require('../../assets/cat_3_trans.png'), bgColor: '#F3F4FC' },
-  { id: 'cat_bakery', title: 'Bakery & Biscuits', imageUrl: '', localImage: require('../../assets/cat_5_trans.png'), bgColor: '#F7F1FC' },
-  { id: 'cat_dryfruits', title: 'Dry Fruits & Cereals', imageUrl: '', localImage: require('../../assets/cat_2_trans.png'), bgColor: '#FCF6F0' },
+  { id: 'cat_veg', title: 'Vegetables & Fruits', imageUrl: '', localImage: require('../../assets/categories/vegetables_fruits.png'), bgColor: '#ECF6F8' },
+  { id: 'cat_atta', title: 'Atta, Rice & Dal', imageUrl: '', localImage: require('../../assets/categories/oil_ghee_masala.png'), bgColor: '#FEF7ED' },
+  { id: 'cat_oil', title: 'Oil, Ghee & Masala', imageUrl: '', localImage: require('../../assets/categories/oil_ghee_masala.png'), bgColor: '#FEF7ED' },
+  { id: 'cat_dairy', title: 'Dairy, Bread & Eggs', imageUrl: '', localImage: require('../../assets/categories/dairy_bread.png'), bgColor: '#F4F4FC' },
+  { id: 'cat_bakery', title: 'Bakery & Biscuits', imageUrl: '', localImage: require('../../assets/categories/bakery_biscuits.png'), bgColor: '#F7F1FB' },
+  { id: 'cat_dryfruits', title: 'Dry Fruits & Cereals', imageUrl: '', localImage: require('../../assets/categories/chips_namkeen.png'), bgColor: '#FBF6F0' },
   { id: 'cat_meat', title: 'Chicken, Meat & Fish', imageUrl: '', localImage: require('../../assets/cat_11_trans.png'), bgColor: '#EAF1FD' },
-  { id: 'cat_kitchen', title: 'Kitchenware & Appliances', imageUrl: '', localImage: require('../../assets/cat_7_trans.png'), bgColor: '#EAF1FD' },
+  { id: 'cat_kitchen', title: 'Kitchenware & Appliances', imageUrl: '', localImage: require('../../assets/categories/household_essentials.png'), bgColor: '#E8F2FB' },
 ];
 
-// Snacks & Drinks Section with Authentic Transparent 3D Assets
+// Snacks & Drinks Section with Authentic Transparent 3D Assets matching Shop by Category
 export const SNACKS_DRINKS_GRID: BlinkitIconTile[] = [
-  { id: 'snk_chips', title: 'Chips & Crisps', imageUrl: '', localImage: require('../../assets/cat_2_trans.png'), bgColor: '#FCF6F0' },
-  { id: 'snk_drinks', title: 'Cold Drinks & Juices', imageUrl: '', localImage: require('../../assets/cat_6_trans.png'), bgColor: '#FCF2F2' },
-  { id: 'snk_chocolates', title: 'Chocolates & Candies', imageUrl: '', localImage: require('../../assets/cat_5_trans.png'), bgColor: '#F7F1FC' },
+  { id: 'snk_chips', title: 'Chips & Crisps', imageUrl: '', localImage: require('../../assets/categories/chips_namkeen.png'), bgColor: '#FBF6F0' },
+  { id: 'snk_drinks', title: 'Cold Drinks & Juices', imageUrl: '', localImage: require('../../assets/categories/drinks_juices.png'), bgColor: '#FBF0F4' },
+  { id: 'snk_chocolates', title: 'Chocolates & Candies', imageUrl: '', localImage: require('../../assets/categories/bakery_biscuits.png'), bgColor: '#F7F1FB' },
   { id: 'snk_noodles', title: 'Noodles & Pasta', imageUrl: '', localImage: require('../../assets/cat_11_trans.png'), bgColor: '#EAF1FD' },
 ];
 
-// Beauty & Personal Care Section with Authentic Transparent 3D Assets
+// Beauty & Personal Care Section with Authentic Transparent 3D Assets matching Shop by Category
 export const BEAUTY_GRID: BlinkitIconTile[] = [
-  { id: 'bt_bath', title: 'Bath & Body', imageUrl: '', localImage: require('../../assets/cat_8_trans.png'), bgColor: '#FAF2FB' },
-  { id: 'bt_hair', title: 'Hair Care', imageUrl: '', localImage: require('../../assets/cat_8_trans.png'), bgColor: '#FAF2FB' },
-  { id: 'bt_skin', title: 'Skin Care', imageUrl: '', localImage: require('../../assets/cat_8_trans.png'), bgColor: '#FAF2FB' },
-  { id: 'bt_baby', title: 'Baby Care', imageUrl: '', localImage: require('../../assets/cat_9_trans.png'), bgColor: '#F5F0FC' },
+  { id: 'bt_bath', title: 'Bath & Body', imageUrl: '', localImage: require('../../assets/categories/personal_care.png'), bgColor: '#F4EFFB' },
+  { id: 'bt_hair', title: 'Hair Care', imageUrl: '', localImage: require('../../assets/categories/personal_care.png'), bgColor: '#F4EFFB' },
+  { id: 'bt_skin', title: 'Skin Care', imageUrl: '', localImage: require('../../assets/categories/personal_care.png'), bgColor: '#F4EFFB' },
+  { id: 'bt_baby', title: 'Baby Care', imageUrl: '', localImage: require('../../assets/categories/baby_care.png'), bgColor: '#F4F0FE' },
 ];
 
-// Household Essentials Section with Authentic Transparent 3D Assets
+// Household Essentials Section with Authentic Transparent 3D Assets matching Shop by Category
 export const HOUSEHOLD_GRID: BlinkitIconTile[] = [
-  { id: 'hh_home', title: 'Household Essentials', imageUrl: '', localImage: require('../../assets/cat_7_trans.png'), bgColor: '#EAF1FD' },
-  { id: 'hh_clean', title: 'Personal Care', imageUrl: '', localImage: require('../../assets/cat_8_trans.png'), bgColor: '#FAF2FB' },
+  { id: 'hh_home', title: 'Household Essentials', imageUrl: '', localImage: require('../../assets/categories/household_essentials.png'), bgColor: '#E8F2FB' },
+  { id: 'hh_clean', title: 'Personal Care', imageUrl: '', localImage: require('../../assets/categories/personal_care.png'), bgColor: '#F4EFFB' },
   { id: 'hh_pet', title: 'Pet Care', imageUrl: '', localImage: require('../../assets/cat_10_trans.png'), bgColor: '#EFF9F6' },
   { id: 'hh_frozen', title: 'Frozen Foods', imageUrl: '', localImage: require('../../assets/cat_11_trans.png'), bgColor: '#EAF1FD' },
 ];

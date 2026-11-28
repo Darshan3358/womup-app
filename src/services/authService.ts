@@ -318,6 +318,7 @@ export const AuthService = {
     aadhaarOrPayload: string | {
       aadhaarNumber: string;
       fullNameAsPerAadhaar?: string;
+      birthDate?: string;
       frontImage?: string;
       backImage?: string;
       bankName?: string;
@@ -350,6 +351,7 @@ export const AuthService = {
       payload = {
         aadhaarNumber: aadhaarOrPayload.aadhaarNumber,
         fullNameAsPerAadhaar: aadhaarOrPayload.fullNameAsPerAadhaar,
+        birthDate: aadhaarOrPayload.birthDate,
         customer_image_aadhar_front: aadhaarOrPayload.frontImage,
         customer_image_aadhar_back: aadhaarOrPayload.backImage,
         aadhaarFrontImage: aadhaarOrPayload.frontImage,

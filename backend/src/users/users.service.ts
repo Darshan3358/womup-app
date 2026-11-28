@@ -266,6 +266,9 @@ export class UsersService {
     dto: {
       aadhaarNumber?: string;
       fullNameAsPerAadhaar?: string;
+      birthDate?: string;
+      birthdate?: string;
+      birthday?: string;
       customer_image_aadhar_front?: string;
       customer_image_aadhar_back?: string;
       aadhaarFrontImage?: string;
@@ -307,6 +310,15 @@ export class UsersService {
 
     if (dto.fullNameAsPerAadhaar && dto.fullNameAsPerAadhaar.trim()) {
       user.fullNameAsPerAadhaar = dto.fullNameAsPerAadhaar.trim();
+    }
+
+    const cleanDob = (dto.birthDate || dto.birthdate || dto.birthday || '').trim();
+    if (cleanDob) {
+      user.birthDate = cleanDob;
+      (user as any).customer_birthdate = cleanDob;
+      if (!user.birthday) {
+        user.birthday = cleanDob;
+      }
     }
 
     if (dto.customer_image_aadhar_front || dto.aadhaarFrontImage) {
@@ -2214,6 +2226,7 @@ export class UsersService {
         submittedAt: user.kycSubmittedAt,
         rejectionReason: user.kycRejectReason || '',
         fullNameAsPerAadhaar: user.fullNameAsPerAadhaar || user.name || '',
+        birthDate: user.birthDate || user.birthday || '',
         aadhaarNumber: user.aadhaarNumber
           ? `XXXX XXXX ${user.aadhaarNumber.slice(-4)}`
           : '',

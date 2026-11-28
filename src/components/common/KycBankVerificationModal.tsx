@@ -50,10 +50,16 @@ export const KycBankVerificationModal: React.FC<KycBankVerificationModalProps> =
 
   // Form Fields
   const [fullName, setFullName] = useState('');
+  const [birthDate, setBirthDate] = useState('');
+  const [showDobPicker, setShowDobPicker] = useState(false);
+  const [dobDay, setDobDay] = useState('01');
+  const [dobMonth, setDobMonth] = useState('January');
+  const [dobYear, setDobYear] = useState('2000');
   const [aadhaarNumber, setAadhaarNumber] = useState('');
   const [frontImageUrl, setFrontImageUrl] = useState('');
   const [backImageUrl, setBackImageUrl] = useState('');
   const [bankName, setBankName] = useState('');
+  const [branchName, setBranchName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [ifscCode, setIfscCode] = useState('');
   const [accountHolderName, setAccountHolderName] = useState('');
@@ -89,10 +95,12 @@ export const KycBankVerificationModal: React.FC<KycBankVerificationModalProps> =
       '';
 
     setFullName(user.fullNameAsPerAadhaar || user.fullName || '');
+    setBirthDate((user as any).birthDate || (user as any).birthdate || user.birthday || '');
     setAadhaarNumber(formattedAadhaar);
     setFrontImageUrl(localFront);
     setBackImageUrl(localBack);
     setBankName(user.bankName || '');
+    setBranchName((user as any).branchName || '');
     setAccountNumber(user.accountNumber || (user as any).bankAccountNo || '');
     setIfscCode(user.ifscCode || '');
     setAccountHolderName(user.accountHolderName || user.fullNameAsPerAadhaar || user.fullName || '');
@@ -120,6 +128,7 @@ export const KycBankVerificationModal: React.FC<KycBankVerificationModalProps> =
         const norm = normalizeKycStatus(d.kycStatus ?? (d as any).customerKycStatus, d);
 
         if (d.fullNameAsPerAadhaar) setFullName(d.fullNameAsPerAadhaar);
+        if ((d as any).birthDate || (d as any).birthdate) setBirthDate((d as any).birthDate || (d as any).birthdate || '');
         if (d.rawAadhaarNumber) {
           setAadhaarNumber(
             d.rawAadhaarNumber.replace(/\D/g, '').slice(0, 12).match(/.{1,4}/g)?.join(' ') ||
@@ -129,6 +138,9 @@ export const KycBankVerificationModal: React.FC<KycBankVerificationModalProps> =
         if (serverFront) setFrontImageUrl(serverFront);
         if (serverBack) setBackImageUrl(serverBack);
         if (d.bankDetails?.bankName || d.bankName) setBankName(d.bankDetails?.bankName || d.bankName || '');
+        if (d.bankDetails?.branchName || (d as any).branchName) {
+          setBranchName(d.bankDetails?.branchName || (d as any).branchName || '');
+        }
         if (d.bankDetails?.rawAccountNumber || d.accountNumber) {
           setAccountNumber(d.bankDetails?.rawAccountNumber || d.accountNumber || '');
         }
@@ -176,8 +188,16 @@ export const KycBankVerificationModal: React.FC<KycBankVerificationModalProps> =
       setErrorMsg('Please enter a valid 12-digit Aadhaar number');
       return;
     }
+    if (!birthDate.trim()) {
+      setErrorMsg('Please select your Date of Birth');
+      return;
+    }
     if (!bankName.trim()) {
       setErrorMsg('Please enter Bank Name');
+      return;
+    }
+    if (!branchName.trim()) {
+      setErrorMsg('Please enter Bank Branch Name');
       return;
     }
     if (!accountNumber.trim() || accountNumber.trim().length < 6) {
@@ -199,9 +219,11 @@ export const KycBankVerificationModal: React.FC<KycBankVerificationModalProps> =
       const payload = {
         aadhaarNumber: rawAadhaar,
         fullNameAsPerAadhaar: (fullName.trim() || user.fullName || 'Customer'),
+        birthDate: birthDate.trim(),
         frontImage: frontImageUrl,
         backImage: backImageUrl,
         bankName: bankName.trim(),
+        branchName: branchName.trim(),
         accountNumber: accountNumber.trim(),
         ifscCode: cleanIfsc,
         accountHolderName: accountHolderName.trim(),
@@ -218,6 +240,8 @@ export const KycBankVerificationModal: React.FC<KycBankVerificationModalProps> =
           customerIsVerify: 2,
           aadhaarVerified: false,
           fullNameAsPerAadhaar: fullName.trim() || user.fullName,
+          birthDate: birthDate.trim(),
+          birthdate: birthDate.trim(),
           aadhaarNumber: rawAadhaar,
           aadharNumber: rawAadhaar,
           customer_image_aadhar_front: frontImageUrl,
@@ -227,6 +251,7 @@ export const KycBankVerificationModal: React.FC<KycBankVerificationModalProps> =
           aadhaarFrontImage: frontImageUrl,
           aadhaarBackImage: backImageUrl,
           bankName: bankName.trim(),
+          branchName: branchName.trim(),
           accountNumber: accountNumber.trim(),
           bankAccountNo: accountNumber.trim(),
           ifscCode: cleanIfsc,
@@ -390,6 +415,37 @@ export const KycBankVerificationModal: React.FC<KycBankVerificationModalProps> =
                   </View>
                 </View>
 
+                {/* Date of Birth (Selectable Only) */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Date of Birth *</Text>
+                  <TouchableOpacity
+                    style={styles.inputRow}
+                    activeOpacity={0.75}
+                    onPress={() => {
+                      if (birthDate) {
+                        const parts = birthDate.split(' ');
+                        if (parts.length === 3) {
+                          setDobDay(parts[0]);
+                          setDobMonth(parts[1]);
+                          setDobYear(parts[2]);
+                        }
+                      }
+                      setShowDobPicker(true);
+                    }}
+                  >
+                    <Ionicons name="calendar-outline" size={18} color={COLORS.textMuted} style={styles.inputIcon} />
+                    <Text
+                      style={[
+                        styles.input,
+                        { color: birthDate ? COLORS.navy : COLORS.secondaryText },
+                      ]}
+                    >
+                      {birthDate || 'Tap to select Date of Birth'}
+                    </Text>
+                    <Ionicons name="chevron-down" size={18} color={COLORS.textMuted} />
+                  </TouchableOpacity>
+                </View>
+
                 {/* 12-Digit Aadhaar Input */}
                 <View style={styles.inputGroup}>
                   <Text style={styles.label}>12-Digit Aadhaar Number *</Text>
@@ -469,6 +525,16 @@ export const KycBankVerificationModal: React.FC<KycBankVerificationModalProps> =
                     <Ionicons name="person" size={16} color="#4F46E5" />
                     <Text style={styles.viewFieldValue}>
                       {fullName || user.fullNameAsPerAadhaar || user.fullName || 'Not provided'}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.viewFieldBox}>
+                  <Text style={styles.viewFieldLabel}>DATE OF BIRTH</Text>
+                  <View style={styles.viewFieldValueRow}>
+                    <Ionicons name="calendar" size={16} color="#4F46E5" />
+                    <Text style={styles.viewFieldValue}>
+                      {birthDate || (user as any).birthDate || (user as any).birthdate || user.birthday || 'Not provided'}
                     </Text>
                   </View>
                 </View>
@@ -574,6 +640,21 @@ export const KycBankVerificationModal: React.FC<KycBankVerificationModalProps> =
                   </View>
                 </View>
 
+                {/* Branch Name */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Branch Name *</Text>
+                  <View style={styles.inputRow}>
+                    <Ionicons name="git-branch-outline" size={18} color={COLORS.textMuted} style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="e.g. Sarkhej Road, SG Highway, Navrangpura..."
+                      placeholderTextColor={COLORS.secondaryText}
+                      value={branchName}
+                      onChangeText={setBranchName}
+                    />
+                  </View>
+                </View>
+
                 {/* Account Number */}
                 <View style={styles.inputGroup}>
                   <Text style={styles.label}>Account Number *</Text>
@@ -655,6 +736,14 @@ export const KycBankVerificationModal: React.FC<KycBankVerificationModalProps> =
                 </View>
 
                 <View style={styles.viewFieldBox}>
+                  <Text style={styles.viewFieldLabel}>BRANCH NAME</Text>
+                  <View style={styles.viewFieldValueRow}>
+                    <Ionicons name="git-branch" size={16} color="#059669" />
+                    <Text style={styles.viewFieldValue}>{branchName || (user as any).branchName || 'Not entered yet'}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.viewFieldBox}>
                   <Text style={styles.viewFieldLabel}>ACCOUNT NUMBER</Text>
                   <View style={styles.viewFieldValueRow}>
                     <Ionicons name="wallet" size={16} color="#059669" />
@@ -705,6 +794,95 @@ export const KycBankVerificationModal: React.FC<KycBankVerificationModalProps> =
           </ScrollView>
         </View>
       </View>
+
+      {/* Selectable-only Date of Birth Picker Modal */}
+      <Modal
+        visible={showDobPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDobPicker(false)}
+      >
+        <View style={styles.dobBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowDobPicker(false)} />
+          <View style={styles.dobCard}>
+            <View style={styles.dobHeader}>
+              <Text style={styles.dobTitle}>Select Date of Birth</Text>
+              <TouchableOpacity onPress={() => setShowDobPicker(false)}>
+                <Ionicons name="close" size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.dobColumns}>
+              {/* Day */}
+              <View style={styles.dobCol}>
+                <Text style={styles.dobColLabel}>Day</Text>
+                <ScrollView style={styles.dobScroll} showsVerticalScrollIndicator={false}>
+                  {Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0')).map((d) => (
+                    <TouchableOpacity
+                      key={d}
+                      style={[styles.dobOption, dobDay === d && styles.dobOptionActive]}
+                      onPress={() => setDobDay(d)}
+                    >
+                      <Text style={[styles.dobOptionText, dobDay === d && styles.dobOptionTextActive]}>
+                        {d}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              {/* Month */}
+              <View style={[styles.dobCol, { flex: 1.5 }]}>
+                <Text style={styles.dobColLabel}>Month</Text>
+                <ScrollView style={styles.dobScroll} showsVerticalScrollIndicator={false}>
+                  {[
+                    'January', 'February', 'March', 'April', 'May', 'June',
+                    'July', 'August', 'September', 'October', 'November', 'December',
+                  ].map((m) => (
+                    <TouchableOpacity
+                      key={m}
+                      style={[styles.dobOption, dobMonth === m && styles.dobOptionActive]}
+                      onPress={() => setDobMonth(m)}
+                    >
+                      <Text style={[styles.dobOptionText, dobMonth === m && styles.dobOptionTextActive]}>
+                        {m}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              {/* Year */}
+              <View style={styles.dobCol}>
+                <Text style={styles.dobColLabel}>Year</Text>
+                <ScrollView style={styles.dobScroll} showsVerticalScrollIndicator={false}>
+                  {Array.from({ length: 75 }, (_, i) => String(new Date().getFullYear() - 14 - i)).map((y) => (
+                    <TouchableOpacity
+                      key={y}
+                      style={[styles.dobOption, dobYear === y && styles.dobOptionActive]}
+                      onPress={() => setDobYear(y)}
+                    >
+                      <Text style={[styles.dobOptionText, dobYear === y && styles.dobOptionTextActive]}>
+                        {y}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.dobConfirmBtn}
+              onPress={() => {
+                setBirthDate(`${dobDay} ${dobMonth} ${dobYear}`);
+                setShowDobPicker(false);
+              }}
+            >
+              <Text style={styles.dobConfirmText}>Confirm: {dobDay} {dobMonth} {dobYear}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </Modal>
   );
 };
@@ -955,5 +1133,80 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#4F46E5',
+  },
+  dobBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  dobCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 18,
+  },
+  dobHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  dobTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  dobColumns: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  dobCol: {
+    flex: 1,
+  },
+  dobColLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+  },
+  dobScroll: {
+    height: 190,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+  },
+  dobOption: {
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  dobOptionActive: {
+    backgroundColor: '#EEF2FF',
+  },
+  dobOptionText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  dobOptionTextActive: {
+    color: '#4F46E5',
+    fontWeight: '800',
+  },
+  dobConfirmBtn: {
+    backgroundColor: '#4F46E5',
+    borderRadius: 12,
+    paddingVertical: 13,
+    alignItems: 'center',
+  },
+  dobConfirmText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
